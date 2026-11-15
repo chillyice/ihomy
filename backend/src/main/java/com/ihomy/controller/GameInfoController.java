@@ -226,4 +226,36 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.mahjongReward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏获胜奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "斗地主获胜奖励")
+    @PostMapping("/doudizhu/reward")
+    public Result<Map<String, Object>> doudizhuReward() {
+        LoginUser user = current();
+        return Result.success(gameService.doudizhuReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏获胜奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "掼蛋获胜奖励")
+    @PostMapping("/guandan/reward")
+    public Result<Map<String, Object>> guandanReward() {
+        LoginUser user = current();
+        return Result.success(gameService.guandanReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏获胜奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "保皇获胜奖励")
+    @PostMapping("/baohuang/reward")
+    public Result<Map<String, Object>> baohuangReward() {
+        LoginUser user = current();
+        return Result.success(gameService.baohuangReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏获胜奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "够级获胜奖励")
+    @PostMapping("/gouji/reward")
+    public Result<Map<String, Object>> goujiReward() {
+        LoginUser user = current();
+        return Result.success(gameService.goujiReward(user.getUserId(), user.getFamilyId()));
+    }
 }

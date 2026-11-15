@@ -2084,6 +2084,92 @@ html.dark .el-badge__content {
   transform: translateY(4px) scale(0.97);
 }
 
+/* 对抗牌桌(斗地主/掼蛋/保皇/够级):FightTable 外壳 + 统一的封面/结算浮层。
+   四个页面共用同一套外壳与浮层样式,细则不要各自复制。 */
+.fight-card {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.fight-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(8, 24, 15, 0.72);
+  backdrop-filter: blur(10px) saturate(1.05);
+}
+.fight-overlay-card {
+  display: flex;
+  width: min(92%, 430px);
+  max-height: 100%;
+  overflow-y: auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+.fight-overlay-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+.fight-overlay-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+.fight-rules {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+.fight-overlay-meta {
+  font-size: 13px;
+  font-weight: 700;
+}
+.fight-overlay-reward {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e0933a;
+}
+.fight-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.fight-bid-log {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.86;
+}
+.fight-bid-item {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.fight-note {
+  font-size: 12px;
+  opacity: 0.86;
+}
+
 /* 列表逐条进场:模板里给 --i(序号)即可,超过 12 条不再继续加延迟 */
 @keyframes rise-in {
   from {

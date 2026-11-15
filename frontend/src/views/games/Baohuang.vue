@@ -1,0 +1,359 @@
+<!-- 保皇:单机五人局(玩家 + 四位电脑)。皇帝牌/侍卫牌、同点套牌与王挂靠的比较、电脑选牌都在
+     utils/games/baohuang.js(纯函数,单测覆盖);本页只做发牌、身份公布、回合驱动与结算展示。
+     我方(保皇派或革命党)赢下对局走统一 H5 奖励通道(按天限次)。 -->
+<template>
+  <div ref="pageEl" class="page game-page game-page-readable">
+    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
+    </PageToolbar>
+
+    <div ref="gameCardEl" class="fight-card">
+      <FightTable
+        :seats="seatViews"
+        :hand="myHand"
+        :selected="selected"
+        :last-play="lastPlayView"
+        :status-text="statusText"
+        :info-chips="infoChips"
+        :my-name="$t('games.fight.me')"
+        :my-role-label="myRoleLabel"
+        :my-tone="myTone"
+        :my-note="myNote"
+        :sort-value="bhValue"
+        @select="toggleCard"
+      >
+        <template #actions>
+          <template v-if="phase === 'playing'">
+            <el-button v-if="canReveal" size="small" round @click="revealGuard">
+              {{ $t('games.baohuang.revealGuard') }}
+            </el-button>
+            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passTurn()">
+              {{ $t('games.fight.pass') }}
+            </el-button>
+            <el-button size="small" round :disabled="!myTurn" @click="hint">{{ $t('games.fight.hint') }}</el-button>
+            <el-button type="primary" size="small" round :disabled="!canPlay" @click="playSelected">
+              {{ $t('games.fight.play') }}
+            </el-button>
+          </template>
+        </template>
+
+        <template #overlay>
+          <Transition name="game-overlay">
+            <div v-if="phase === 'idle' || phase === 'ended'" class="fight-overlay">
+              <div class="fight-overlay-card game-overlay-card">
+                <div class="fight-overlay-title">
+                  {{ phase === 'idle' ? $t('games.baohuang.title') : result === 'win' ? $t('games.fight.win') : $t('games.fight.lose') }}
+                </div>
+                <div v-if="phase === 'idle'" class="fight-overlay-desc">{{ $t('games.baohuang.desc') }}</div>
+                <ul v-if="phase === 'idle'" class="fight-rules">
+                  <li>{{ $t('games.baohuang.rules1') }}</li>
+                  <li>{{ $t('games.baohuang.rules2') }}</li>
+                  <li>{{ $t('games.baohuang.rules3') }}</li>
+                  <li>{{ $t('games.baohuang.rules4') }}</li>
+                </ul>
+                <div v-else class="fight-overlay-meta">{{ resultMeta }}</div>
+                <div v-if="rewardMsg" class="fight-overlay-reward">{{ rewardMsg }}</div>
+                <div class="fight-overlay-actions">
+                  <el-button type="primary" size="small" round @click="startGame">
+                    {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
+                  </el-button>
+                  <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
+                    {{ $t('games.back') }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </template>
+      </FightTable>
+    </div>
+  </div>
+</template>
+
+<script setup>
+// 身份:皇帝(公开)/ 侍卫(默认暗保,可明保)/ 革命党。暗保时电脑革命党把侍卫当自己人,
+// 只有明保或自己就是侍卫时才认得出来,这样隐身护主的味道才在。
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import FightTable from '@/components/games/FightTable.vue'
+import { useGameView } from '@/composables/useGameView'
+import { gameApi } from '@/api'
+import { bhAiChoose, bhBeats, bhCombo, bhDeal, bhPlays, bhRankText, bhRoles, bhStrength, bhValue } from '@/utils/games/baohuang'
+
+const SEATS = 5
+const AI_DELAY = 720
+
+const router = useRouter()
+const { t } = useI18n()
+
+const pageEl = ref(null)
+const gameCardEl = ref(null)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({
+  page: pageEl,
+  stage: gameCardEl,
+  fit: false,
+})
+const goBack = () => router.push('/games')
+
+const phase = ref('idle') // idle | playing | ended
+const hands = ref([[], [], [], [], []])
+const roles = ref({ emperor: -1, guard: -1, solo: false, royal: [] })
+const guardRevealed = ref(false)
+const turn = ref(0)
+const last = ref(null) // { seat, combo }
+const passCount = ref(0)
+const selected = ref([])
+const finishOrder = ref([])
+const result = ref('')
+const rewardMsg = ref('')
+// 电脑连续「让牌」次数:队友的颜色牌不抢,但一直让会让某个革命党整局一张不出、看着别人打完,
+// 所以连让两次之后就当自己也得推牌(见 scheduleTick 的 lastIsAlly 判定)。
+const passStreak = ref([0, 0, 0, 0, 0])
+
+let session = 0
+let aiTimer = null
+
+const myHand = computed(() => hands.value[0])
+const myTurn = computed(() => phase.value === 'playing' && turn.value === 0)
+const lastCombo = computed(() => last.value?.combo || null)
+const selectedCards = computed(() => {
+  const ids = new Set(selected.value)
+  return myHand.value.filter((card) => ids.has(card.id))
+})
+const selection = computed(() => (selected.value.length ? bhCombo(selectedCards.value) : null))
+const canPlay = computed(() => myTurn.value && !!selection.value && bhBeats(selection.value, lastCombo.value))
+const activeCount = computed(() => hands.value.filter((hand) => hand.length).length)
+const isRoyalSeat = (seat) => roles.value.royal.includes(seat)
+const myRole = computed(() => {
+  if (roles.value.emperor === 0) return 'emperor'
+  if (roles.value.guard === 0) return 'guard'
+  return 'rebel'
+})
+const canReveal = computed(() => myRole.value === 'guard' && !roles.value.solo && !guardRevealed.value)
+
+const seatName = (seat) => (seat === 0 ? t('games.fight.me') : t('games.fight.aiName', { n: seat }))
+
+const roleOf = (seat) => {
+  if (seat === roles.value.emperor) return t('games.baohuang.emperor')
+  if (seat === roles.value.guard && (guardRevealed.value || seat === 0)) return t('games.baohuang.guard')
+  if (seat === 0) return t('games.baohuang.rebel')
+  return ''
+}
+const toneOf = (seat) => {
+  if (seat === roles.value.emperor) return 'emperor'
+  if (seat === roles.value.guard) return 'royal'
+  return 'rebel'
+}
+const myRoleLabel = computed(() => roleOf(0))
+const myTone = computed(() => (roles.value.emperor < 0 ? '' : toneOf(0)))
+
+const seatViews = computed(() =>
+  hands.value.map((hand, seat) => ({
+    name: seatName(seat),
+    count: hand.length,
+    active: phase.value === 'playing' && turn.value === seat,
+    finished: finishOrder.value.includes(seat),
+    roleLabel: roleOf(seat),
+    tone: toneOf(seat),
+    finishedLabel: finishOrder.value.includes(seat) ? t('games.fight.out') : '',
+  })),
+)
+
+const comboLabel = (combo) => {
+  if (!combo) return ''
+  if (!combo.baseRank) return t('games.baohuang.jokerOnly', { n: combo.len })
+  return t('games.baohuang.sameRank', { rank: bhRankText(combo.baseRank), n: combo.len })
+}
+
+const lastPlayView = computed(() => {
+  if (!last.value) return null
+  return {
+    seat: last.value.seat,
+    name: seatName(last.value.seat),
+    cards: last.value.combo.cards,
+    label: comboLabel(last.value.combo),
+  }
+})
+
+const infoChips = computed(() => {
+  const chips = []
+  if (roles.value.emperor >= 0) {
+    chips.push({
+      key: 'emperor',
+      label: t('games.baohuang.emperor'),
+      value: seatName(roles.value.emperor),
+    })
+  }
+  if (roles.value.solo) chips.push({ key: 'solo', label: t('games.baohuang.solo'), value: '' })
+  if (guardRevealed.value && !roles.value.solo) {
+    chips.push({ key: 'guard', label: t('games.baohuang.guard'), value: seatName(roles.value.guard) })
+  }
+  return chips
+})
+
+const statusText = computed(() => {
+  if (phase.value === 'idle') return t('games.baohuang.desc')
+  if (phase.value === 'ended') return ''
+  if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.baohuang.yourLead')
+  return t('games.fight.thinking', { name: seatName(turn.value) })
+})
+
+const myNote = computed(() => {
+  if (phase.value !== 'playing' || !myTurn.value || !selected.value.length) return ''
+  if (!selection.value) return t('games.fight.badCards')
+  if (!bhBeats(selection.value, lastCombo.value)) return t('games.fight.notBigEnough')
+  return comboLabel(selection.value)
+})
+
+const resultMeta = computed(() => {
+  const emperorRank = finishOrder.value.indexOf(roles.value.emperor) + 1
+  const royalWin = emperorRank >= 1 && emperorRank <= 2
+  return royalWin ? t('games.baohuang.royalWin') : t('games.baohuang.rebelWin')
+})
+
+const clearTimer = () => {
+  clearTimeout(aiTimer)
+  aiTimer = null
+}
+
+function startGame() {
+  session += 1
+  clearTimer()
+  const dealt = bhDeal()
+  hands.value = dealt
+  const found = bhRoles(dealt)
+  roles.value = found
+  // 电脑当侍卫时按手牌强度决定明保;玩家自己当侍卫时默认暗保,可随时点「明保」
+  guardRevealed.value = found.solo || (found.guard !== 0 && found.guard >= 0 && bhStrength(dealt[found.guard]) >= 15)
+  turn.value = found.emperor >= 0 ? found.emperor : 0
+  last.value = null
+  passCount.value = 0
+  selected.value = []
+  finishOrder.value = []
+  result.value = ''
+  rewardMsg.value = ''
+  passStreak.value = [0, 0, 0, 0, 0]
+  phase.value = 'playing'
+  scheduleTick()
+}
+
+function allyOf(a, b) {
+  if (a === b) return false
+  if (isRoyalSeat(a)) return isRoyalSeat(b)
+  if (b === roles.value.emperor) return false
+  if (isRoyalSeat(b) && guardRevealed.value) return false
+  return true
+}
+
+function scheduleTick() {
+  clearTimer()
+  if (phase.value !== 'playing' || turn.value === 0) return
+  const mySession = session
+  const seat = turn.value
+  aiTimer = setTimeout(() => {
+    if (mySession !== session || phase.value !== 'playing' || turn.value !== seat) return
+    const opponents = Array.from({ length: SEATS }, (_, i) => i).filter((i) => i !== seat && !allyOf(seat, i))
+    const opponentMin = opponents.length ? Math.min(...opponents.map((i) => hands.value[i].length)) : 99
+    const pick = bhAiChoose({
+      hand: hands.value[seat],
+      last: lastCombo.value,
+      // 队友刚出的牌不抢;但连让两次之后要自己推牌,否则一家会整局不出牌
+      lastIsAlly: last.value ? allyOf(seat, last.value.seat) && passStreak.value[seat] < 2 : false,
+      opponentMin,
+    })
+    if (pick) commitPlay(seat, pick)
+    else passTurn(seat)
+  }, AI_DELAY)
+}
+
+function commitPlay(seat, combo) {
+  const ids = new Set(combo.cards.map((card) => card.id))
+  hands.value = hands.value.map((hand, i) => (i === seat ? hand.filter((card) => !ids.has(card.id)) : hand))
+  last.value = { seat, combo }
+  passCount.value = 0
+  passStreak.value = passStreak.value.map((n, i) => (i === seat ? 0 : n))
+  selected.value = []
+  if (!hands.value[seat].length) {
+    finishOrder.value = [...finishOrder.value, seat]
+    const rebelsDone = Array.from({ length: SEATS }, (_, i) => i).filter((i) => !isRoyalSeat(i) && finishOrder.value.includes(i)).length
+    const emperorDone = finishOrder.value.includes(roles.value.emperor)
+    if (emperorDone || rebelsDone >= SEATS - roles.value.royal.length) {
+      finishGame()
+      return
+    }
+  }
+  advanceTurn()
+}
+
+function advanceTurn() {
+  if (phase.value !== 'playing') return
+  for (let i = 1; i <= SEATS; i += 1) {
+    const seat = (turn.value + i) % SEATS
+    if (hands.value[seat].length) {
+      turn.value = seat
+      break
+    }
+  }
+  scheduleTick()
+}
+
+function passTurn(seat = turn.value) {
+  if (phase.value !== 'playing' || !last.value || turn.value !== seat) return
+  if (last.value.seat === seat) return
+  passCount.value += 1
+  passStreak.value = passStreak.value.map((n, i) => (i === seat ? n + 1 : n))
+  if (passCount.value >= activeCount.value - 1) {
+    last.value = null
+    passCount.value = 0
+  }
+  advanceTurn()
+}
+
+function finishGame() {
+  phase.value = 'ended'
+  clearTimer()
+  const emperorRank = finishOrder.value.indexOf(roles.value.emperor) + 1
+  const royalWin = emperorRank >= 1 && emperorRank <= 2
+  const myWin = isRoyalSeat(0) ? royalWin : !royalWin
+  result.value = myWin ? 'win' : 'lose'
+  if (myWin) grantReward()
+}
+
+function revealGuard() {
+  if (!canReveal.value) return
+  guardRevealed.value = true
+}
+
+async function grantReward() {
+  try {
+    const res = await gameApi.baohuangReward()
+    rewardMsg.value = res && res.awarded > 0 ? t('games.rewarded', { n: res.awarded }) : t('games.rewardCapped')
+  } catch (e) {
+    rewardMsg.value = t('games.rewardFailed')
+  }
+}
+
+function toggleCard(card) {
+  if (!myTurn.value) return
+  selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
+}
+
+function playSelected() {
+  if (!canPlay.value) return
+  commitPlay(0, selection.value)
+}
+
+function hint() {
+  if (!myTurn.value) return
+  const plays = bhPlays(myHand.value, lastCombo.value)
+  selected.value = plays.length ? plays[0].cards.map((card) => card.id) : []
+}
+
+onBeforeUnmount(() => {
+  session += 1
+  clearTimer()
+})
+</script>

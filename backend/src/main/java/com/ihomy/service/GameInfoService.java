@@ -330,6 +330,38 @@ public class GameInfoService {
                 GameConst.H5_GAME_DAILY_LIMIT, "麻将胡牌");
     }
 
+    /**
+     * 斗地主获胜奖励(单机对电脑赢一局上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> doudizhuReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_DOUDIZHU, "doudizhu",
+                GameConst.H5_GAME_DAILY_LIMIT, "斗地主获胜");
+    }
+
+    /**
+     * 掼蛋获胜奖励(我方拿下这一局上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> guandanReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_GUANDAN, "guandan",
+                GameConst.H5_GAME_DAILY_LIMIT, "掼蛋获胜");
+    }
+
+    /**
+     * 保皇获胜奖励(我方赢一局上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> baohuangReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_BAOHUANG, "baohuang",
+                GameConst.H5_GAME_DAILY_LIMIT, "保皇获胜");
+    }
+
+    /**
+     * 够级获胜奖励(我方积分领先上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> goujiReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_GOUJI, "gouji",
+                GameConst.H5_GAME_DAILY_LIMIT, "够级获胜");
+    }
+
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();

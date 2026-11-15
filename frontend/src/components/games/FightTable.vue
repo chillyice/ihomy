@@ -1,0 +1,524 @@
+<!-- 对抗牌桌公共外壳:座位环绕、中央出牌区、底部手牌与操作栏。
+     规则全部由各玩法页面提供,这里只做布局、选牌与操作按钮的展示。 -->
+<template>
+  <div class="ft-root game-surface" @contextmenu.prevent @dblclick.prevent>
+    <div class="ft-table">
+      <div
+        v-for="s in seatViews"
+        :key="s.seat"
+        class="ft-seat"
+        :class="[`pos-${s.rel}`, { active: s.active, finished: s.finished, me: s.isMe }]"
+        :style="{ left: s.x, top: s.y }"
+      >
+        <div class="ft-avatar">
+          <img v-if="s.avatar" :src="s.avatar" :alt="s.name" />
+          <el-icon v-else :size="20"><UserFilled /></el-icon>
+          <span v-if="s.active" class="ft-turn-dot" aria-hidden="true" />
+        </div>
+        <div class="ft-seat-main">
+          <div class="ft-seat-name" :title="s.name">{{ s.name }}</div>
+          <div v-if="s.roleLabel" class="ft-role" :class="s.tone">{{ s.roleLabel }}</div>
+          <div class="ft-seat-count">{{ $t('games.fight.cardsLeft', { n: s.count }) }}</div>
+        </div>
+        <div v-if="s.finishedLabel" class="ft-finish">{{ s.finishedLabel }}</div>
+        <div v-else-if="s.bubble" class="ft-seat-bubble">{{ s.bubble }}</div>
+      </div>
+
+      <div class="ft-center">
+        <div v-if="infoChips?.length" class="ft-chips">
+          <span v-for="chip in infoChips" :key="chip.key" class="ft-chip">
+            <b>{{ chip.label }}</b>
+            <span v-if="chip.value">{{ chip.value }}</span>
+          </span>
+        </div>
+
+        <div v-if="lastPlay" class="ft-last" role="region" :aria-label="$t('games.fight.lastPlay')">
+          <div class="ft-last-head">
+            <span class="ft-last-name">{{ lastPlay.name }}</span>
+            <span v-if="lastPlay.label" class="ft-last-combo">{{ lastPlay.label }}</span>
+          </div>
+          <div class="ft-last-cards">
+            <span v-for="c in lastPlay.cards" :key="c.id" class="ft-mini">
+              <PlayingCard :card="c" />
+            </span>
+          </div>
+        </div>
+        <div v-else class="ft-center-empty">{{ statusText }}</div>
+
+        <div v-if="lastPlay" class="ft-status">{{ statusText }}</div>
+        <slot name="center-extra" />
+      </div>
+
+      <slot name="table-extra" />
+    </div>
+
+    <div class="ft-my-area">
+      <div class="ft-my-head">
+        <span class="ft-my-name">{{ myName }}</span>
+        <span v-if="myRoleLabel" class="ft-role my" :class="myTone">{{ myRoleLabel }}</span>
+        <span class="ft-my-count">{{ $t('games.fight.cardsLeft', { n: hand.length }) }}</span>
+        <span v-if="myNote" class="ft-my-note">{{ myNote }}</span>
+      </div>
+      <div class="ft-hand" :style="{ '--fc-hand-n': Math.max(1, hand.length) }" role="group" :aria-label="$t('games.fight.myHand')">
+        <button
+          v-for="card in sortedHand"
+          :key="card.id"
+          type="button"
+          class="ft-card"
+          :class="{ sel: selectedIds.has(card.id), wild: isWild?.(card) }"
+          :aria-pressed="selectedIds.has(card.id)"
+          :aria-label="cardLabel(card)"
+          @click="$emit('select', card)"
+        >
+          <PlayingCard :card="card" />
+          <span v-if="isWild?.(card)" class="ft-wild">{{ $t('games.fight.wild') }}</span>
+        </button>
+      </div>
+      <div class="ft-actions">
+        <slot name="actions" />
+      </div>
+    </div>
+
+    <slot name="overlay" />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { UserFilled } from '@element-plus/icons-vue'
+import PlayingCard from './PlayingCard.vue'
+import { cardRankText } from '@/utils/games/cardCore'
+
+const props = defineProps({
+  seats: { type: Array, required: true },
+  mySeat: { type: Number, default: 0 },
+  hand: { type: Array, default: () => [] },
+  selected: { type: Array, default: () => [] },
+  lastPlay: { type: Object, default: null },
+  statusText: { type: String, default: '' },
+  infoChips: { type: Array, default: () => [] },
+  isWild: { type: Function, default: null },
+  myName: { type: String, default: '' },
+  myRoleLabel: { type: String, default: '' },
+  myTone: { type: String, default: '' },
+  myNote: { type: String, default: '' },
+  sortValue: { type: Function, default: null },
+})
+
+defineEmits(['select'])
+
+// 相对座位坐标(百分比):0 号永远是自己(下),按逆时针依次环绕。
+const POSITIONS = {
+  3: [
+    [50, 98],
+    [10, 46],
+    [90, 46],
+  ],
+  4: [
+    [50, 98],
+    [7, 55],
+    [50, 6],
+    [93, 55],
+  ],
+  5: [
+    [50, 98],
+    [8, 70],
+    [20, 12],
+    [80, 12],
+    [92, 70],
+  ],
+  6: [
+    [50, 98],
+    [6, 72],
+    [14, 16],
+    [50, 5],
+    [86, 16],
+    [94, 72],
+  ],
+}
+
+const selectedIds = computed(() => new Set(props.selected || []))
+const sortedHand = computed(() => {
+  const list = [...props.hand]
+  if (props.sortValue) list.sort((a, b) => props.sortValue(a) - props.sortValue(b))
+  return list
+})
+const seatViews = computed(() => {
+  const n = Math.max(1, props.seats.length)
+  const table = POSITIONS[n] || POSITIONS[6]
+  return props.seats.map((s, seat) => {
+    const rel = (seat - props.mySeat + n) % n
+    const [x, y] = table[rel] || table[0]
+    return { ...s, seat, rel, x: `${x}%`, y: `${y}%` }
+  })
+})
+
+const SUIT_SYMBOL = { S: '♠', H: '♥', C: '♣', D: '♦' }
+const cardLabel = (card) => {
+  if (!card) return ''
+  if (card.suit === 'JOKER') return cardRankText(card)
+  return `${cardRankText(card)}${SUIT_SYMBOL[card.suit] || ''}`
+}
+</script>
+
+<style scoped>
+.ft-root {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.ft-root:fullscreen {
+  padding: clamp(8px, 2vw, 18px);
+  overflow: auto;
+  background: var(--color-bg);
+}
+
+.ft-table {
+  position: relative;
+  flex: 1 1 300px;
+  min-height: 300px;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1), transparent 62%), linear-gradient(160deg, #1f5c39, #123c26 62%, #0d2f1e);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 26px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.ft-seat {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 132px;
+  padding: 4px 7px;
+  border-radius: 10px;
+  background: rgba(6, 26, 15, 0.5);
+  color: #eef7ee;
+  transform: translate(-50%, -50%);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.ft-seat.me {
+  background: rgba(255, 209, 102, 0.16);
+}
+.ft-seat.active {
+  background: rgba(255, 209, 102, 0.26);
+  box-shadow:
+    0 0 0 1px rgba(255, 209, 102, 0.7),
+    0 0 16px rgba(255, 209, 102, 0.35);
+}
+.ft-seat.finished {
+  opacity: 0.6;
+}
+.ft-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+.ft-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ft-turn-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffd166;
+  box-shadow: 0 0 8px #ffd166;
+}
+.ft-seat-main {
+  min-width: 0;
+  line-height: 1.25;
+}
+.ft-seat-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ft-seat-count {
+  font-size: 11px;
+  opacity: 0.82;
+}
+.ft-role {
+  display: inline-block;
+  margin-top: 1px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 10px;
+  line-height: 15px;
+}
+.ft-role.landlord,
+.ft-role.emperor,
+.ft-role.royal {
+  background: rgba(255, 209, 102, 0.3);
+  color: #ffe6a2;
+}
+.ft-role.farmer,
+.ft-role.rebel {
+  background: rgba(130, 195, 255, 0.24);
+  color: #d5ecff;
+}
+.ft-role.wild {
+  background: rgba(255, 120, 160, 0.26);
+  color: #ffd9e4;
+}
+.ft-role.my {
+  margin-left: 2px;
+}
+.ft-finish {
+  position: absolute;
+  right: -4px;
+  top: -10px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ffd166;
+  color: #3a2600;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.ft-seat-bubble {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 11px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.ft-center {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(64%, 560px);
+  color: #f2fff2;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ft-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+.ft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 11px;
+}
+.ft-chip b {
+  font-weight: 600;
+  opacity: 0.74;
+}
+.ft-last {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ft-last-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.ft-last-name {
+  font-weight: 700;
+}
+.ft-last-combo {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.24);
+  color: #ffe9ae;
+}
+.ft-last-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+.ft-mini {
+  position: relative;
+  display: block;
+  width: clamp(26px, 3.2vw, 40px);
+  aspect-ratio: 5 / 7;
+  border-radius: 4px;
+  background: #fdfcf8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.ft-center-empty {
+  font-size: 15px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.ft-status {
+  font-size: 12px;
+  opacity: 0.86;
+}
+
+.ft-my-area {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.ft-my-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #666);
+}
+.ft-my-name {
+  font-weight: 700;
+  color: var(--color-text, #222);
+}
+.ft-my-count {
+  opacity: 0.8;
+}
+.ft-my-note {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ft-hand {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: calc(var(--fc-card-w, 54px) * 1.4 + 20px);
+  padding: 20px 6px 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  --fc-hand-n: 20;
+  --fc-step: clamp(13px, calc((100vw - 72px) / var(--fc-hand-n, 20)), 30px);
+  --fc-card-w: clamp(30px, calc(var(--fc-step) * 2.1), 56px);
+}
+.ft-hand::-webkit-scrollbar {
+  display: none;
+}
+.ft-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--fc-card-w);
+  aspect-ratio: 5 / 7;
+  margin-left: calc(var(--fc-step) - var(--fc-card-w));
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #fdfcf8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+  touch-action: manipulation;
+}
+.ft-card:first-child {
+  margin-left: 0;
+}
+.ft-card.sel {
+  z-index: 2;
+  outline: 2px solid #ffd166;
+  outline-offset: -2px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.34);
+  transform: translateY(-16px);
+}
+.ft-card.wild {
+  box-shadow:
+    0 0 0 2px rgba(255, 120, 160, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+.ft-card :deep(.pc-face) {
+  position: absolute;
+  inset: 0;
+}
+.ft-card :deep(.pc-img) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ft-wild {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #ff5c8a;
+  color: #fff;
+  font-size: 9px;
+  line-height: 13px;
+  font-weight: 800;
+}
+.ft-actions {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ft-actions:empty {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .ft-table {
+    min-height: 260px;
+  }
+  .ft-seat {
+    max-width: 100px;
+    padding: 3px 5px;
+  }
+  .ft-avatar {
+    width: 24px;
+    height: 24px;
+  }
+  .ft-seat-name {
+    font-size: 11px;
+  }
+  .ft-center {
+    width: 70%;
+  }
+  .ft-mini {
+    width: 24px;
+  }
+}
+</style>

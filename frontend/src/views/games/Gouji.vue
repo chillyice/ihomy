@@ -1,0 +1,341 @@
+<!-- 够级:单机六人局(玩家 + 五位电脑,隔座三人一联邦)。同点套牌/贴 2/挂王、够级牌限制、
+     憋三与名次积分都在 utils/games/gouji.js(纯函数,单测覆盖);本页只做发牌、回合驱动与结算展示。
+     我方积分领先走统一 H5 奖励通道(按天限次)。 -->
+<template>
+  <div ref="pageEl" class="page game-page game-page-readable">
+    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
+    </PageToolbar>
+
+    <div ref="gameCardEl" class="fight-card">
+      <FightTable
+        :seats="seatViews"
+        :hand="myHand"
+        :selected="selected"
+        :last-play="lastPlayView"
+        :status-text="statusText"
+        :info-chips="infoChips"
+        :my-name="$t('games.fight.me')"
+        :my-role-label="$t('games.gouji.teamUs')"
+        my-tone="royal"
+        :my-note="myNote"
+        :sort-value="gjValue"
+        @select="toggleCard"
+      >
+        <template #actions>
+          <template v-if="phase === 'playing'">
+            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passTurn()">
+              {{ $t('games.fight.pass') }}
+            </el-button>
+            <el-button size="small" round :disabled="!myTurn" @click="hint">{{ $t('games.fight.hint') }}</el-button>
+            <el-button type="primary" size="small" round :disabled="!canPlay" @click="playSelected">
+              {{ $t('games.fight.play') }}
+            </el-button>
+          </template>
+        </template>
+
+        <template #center-extra>
+          <div v-if="phase === 'playing' && lastCombo?.gouji" class="fight-note">
+            {{ $t('games.gouji.goujiOnTable') }}
+          </div>
+        </template>
+
+        <template #overlay>
+          <Transition name="game-overlay">
+            <div v-if="phase === 'idle' || phase === 'ended'" class="fight-overlay">
+              <div class="fight-overlay-card game-overlay-card">
+                <div class="fight-overlay-title">
+                  {{ phase === 'idle' ? $t('games.gouji.title') : result === 'win' ? $t('games.fight.win') : $t('games.fight.lose') }}
+                </div>
+                <div v-if="phase === 'idle'" class="fight-overlay-desc">{{ $t('games.gouji.desc') }}</div>
+                <ul v-if="phase === 'idle'" class="fight-rules">
+                  <li>{{ $t('games.gouji.rules1') }}</li>
+                  <li>{{ $t('games.gouji.rules2') }}</li>
+                  <li>{{ $t('games.gouji.rules3') }}</li>
+                  <li>{{ $t('games.gouji.rules4') }}</li>
+                  <li>{{ $t('games.gouji.rules5') }}</li>
+                </ul>
+                <div v-else class="fight-overlay-meta">{{ resultMeta }}</div>
+                <div v-if="rewardMsg" class="fight-overlay-reward">{{ rewardMsg }}</div>
+                <div class="fight-overlay-actions">
+                  <el-button type="primary" size="small" round @click="startGame">
+                    {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
+                  </el-button>
+                  <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
+                    {{ $t('games.back') }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </template>
+      </FightTable>
+    </div>
+  </div>
+</template>
+
+<script setup>
+// 顶牌顺序:玩家固定 0 号座,每局从 0 号先出;够级限制按「场上还有几家有牌」判断,
+// 人少了(四人乱缠)就放开对头限制,与规则内核同口径。
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import FightTable from '@/components/games/FightTable.vue'
+import { useGameView } from '@/composables/useGameView'
+import { gameApi } from '@/api'
+import { gjAiChoose, gjCanBeat, gjCombo, gjDeal, gjLegal, gjOpposite, gjPlays, gjRankText, gjScores, gjValue } from '@/utils/games/gouji'
+
+const SEATS = 6
+const AI_DELAY = 700
+
+const router = useRouter()
+const { t } = useI18n()
+
+const pageEl = ref(null)
+const gameCardEl = ref(null)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({
+  page: pageEl,
+  stage: gameCardEl,
+  fit: false,
+})
+const goBack = () => router.push('/games')
+
+const phase = ref('idle') // idle | playing | ended
+const hands = ref([[], [], [], [], [], []])
+const turn = ref(0)
+const last = ref(null) // { seat, combo }
+const passCount = ref(0)
+const selected = ref([])
+const finishOrder = ref([])
+const result = ref('')
+const rewardMsg = ref('')
+const scores = ref({ teamScores: [0, 0], shun: false })
+// 电脑连续「让牌」次数:联邦出的牌不抢,但连让两次之后要自己推牌,否则一家可能整局很少出牌
+const passStreak = ref([0, 0, 0, 0, 0, 0])
+
+let session = 0
+let aiTimer = null
+
+const myHand = computed(() => hands.value[0])
+const handCounts = computed(() => hands.value.map((hand) => hand.length))
+const myTurn = computed(() => phase.value === 'playing' && turn.value === 0)
+const activeCount = computed(() => hands.value.filter((hand) => hand.length).length)
+const lastCombo = computed(() => (last.value ? { ...last.value.combo, seat: last.value.seat } : null))
+const selectedCards = computed(() => {
+  const ids = new Set(selected.value)
+  return myHand.value.filter((card) => ids.has(card.id))
+})
+const selection = computed(() => (selected.value.length ? gjCombo(selectedCards.value) : null))
+const canPlay = computed(() => {
+  if (!myTurn.value || !selection.value) return false
+  if (!gjLegal(selection.value, myHand.value)) return false
+  return gjCanBeat({ ...selection.value, seat: 0 }, lastCombo.value, {
+    seat: 0,
+    activeCount: activeCount.value,
+  })
+})
+
+const seatName = (seat) => (seat === 0 ? t('games.fight.me') : t('games.fight.aiName', { n: seat }))
+const isMyTeam = (seat) => seat % 2 === 0
+const teamRole = (seat) => {
+  const base = isMyTeam(seat) ? t('games.gouji.teamUs') : t('games.gouji.teamThem')
+  return seat === gjOpposite(0) ? `${base} · ${t('games.gouji.opposite')}` : base
+}
+const teamTone = (seat) => (isMyTeam(seat) ? 'royal' : 'rebel')
+const rankLabel = (rank) => t(`games.gouji.rank${rank}`)
+
+const seatViews = computed(() =>
+  hands.value.map((hand, seat) => {
+    const order = finishOrder.value.indexOf(seat)
+    return {
+      name: seatName(seat),
+      count: hand.length,
+      active: phase.value === 'playing' && turn.value === seat,
+      finished: order >= 0,
+      roleLabel: teamRole(seat),
+      tone: teamTone(seat),
+      finishedLabel: order >= 0 ? rankLabel(order + 1) : '',
+    }
+  }),
+)
+
+const comboLabel = (combo) => {
+  if (!combo) return ''
+  const parts = []
+  if (combo.baseRank > 0) parts.push(gjRankText(combo.baseRank))
+  if (combo.twos) parts.push(t('games.gouji.attachTwo', { n: combo.twos }))
+  if (combo.jokers) parts.push(t('games.gouji.attachJoker', { n: combo.jokers }))
+  return parts.join(' + ')
+}
+
+const lastPlayView = computed(() => {
+  if (!last.value) return null
+  return {
+    seat: last.value.seat,
+    name: seatName(last.value.seat),
+    cards: last.value.combo.cards,
+    label: comboLabel(last.value.combo),
+  }
+})
+
+const finishedCount = (team) => finishOrder.value.filter((seat) => seat % 2 === team).length
+
+const infoChips = computed(() => [
+  { key: 'us', label: t('games.gouji.teamUs'), value: `${finishedCount(0)}/${SEATS / 2}` },
+  { key: 'them', label: t('games.gouji.teamThem'), value: `${finishedCount(1)}/${SEATS / 2}` },
+])
+
+const statusText = computed(() => {
+  if (phase.value === 'idle') return t('games.gouji.desc')
+  if (phase.value === 'ended') return ''
+  if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.gouji.yourLead')
+  return t('games.fight.thinking', { name: seatName(turn.value) })
+})
+
+const myNote = computed(() => {
+  if (phase.value !== 'playing' || !myTurn.value || !selected.value.length) return ''
+  if (!selection.value) return t('games.fight.badCards')
+  if (!gjLegal(selection.value, myHand.value)) return t('games.gouji.threeRule')
+  if (!gjCanBeat({ ...selection.value, seat: 0 }, lastCombo.value, { seat: 0, activeCount: activeCount.value })) {
+    const restricted = lastCombo.value?.gouji && activeCount.value > 4 && last.value.seat !== gjOpposite(0)
+    return restricted ? t('games.gouji.onlyOpposite') : t('games.fight.notBigEnough')
+  }
+  return comboLabel(selection.value)
+})
+
+const resultMeta = computed(() => {
+  const parts = [t('games.gouji.teamScore', { a: scores.value.teamScores[0], b: scores.value.teamScores[1] })]
+  if (scores.value.shun) parts.push(t('games.gouji.shun'))
+  return parts.join(' · ')
+})
+
+const clearTimer = () => {
+  clearTimeout(aiTimer)
+  aiTimer = null
+}
+
+function startGame() {
+  session += 1
+  clearTimer()
+  hands.value = gjDeal()
+  turn.value = 0
+  last.value = null
+  passCount.value = 0
+  selected.value = []
+  finishOrder.value = []
+  result.value = ''
+  rewardMsg.value = ''
+  scores.value = { teamScores: [0, 0], shun: false }
+  passStreak.value = [0, 0, 0, 0, 0, 0]
+  phase.value = 'playing'
+  scheduleTick()
+}
+
+function scheduleTick() {
+  clearTimer()
+  if (phase.value !== 'playing' || turn.value === 0) return
+  const mySession = session
+  const seat = turn.value
+  aiTimer = setTimeout(() => {
+    if (mySession !== session || phase.value !== 'playing' || turn.value !== seat) return
+    const pick = gjAiChoose({
+      hand: hands.value[seat],
+      last: lastCombo.value,
+      seat,
+      activeCount: activeCount.value,
+      handCounts: handCounts.value,
+      lastSeat: last.value && passStreak.value[seat] < 2 ? last.value.seat : null,
+    })
+    if (pick) commitPlay(seat, pick)
+    else passTurn(seat)
+  }, AI_DELAY)
+}
+
+function commitPlay(seat, combo) {
+  const ids = new Set(combo.cards.map((card) => card.id))
+  hands.value = hands.value.map((hand, i) => (i === seat ? hand.filter((card) => !ids.has(card.id)) : hand))
+  last.value = { seat, combo }
+  passCount.value = 0
+  passStreak.value = passStreak.value.map((n, i) => (i === seat ? 0 : n))
+  selected.value = []
+  if (!hands.value[seat].length) {
+    finishOrder.value = [...finishOrder.value, seat]
+    if (finishOrder.value.length >= SEATS - 1) {
+      const rest = Array.from({ length: SEATS }, (_, i) => i).filter((s) => !finishOrder.value.includes(s))
+      finishOrder.value = [...finishOrder.value, ...rest]
+      endGame()
+      return
+    }
+  }
+  advanceTurn()
+}
+
+function advanceTurn() {
+  if (phase.value !== 'playing') return
+  for (let i = 1; i <= SEATS; i += 1) {
+    const seat = (turn.value + i) % SEATS
+    if (hands.value[seat].length) {
+      turn.value = seat
+      break
+    }
+  }
+  scheduleTick()
+}
+
+function passTurn(seat = turn.value) {
+  if (phase.value !== 'playing' || !last.value || turn.value !== seat) return
+  if (last.value.seat === seat) return
+  passCount.value += 1
+  passStreak.value = passStreak.value.map((n, i) => (i === seat ? n + 1 : n))
+  if (passCount.value >= activeCount.value - 1) {
+    last.value = null
+    passCount.value = 0
+  }
+  advanceTurn()
+}
+
+function endGame() {
+  phase.value = 'ended'
+  clearTimer()
+  const points = gjScores(finishOrder.value)
+  scores.value = { teamScores: points.teamScores, shun: points.shun }
+  const myWin = points.teamScores[0] > points.teamScores[1]
+  result.value = myWin ? 'win' : 'lose'
+  if (myWin) grantReward()
+}
+
+async function grantReward() {
+  try {
+    const res = await gameApi.goujiReward()
+    rewardMsg.value = res && res.awarded > 0 ? t('games.rewarded', { n: res.awarded }) : t('games.rewardCapped')
+  } catch (e) {
+    rewardMsg.value = t('games.rewardFailed')
+  }
+}
+
+function toggleCard(card) {
+  if (!myTurn.value) return
+  selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
+}
+
+function playSelected() {
+  if (!canPlay.value) return
+  commitPlay(0, selection.value)
+}
+
+function hint() {
+  if (!myTurn.value) return
+  const plays = gjPlays(myHand.value, lastCombo.value, {
+    seat: 0,
+    activeCount: activeCount.value,
+  })
+  selected.value = plays.length ? plays[0].cards.map((card) => card.id) : []
+}
+
+onBeforeUnmount(() => {
+  session += 1
+  clearTimer()
+})
+</script>

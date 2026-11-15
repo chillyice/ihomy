@@ -15,7 +15,8 @@ for (const [path, url] of Object.entries(CARD_FILES)) {
 /** 牌面图片地址;缺图时返回空串,由组件回退成文字牌面 */
 export function cardFaceUrl(card) {
   if (!card || !card.suit || !card.rank) return ''
-  if (card.suit === 'JOKER') return URL_BY_ID[card.rank === 14 ? 'joker-small' : 'joker-big'] || ''
+  // 小王:老纸牌内核用 14,对抗牌局内核用 16(见 utils/games/cardCore)
+  if (card.suit === 'JOKER') return URL_BY_ID[card.rank === 14 || card.rank === 16 ? 'joker-small' : 'joker-big'] || ''
   return URL_BY_ID[`${card.suit}-${card.rank}`] || ''
 }
 

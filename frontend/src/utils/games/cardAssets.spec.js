@@ -19,6 +19,11 @@ describe('cardAssets', () => {
     expect(cardFaceUrl({ suit: 'JOKER', rank: 15 })).toContain('joker-big')
   })
 
+  it('对抗牌局内核的小王 16、大王 17 也能取到图', () => {
+    expect(cardFaceUrl({ suit: 'JOKER', rank: 16 })).toContain('joker-small')
+    expect(cardFaceUrl({ suit: 'JOKER', rank: 17 })).toContain('joker-big')
+  })
+
   it('非法牌与缺图返回空串', () => {
     expect(cardFaceUrl(null)).toBe('')
     expect(cardFaceUrl({ suit: 'X', rank: 1 })).toBe('')
