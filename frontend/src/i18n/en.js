@@ -1503,6 +1503,8 @@ export default {
       pong: 'Pong',
       pongHint: 'You can pong this tile — pong or pass?',
       pass: 'Pass',
+      dealer: 'Dealer',
+      discardedBy: 'Win off a discard by {name}',
       wallLeft: '{n} tiles left',
       youWin: 'You win the hand!',
       aiWins: '{name} wins the hand',

@@ -1494,6 +1494,8 @@ export default {
       pong: '碰',
       pongHint: '可以碰这张牌，碰还是过？',
       pass: '过',
+      dealer: '庄',
+      discardedBy: '{name} 点炮',
       wallLeft: '牌墙剩 {n} 张',
       youWin: '胡了！',
       aiWins: '{name} 胡了',
