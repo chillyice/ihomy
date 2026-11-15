@@ -98,9 +98,7 @@
               <span class="mj-seat-name" :title="seatName(topSeat.seat)">
                 {{ seatName(topSeat.seat) }}<span v-if="topSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
               </span>
-              <span class="mj-backs">
-                <span v-for="n in seatTileCount(topSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
-              </span>
+              <!-- 对家视角的右手侧在屏幕左,故副露排到手牌牌背前面 -->
               <div v-if="meldGroups(topSeat.seat).length" class="mj-meld-corner">
                 <span v-for="(group, i) in meldGroups(topSeat.seat)" :key="i" class="meld-group">
                   <template v-if="group.dark">
@@ -113,6 +111,9 @@
                   </template>
                 </span>
               </div>
+              <span class="mj-backs">
+                <span v-for="n in seatTileCount(topSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
+              </span>
             </div>
 
             <!-- 上家(左) -->
@@ -172,9 +173,7 @@
               <span class="mj-seat-name" :title="seatName(rightSeat.seat)">
                 {{ seatName(rightSeat.seat) }}<span v-if="rightSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
               </span>
-              <span class="mj-backs-col">
-                <span v-for="n in seatTileCount(rightSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
-              </span>
+              <!-- 下家视角的右手侧在屏幕上,副露排到手牌牌背前面 -->
               <div v-if="meldGroups(rightSeat.seat).length" class="mj-meld-corner">
                 <span v-for="(group, i) in meldGroups(rightSeat.seat)" :key="i" class="meld-group">
                   <template v-if="group.dark">
@@ -187,6 +186,9 @@
                   </template>
                 </span>
               </div>
+              <span class="mj-backs-col">
+                <span v-for="n in seatTileCount(rightSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
+              </span>
             </div>
 
             <!-- 我方(下):碰/杠/吃/胡询问浮层 + 副露 + 立牌手牌 + 操作 -->
@@ -508,12 +510,17 @@ watch(
   async (lengths, previous) => {
     const follow = lengths.map((length, seat) => {
       const el = riverEls.get(seat)
-      return length > previous[seat] && (!el || el.scrollHeight - el.scrollTop - el.clientHeight < 4)
+      if (!el || length <= previous[seat]) return null
+      // 纵向牌河(对家/我方)跟随垂直滚动,横向牌河(上/下家)跟随水平滚动
+      const vertical = el.scrollHeight > el.clientHeight
+      const nearEnd = vertical ? el.scrollHeight - el.scrollTop - el.clientHeight < 4 : el.scrollWidth - el.scrollLeft - el.clientWidth < 4
+      return nearEnd ? (vertical ? { el, axis: 'y' } : { el, axis: 'x' }) : null
     })
     await nextTick()
-    follow.forEach((atEnd, seat) => {
-      const el = riverEls.get(seat)
-      if (atEnd && el) el.scrollTop = el.scrollHeight
+    follow.forEach((f) => {
+      if (!f) return
+      if (f.axis === 'y') f.el.scrollTop = f.el.scrollHeight
+      else f.el.scrollLeft = f.el.scrollWidth
     })
   },
 )
@@ -1538,7 +1545,9 @@ onBeforeUnmount(() => {
     radial-gradient(ellipse at 50% 32%, rgba(255, 255, 255, 0.16) 0%, transparent 58%),
     linear-gradient(158deg, var(--mj-felt-a) 0%, var(--mj-felt-b) 100%);
   box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 2px rgba(255, 246, 224, 0.14),
+    inset 0 0 0 6px #8a5a30,
+    inset 0 0 0 9px #5a3a1f,
     inset 0 0 46px rgba(0, 0, 0, 0.3),
     0 12px 26px rgba(0, 0, 0, 0.22);
   color: #f4f4e9;
@@ -1609,7 +1618,6 @@ html.dark .mj-table {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-inline: clamp(0px, 8%, 140px);
 }
 .mj-seat-name {
   display: block;
@@ -1716,8 +1724,10 @@ html.dark .mj-table {
   grid-template-rows: repeat(6, var(--mj-river-h));
   grid-auto-flow: column;
   grid-auto-columns: var(--mj-river-w);
-  max-width: calc(3 * var(--mj-river-w) + 4px);
+  max-width: calc(3 * var(--mj-river-w) + var(--mj-river-h) + 6px);
   align-self: center;
+  /* 旋转后的牌横向占位比格宽,留出内边距避免被裁 */
+  padding-inline: calc((var(--mj-river-h) - var(--mj-river-w)) / 2 + 1px);
 }
 .river-left {
   grid-area: rl;
@@ -1804,6 +1814,34 @@ html.dark .rules-chip {
   border-radius: 3px;
   box-shadow: 0 1px 0 #a29c8b;
 }
+/* 桌面几何:他家的牌一律按该家视角摆放——牌面字头朝牌主,副露贴其右手侧 */
+.mj-top .tile.mini {
+  transform: rotate(180deg);
+}
+.mj-left .tile.mini {
+  transform: rotate(-90deg);
+}
+.mj-right .tile.mini {
+  transform: rotate(90deg);
+}
+/* 左右家的副露:面子与手牌平行排成纵向条,组间横向排开 */
+.mj-left .meld-group,
+.mj-right .meld-group {
+  flex-direction: column;
+}
+.mj-left .mj-meld-corner,
+.mj-right .mj-meld-corner {
+  padding-inline: 6px;
+}
+.river-top .tile {
+  transform: rotate(180deg);
+}
+.river-left .tile {
+  transform: rotate(-90deg);
+}
+.river-right .tile {
+  transform: rotate(90deg);
+}
 @container mahjong (max-width: 620px) {
   .mj-top {
     flex-wrap: wrap;
@@ -1818,13 +1856,15 @@ html.dark .rules-chip {
 }
 .hand-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 4px;
+  flex-wrap: nowrap;
+  gap: 4px;
   justify-content: center;
   align-items: flex-end;
+  max-width: 100%;
 }
+/* 手牌永远一排:宽度随容器自动缩放,不换行不出滚动条 */
 .tile.hand {
-  width: clamp(31px, calc((100cqi - 52px) / 14), 46px);
+  width: min(52px, calc((100cqi - 58px) / 14));
   height: auto;
   aspect-ratio: 11 / 15;
   padding: 0;
