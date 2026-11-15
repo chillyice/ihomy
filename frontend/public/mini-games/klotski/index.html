@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>华容道</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --warn: #b26a00;
+    --wall: #6b7684;
+    --wall-top: #8b95a3;
+    --floor: #f0f2f5;
+    --floor-alt: #e7eaef;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; max-width: 520px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .level {
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 200px;
+    text-align: center;
+    color: var(--accent);
+  }
+  .level.done { color: var(--good); }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 64px;
+    text-align: center;
+  }
+  .stat small { font-weight: 400; opacity: .65; font-size: 11px; }
+
+  /* ---------- board ---------- */
+  #stage {
+    --cell: 60px;
+    position: relative;
+    margin: 0 auto;
+    background: #d7dce3;
+    border-radius: 10px;
+    touch-action: none;
+    user-select: none;
+  }
+
+  #tiles, #actors {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+
+  /* Both layers are positioned by --r (row) / --c (column). Pieces also carry
+     --w / --h (their footprint in cells) so a single transform + size rule
+     handles every piece shape — resizing only changes --cell. */
+  .tile {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cell);
+    height: var(--cell);
+    transform: translate(calc(var(--c, 0) * var(--cell)), calc(var(--r, 0) * var(--cell)));
+  }
+  .tile.floor { background: var(--floor); }
+  .tile.floor.alt { background: var(--floor-alt); }
+
+  /* The 2x2 goal zone (bottom-centre) is the Cao Cao exit. */
+  .tile.goal::after {
+    content: '';
+    position: absolute;
+    inset: 16%;
+    border: 3px dashed #2e7d32;
+    border-radius: 8px;
+    opacity: .8;
+  }
+  .tile.goal::before {
+    content: '\2193';            /* down arrow hint */
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    color: #2e7d32;
+    font-size: calc(var(--cell) * .3);
+    opacity: .35;
+  }
+
+  .piece {
+    position: absolute;
+    top: 0; left: 0;
+    width: calc(var(--w) * var(--cell) - 8px);
+    height: calc(var(--h) * var(--cell) - 8px);
+    transform: translate(calc(var(--c) * var(--cell) + 4px), calc(var(--r) * var(--cell) + 4px));
+    transition: transform .13s ease-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: center;
+    line-height: 1;
+  }
+
+  .piece .zh { font-weight: 700; }
+  .piece .en { opacity: .82; margin-top: 2px; font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
+
+  .piece.caocao  { background: linear-gradient(160deg, #ff8a8a, #e23b3b); border: 2px solid #b71c1c; color: #fff; }
+  .piece.caocao .zh { font-size: calc(var(--cell) * .42); }
+  .piece.caocao .en { font-size: calc(var(--cell) * .2); }
+
+  .piece.hgen, .piece.vgen {
+    background: linear-gradient(160deg, #8fb0ff, #3b6ef5);
+    border: 2px solid #1f4fc0; color: #fff;
+  }
+  .piece.hgen .zh, .piece.vgen .zh { font-size: calc(var(--cell) * .34); }
+  .piece.hgen .en, .piece.vgen .en { font-size: calc(var(--cell) * .18); }
+
+  .piece.soldier {
+    background: linear-gradient(160deg, #cfd6e0, #aeb8c7);
+    border: 2px solid #8b95a3; color: #2f3640;
+  }
+  .piece.soldier .zh { font-size: calc(var(--cell) * .42); }
+  .piece.soldier .en { font-size: calc(var(--cell) * .2); }
+
+  .piece.sel {
+    outline: 3px solid #ffd400;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 3px rgba(255,212,0,.45);
+  }
+
+  #status {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 20px;
+    text-align: center;
+    color: var(--warn);
+  }
+
+  /* ---------- touch pad ---------- */
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 8px;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .pad button { font-size: 16px; padding: 0; }
+  .pad-up    { grid-column: 2; grid-row: 1; }
+  .pad-left  { grid-column: 1; grid-row: 2; }
+  .pad-down  { grid-column: 2; grid-row: 2; }
+  .pad-right { grid-column: 3; grid-row: 2; }
+
+  .wide {
+    margin-top: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 22px;
+  }
+
+  /* ---------- overlays (start + win) ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 22, 30, .5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px 24px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .dialog h2 { margin: 0 0 6px; font-size: 22px; }
+  .dialog p  {
+    margin: 0 0 22px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .dialog .actions { display: flex; gap: 10px; justify-content: center; }
+  .dialog button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .dialog button:hover { filter: brightness(1.06); color: #fff; }
+  .dialog button.secondary {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .dialog button.secondary:hover { color: var(--accent); border-color: var(--accent); }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 10px; }
+    .bar { gap: 6px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .level { min-width: 160px; font-size: 13px; }
+    .stat { min-width: 56px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <button id="btnPrev" data-i18n="prev"></button>
+    <div class="level" id="lvLabel"></div>
+    <button id="btnNext" data-i18n="next"></button>
+    <button id="btnUndo" data-i18n="undo"></button>
+    <button id="btnRestart" data-i18n="restart"></button>
+    <div class="stat"><small data-i18n="movesL"></small> <span id="moves">0</span></div>
+    <div class="stat"><small data-i18n="timeL"></small> <span id="time">00:00</span></div>
+    <div class="stat"><small data-i18n="bestL"></small> <span id="best">--</span></div>
+  </div>
+  <div id="stage">
+    <div id="tiles"></div>
+    <div id="actors"></div>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div class="pad">
+  <button id="btnUp" class="pad-up" type="button" aria-label="up">&#9650;</button>
+  <button id="btnLeft" class="pad-left" type="button" aria-label="left">&#9664;</button>
+  <button id="btnDown" class="pad-down" type="button" aria-label="down">&#9660;</button>
+  <button id="btnRight" class="pad-right" type="button" aria-label="right">&#9654;</button>
+</div>
+
+<button id="btnNewGame" class="wide" data-i18n="newGame"></button>
+
+<!-- Start screen: the visible entry point required by the project. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n="startSub"></p>
+    <div class="actions">
+      <button id="btnStart" class="primary" data-i18n="start"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Win dialog. -->
+<div id="winOverlay" class="overlay">
+  <div class="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <div class="actions">
+      <button id="dlgNext" class="primary"></button>
+      <button id="btnWinClose" class="secondary" data-i18n="close"></button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:    { en: 'Klotski', zh: '华容道' },
+    tip: {
+      en: 'Slide the pieces and guide Cao Cao (red, 2x2) to the exit at the bottom centre. ' +
+          'Tap a piece to select it, then use arrow keys / WASD / the pad, or swipe.',
+      zh: '滑动棋子，把红色的曹操（2×2）送到棋盘底部中央的出口。' +
+          '点选棋子后用方向键 / WASD / 方向键按钮，或滑动屏幕移动。'
+    },
+    prev:     { en: 'Prev', zh: '上一关' },
+    next:     { en: 'Next', zh: '下一关' },
+    undo:     { en: 'Undo (U)', zh: '撤销 (U)' },
+    restart:  { en: 'Restart (R)', zh: '重开 (R)' },
+    movesL:   { en: 'Moves', zh: '步数' },
+    timeL:    { en: 'Time', zh: '用时' },
+    bestL:    { en: 'Best', zh: '最佳' },
+    levelOf:  { en: 'Lv {n} / {total}', zh: '第 {n} 关 / 共 {total}' },
+    newGame:  { en: 'New Game', zh: '新游戏' },
+    start:    { en: 'Start', zh: '开始' },
+    startSub: {
+      en: 'Pick a level above, then press Start. Help Cao Cao escape!',
+      zh: '在上方选择关卡，然后点开始。助曹操脱身！'
+    },
+    wonTitle: { en: 'Cao Cao escaped!', zh: '曹操脱身！' },
+    allDone:  { en: 'All levels cleared!', zh: '全部关卡通关！' },
+    wonSub:   { en: '{moves} moves · {time}', zh: '步数 {moves} · 用时 {time}' },
+    nextLevel:{ en: 'Next level', zh: '下一关' },
+    replay:   { en: 'Play again', zh: '再玩一次' },
+    close:    { en: 'Close', zh: '关闭' }
+  });
+
+  /* ----------------------------------------------------------- constants */
+  var COLS = 4, ROWS = 5;
+  var DIRS = [ { dr: -1, dc: 0, key: 'ArrowUp' },
+               { dr: 1,  dc: 0, key: 'ArrowDown' },
+               { dr: 0,  dc: -1, key: 'ArrowLeft' },
+               { dr: 0,  dc: 1,  key: 'ArrowRight' } ];
+
+  // Display names per grid character (Chinese + English). Soldiers reuse 兵 / Pawn.
+  var PIECE_NAMES = {
+    C: { zh: '曹操', en: 'Cao Cao' },
+    G: { zh: '关羽', en: 'Guan Yu' },
+    a: { zh: '张飞', en: 'Zhang Fei' },
+    b: { zh: '赵云', en: 'Zhao Yun' },
+    c: { zh: '马超', en: 'Ma Chao' },
+    d: { zh: '黄忠', en: 'Huang Zhong' },
+    s: { zh: '兵', en: 'Pawn' },
+    t: { zh: '兵', en: 'Pawn' },
+    u: { zh: '兵', en: 'Pawn' },
+    v: { zh: '兵', en: 'Pawn' },
+    p: { zh: '兵', en: 'Pawn' },
+    q: { zh: '兵', en: 'Pawn' }
+  };
+
+  /* Each layout: a 5x4 grid. A piece is one distinct character spanning its
+   * whole footprint. C = Cao Cao (2x2), G = Guan Yu (horizontal 2x1), the four
+   * letters a/b/c/d = vertical generals (1x2), s.. = soldiers (1x1), '.' = empty.
+   * The two empty cells are the slack that makes every level solvable. */
+  var LEVELS = [
+    { name: '横刀立马', nameEn: 'Blockade', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'cstd',
+      'u..v'
+    ] },
+    { name: '指挥若定', nameEn: 'Steady Command', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'cstd',
+      '.uv.'
+    ] },
+    { name: '将拥曹营', nameEn: 'Guarded Camp', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'c..d',
+      'stuv'
+    ] },
+    { name: '齐头并进', nameEn: 'Level Advance', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'c.sd',
+      'uv.t'
+    ] },
+    { name: '兵分三路', nameEn: 'Three Prongs', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'cs.d',
+      'u.vt'
+    ] },
+    { name: '横冲直撞', nameEn: 'Breakthrough', grid: [
+      'aCCb',
+      'aCCb',
+      'cGGd',
+      'c.sd',
+      '.uvt'
+    ] }
+  ];
+
+  var STORE_CLEARED = 'klotski_cleared';
+  var STORE_BEST = 'klotski_best';
+
+  /* ------------------------------------------------------------------ dom */
+  var stageEl   = document.getElementById('stage');
+  var tilesEl   = document.getElementById('tiles');
+  var actorsEl  = document.getElementById('actors');
+  var lvLabelEl = document.getElementById('lvLabel');
+  var movesEl   = document.getElementById('moves');
+  var timeEl    = document.getElementById('time');
+  var bestEl    = document.getElementById('best');
+  var statusEl  = document.getElementById('status');
+  var startEl   = document.getElementById('startOverlay');
+  var winEl     = document.getElementById('winOverlay');
+  var dlgTitleEl = document.getElementById('dlgTitle');
+  var dlgSubEl   = document.getElementById('dlgSub');
+  var dlgNextEl  = document.getElementById('dlgNext');
+
+  /* ---------------------------------------------------------------- state */
+  var lvIndex = 0;
+  var pieces = [];           // { id, kind, w, h, r, c, name, en, el }
+  var caocao = null;         // reference to the 2x2 piece
+  var selected = null;
+  var moves = 0;
+  var history = [];          // undo stack: { p, dr, dc }
+  var started = false;
+  var won = false;
+  var startTime = 0;
+  var timer = null;
+  var cell = 60;
+
+  /* ---------------------------------------------------------------- board */
+
+  function fitCell(c, r) {
+    var w = (window.innerWidth || 480) - 44;
+    var h = (window.innerHeight || 700) - 360;
+    return Math.max(34, Math.min(64,
+      Math.floor(Math.min(w, 640) / c),
+      Math.floor(Math.max(h, 220) / r)));
+  }
+
+  function resizeStage() {
+    cell = fitCell(COLS, ROWS);
+    stageEl.style.setProperty('--cell', cell + 'px');
+    stageEl.style.width = (COLS * cell) + 'px';
+    stageEl.style.height = (ROWS * cell) + 'px';
+  }
+
+  // Build the piece list from a grid by merging each character's cells.
+  function parseGrid(grid) {
+    var cells = {};
+    for (var r = 0; r < grid.length; r++) {
+      var line = grid[r];
+      for (var c = 0; c < line.length; c++) {
+        var ch = line[c];
+        if (ch === '.' || ch === ' ') continue;
+        (cells[ch] = cells[ch] || []).push([r, c]);
+      }
+    }
+    var out = [];
+    Object.keys(cells).forEach(function (ch) {
+      var list = cells[ch];
+      var minR = 99, minC = 99, maxR = -1, maxC = -1;
+      list.forEach(function (p) {
+        if (p[0] < minR) minR = p[0];
+        if (p[1] < minC) minC = p[1];
+        if (p[0] > maxR) maxR = p[0];
+        if (p[1] > maxC) maxC = p[1];
+      });
+      var w = maxC - minC + 1, h = maxR - minR + 1;
+      var kind = (w === 2 && h === 2) ? 'caocao'
+               : (w === 2 && h === 1) ? 'hgen'
+               : (w === 1 && h === 2) ? 'vgen' : 'soldier';
+      var nm = PIECE_NAMES[ch] || { zh: ch, en: ch };
+      out.push({
+        id: ch, kind: kind, w: w, h: h,
+        r: minR, c: minC, name: nm.zh, en: nm.en, el: null
+      });
+    });
+    return out;
+  }
+
+  function build(idx) {
+    var L = LEVELS[idx];
+    pieces = parseGrid(L.grid);
+    caocao = null;
+    pieces.forEach(function (p) { if (p.kind === 'caocao') caocao = p; });
+    selected = null;
+    moves = 0;
+    history = [];
+    won = false;
+    statusEl.textContent = '';
+    resizeStage();
+    renderTiles();
+    renderPieces();
+    updateHud();
+  }
+
+  function renderTiles() {
+    tilesEl.innerHTML = '';
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        var el = document.createElement('div');
+        el.className = 'tile floor' + ((r + c) % 2 ? ' alt' : '') +
+                       (r >= 3 && c >= 1 && c <= 2 ? ' goal' : '');
+        el.style.setProperty('--r', r);
+        el.style.setProperty('--c', c);
+        el._cell = { r: r, c: c };
+        tilesEl.appendChild(el);
+      }
+    }
+  }
+
+  function renderPieces() {
+    actorsEl.innerHTML = '';
+    pieces.forEach(function (p) {
+      var el = document.createElement('div');
+      el.className = 'piece ' + p.kind;
+      el.style.setProperty('--w', p.w);
+      el.style.setProperty('--r', p.r);
+      el.style.setProperty('--c', p.c);
+      el._pid = p.id;
+      el._piece = p;
+      p.el = el;
+      el.innerHTML = '<span class="zh">' + p.name + '</span>' +
+                     '<span class="en">' + p.en + '</span>';
+      el.addEventListener('click', function () { select(p); });
+      actorsEl.appendChild(el);
+    });
+  }
+
+  function syncPieces() {
+    pieces.forEach(function (p) {
+      if (!p.el) return;
+      p.el.style.setProperty('--r', p.r);
+      p.el.style.setProperty('--c', p.c);
+      if (p === selected) p.el.classList.add('sel');
+      else p.el.classList.remove('sel');
+    });
+  }
+
+  /* ----------------------------------------------------------------- rules */
+
+  function footprint(r, c, w, h) {
+    var out = [];
+    for (var i = 0; i < h; i++)
+      for (var j = 0; j < w; j++) out.push([r + i, c + j]);
+    return out;
+  }
+
+  function occupiedByOther(r, c, except) {
+    for (var i = 0; i < pieces.length; i++) {
+      var q = pieces[i];
+      if (q === except) continue;
+      if (r >= q.r && r < q.r + q.h && c >= q.c && c < q.c + q.w) return true;
+    }
+    return false;
+  }
+
+  // A piece may slide one cell in a cardinal direction only into empty,
+  // in-bounds cells that do not overlap another piece. No diagonals.
+  function canMove(p, dr, dc) {
+    var nr = p.r + dr, nc = p.c + dc;
+    var cells = footprint(nr, nc, p.w, p.h);
+    for (var i = 0; i < cells.length; i++) {
+      var rr = cells[i][0], cc = cells[i][1];
+      if (rr < 0 || cc < 0 || rr >= ROWS || cc >= COLS) return false;
+      if (occupiedByOther(rr, cc, p)) return false;
+    }
+    return true;
+  }
+
+  // Cao Cao wins when his 2x2 footprint sits on the bottom-centre exit.
+  function isAtExit(p) { return p.r === 3 && p.c === 1; } /*__WIN__*/
+
+  function tryMove(p, dr, dc) {
+    if (!started || won || !p) return false;
+    if (!canMove(p, dr, dc)) return false; /*__GUARD__*/
+    p.r += dr; p.c += dc;
+    history.push({ p: p, dr: dr, dc: dc });
+    moves++;
+    syncPieces();
+    updateHud();
+    if (isAtExit(caocao)) finish();
+    return true;
+  }
+
+  function moveSelected(dr, dc) {
+    if (!selected) return;
+    tryMove(selected, dr, dc);
+  }
+
+  function select(p) {
+    selected = p;
+    syncPieces();
+  }
+
+  function undo() {
+    if (won || !history.length) return;
+    var h = history.pop();
+    h.p.r -= h.dr;
+    h.p.c -= h.dc;
+    moves--;
+    syncPieces();
+    updateHud();
+  }
+
+  /* --------------------------------------------------------------- progress */
+
+  function clearedList() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(STORE_CLEARED) || '[]');
+      return Object.prototype.toString.call(arr) === '[object Array]' ? arr : [];
+    } catch (e) { return []; }
+  }
+  function markCleared(i) {
+    var arr = clearedList();
+    if (arr.indexOf(i) < 0) {
+      arr.push(i);
+      try { localStorage.setItem(STORE_CLEARED, JSON.stringify(arr)); } catch (e) {}
+    }
+  }
+  function isClearedLevel(i) { return clearedList().indexOf(i) >= 0; }
+
+  function bestList() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(STORE_BEST) || '[]');
+      return Object.prototype.toString.call(arr) === '[object Array]' ? arr : [];
+    } catch (e) { return []; }
+  }
+  function bestSteps(i) {
+    var arr = bestList();
+    return (typeof arr[i] === 'number') ? arr[i] : null;
+  }
+  function setBest(i, v) {
+    var arr = bestList();
+    arr[i] = v;
+    try { localStorage.setItem(STORE_BEST, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  /* ------------------------------------------------------------------- hud */
+
+  function fmt(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function updateHud() {
+    movesEl.textContent = String(moves);
+    var sec = (started && !won) ? Math.floor((Date.now() - startTime) / 1000) : 0;
+    timeEl.textContent = fmt(sec);
+    var best = bestSteps(lvIndex);
+    bestEl.textContent = (best == null) ? '--' : String(best);
+
+    var L = LEVELS[lvIndex];
+    var name = (T.lang === 'zh') ? L.name : L.nameEn;
+    var done = isClearedLevel(lvIndex);
+    lvLabelEl.textContent = T.t('levelOf', { n: lvIndex + 1, total: LEVELS.length }) +
+                            ' · ' + name + (done ? ' ✓' : '');
+    lvLabelEl.className = 'level' + (done ? ' done' : '');
+
+    document.getElementById('btnPrev').disabled = (lvIndex === 0);
+    document.getElementById('btnNext').disabled = (lvIndex === LEVELS.length - 1);
+  }
+
+  function startTimer() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(function () {
+      if (!started || won) return;           // idempotent: never throws, just refreshes
+      var sec = Math.floor((Date.now() - startTime) / 1000);
+      timeEl.textContent = fmt(sec);
+    }, 250);
+  }
+
+  /* ---------------------------------------------------------------- dialog */
+
+  function showOverlay(el) { el.classList.add('show'); }
+  function hideOverlay(el) { el.classList.remove('show'); }
+
+  function finish() {
+    won = true;
+    if (timer) { clearInterval(timer); timer = null; }
+    markCleared(lvIndex);
+    var best = bestSteps(lvIndex);
+    if (best == null || moves < best) setBest(lvIndex, moves);
+    updateHud();
+
+    var last = lvIndex === LEVELS.length - 1;
+    dlgTitleEl.textContent = last ? T.t('allDone') : T.t('wonTitle');
+    dlgSubEl.textContent = T.t('wonSub', { moves: moves, time: fmt(Math.floor((Date.now() - startTime) / 1000)) });
+    dlgNextEl.textContent = last ? T.t('replay') : T.t('nextLevel');
+    showOverlay(winEl);
+  }
+
+  function closeWin() { hideOverlay(winEl); }
+
+  function advance() {
+    closeWin();
+    if (lvIndex < LEVELS.length - 1) lvIndex++;
+    beginLevel();
+  }
+
+  // Reset the current level and (re)start play; used by Start, Restart (R) and Next.
+  function beginLevel() {
+    build(lvIndex);
+    selected = null;
+    moves = 0;
+    history = [];
+    won = false;
+    started = true;
+    startTime = Date.now();
+    setControls(true);
+    startTimer();
+    updateHud();
+  }
+
+  function startGame() {
+    hideOverlay(startEl);
+    beginLevel();
+  }
+
+  function restartLevel() { beginLevel(); }
+
+  function newGame() {
+    if (timer) { clearInterval(timer); timer = null; }
+    lvIndex = 0;
+    build(0);
+    started = false;
+    won = false;
+    moves = 0;
+    history = [];
+    selected = null;
+    setControls(false);
+    updateHud();
+    showOverlay(startEl);
+  }
+
+  function go(delta) {
+    var n = lvIndex + delta;
+    if (n < 0 || n >= LEVELS.length) return;
+    lvIndex = n;
+    build(lvIndex);
+    selected = null;
+    moves = 0;
+    history = [];
+    won = false;
+    if (started) { startTime = Date.now(); startTimer(); }
+    updateHud();
+  }
+
+  function setControls(enabled) {
+    ['btnUndo', 'btnRestart', 'btnUp', 'btnDown', 'btnLeft', 'btnRight']
+      .forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+      });
+  }
+
+  /* ---------------------------------------------------------------- events */
+
+  function bind(id, fn) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  }
+
+  bind('btnPrev',    function () { go(-1); });
+  bind('btnNext',    function () { go(1); });
+  bind('btnUndo',    undo);
+  bind('btnRestart', restartLevel);
+  bind('btnNewGame', newGame);
+  bind('btnStart',   startGame);
+  bind('btnUp',      function () { moveSelected(-1, 0); });
+  bind('btnDown',    function () { moveSelected(1, 0); });
+  bind('btnLeft',    function () { moveSelected(0, -1); });
+  bind('btnRight',   function () { moveSelected(0, 1); });
+  bind('dlgNext',    advance);
+  bind('btnWinClose', closeWin);
+
+  // Clicking a tile next to the selected piece nudges it one step that way.
+  stageEl.addEventListener('click', function (ev) {
+    var t = ev && ev.target;
+    if (t && t._pid) return;            // a piece was clicked — handled by its own listener
+    if (!started || won || !selected || !t || !t._cell) return;
+    var r = t._cell.r, c = t._cell.c;
+    for (var i = 0; i < DIRS.length; i++) {
+      if (canMove(selected, DIRS[i].dr, DIRS[i].dc) && pieceCovers(selected, DIRS[i], r, c)) {
+        tryMove(selected, DIRS[i].dr, DIRS[i].dc);
+        return;
+      }
+    }
+  });
+
+  // Does moving `p` one step in dir leave its footprint covering (r,c)?
+  function pieceCovers(p, dir, r, c) {
+    var cells = footprint(p.r + dir.dr, p.c + dir.dc, p.w, p.h);
+    for (var i = 0; i < cells.length; i++)
+      if (cells[i][0] === r && cells[i][1] === c) return true;
+    return false;
+  }
+
+  window.addEventListener('keydown', function (ev) {
+    var k = ev.key;
+    var low = String(k || '').toLowerCase();
+
+    if (k === 'Escape') { closeWin(); return; }
+    if (low === 'u') { undo(); return; }
+    if (low === 'r') { restartLevel(); return; }
+
+    var dr = 0, dc = 0;
+    if (k === 'ArrowUp' || low === 'w') dr = -1;
+    else if (k === 'ArrowDown' || low === 's') dr = 1;
+    else if (k === 'ArrowLeft' || low === 'a') dc = -1;
+    else if (k === 'ArrowRight' || low === 'd') dc = 1;
+    else return;
+
+    ev.preventDefault();
+    moveSelected(dr, dc);
+  });
+
+  // Swipe anywhere on the board to push the selected piece.
+  var touchStart = null;
+  stageEl.addEventListener('touchstart', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (t) touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+
+  stageEl.addEventListener('touchend', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!touchStart || !t) return;
+    var dx = t.clientX - touchStart.x;
+    var dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) moveSelected(0, dx > 0 ? 1 : -1);
+    else moveSelected(dy > 0 ? 1 : -1, 0);
+  }, { passive: true });
+
+  window.addEventListener('resize', function () {
+    if (pieces.length) resizeStage();
+  });
+
+  T.onChange(function () {
+    updateHud();
+    if (won) finish();
+  });
+
+  /* ------------------------------------------------------------------ boot */
+
+  // The board exists immediately so the page is never a blank screen, but play
+  // is gated behind the visible Start overlay until the player opts in.
+  build(0);
+  setControls(false);
+  updateHud();
+  showOverlay(startEl);   // ensure the entry point shows even in a DOM that ignores HTML classes
+  T.start();
+})();
+</script>
+</body>
+</html>

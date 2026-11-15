@@ -999,6 +999,17 @@ export default {
   },
   games: {
     title: 'Games',
+    embedded: {
+      xiangqi: { title: 'Chinese Chess', desc: 'Cross the river and outplay the computer, three difficulty levels' },
+      reversi: { title: 'Reversi', desc: 'Sandwich discs to flip them; whoever holds more at the end wins' },
+      sokoban: { title: 'Sokoban', desc: 'Push every crate onto a target — pushing only, no pulling' },
+      klotski: { title: 'Klotski', desc: 'Slide the blocks aside and free Cao Cao from the frame' },
+      nonogram: { title: 'Nonogram', desc: 'Fill cells by the row and column clues to reveal a picture' },
+      match3: { title: 'Match 3', desc: 'Swap neighbouring gems, line up three or more, and chain for combo points' },
+      bubble: { title: 'Bubble Shooter', desc: 'Aim and fire; three bubbles of a colour pop once they touch' },
+      pinball: { title: 'Pinball', desc: 'Flip the paddles and keep the ball off the drain' },
+      trex: { title: 'Dino Run', desc: 'Leap over cacti, duck under pterodactyls, and see how far you get' },
+    },
     match: {
       tag: 'Family duel',
       vs: 'Opponent: {opponent}',

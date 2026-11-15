@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bubble Shooter</title>
+<style>
+  :root {
+    --bg: #0f1226;
+    --panel: #1a1f3a;
+    --border: #2c3358;
+    --text: #eef1ff;
+    --muted: #9aa3c7;
+    --accent: #7c9cff;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 18px 12px 40px;
+    background: radial-gradient(120% 120% at 50% 0%, #1b2148 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 2px; font-size: 28px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    width: min(440px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .stat {
+    background: #11152e;
+    color: #b9c4ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .stat small { font-weight: 400; opacity: .65; font-size: 11px; }
+  .stat b { color: #fff; }
+
+  select {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: #11152e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  select:disabled { opacity: .45; cursor: not-allowed; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #11152e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary {
+    background: linear-gradient(160deg, #8aa2ff, #5b78f5);
+    border-color: #5b78f5;
+    color: #fff;
+    font-weight: 700;
+  }
+  button.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+
+  #board {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #141935, #0e1126);
+    border: 1px solid var(--border);
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 22, .62);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 30px 22px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 12px 44px rgba(0,0,0,.45);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  #dlgTitle { margin: 0 0 8px; font-size: 22px; }
+  #dlgSub {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 14px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  .dialog p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .dialog kbd {
+    display: inline-block;
+    min-width: 16px;
+    padding: 1px 6px;
+    margin: 0 1px;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: #11152e;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 23px; }
+    .panel { padding: 10px; }
+    .bar { gap: 5px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="shots"></small> <b id="shots">0</b></span>
+    <span class="stat"><small data-i18n="progress"></small> <b id="progress">-</b></span>
+    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+    <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
+    <label class="stat" style="gap:6px">
+      <span data-i18n="difficulty"></span>
+      <select id="difficulty">
+        <option value="easy" data-i18n="diff_easy"></option>
+        <option value="normal" selected data-i18n="diff_normal"></option>
+        <option value="hard" data-i18n="diff_hard"></option>
+      </select>
+    </label>
+    <button id="btnNew" data-i18n="newgame"></button>
+  </div>
+  <canvas id="board"></canvas>
+</div>
+
+<!-- Start overlay: the only required entry point from the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="aimhtml"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown on game over or board cleared. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <button id="dlgBtn" class="primary" data-i18n="replay"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Bubble Shooter — a single-file, zero-dependency canvas game.
+ *
+ * Coordinate model (hex / staggered grid):
+ *   - Even rows are flush-left; odd rows are shifted right by one radius.
+ *   - A bubble in (r, c) has center:
+ *       x = (r even ? c*CELL + R : c*CELL + 2R)
+ *       y = CEIL_Y + R + r * ROW_H
+ *   - The six neighbours of a cell depend on row parity (see neighbors()).
+ *
+ * The whole script is written at the top level (no IIFE) on purpose: under the
+ * test harness every `var`/function lands on the vm global, so the logic suite
+ * can read internal state directly. Nothing here relies on browser-only globals
+ * at load time, so it also boots cleanly inside the stub DOM used by smoke.js.
+ * ========================================================================== */
+
+var T = LiteI18N.create({
+  title:      { en: 'Bubble Shooter', zh: '泡泡龙' },
+  tip:        { en: 'Match 3+ same-colour bubbles — clear the board before it drops',
+                zh: '三个及以上同色泡泡相连即可消除 —— 在泡泡压到警戒线前清空棋盘' },
+  score:      { en: 'Score', zh: '得分' },
+  shots:      { en: 'Shots', zh: '发射' },
+  progress:   { en: 'Drop in', zh: '下压' },
+  best:       { en: 'Best', zh: '最佳' },
+  level:      { en: 'Level', zh: '难度' },
+  difficulty: { en: 'Difficulty', zh: '难度' },
+  diff_easy:  { en: 'Easy', zh: '简单' },
+  diff_normal:{ en: 'Normal', zh: '普通' },
+  diff_hard:  { en: 'Hard', zh: '困难' },
+  newgame:    { en: 'New Game', zh: '重开' },
+  start:      { en: 'Start Game', zh: '开始游戏' },
+  replay:     { en: 'Play Again', zh: '再玩一次' },
+  gameover:   { en: 'Game Over', zh: '游戏结束' },
+  cleared:    { en: 'Board Cleared!', zh: '通关啦！' },
+  resultSub:  { en: 'Score {score} · Best {best}', zh: '得分 {score} · 最佳 {best}' },
+  aimhtml:    {
+    en: 'Aim with mouse / touch · rotate with <kbd>&larr;</kbd> <kbd>&rarr;</kbd> · ' +
+         'shoot with <kbd>Space</kbd> or click',
+    zh: '移动鼠标 / 手指瞄准 · <kbd>&larr;</kbd> <kbd>&rarr;</kbd> 旋转 · ' +
+         '<kbd>空格</kbd> 或点击发射'
+  }
+});
+
+/* ---------------------------------------------------------------- geometry */
+var R = 14;                       // bubble radius
+var COLS = 14;                    // bubbles per row
+var CELL = 2 * R;                 // horizontal spacing between even-row columns
+var FIELD_W = COLS * CELL + R;    // playfield width (odd rows just fit)
+var ROW_H = R * Math.sqrt(3);     // vertical spacing between rows (hex packing)
+var CEIL_Y = 8;                   // y of the ceiling line
+var FIELD_H = 600;                // canvas height
+var WARN_Y = FIELD_H - 56;        // bubbles below this line end the game
+var SHOOTER_X = FIELD_W / 2;
+var SHOOTER_Y = FIELD_H - 22;
+var SPEED = 7;                    // bubble travel speed (px per frame step)
+var MAX_ROWS = 60;                // hard cap so the grid can never grow forever
+
+var PALETTE =        ['#ef4444', '#f59e0b', '#facc15', '#22c55e', '#3b82f6', '#a855f7'];
+var PALETTE_LIGHT =  ['#fca5a5', '#fcd34d', '#fde68a', '#86efac', '#93c5fd', '#d8b4fe'];
+
+var DIFF = {
+  easy:   { colors: 4, initRows: 5, pushEvery: 8 },
+  normal: { colors: 5, initRows: 6, pushEvery: 6 },
+  hard:   { colors: 6, initRows: 7, pushEvery: 5 }
+};
+
+/* ------------------------------------------------------------------- state */
+var grid = [];            // grid[r][c] = colour index, or -1 when empty
+var state = 'ready';      // 'ready' | 'playing' | 'over'
+var diffKey = 'normal';
+var config = DIFF[diffKey];
+var score = 0;
+var shots = 0;
+var best = 0;
+var curColor = 0;         // colour loaded in the cannon
+var nextColor = 0;        // colour shown in the "next" preview
+var flying = null;        // the bubble in flight, or null
+var aimAngle = -Math.PI / 2;  // straight up by default
+var particles = [];       // simple pop animation
+
+/* --------------------------------------------------------------------- dom */
+var canvas = document.getElementById('board');
+var ctx = canvas.getContext('2d');
+var scoreEl = document.getElementById('score');
+var shotsEl = document.getElementById('shots');
+var progressEl = document.getElementById('progress');
+var bestEl = document.getElementById('best');
+var levelLabelEl = document.getElementById('levelLabel');
+var diffEl = document.getElementById('difficulty');
+var btnNew = document.getElementById('btnNew');
+var startOverlay = document.getElementById('startOverlay');
+var overlay = document.getElementById('overlay');
+var dlgTitle = document.getElementById('dlgTitle');
+var dlgSub = document.getElementById('dlgSub');
+var dlgBtn = document.getElementById('dlgBtn');
+
+// Size the canvas once; geometry always uses FIELD_W / FIELD_H, never ctx.canvas.
+canvas.width = FIELD_W;
+canvas.height = FIELD_H;
+
+/* ------------------------------------------------------------- grid helpers */
+function centerX(r, c) {
+  return (r % 2 === 0 ? c * CELL + R : c * CELL + 2 * R);
+}
+function centerY(r) {
+  return CEIL_Y + R + r * ROW_H;
+}
+
+// The six neighbours of (r, c), filtered to in-bounds cells. Parity matters:
+// odd rows are shifted right, so their up/down neighbours are offset by +1 col.
+function neighbors(r, c) {
+  var even = (r % 2 === 0);
+  var raw = even
+    ? [[r, c - 1], [r, c + 1], [r - 1, c - 1], [r - 1, c], [r + 1, c - 1], [r + 1, c]]
+    : [[r, c - 1], [r, c + 1], [r - 1, c], [r - 1, c + 1], [r + 1, c], [r + 1, c + 1]];
+  var out = [];
+  for (var i = 0; i < raw.length; i++) {
+    var nr = raw[i][0], nc = raw[i][1];
+    if (nr >= 0 && nc >= 0 && nc < COLS) out.push([nr, nc]);
+  }
+  return out;
+}
+
+function getColor(r, c) {
+  if (r < 0 || r >= grid.length) return -1;
+  if (c < 0 || c >= COLS) return -1;
+  var v = grid[r][c];
+  return v == null ? -1 : v;
+}
+function setColor(r, c, v) {
+  while (grid.length <= r) {
+    var row = [];
+    for (var i = 0; i < COLS; i++) row[i] = -1;
+    grid.push(row);
+  }
+  grid[r][c] = v;
+}
+function totalFilled() {
+  var n = 0;
+  for (var r = 0; r < grid.length; r++) {
+    if (!grid[r]) continue;
+    for (var c = 0; c < COLS; c++) if (grid[r][c] >= 0) n++;
+  }
+  return n;
+}
+
+/* ------------------------------------------------------- match / float rules */
+// Flood fill over same-colour, connected cells starting from (r, c).
+function findGroup(r, c) {
+  var color = getColor(r, c);
+  if (color < 0) return [];
+  var visited = {};
+  var stack = [[r, c]];
+  var out = [];
+  while (stack.length) {
+    var p = stack.pop();
+    var key = p[0] + ',' + p[1];
+    if (visited[key]) continue;
+    visited[key] = true;
+    out.push(p);
+    var ns = neighbors(p[0], p[1]);
+    for (var i = 0; i < ns.length; i++) {
+      var nr = ns[i][0], nc = ns[i][1];
+      var k2 = nr + ',' + nc;
+      if (!visited[k2] && getColor(nr, nc) === color) stack.push([nr, nc]);
+    }
+  }
+  return out;
+}
+
+// Cells filled but NOT connected (through any colour) to the top row are
+// "floating" and should drop. We flood from every filled cell in row 0.
+function findFloating() {
+  var visited = {};
+  var stack = [];
+  for (var c = 0; c < COLS; c++) {
+    if (getColor(0, c) >= 0) { visited['0,' + c] = true; stack.push([0, c]); }
+  }
+  while (stack.length) {
+    var p = stack.pop();
+    var ns = neighbors(p[0], p[1]);
+    for (var i = 0; i < ns.length; i++) {
+      var nr = ns[i][0], nc = ns[i][1];
+      var k = nr + ',' + nc;
+      if (!visited[k] && getColor(nr, nc) >= 0) { visited[k] = true; stack.push([nr, nc]); }
+    }
+  }
+  var out = [];
+  for (var r = 0; r < grid.length; r++) {
+    if (!grid[r]) continue;
+    for (var cc = 0; cc < COLS; cc++) {
+      if (grid[r][cc] >= 0 && !visited[r + ',' + cc]) out.push([r, cc]);
+    }
+  }
+  return out;
+}
+
+// Resolve a pixel position to the nearest empty grid cell (where a moving
+// bubble should stick). Mirrors the in-game attachment logic without firing.
+function resolveCell(x, y) {
+  var r = Math.round((y - CEIL_Y - R) / ROW_H);
+  if (r < 0) r = 0;
+  var maxR = Math.floor((WARN_Y - CEIL_Y - R) / ROW_H);
+  if (r > maxR) r = maxR;
+  var c = Math.round((x - ((r % 2 === 0) ? R : 2 * R)) / CELL);
+  if (c < 0) c = 0;
+  if (c > COLS - 1) c = COLS - 1;
+  if (getColor(r, c) >= 0) {
+    var bestCell = null, bestD = Infinity;
+    var cands = [[r, c]].concat(neighbors(r, c));
+    for (var i = 0; i < cands.length; i++) {
+      var nr = cands[i][0], nc = cands[i][1];
+      if (nr < 0 || nc < 0 || nc >= COLS) continue;
+      if (getColor(nr, nc) >= 0) continue;
+      var dx = x - centerX(nr, nc), dy = y - centerY(nr);
+      var d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; bestCell = [nr, nc]; }
+    }
+    if (bestCell) return bestCell;
+  }
+  return [r, c];
+}
+
+// Run the match + drop pipeline for a freshly placed bubble. Returns what
+// happened so the UI (and tests) can assert on it.
+function applyMatches(r, c) {
+  var group = findGroup(r, c);
+  var removed = 0, dropped = 0;
+  if (group.length >= 3) {
+    for (var i = 0; i < group.length; i++) {
+      spawnParticles(centerX(group[i][0], group[i][1]), centerY(group[i][0]), getColor(group[i][0], group[i][1]));
+      setColor(group[i][0], group[i][1], -1);
+    }
+    removed = group.length;
+    var floating = findFloating();
+    for (var j = 0; j < floating.length; j++) {
+      spawnParticles(centerX(floating[j][0], floating[j][1]), centerY(floating[j][0]), getColor(floating[j][0], floating[j][1]));
+      setColor(floating[j][0], floating[j][1], -1);
+    }
+    dropped = floating.length;
+  }
+  return { removed: removed, dropped: dropped };
+}
+
+/* ------------------------------------------------------------ game lifecycle */
+function randColor() {
+  return Math.floor(Math.random() * config.colors);
+}
+
+function setupBoard() {
+  config = DIFF[diffKey];
+  grid = [];
+  for (var r = 0; r < config.initRows; r++) {
+    for (var c = 0; c < COLS; c++) setColor(r, c, randColor());
+  }
+  score = 0;
+  shots = 0;
+  flying = null;
+  particles = [];
+  curColor = randColor();
+  nextColor = randColor();
+  aimAngle = -Math.PI / 2;
+  state = 'ready';
+  startOverlay.classList.add('show');
+  overlay.classList.remove('show');
+  updateHud();
+}
+
+function startGame() {
+  if (state === 'playing') return;   // already running, ignore stray clicks
+  loadBest();
+  state = 'playing';
+  startOverlay.classList.remove('show');
+  overlay.classList.remove('show');
+  updateHud();
+}
+
+function restart() {
+  setupBoard();
+  startGame();
+}
+
+function fire() {
+  if (state !== 'playing' || flying) return;
+  var vx = Math.cos(aimAngle) * SPEED;
+  var vy = Math.sin(aimAngle) * SPEED;
+  flying = { x: SHOOTER_X, y: SHOOTER_Y, vx: vx, vy: vy, color: curColor };
+  shots++;
+  curColor = nextColor;
+  nextColor = randColor();
+  updateHud();
+}
+
+function stepPhysics() {
+  if (!flying) return;
+  flying.x += flying.vx;
+  flying.y += flying.vy;
+  // Left / right wall bounce (at most once per frame; both walls possible).
+  if (flying.x - R < 0) { flying.x = R; flying.vx = -flying.vx; }
+  if (flying.x + R > FIELD_W) { flying.x = FIELD_W - R; flying.vx = -flying.vx; }
+  // Reached the ceiling -> stick.
+  if (flying.y - R <= CEIL_Y) { attach(); return; }
+  // Collided with an existing bubble -> stick to the nearest empty cell.
+  var hit = false;
+  for (var r = 0; r < grid.length; r++) {
+    var row = grid[r];
+    if (!row) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (row[c] < 0) continue;
+      var dx = flying.x - centerX(r, c);
+      var dy = flying.y - centerY(r);
+      if (dx * dx + dy * dy < (2 * R * 0.92) * (2 * R * 0.92)) { hit = true; break; }
+    }
+    if (hit) break;
+  }
+  if (hit) attach();
+}
+
+function attach() {
+  var cell = resolveCell(flying.x, flying.y);
+  var r = cell[0], c = cell[1];
+  setColor(r, c, flying.color);
+  flying = null;
+
+  var res = applyMatches(r, c);
+  if (res.removed > 0) {
+    score += res.removed * 10 + res.dropped * 20 + (res.dropped > 0 ? 50 : 0);
+  }
+
+  // Descend the ceiling every N shots.
+  if (shots % config.pushEvery === 0) pushRow();
+
+  if (score > best) { best = score; saveBest(); }
+
+  if (totalFilled() === 0) { endGame('cleared'); }
+  else if (checkGameOver()) { /* endGame already called */ }
+  updateHud();
+}
+
+function pushRow() {
+  var row = [];
+  for (var c = 0; c < COLS; c++) row[c] = randColor();
+  grid.unshift(row);   // parity flips for every existing row, which is correct
+}
+
+function checkGameOver() {
+  for (var r = 0; r < grid.length; r++) {
+    if (!grid[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (grid[r][c] >= 0 && centerY(r) + R > WARN_Y) { endGame('gameover'); return true; }
+    }
+  }
+  return false;
+}
+
+function endGame(kind) {
+  state = 'over';
+  dlgTitle.textContent = T.t(kind === 'cleared' ? 'cleared' : 'gameover');
+  dlgSub.textContent = T.t('resultSub', { score: score, best: best });
+  overlay.classList.add('show');
+  updateHud();
+}
+
+/* --------------------------------------------------------------- particles */
+function spawnParticles(cx, cy, color) {
+  if (color < 0) return;
+  for (var i = 0; i < 6; i++) {
+    var a = Math.random() * Math.PI * 2;
+    var sp = 1 + Math.random() * 2.5;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: 18 + Math.floor(Math.random() * 10),
+      color: color
+    });
+  }
+}
+function updateParticles() {
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+/* ------------------------------------------------------------------ render */
+function drawBubble(cx, cy, colorIdx, scale) {
+  if (colorIdx < 0) return;
+  var rad = R * (scale || 1);
+  var col = PALETTE[colorIdx] || '#888';
+  var light = PALETTE_LIGHT[colorIdx] || '#bbb';
+  var g = ctx.createRadialGradient(cx - rad * 0.35, cy - rad * 0.35, rad * 0.15, cx, cy, rad);
+  g.addColorStop(0, light);
+  g.addColorStop(1, col);
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  // glossy highlight
+  ctx.beginPath();
+  ctx.arc(cx - rad * 0.3, cy - rad * 0.35, rad * 0.22, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+}
+
+function render() {
+  ctx.clearRect(0, 0, FIELD_W, FIELD_H);
+
+  // ceiling
+  ctx.fillStyle = 'rgba(124,156,255,0.25)';
+  ctx.fillRect(0, 0, FIELD_W, CEIL_Y);
+
+  // warning line
+  ctx.strokeStyle = 'rgba(248,113,113,0.55)';
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(0, WARN_Y);
+  ctx.lineTo(FIELD_W, WARN_Y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // filled bubbles
+  for (var r = 0; r < grid.length; r++) {
+    if (!grid[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (grid[r][c] >= 0) drawBubble(centerX(r, c), centerY(r), grid[r][c], 1);
+    }
+  }
+
+  // particles
+  for (var i = 0; i < particles.length; i++) {
+    var p = particles[i];
+    ctx.globalAlpha = Math.max(0, p.life / 24);
+    drawBubble(p.x, p.y, p.color, 0.5);
+    ctx.globalAlpha = 1;
+  }
+
+  // flying bubble
+  if (flying) drawBubble(flying.x, flying.y, flying.color, 1);
+
+  // aim guide (only while playing and not mid-flight)
+  if (state === 'playing' && !flying) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(SHOOTER_X, SHOOTER_Y);
+    ctx.lineTo(SHOOTER_X + Math.cos(aimAngle) * 120, SHOOTER_Y + Math.sin(aimAngle) * 120);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawBubble(SHOOTER_X, SHOOTER_Y, curColor, 1);
+  }
+
+  // cannon base
+  ctx.fillStyle = '#2c3358';
+  ctx.beginPath();
+  ctx.arc(SHOOTER_X, SHOOTER_Y, R + 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // next-bubble preview, bottom-right corner
+  var nx = FIELD_W - 30, ny = FIELD_H - 24;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath();
+  ctx.arc(nx, ny, R + 8, 0, Math.PI * 2);
+  ctx.fill();
+  drawBubble(nx, ny, nextColor, 0.92);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '10px sans-serif';
+  ctx.fillText('NEXT', nx - 12, ny - R - 12);
+}
+
+/* --------------------------------------------------------------------- loop */
+function loop() {
+  if (state === 'playing' && flying) stepPhysics();
+  updateParticles();
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ---------------------------------------------------------------------- hud */
+function loadBest() {
+  try {
+    var v = parseInt(localStorage.getItem('bubble_best') || '0', 10);
+    best = isNaN(v) ? 0 : v;
+  } catch (e) { best = 0; }
+}
+function saveBest() {
+  try { localStorage.setItem('bubble_best', String(best)); } catch (e) {}
+}
+
+function updateHud() {
+  if (scoreEl) scoreEl.textContent = String(score);
+  if (shotsEl) shotsEl.textContent = String(shots);
+  if (progressEl) progressEl.textContent = String(config.pushEvery - (shots % config.pushEvery));
+  if (bestEl) bestEl.textContent = String(best);
+  if (levelLabelEl) levelLabelEl.textContent = T.t('diff_' + diffKey);
+  if (btnNew) btnNew.disabled = (state === 'ready');
+  if (diffEl) diffEl.disabled = (state === 'playing');
+}
+
+/* ---------------------------------------------------------------- controls */
+function clampAim() {
+  var min = -Math.PI + 0.12, max = -0.12;
+  if (aimAngle > max) aimAngle = max;
+  if (aimAngle < min) aimAngle = min;
+}
+
+function aimFromEvent(ev) {
+  if (typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return; // stub-safe
+  var rect = canvas.getBoundingClientRect();
+  var sx = rect.width ? (FIELD_W / rect.width) : 1;
+  var sy = rect.height ? (FIELD_H / rect.height) : 1;
+  var fx = (ev.clientX - rect.left) * sx;
+  var fy = (ev.clientY - rect.top) * sy;
+  var dx = fx - SHOOTER_X, dy = fy - SHOOTER_Y;
+  if (dy > -2) return;               // never aim downward
+  aimAngle = Math.atan2(dy, dx);
+  clampAim();
+}
+
+/* ---------------------------------------------------------------- listeners */
+function bindClick(id, fn) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+
+bindClick('btnStart', startGame);
+bindClick('btnNew', restart);
+bindClick('dlgBtn', restart);
+
+canvas.addEventListener('mousemove', function (ev) { aimFromEvent(ev); });
+canvas.addEventListener('click', function (ev) { aimFromEvent(ev); fire(); });
+
+canvas.addEventListener('touchstart', function (ev) {
+  var t = ev.changedTouches && ev.changedTouches[0];
+  if (t) aimFromEvent(t);
+}, { passive: true });
+canvas.addEventListener('touchmove', function (ev) {
+  var t = ev.changedTouches && ev.changedTouches[0];
+  if (t) aimFromEvent(t);
+  if (ev.preventDefault) ev.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', function (ev) {
+  if (ev.preventDefault) ev.preventDefault();
+  fire();
+}, { passive: false });
+
+if (diffEl) diffEl.addEventListener('change', function () {
+  diffKey = diffEl.value || 'normal';
+  if (state !== 'playing') setupBoard();   // only re-roll while not mid-game
+});
+
+// Backdrop click closes the result dialog (a fresh game is one tap away).
+overlay.addEventListener('click', function (ev) {
+  if (ev.target === overlay) overlay.classList.remove('show');
+});
+
+window.addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  if (state === 'ready' || state === 'over') {
+    if (k === ' ' || k === 'Enter') { if (ev.preventDefault) ev.preventDefault(); startGame(); }
+    return;
+  }
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') { aimAngle -= 0.06; clampAim(); if (ev.preventDefault) ev.preventDefault(); }
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { aimAngle += 0.06; clampAim(); if (ev.preventDefault) ev.preventDefault(); }
+  else if (k === ' ') { if (ev.preventDefault) ev.preventDefault(); fire(); }
+});
+
+window.addEventListener('resize', function () { /* canvas scales via CSS; nothing to recompute */ });
+
+T.onChange(function () { updateHud(); });
+
+/* --------------------------------------------------------------------- boot */
+setupBoard();   // build a board and show the start overlay
+T.start();      // apply language + mount the switcher (always last)
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

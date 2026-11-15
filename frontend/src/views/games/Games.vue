@@ -248,6 +248,15 @@ import {
   Cherry,
   Medal,
   Promotion,
+  Flag,
+  GoldMedal,
+  Suitcase,
+  Platform,
+  DataBoard,
+  Star,
+  Grape,
+  Basketball,
+  Compass,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -262,6 +271,7 @@ import { useAudience } from '@/composables/useAudience'
 import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
+import { EMBEDDED_GAMES } from '@/utils/games/embeddedGames'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 
 const router = useRouter()
@@ -279,6 +289,27 @@ const loading = ref(false)
 const activeCategory = ref('ALL')
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
+
+/** 开源小游戏整包(public/mini-games/*):只在这里挂图标与站内路由,元数据见 utils/games/embeddedGames.js */
+const EMBEDDED_ICONS = {
+  xiangqi: Flag,
+  reversi: GoldMedal,
+  sokoban: Suitcase,
+  klotski: Platform,
+  nonogram: DataBoard,
+  match3: Star,
+  bubble: Grape,
+  pinball: Basketball,
+  trex: Compass,
+}
+const embeddedEntries = EMBEDDED_GAMES.map((g) => ({
+  key: `embed-${g.slug}`,
+  titleKey: g.titleKey,
+  descKey: g.descKey,
+  icon: EMBEDDED_ICONS[g.slug] || MagicStick,
+  path: `/games/embed/${g.slug}`,
+  category: g.category,
+}))
 
 /** 站内固定入口也按同一套分类参与筛选;图标直接引用组件 */
 const builtinGames = [
@@ -354,6 +385,7 @@ const builtinGames = [
     path: '/games/mahjong',
     category: 'CASUAL',
   },
+  ...embeddedEntries,
 ]
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))

@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数织 Nonogram</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --danger: #e24b4a;
+    --cell-line: #c7cdd6;
+    --clue: #4b5563;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 12px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; max-width: 560px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.06); color: #fff; }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 56px;
+    text-align: center;
+  }
+  .stat small { font-weight: 400; opacity: .65; font-size: 11px; }
+
+  .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+  .chk input { accent-color: var(--accent); }
+
+  #patternInfo { font-size: 13px; color: var(--muted); margin-bottom: 8px; min-height: 18px; }
+
+  #frame {
+    display: grid;
+    gap: 0;
+    margin: 0 auto;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .cell {
+    border: 1px solid var(--cell-line);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .cell.fill { background: #34404f; color: #34404f; }
+  .cell.mark { color: var(--muted); }
+  .cell.err  { background: var(--danger); color: #fff; }
+  /* thicker separators every 5 cells for readability */
+  .cell.sep-r { border-right: 2px solid var(--clue); }
+  .cell.sep-b { border-bottom: 2px solid var(--clue); }
+
+  .clue {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--clue);
+    font-size: 100%;
+  }
+  .clue.done { opacity: .3; text-decoration: line-through; }
+
+  #status {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 20px;
+    text-align: center;
+    color: var(--good);
+  }
+
+  /* ---------- overlays (start + win) ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 22, 30, .5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 26px 30px 22px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .dialog h2 { margin: 0 0 6px; font-size: 22px; }
+  .dialog .sub { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+  .size-buttons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .size-buttons button { padding: 10px; font-size: 14px; font-weight: 600; }
+  .dialog .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .dialog .actions button { padding: 10px 20px; font-size: 14px; font-weight: 600; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 10px; }
+    .bar { gap: 6px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .stat { min-width: 48px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<!-- Start overlay: the visible entry point before a puzzle is generated. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="startTitle"></h2>
+    <p class="sub" data-i18n="startSub"></p>
+    <div class="size-buttons">
+      <button id="size5" data-i18n="sizeNewbie"></button>
+      <button id="size10" data-i18n="sizeNormal"></button>
+      <button id="size15" data-i18n="sizeHard"></button>
+    </div>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="bar">
+    <div class="stat"><small data-i18n="time"></small> <span id="time">0</span></div>
+    <div class="stat"><small data-i18n="progress"></small> <span id="progress">0/0</span></div>
+    <div class="stat"><small data-i18n="hints"></small> <span id="hints">0</span></div>
+    <button id="btnHint" data-i18n="hint"></button>
+    <button id="btnUndo" data-i18n="undo"></button>
+    <button id="btnRestart" data-i18n="restart"></button>
+    <button id="btnNew" data-i18n="newGame"></button>
+    <label class="chk"><input type="checkbox" id="errToggle" checked> <span data-i18n="errors"></span></label>
+  </div>
+  <div id="patternInfo"></div>
+  <div id="frame"></div>
+  <div id="status"></div>
+</div>
+
+<!-- Win overlay -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p class="sub" id="dlgSub"></p>
+    <div class="actions">
+      <button id="dlgNext" class="primary"></button>
+      <button id="dlgClose"></button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* =========================================================================
+ * Nonogram / Picross — zero-dependency single-file game.
+ *
+ * Puzzle generation guarantees a UNIQUE solution by construction: every
+ * generated puzzle is verified by a constraint-propagation solver (the same
+ * solver exposed for tests) before it is handed to the player.
+ * ========================================================================= */
+
+var T = LiteI18N.create({
+  title:     { en: 'Nonogram', zh: '数织' },
+  tip: {
+    en: 'Fill the grid so every row and column matches its number clues. ' +
+        'Left click cycles empty → filled → ✕ → empty; right click marks ✕.',
+    zh: '根据每行每列的数字线索填色。左键循环 空 → 填色 → ✕ → 空；右键直接标 ✕。'
+  },
+  startTitle:{ en: 'Nonogram', zh: '数织' },
+  startSub:  { en: 'Pick a size and start', zh: '选择尺寸后开始' },
+  sizeNewbie:{ en: '5×5 · Newbie', zh: '5×5 · 新手' },
+  sizeNormal:{ en: '10×10 · Normal', zh: '10×10 · 普通' },
+  sizeHard:  { en: '15×15 · Hard', zh: '15×15 · 困难' },
+  start:     { en: 'Start', zh: '开始' },
+  time:      { en: 'Time', zh: '用时' },
+  progress:  { en: 'Progress', zh: '进度' },
+  hints:     { en: 'Hints', zh: '提示' },
+  hint:      { en: 'Hint', zh: '提示' },
+  undo:      { en: 'Undo', zh: '撤销' },
+  restart:   { en: 'Restart', zh: '重开' },
+  newGame:   { en: 'New game', zh: '换一题' },
+  errors:    { en: 'Error highlight', zh: '错误提示' },
+  pattern:   { en: 'Pattern: {name}', zh: '图案：{name}' },
+  wonTitle:  { en: 'Solved!', zh: '完成！' },
+  wonSub:    { en: 'Time {sec}s · {hints} hints', zh: '用时 {sec} 秒 · 提示 {hints} 次' },
+  next:      { en: 'Next puzzle', zh: '下一题' },
+  close:     { en: 'Close', zh: '关闭' }
+});
+
+/* ----------------------------------------------------- built-in patterns
+ * Hand-drawn pixel art. Each grid is stored as rows of '0'/'1'. They were
+ * verified (offline) to yield exactly one solution. `sym` (if set) is the
+ * declared symmetry, asserted by the test suite. */
+var PATTERNS = {
+  5: [
+    { en: 'Heart',   zh: '心形', sym: null, grid: ["11010","11111","11111","01110","00100"] },
+    { en: 'Smiley',  zh: '笑脸', sym: 'h',  grid: ["01110","10101","10101","10001","01110"] },
+    { en: 'Cat',     zh: '小猫', sym: 'h',  grid: ["10001","11011","11111","10101","01010"] },
+    { en: 'Rocket',  zh: '飞船', sym: null, grid: ["00100","01110","11111","10101","11010"] },
+    { en: 'Mushroom',zh: '蘑菇', sym: null, grid: ["00100","01110","11111","11010","11010"] },
+    { en: 'Key',     zh: '钥匙', sym: null, grid: ["10101","11111","00100","00101","00101"] },
+    { en: 'Cup',     zh: '咖啡杯', sym: null, grid: ["01110","11111","11110","10101","01010"] },
+    { en: 'Note',    zh: '音符', sym: null, grid: ["00010","00010","00111","01001","01111"] },
+    { en: 'Fish',    zh: '小鱼', sym: null, grid: ["11000","11111","01111","11111","01000"] },
+    { en: 'Star',    zh: '星星', sym: 'h',  grid: ["00100","01110","11111","01110","10101"] }
+  ],
+  10: [
+    { en: 'Heart',   zh: '心形', sym: null, grid: ["0010000100","0111101111","1111111111","1111111111","1111111111","0111111110","0011111100","0001111000","0000110000","0000010000"] },
+    { en: 'Smiley',  zh: '笑脸', sym: null, grid: ["0001111000","0111111110","1101111011","1101111010","1111111111","1111111111","1101111011","0101001010","0111111110","0001111000"] },
+    { en: 'Cat',     zh: '小猫', sym: null, grid: ["1010000101","1010110101","1111111111","1101111011","1010010101","1010010101","1111111111","1101111011","1010000101","1010000101"] },
+    { en: 'Mushroom',zh: '蘑菇', sym: 'h',  grid: ["0001111000","0111111110","1111111111","1111111111","0111111110","0000110000","0001001000","0001001000","0001111000","0000000000"] },
+    { en: 'Star',    zh: '星星', sym: null, grid: ["0000011000","0000101000","1000010000","1111111111","0111111110","0111111110","0111111110","1111111111","0000100000","0000100000"] },
+    { en: 'Fish',    zh: '小鱼', sym: 'h',  grid: ["0000110000","0001111000","1111111111","1111111111","1111111111","1111111111","1111111111","0001111000","0000110000","0000000000"] },
+    { en: 'Key',     zh: '钥匙', sym: null, grid: ["0111111000","1100001100","1100001100","0111111000","0000110000","0000110000","0000111100","0000100100","0000100100","0000111100"] },
+    { en: 'Cup',     zh: '咖啡杯', sym: null, grid: ["1111111111","1100001011","1100001011","1100001011","1111111111","1111111111","1100001011","1100001011","1111111111","0100000010"] },
+    { en: 'Note',    zh: '音符', sym: null, grid: ["0000000010","0000000010","0000000010","0000001111","0010110001","0000100001","0001100001","0010000001","0100000001","1111111110"] },
+    { en: 'Rocket',  zh: '火箭', sym: null, grid: ["0000010000","0000111000","0001111100","0011111110","0111111110","1111111011","1111111111","0101010101","0101010101","0010101000"] }
+  ]
+};
+
+/* ============================================================ solver
+ * Row/column clues describe the lengths of consecutive filled runs.
+ * The solver uses line constraint propagation (enumerate every arrangement
+ * a clue allows, then keep only the cells forced across all of them) plus
+ * backtracking when propagation stalls. */
+
+// clue from a 0/1 grid
+function computeClues(grid, N) {
+  var rowClues = [], colClues = [], r, c;
+  for (r = 0; r < N; r++) {
+    var runs = [], cnt = 0;
+    for (c = 0; c <= N; c++) {
+      if (c < N && grid[r][c]) cnt++;
+      else { if (cnt) { runs.push(cnt); cnt = 0; } }
+    }
+    rowClues.push(runs);
+  }
+  for (c = 0; c < N; c++) {
+    var runs2 = [], cnt2 = 0;
+    for (r = 0; r <= N; r++) {
+      if (r < N && grid[r][c]) cnt2++;
+      else { if (cnt2) { runs2.push(cnt2); cnt2 = 0; } }
+    }
+    colClues.push(runs2);
+  }
+  return { rowClues: rowClues, colClues: colClues };
+}
+
+// every full arrangement (0/1 array) consistent with `clue`
+function placements(clue, N) {
+  var res = [], arr = new Array(N).fill(0);
+  function rec(idx, pos) {
+    if (idx === clue.length) {
+      for (var i = pos; i < N; i++) arr[i] = 0;
+      res.push(arr.slice());
+      return;
+    }
+    var run = clue[idx], remaining = 0, k;
+    for (k = idx + 1; k < clue.length; k++) remaining += clue[k];
+    remaining += (clue.length - 1 - idx);
+    var limit = N - run - remaining;
+    for (var start = pos; start <= limit; start++) {
+      // Clear the WHOLE tail, not just [pos, start). A previous sibling (or a
+      // deeper recursion) leaves 1s anywhere after `start`, and the separator
+      // cell at start+run is never written explicitly -- stale 1s there would
+      // mint arrangements that do not match the clue (e.g. [1,1] -> 01011).
+      for (var i = pos; i < N; i++) arr[i] = 0;
+      for (var i = start; i < start + run; i++) arr[i] = 1;
+      rec(idx + 1, start + run + 1);
+    }
+  }
+  rec(0, 0);
+  return res;
+}
+
+// arrangements compatible with a partial line (0 unknown, 1 filled, 2 empty)
+function validPls(clue, line, all) {
+  var out = [];
+  for (var p = 0; p < all.length; p++) {
+    var pl = all[p], ok = true;
+    for (var i = 0; i < line.length; i++) {
+      if (line[i] === 1 && pl[i] !== 1) { ok = false; break; }
+      if (line[i] === 2 && pl[i] !== 0) { ok = false; break; }
+    }
+    if (ok) out.push(pl);
+  }
+  return out;
+}
+
+// forced cells across all compatible arrangements (null on contradiction)
+function forcedLine(vpls, N) {
+  if (vpls.length === 0) return null;
+  var forced = new Array(N).fill(0), p, i;
+  for (p = 0; p < vpls.length; p++) {
+    var pl = vpls[p];
+    for (i = 0; i < N; i++) {
+      var val = pl[i] ? 1 : 2;
+      if (forced[i] === 0) forced[i] = val;
+      else if (forced[i] !== val) forced[i] = -1;
+    }
+  }
+  for (i = 0; i < N; i++) if (forced[i] === -1) forced[i] = 0;
+  return forced;
+}
+
+function buildCache(rowClues, colClues, N) {
+  return {
+    rowAll: rowClues.map(function (cl) { return placements(cl, N); }),
+    colAll: colClues.map(function (cl) { return placements(cl, N); })
+  };
+}
+
+// Count solutions up to `limit` (defaults to 2). Returns the count, capped.
+function countSolutions(rowClues, colClues, N, limit, cache) {
+  limit = limit || 2;
+  if (!cache) cache = buildCache(rowClues, colClues, N);
+  var g = [];
+  for (var r = 0; r < N; r++) g.push(new Array(N).fill(0));
+  var nodes = { n: 0 }, CAP = 2000000;
+
+  function propagate() {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var r = 0; r < N; r++) {
+        var v = validPls(rowClues[r], g[r], cache.rowAll[r]);
+        if (v.length === 0) return false;
+        var f = forcedLine(v, N);
+        for (var c = 0; c < N; c++) if (f[c] !== 0 && g[r][c] === 0) { g[r][c] = f[c]; changed = true; }
+      }
+      for (var cc = 0; cc < N; cc++) {
+        var col = [];
+        for (var rr = 0; rr < N; rr++) col.push(g[rr][cc]);
+        var v2 = validPls(colClues[cc], col, cache.colAll[cc]);
+        if (v2.length === 0) return false;
+        var f2 = forcedLine(v2, N);
+        for (var r2 = 0; r2 < N; r2++) if (f2[r2] !== 0 && g[r2][cc] === 0) { g[r2][cc] = f2[r2]; changed = true; }
+      }
+    }
+    return true;
+  }
+  function solved() {
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (g[r][c] === 0) return false;
+    return true;
+  }
+  // branch on the most-constrained unknown cell (fewest compatible arrangements)
+  function pickCell() {
+    var br = -1, bc = -1, best = 1e9;
+    for (var r = 0; r < N; r++) {
+      var v = validPls(rowClues[r], g[r], cache.rowAll[r]), cnt = v.length, c;
+      for (c = 0; c < N; c++) if (g[r][c] === 0) {
+        var col = [];
+        for (var rr = 0; rr < N; rr++) col.push(g[rr][c]);
+        var ccnt = validPls(colClues[c], col, cache.colAll[c]).length;
+        var score = Math.max(cnt, ccnt);
+        if (score < best) { best = score; br = r; bc = c; }
+      }
+    }
+    return { r: br, c: bc };
+  }
+  function search() {
+    if (nodes.n++ > CAP) return 99;
+    if (!propagate()) return 0;
+    if (solved()) return 1;
+    var cell = pickCell(), snap = [];
+    for (var r = 0; r < N; r++) snap.push(g[r].slice());
+    var count = 0;
+    for (var v = 0; v < 2; v++) {
+      for (var r2 = 0; r2 < N; r2++) g[r2] = snap[r2].slice();
+      g[cell.r][cell.c] = v === 0 ? 1 : 2;
+      count += search();
+      if (count >= limit) return count;
+    }
+    return count;
+  }
+  return search();
+}
+
+// Return one solution grid (2D 0/1) or null.
+function findSolution(rowClues, colClues, N, cache) {
+  if (!cache) cache = buildCache(rowClues, colClues, N);
+  var g = [];
+  for (var r = 0; r < N; r++) g.push(new Array(N).fill(0));
+  function propagate() {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var r = 0; r < N; r++) {
+        var v = validPls(rowClues[r], g[r], cache.rowAll[r]);
+        if (v.length === 0) return false;
+        var f = forcedLine(v, N);
+        for (var c = 0; c < N; c++) if (f[c] !== 0 && g[r][c] === 0) { g[r][c] = f[c]; changed = true; }
+      }
+      for (var cc = 0; cc < N; cc++) {
+        var col = [];
+        for (var rr = 0; rr < N; rr++) col.push(g[rr][cc]);
+        var v2 = validPls(colClues[cc], col, cache.colAll[cc]);
+        if (v2.length === 0) return false;
+        var f2 = forcedLine(v2, N);
+        for (var r2 = 0; r2 < N; r2++) if (f2[r2] !== 0 && g[r2][cc] === 0) { g[r2][cc] = f2[r2]; changed = true; }
+      }
+    }
+    return true;
+  }
+  function solved() {
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (g[r][c] === 0) return false;
+    return true;
+  }
+  function pickCell() {
+    var br = -1, bc = -1, best = 1e9;
+    for (var r = 0; r < N; r++) {
+      var v = validPls(rowClues[r], g[r], cache.rowAll[r]), cnt = v.length, c;
+      for (c = 0; c < N; c++) if (g[r][c] === 0) {
+        var col = [];
+        for (var rr = 0; rr < N; rr++) col.push(g[rr][c]);
+        var ccnt = validPls(colClues[c], col, cache.colAll[c]).length;
+        var score = Math.max(cnt, ccnt);
+        if (score < best) { best = score; br = r; bc = c; }
+      }
+    }
+    return { r: br, c: bc };
+  }
+  function search() {
+    if (!propagate()) return false;
+    if (solved()) return true;
+    var cell = pickCell(), snap = [];
+    for (var r = 0; r < N; r++) snap.push(g[r].slice());
+    for (var v = 0; v < 2; v++) {
+      for (var r2 = 0; r2 < N; r2++) g[r2] = snap[r2].slice();
+      g[cell.r][cell.c] = v === 0 ? 1 : 2;
+      if (search()) return true;
+    }
+    return false;
+  }
+  if (search()) {
+    var out = [];
+    for (var r = 0; r < N; r++) {
+      var row = [];
+      for (var c = 0; c < N; c++) row.push(g[r][c] === 1 ? 1 : 0);
+      out.push(row);
+    }
+    return out;
+  }
+  return null;
+}
+
+// Pure line-solving: if propagation fully determines the grid, that solution
+// is unique (and human-solvable by logic). Returns the 0/1 grid or null.
+function solveByLogic(rowClues, colClues, N, cache) {
+  if (!cache) cache = buildCache(rowClues, colClues, N);
+  var g = [];
+  for (var r = 0; r < N; r++) g.push(new Array(N).fill(0));
+  for (var iter = 0; iter < N * N * 4; iter++) {
+    var changed = false, r, c;
+    for (r = 0; r < N; r++) {
+      var v = validPls(rowClues[r], g[r], cache.rowAll[r]);
+      if (v.length === 0) return null;
+      var f = forcedLine(v, N);
+      for (c = 0; c < N; c++) if (f[c] !== 0 && g[r][c] === 0) { g[r][c] = f[c]; changed = true; }
+    }
+    for (var cc = 0; cc < N; cc++) {
+      var col = [];
+      for (var rr = 0; rr < N; rr++) col.push(g[rr][cc]);
+      var v2 = validPls(colClues[cc], col, cache.colAll[cc]);
+      if (v2.length === 0) return null;
+      var f2 = forcedLine(v2, N);
+      for (var r2 = 0; r2 < N; r2++) if (f2[r2] !== 0 && g[r2][cc] === 0) { g[r2][cc] = f2[r2]; changed = true; }
+    }
+    if (!changed) break;
+  }
+  for (var rr2 = 0; rr2 < N; rr2++) for (var c2 = 0; c2 < N; c2++) if (g[rr2][c2] === 0) return null;
+  var out = [];
+  for (var r3 = 0; r3 < N; r3++) {
+    var row = [];
+    for (var c3 = 0; c3 < N; c3++) row.push(g[r3][c3] === 1 ? 1 : 0);
+    out.push(row);
+  }
+  return out;
+}
+
+/* ----------------------------------------------------- puzzle generation */
+
+function patternToGrid(p) {
+  return p.grid.map(function (s) {
+    return s.split('').map(function (ch) { return ch === '1' ? 1 : 0; });
+  });
+}
+
+// random double-symmetric pattern
+function rndSym(N, p) {
+  var g = [], h = Math.floor(N / 2), r, c;
+  for (r = 0; r < N; r++) g.push(new Array(N).fill(0));
+  for (r = 0; r <= h; r++) for (c = 0; c <= h; c++) {
+    var v = Math.random() < p ? 1 : 0;
+    g[r][c] = v; g[r][N - 1 - c] = v; g[N - 1 - r][c] = v; g[N - 1 - r][N - 1 - c] = v;
+  }
+  return g;
+}
+
+function countFilled(g, N) {
+  var n = 0;
+  for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) n += g[r][c];
+  return n;
+}
+
+// Build a puzzle guaranteed to have a unique solution.
+// ~50% built-in picture (pre-verified unique), else a random symmetric
+// pattern that line-solving fully resolves (hence unique + logic-solvable).
+function generatePuzzle(size) {
+  var N = size;
+  if (PATTERNS[size] && PATTERNS[size].length && Math.random() < 0.5) {
+    var list = PATTERNS[size];
+    var p = list[Math.floor(Math.random() * list.length)];
+    var sol = patternToGrid(p);
+    var cl = computeClues(sol, N);
+    return {
+      N: N, solution: sol, rowClues: cl.rowClues, colClues: cl.colClues,
+      nameEn: p.en, nameZh: p.zh, isRandom: false
+    };
+  }
+  var dens = (N === 15) ? 0.7 : 0.55;
+  var attempt, g, cl, cache, sol;
+  for (attempt = 0; attempt < 800; attempt++) {
+    if (attempt === 400) dens = 0.8;            // bump density if struggling
+    g = rndSym(N, dens);
+    if (countFilled(g, N) < N * N * 0.12) continue;   // avoid near-empty puzzles
+    cl = computeClues(g, N);
+    cache = buildCache(cl.rowClues, cl.colClues, N);
+    sol = solveByLogic(cl.rowClues, cl.colClues, N, cache);
+    if (sol) {
+      return {
+        N: N, solution: sol, rowClues: cl.rowClues, colClues: cl.colClues,
+        nameEn: 'Random', nameZh: '随机', isRandom: true
+      };
+    }
+  }
+  // last-resort: dense symmetric pattern almost always resolves
+  for (attempt = 0; attempt < 2000; attempt++) {
+    g = rndSym(N, 0.85);
+    cl = computeClues(g, N);
+    cache = buildCache(cl.rowClues, cl.colClues, N);
+    sol = solveByLogic(cl.rowClues, cl.colClues, N, cache);
+    if (sol) {
+      return {
+        N: N, solution: sol, rowClues: cl.rowClues, colClues: cl.colClues,
+        nameEn: 'Random', nameZh: '随机', isRandom: true
+      };
+    }
+  }
+  // absolute fallback: a built-in if present, else a trivial full-border puzzle
+  if (PATTERNS[size] && PATTERNS[size].length) {
+    var p2 = PATTERNS[size][0];
+    var sol2 = patternToGrid(p2);
+    var cl2 = computeClues(sol2, N);
+    return { N: N, solution: sol2, rowClues: cl2.rowClues, colClues: cl2.colClues, nameEn: p2.en, nameZh: p2.zh, isRandom: false };
+  }
+  var fb = [];
+  for (var r = 0; r < N; r++) { fb.push([]); for (var c = 0; c < N; c++) fb[r].push((r === 0 || c === 0 || r === N-1 || c === N-1) ? 1 : 0); }
+  var fcl = computeClues(fb, N);
+  return { N: N, solution: fb, rowClues: fcl.rowClues, colClues: fcl.colClues, nameEn: 'Random', nameZh: '随机', isRandom: true };
+}
+
+/* --------------------------------------------------------------- game state */
+var N = 0;
+var grid = null;          // 2D: 0 empty, 1 filled, 2 marked (✕)
+var solution = null;      // 2D 0/1
+var rowClues = null, colClues = null;
+var cellEls = [], rowClueEls = [], colClueEls = [];
+var maxRowC = 1, maxColC = 1;
+var undoStack = [];
+var timerId = null, seconds = 0, hintsUsed = 0;
+var won = false, started = false, errorOn = true, currentSize = 5;
+var curNameEn = '', curNameZh = '';
+var cellPx = 28;
+
+/* ----------------------------------------------------------------- dom refs */
+var startOverlayEl = document.getElementById('startOverlay');
+var btnStartEl     = document.getElementById('btnStart');
+var size5El        = document.getElementById('size5');
+var size10El       = document.getElementById('size10');
+var size15El       = document.getElementById('size15');
+var frameEl        = document.getElementById('frame');
+var statusEl       = document.getElementById('status');
+var timeEl         = document.getElementById('time');
+var progressEl     = document.getElementById('progress');
+var hintsEl        = document.getElementById('hints');
+var patternNameEl  = document.getElementById('patternInfo');
+var overlayEl      = document.getElementById('overlay');
+var dlgTitleEl     = document.getElementById('dlgTitle');
+var dlgSubEl        = document.getElementById('dlgSub');
+var dlgNextEl       = document.getElementById('dlgNext');
+var dlgCloseEl      = document.getElementById('dlgClose');
+var errToggleEl    = document.getElementById('errToggle');
+
+/* ------------------------------------------------------------- cell sizing */
+function fitCell(n, mrc, mcc) {
+  var iw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 480;
+  var ih = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 800;
+  var availW = Math.min(iw, 680) - 28;
+  var availH = Math.max(260, ih - 250);
+  var cw = Math.floor(availW / (n + mrc));
+  var ch = Math.floor(availH / (n + mcc));
+  return Math.max(13, Math.min(36, Math.min(cw, ch)));
+}
+
+function relayout() {
+  if (!N) return;
+  cellPx = fitCell(N, maxRowC, maxColC);
+  var cols = maxRowC + N, rows = maxColC + N;
+  frameEl.style.gridTemplateColumns = 'repeat(' + cols + ',' + cellPx + 'px)';
+  frameEl.style.gridTemplateRows = 'repeat(' + rows + ',' + cellPx + 'px)';
+  frameEl.style.width = (cols * cellPx) + 'px';
+  frameEl.style.height = (rows * cellPx) + 'px';
+  frameEl.style.fontSize = (cellPx * 0.42) + 'px';
+}
+
+/* --------------------------------------------------------------- build board */
+function buildBoard() {
+  frameEl.innerHTML = '';
+  cellEls = []; rowClueEls = []; colClueEls = [];
+  maxRowC = 1; maxColC = 1;
+  var r, c;
+  for (r = 0; r < N; r++) maxRowC = Math.max(maxRowC, rowClues[r].length);
+  for (c = 0; c < N; c++) maxColC = Math.max(maxColC, colClues[c].length);
+  relayout();
+
+  // row clues (right-aligned in the left gutter)
+  for (r = 0; r < N; r++) {
+    rowClueEls[r] = [];
+    var k = rowClues[r].length;
+    for (var i = 0; i < k; i++) {
+      var d = document.createElement('div');
+      d.className = 'clue';
+      d.textContent = String(rowClues[r][i]);
+      d.style.gridColumn = String(maxRowC - k + i + 1);
+      d.style.gridRow = String(maxColC + r + 1);
+      frameEl.appendChild(d);
+      rowClueEls[r].push(d);
+    }
+  }
+  // column clues (bottom-aligned in the top gutter)
+  for (c = 0; c < N; c++) {
+    colClueEls[c] = [];
+    var k2 = colClues[c].length;
+    for (var j = 0; j < k2; j++) {
+      var d2 = document.createElement('div');
+      d2.className = 'clue';
+      d2.textContent = String(colClues[c][j]);
+      d2.style.gridRow = String(maxColC - k2 + j + 1);
+      d2.style.gridColumn = String(maxRowC + c + 1);
+      frameEl.appendChild(d2);
+      colClueEls[c].push(d2);
+    }
+  }
+  // playable cells
+  for (r = 0; r < N; r++) {
+    cellEls[r] = [];
+    for (c = 0; c < N; c++) {
+      var el = document.createElement('div');
+      el.className = 'cell';
+      if (c % 5 === 4 && c !== N - 1) el.className += ' sep-r';
+      if (r % 5 === 4 && r !== N - 1) el.className += ' sep-b';
+      el.style.gridRow = String(maxColC + r + 1);
+      el.style.gridColumn = String(maxRowC + c + 1);
+      bindCell(el, r, c);
+      frameEl.appendChild(el);
+      cellEls[r].push(el);
+    }
+  }
+  for (r = 0; r < N; r++) for (c = 0; c < N; c++) renderCell(r, c);
+  renderClues();
+}
+
+function bindCell(el, r, c) {
+  el.addEventListener('click', function () { onCellClick(r, c); });
+  el.addEventListener('contextmenu', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    onCellRight(r, c);
+  });
+}
+
+/* --------------------------------------------------------------- rendering */
+function renderCell(r, c) {
+  var el = cellEls[r][c];
+  if (!el) return;
+  var st = grid[r][c];
+  var cls = 'cell';
+  if (c % 5 === 4 && c !== N - 1) cls += ' sep-r';
+  if (r % 5 === 4 && r !== N - 1) cls += ' sep-b';
+  if (st === 1) cls += ' fill';
+  else if (st === 2) cls += ' mark';
+  if (errorOn && st === 1 && solution[r][c] === 0) cls += ' err';
+  el.className = cls;
+  el.textContent = (st === 2) ? '✕' : '';
+}
+
+function lineSatisfied(line, clue) {
+  var i, cnt = 0, runs = [];
+  for (i = 0; i < line.length; i++) if (line[i] === 0) return false;  // an unknown remains
+  for (i = 0; i <= line.length; i++) {
+    if (i < line.length && line[i] === 1) cnt++;
+    else { if (cnt) { runs.push(cnt); cnt = 0; } }
+  }
+  if (runs.length !== clue.length) return false;
+  for (i = 0; i < runs.length; i++) if (runs[i] !== clue[i]) return false;
+  return true;
+}
+
+function renderClues() {
+  var r, c;
+  for (r = 0; r < N; r++) {
+    var sat = lineSatisfied(grid[r], rowClues[r]);
+    for (var i = 0; i < rowClueEls[r].length; i++) {
+      if (sat) rowClueEls[r][i].classList.add('done');
+      else rowClueEls[r][i].classList.remove('done');
+    }
+  }
+  for (c = 0; c < N; c++) {
+    var col = [];
+    for (r = 0; r < N; r++) col.push(grid[r][c]);
+    var sat2 = lineSatisfied(col, colClues[c]);
+    for (var j = 0; j < colClueEls[c].length; j++) {
+      if (sat2) colClueEls[c][j].classList.add('done');
+      else colClueEls[c][j].classList.remove('done');
+    }
+  }
+}
+
+function renderAllCells() {
+  for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) renderCell(r, c);
+}
+
+function updateHud() {
+  var total = 0, correct = 0, r, c;
+  for (r = 0; r < N; r++) for (c = 0; c < N; c++) {
+    if (solution[r][c] === 1) { total++; if (grid[r][c] === 1) correct++; }
+  }
+  progressEl.textContent = correct + '/' + total;
+  hintsEl.textContent = String(hintsUsed);
+}
+
+function renderName() {
+  if (!patternNameEl) return;
+  var nm = (T.lang === 'zh') ? curNameZh : curNameEn;
+  patternNameEl.textContent = nm ? T.t('pattern', { name: nm }) : '';
+}
+
+/* ------------------------------------------------------------- interaction */
+function onCellClick(r, c) {
+  if (!started || won) return;
+  var prev = grid[r][c];
+  var next = prev === 0 ? 1 : (prev === 1 ? 2 : 0);
+  applyCell(r, c, next, true);
+}
+
+function onCellRight(r, c) {
+  if (!started || won) return;
+  var prev = grid[r][c];
+  var next = prev === 2 ? 0 : 2;
+  applyCell(r, c, next, true);
+}
+
+function applyCell(r, c, next, record) {
+  if (record && next !== grid[r][c]) undoStack.push({ r: r, c: c, prev: grid[r][c] });
+  grid[r][c] = next;
+  renderCell(r, c);
+  renderClues();
+  updateHud();
+  checkWin();
+}
+
+function isSolved() {
+  for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+    if ((solution[r][c] === 1) !== (grid[r][c] === 1)) return false;
+  }
+  return true;
+}
+
+function checkWin() {
+  if (isSolved()) {
+    won = true;
+    stopTimer();
+    showWin();
+  }
+}
+
+function showWin() {
+  dlgTitleEl.textContent = T.t('wonTitle');
+  dlgSubEl.textContent = T.t('wonSub', { sec: seconds, hints: hintsUsed });
+  dlgNextEl.textContent = T.t('next');
+  dlgCloseEl.textContent = T.t('close');
+  overlayEl.classList.add('show');
+}
+
+/* ------------------------------------------------------------- timer */
+function startTimer() {
+  stopTimer();
+  timerId = setInterval(function () { seconds++; timeEl.textContent = String(seconds); }, 1000);
+}
+function stopTimer() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+}
+
+/* ------------------------------------------------------------- actions */
+function hint() {
+  if (!started || won) return;
+  var r, c, target = null;
+  for (r = 0; r < N; r++) for (c = 0; c < N; c++) {
+    if (solution[r][c] === 1 && grid[r][c] !== 1) { target = [r, c]; break; }
+    if (target) break;
+  }
+  if (!target) {
+    for (r = 0; r < N; r++) for (c = 0; c < N; c++) {
+      if (solution[r][c] === 0 && grid[r][c] !== 2) { target = [r, c]; break; }
+      if (target) break;
+    }
+  }
+  if (!target) return;
+  applyCell(target[0], target[1], (solution[target[0]][target[1]] === 1 ? 1 : 2), true);
+  hintsUsed++;
+  updateHud();
+}
+
+function undo() {
+  if (!started || won) return;
+  var m = undoStack.pop();
+  if (!m) return;
+  grid[m.r][m.c] = m.prev;
+  renderCell(m.r, m.c);
+  renderClues();
+  updateHud();
+}
+
+function restart() {
+  if (!started) return;
+  stopTimer();
+  seconds = 0; hintsUsed = 0; undoStack = []; won = false;
+  for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) grid[r][c] = 0;
+  buildBoard();
+  startTimer();
+  statusEl.textContent = '';
+  if (overlayEl.className.indexOf('show') >= 0) overlayEl.classList.remove('show');
+}
+
+function startGame(size) {
+  currentSize = size;
+  var puz = generatePuzzle(size);
+  N = puz.N;
+  solution = puz.solution;
+  rowClues = puz.rowClues;
+  colClues = puz.colClues;
+  curNameEn = puz.nameEn;
+  curNameZh = puz.nameZh;
+  grid = [];
+  for (var r = 0; r < N; r++) grid.push(new Array(N).fill(0));
+  undoStack = [];
+  seconds = 0; hintsUsed = 0; won = false; started = true;
+  buildBoard();
+  startTimer();
+  startOverlayEl.classList.remove('show');
+  if (overlayEl.className.indexOf('show') >= 0) overlayEl.classList.remove('show');
+  timeEl.textContent = '0';
+  renderName();
+  updateHud();
+  statusEl.textContent = '';
+}
+
+function newGame() { startGame(currentSize); }
+
+function selectSize(size) {
+  currentSize = size;
+  size5El.classList.toggle('active', size === 5);
+  size10El.classList.toggle('active', size === 10);
+  size15El.classList.toggle('active', size === 15);
+}
+
+/* ----------------------------------------------------------------- bindings */
+function bind(id, fn) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+
+bind('btnStart', function () { startGame(currentSize); });
+bind('size5',  function () { selectSize(5); });
+bind('size10', function () { selectSize(10); });
+bind('size15', function () { selectSize(15); });
+bind('btnHint', hint);
+bind('btnUndo', undo);
+bind('btnRestart', restart);
+bind('btnNew', newGame);
+bind('dlgNext', newGame);
+bind('dlgClose', function () { overlayEl.classList.remove('show'); });
+
+if (errToggleEl) errToggleEl.addEventListener('change', function () {
+  errorOn = errToggleEl.checked;
+  renderAllCells();
+});
+
+if (typeof window !== 'undefined') window.addEventListener('keydown', function (ev) {
+  if (!started) return;
+  var k = ev.key;
+  var low = String(k || '').toLowerCase();
+  if (low === 'u') { undo(); }
+  else if (low === 'r') { restart(); }
+  else if (k === 'Escape') { if (overlayEl.className.indexOf('show') >= 0) overlayEl.classList.remove('show'); }
+});
+
+if (typeof window !== 'undefined') window.addEventListener('resize', function () { relayout(); });
+
+// Re-render dynamic, runtime-assembled copy when the language switches.
+T.onChange(function () {
+  renderName();
+  if (won) { dlgTitleEl.textContent = T.t('wonTitle'); dlgSubEl.textContent = T.t('wonSub', { sec: seconds, hints: hintsUsed }); dlgNextEl.textContent = T.t('next'); dlgCloseEl.textContent = T.t('close'); }
+});
+
+// Initialize the game first (overlay is already visible), then apply language.
+selectSize(5);
+T.start();
+
+/* --------------------------------------------------- test harness bridge
+ * Expose key internals so tools/nonogram-test.js can drive the real UI and
+ * read internal state directly inside a vm sandbox. All top-level `var`
+ * declarations above are already global; this object is a convenience. */
+var NONO = {
+  computeClues: computeClues,
+  placements: placements,
+  validPls: validPls,
+  forcedLine: forcedLine,
+  buildCache: buildCache,
+  countSolutions: countSolutions,
+  findSolution: findSolution,
+  solveByLogic: solveByLogic,
+  generatePuzzle: generatePuzzle,
+  patternToGrid: patternToGrid,
+  PATTERNS: PATTERNS,
+  getState: function () {
+    return {
+      N: N, grid: grid, solution: solution,
+      rowClues: rowClues, colClues: colClues,
+      started: started, won: won, errorOn: errorOn,
+      currentSize: currentSize, cellEls: cellEls,
+      rowClueEls: rowClueEls, colClueEls: colClueEls
+    };
+  }
+};
+if (typeof window !== 'undefined') window.NONO = NONO;
+else if (typeof global !== 'undefined') global.NONO = NONO;
+</script>
+</body>
+</html>

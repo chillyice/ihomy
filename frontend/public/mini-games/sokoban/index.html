@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推箱子</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --warn: #b26a00;
+    --wall: #6b7684;
+    --wall-top: #8b95a3;
+    --floor: #f0f2f5;
+    --floor-alt: #e7eaef;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .level {
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 132px;
+    text-align: center;
+    color: var(--accent);
+  }
+  .level.done { color: var(--good); }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 72px;
+    text-align: center;
+  }
+  .stat small { font-weight: 400; opacity: .65; font-size: 11px; }
+
+  /* ---------- board ---------- */
+  #stage {
+    --cell: 44px;
+    position: relative;
+    margin: 0 auto;
+    background: #d7dce3;
+    border-radius: 10px;
+    touch-action: none;
+    user-select: none;
+  }
+
+  #tiles, #actors {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+  #actors { pointer-events: none; }
+
+  /* Both layers are positioned by two custom properties: --r (row) and
+     --c (column). Assigning them is all a move has to do — the CSS below
+     turns them into pixels, so resizing only has to change --cell. */
+  .tile, .actor {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cell);
+    height: var(--cell);
+    transform: translate(calc(var(--c, 0) * var(--cell)), calc(var(--r, 0) * var(--cell)));
+  }
+
+  .tile.floor { background: var(--floor); }
+  .tile.floor.alt { background: var(--floor-alt); }
+
+  /* Goals sit on the floor as a dashed ring. */
+  .tile.goal::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46%;
+    height: 46%;
+    transform: translate(-50%, -50%);
+    border: 3px dashed #9aa7b8;
+    border-radius: 50%;
+  }
+
+  .tile.wall {
+    background: linear-gradient(180deg, var(--wall-top), var(--wall));
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.16), inset 0 2px 0 rgba(255,255,255,.18);
+    border-radius: 3px;
+  }
+
+  /* Actors are scaled down a touch so the floor grid stays visible. */
+  .actor {
+    transform:
+      translate(calc(var(--c, 0) * var(--cell)), calc(var(--r, 0) * var(--cell)))
+      scale(.86);
+    transition: transform .12s ease-out;
+  }
+
+  /* Crate */
+  .actor.box {
+    background: linear-gradient(160deg, #e3b478, #b87a34);
+    border: 2px solid #8a5620;
+    border-radius: 6px;
+    box-shadow: inset 0 2px 3px rgba(255,255,255,.4), 0 2px 4px rgba(0,0,0,.18);
+  }
+  .actor.box::after {
+    content: '';
+    position: absolute;
+    inset: 20%;
+    border: 2px solid rgba(255,255,255,.45);
+    border-radius: 3px;
+  }
+  /* Crate parked on a goal */
+  .actor.box.on {
+    background: linear-gradient(160deg, #8fd98a, #46a04c);
+    border-color: #2e7d32;
+    box-shadow: inset 0 2px 3px rgba(255,255,255,.45), 0 0 0 3px rgba(76,175,80,.25);
+  }
+  .actor.box.on::after { border-color: rgba(255,255,255,.6); }
+
+  /* Porter: head + body, painted with pseudo elements */
+  .actor.player::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 15%;
+    width: 34%;
+    height: 34%;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: linear-gradient(160deg, #ffd9b3, #efb27e);
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,.14);
+  }
+  .actor.player::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 51%;
+    width: 56%;
+    height: 40%;
+    transform: translateX(-50%);
+    border-radius: 44% 44% 32% 32%;
+    background: linear-gradient(160deg, #5b8cff, #3b6ef5);
+    box-shadow: inset 0 -3px 5px rgba(0,0,0,.16);
+  }
+
+  #status {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 20px;
+    text-align: center;
+    color: var(--warn);
+  }
+
+  /* ---------- touch pad ---------- */
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 8px;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .pad button { font-size: 16px; padding: 0; }
+  .pad-up    { grid-column: 2; grid-row: 1; }
+  .pad-left  { grid-column: 1; grid-row: 2; }
+  .pad-down  { grid-column: 2; grid-row: 2; }
+  .pad-right { grid-column: 3; grid-row: 2; }
+
+  /* ---------- dialog ---------- */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 22, 30, .5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  #overlay.show { display: flex; }
+
+  #dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px 24px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  #dlgTitle { margin: 0 0 6px; font-size: 22px; }
+  #dlgSub {
+    margin: 0 0 22px;
+    color: var(--muted);
+    font-size: 14px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  #dialog .actions { display: flex; gap: 10px; justify-content: center; }
+  #dialog button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  #dialog button:hover { filter: brightness(1.06); color: #fff; }
+  #dialog button.secondary {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  #dialog button.secondary:hover { color: var(--accent); border-color: var(--accent); }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 10px; }
+    .bar { gap: 6px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .level { min-width: 112px; font-size: 13px; }
+    .stat { min-width: 62px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <button id="btnPrev" data-i18n="prev"></button>
+    <div class="level" id="lvLabel"></div>
+    <button id="btnNext" data-i18n="next"></button>
+    <button id="btnUndo" data-i18n="undo"></button>
+    <button id="btnRestart" data-i18n="restart"></button>
+    <div class="stat"><small data-i18n="movesL"></small> <span id="moves">0</span></div>
+    <div class="stat"><small data-i18n="pushesL"></small> <span id="pushes">0</span></div>
+  </div>
+  <div id="stage">
+    <div id="tiles"></div>
+    <div id="actors"></div>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div class="pad">
+  <button id="btnUp" class="pad-up" type="button" aria-label="up">&#9650;</button>
+  <button id="btnLeft" class="pad-left" type="button" aria-label="left">&#9664;</button>
+  <button id="btnDown" class="pad-down" type="button" aria-label="down">&#9660;</button>
+  <button id="btnRight" class="pad-right" type="button" aria-label="right">&#9654;</button>
+</div>
+
+<div id="overlay">
+  <div id="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <div class="actions">
+      <button id="dlgNext"></button>
+      <button id="btnClose" class="secondary" data-i18n="close"></button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:   { en: 'Sokoban', zh: '推箱子' },
+    tip: {
+      en: 'Push every crate onto a ringed tile — you can only push, never pull',
+      zh: '把所有木箱推到圆环目标上 —— 只能推，不能拉'
+    },
+    prev:    { en: 'Prev', zh: '上一关' },
+    next:    { en: 'Next', zh: '下一关' },
+    undo:    { en: 'Undo', zh: '撤销' },
+    restart: { en: 'Restart', zh: '重开' },
+    movesL:  { en: 'Moves', zh: '步数' },
+    pushesL: { en: 'Pushes', zh: '推动' },
+    levelOf: { en: 'Level {n} / {total}', zh: '第 {n} 关 / 共 {total}' },
+    stuck:   { en: 'A crate is stuck in a corner — undo or restart', zh: '有箱子卡在死角了 —— 撤销或重开' },
+    wonTitle:{ en: 'Level cleared!', zh: '过关！' },
+    allDone: { en: 'All levels cleared!', zh: '全部关卡通关！' },
+    wonSub:  { en: '{moves} moves · {pushes} pushes', zh: '步数 {moves} · 推动 {pushes}' },
+    nextLevel:{ en: 'Next level', zh: '下一关' },
+    replay:  { en: 'Play again', zh: '再玩一次' },
+    close:   { en: 'Close', zh: '关闭' }
+  });
+
+  /* ---------------------------------------------------------------- levels
+   * '#' wall   ' ' floor   '.' goal   '$' crate   '*' crate on a goal
+   * '@' player '+' player on a goal
+   */
+  var LEVELS = [
+    [
+      '#######',
+      '#  .  #',
+      '#  $  #',
+      '#     #',
+      '#  @  #',
+      '#######'
+    ],
+    [
+      '#######',
+      '#     #',
+      '#  @  #',
+      '# $   #',
+      '# .   #',
+      '#######'
+    ],
+    [
+      '#######',
+      '#     #',
+      '#  $  #',
+      '#  @  #',
+      '#   . #',
+      '#######'
+    ],
+    [
+      '########',
+      '#      #',
+      '#      #',
+      '# $..$ #',
+      '#  @   #',
+      '########'
+    ],
+    [
+      '#########',
+      '#       #',
+      '#  .... #',
+      '#  $$$$ #',
+      '#   @   #',
+      '#########'
+    ],
+    [
+      '#########',
+      '#       #',
+      '#  .$   #',
+      '#       #',
+      '#  @    #',
+      '#       #',
+      '#  .$   #',
+      '#########'
+    ],
+    [
+      '##########',
+      '#        #',
+      '#  $  .  #',
+      '#  $  .  #',
+      '#  $  .  #',
+      '#   @    #',
+      '##########'
+    ],
+    [
+      '########',
+      '#      #',
+      '#  $   #',
+      '#  #.  #',
+      '#   @  #',
+      '########'
+    ],
+    [
+      '#########',
+      '#       #',
+      '#  $ .  #',
+      '#       #',
+      '#  . $  #',
+      '#   @   #',
+      '#########'
+    ],
+    [
+      '##########',
+      '#        #',
+      '#  .  .  #',
+      '#  $  $  #',
+      '#        #',
+      '#  $  $  #',
+      '#  .  .  #',
+      '#   @    #',
+      '##########'
+    ]
+  ];
+
+  var STORE = 'sokoban_cleared';
+
+  /* ------------------------------------------------------------------ dom */
+  var stageEl   = document.getElementById('stage');
+  var tilesEl   = document.getElementById('tiles');
+  var actorsEl  = document.getElementById('actors');
+  var lvLabelEl = document.getElementById('lvLabel');
+  var movesEl   = document.getElementById('moves');
+  var pushesEl  = document.getElementById('pushes');
+  var statusEl  = document.getElementById('status');
+  var overlayEl = document.getElementById('overlay');
+  var dlgTitleEl = document.getElementById('dlgTitle');
+  var dlgSubEl   = document.getElementById('dlgSub');
+  var dlgNextEl  = document.getElementById('dlgNext');
+
+  /* ---------------------------------------------------------------- state */
+  var lvIndex = 0;
+  var rows = 0, cols = 0, cell = 44;
+  var walls = [], goals = [];   // 2D lookups
+  var boxes = [];               // { r, c, el }
+  var player = null;            // { r, c, el }
+  var moves = 0, pushes = 0;
+  var history = [];             // undo stack: { dr, dc, box }
+  var won = false;
+  var touchStart = null;
+
+  /* ---------------------------------------------------------------- board */
+
+  // Pick the largest cell size that keeps the whole board on screen.
+  function fitCell(c, r) {
+    var availW = Math.min(620, (window.innerWidth || 480) - 44);
+    var availH = Math.max(200, (window.innerHeight || 700) - 320);
+    return Math.max(22, Math.min(52, Math.floor(availW / c), Math.floor(availH / r)));
+  }
+
+  // Park an element at a grid coordinate; CSS turns --r/--c into pixels.
+  function place(el, r, c) {
+    el.style.setProperty('--r', r);
+    el.style.setProperty('--c', c);
+  }
+
+  function resizeStage() {
+    cell = fitCell(cols, rows);
+    stageEl.style.setProperty('--cell', cell + 'px');
+    stageEl.style.width  = (cols * cell) + 'px';
+    stageEl.style.height = (rows * cell) + 'px';
+  }
+
+  function build(idx) {
+    var layout = LEVELS[idx];
+    rows = layout.length;
+    cols = 0;
+    for (var i = 0; i < rows; i++) cols = Math.max(cols, layout[i].length);
+
+    walls = []; goals = []; boxes = [];
+    var start = null;
+
+    for (var r = 0; r < rows; r++) {
+      walls[r] = []; goals[r] = [];
+      for (var c = 0; c < cols; c++) {
+        var ch = layout[r][c] || ' ';
+        walls[r][c] = (ch === '#');
+        goals[r][c] = (ch === '.' || ch === '*' || ch === '+');
+        if (ch === '$' || ch === '*') boxes.push({ r: r, c: c, el: null });
+        if (ch === '@' || ch === '+') start = { r: r, c: c, el: null };
+      }
+    }
+
+    resizeStage();
+
+    // Static layer: one element per tile.
+    tilesEl.innerHTML = '';
+    for (var tr = 0; tr < rows; tr++) {
+      for (var tc = 0; tc < cols; tc++) {
+        var el = document.createElement('div');
+        if (walls[tr][tc]) {
+          el.className = 'tile wall';
+        } else {
+          el.className = 'tile floor' + ((tr + tc) % 2 ? ' alt' : '') +
+                         (goals[tr][tc] ? ' goal' : '');
+        }
+        place(el, tr, tc);
+        tilesEl.appendChild(el);
+      }
+    }
+
+    // Moving layer: crates then the porter (so he paints on top of a crate
+    // he is standing next to, never the other way round).
+    actorsEl.innerHTML = '';
+    boxes.forEach(function (b) {
+      var be = document.createElement('div');
+      be.className = 'actor box' + (goals[b.r][b.c] ? ' on' : '');
+      place(be, b.r, b.c);
+      b.el = be;
+      actorsEl.appendChild(be);
+    });
+    var pe = document.createElement('div');
+    pe.className = 'actor player';
+    place(pe, start.r, start.c);
+    start.el = pe;
+    actorsEl.appendChild(pe);
+    player = start;
+
+    moves = 0; pushes = 0; history = []; won = false; touchStart = null;
+    statusEl.textContent = '';
+    closeDialog();
+    updateHud();
+  }
+
+  /* ----------------------------------------------------------------- rules */
+
+  function walkable(r, c) {
+    return walls[r] !== undefined && walls[r][c] !== undefined && !walls[r][c];
+  }
+  function isWall(r, c) { return !walkable(r, c); }
+
+  function boxAt(r, c) {
+    for (var i = 0; i < boxes.length; i++) {
+      if (boxes[i].r === r && boxes[i].c === c) return i;
+    }
+    return -1;
+  }
+
+  function move(dr, dc) {
+    if (won || !player) return;
+    var nr = player.r + dr, nc = player.c + dc;
+    if (!walkable(nr, nc)) return;
+
+    var bi = boxAt(nr, nc);
+    if (bi >= 0) {
+      var br = nr + dr, bc = nc + dc;
+      if (!walkable(br, bc) || boxAt(br, bc) >= 0) return;   // blocked behind
+      boxes[bi].r = br;
+      boxes[bi].c = bc;
+      pushes++;
+      history.push({ dr: dr, dc: dc, box: bi });
+    } else {
+      history.push({ dr: dr, dc: dc, box: -1 });
+    }
+
+    player.r = nr;
+    player.c = nc;
+    moves++;
+    syncActors();
+    updateHud();
+
+    if (isCleared()) return finish();
+    statusEl.textContent = anyStuck() ? T.t('stuck') : '';
+  }
+
+  function undo() {
+    if (won) return;
+    var h = history.pop();
+    if (!h) return;
+    if (h.box >= 0) {
+      boxes[h.box].r -= h.dr;
+      boxes[h.box].c -= h.dc;
+      pushes--;
+    }
+    player.r -= h.dr;
+    player.c -= h.dc;
+    moves--;
+    syncActors();
+    updateHud();
+    statusEl.textContent = anyStuck() ? T.t('stuck') : '';
+  }
+
+  function isCleared() {
+    for (var i = 0; i < boxes.length; i++) {
+      if (!goals[boxes[i].r][boxes[i].c]) return false;
+    }
+    return true;
+  }
+
+  // A crate wedged against two perpendicular walls can never move again.
+  function anyStuck() {
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (goals[b.r][b.c]) continue;
+      var vertical = isWall(b.r - 1, b.c) || isWall(b.r + 1, b.c);
+      var horizontal = isWall(b.r, b.c - 1) || isWall(b.r, b.c + 1);
+      if (vertical && horizontal) return true;
+    }
+    return false;
+  }
+
+  /* ------------------------------------------------------------ rendering */
+
+  function syncActors() {
+    boxes.forEach(function (b) {
+      place(b.el, b.r, b.c);
+      if (goals[b.r][b.c]) b.el.classList.add('on');
+      else b.el.classList.remove('on');
+    });
+    place(player.el, player.r, player.c);
+  }
+
+  /* --------------------------------------------------------------- progress */
+
+  function clearedList() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(STORE) || '[]');
+      return Object.prototype.toString.call(arr) === '[object Array]' ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function markCleared(i) {
+    var arr = clearedList();
+    if (arr.indexOf(i) < 0) {
+      arr.push(i);
+      try { localStorage.setItem(STORE, JSON.stringify(arr)); } catch (e) {}
+    }
+  }
+
+  function isClearedLevel(i) { return clearedList().indexOf(i) >= 0; }
+
+  /* ------------------------------------------------------------------- hud */
+
+  function updateHud() {
+    movesEl.textContent = String(moves);
+    pushesEl.textContent = String(pushes);
+    var done = isClearedLevel(lvIndex);
+    lvLabelEl.textContent = T.t('levelOf', { n: lvIndex + 1, total: LEVELS.length }) +
+                            (done ? ' \u2713' : '');
+    lvLabelEl.className = 'level' + (done ? ' done' : '');
+    document.getElementById('btnPrev').disabled = (lvIndex === 0);
+    document.getElementById('btnNext').disabled = (lvIndex === LEVELS.length - 1);
+  }
+
+  /* ---------------------------------------------------------------- dialog */
+
+  function finish() {
+    won = true;
+    markCleared(lvIndex);
+    updateHud();
+    var last = lvIndex === LEVELS.length - 1;
+    dlgTitleEl.textContent = last ? T.t('allDone') : T.t('wonTitle');
+    dlgSubEl.textContent = T.t('wonSub', { moves: moves, pushes: pushes });
+    dlgNextEl.textContent = last ? T.t('replay') : T.t('nextLevel');
+    overlayEl.classList.add('show');
+  }
+
+  function closeDialog() { overlayEl.classList.remove('show'); }
+
+  function advance() {
+    closeDialog();
+    if (lvIndex < LEVELS.length - 1) {
+      lvIndex++;
+      build(lvIndex);
+    } else {
+      build(lvIndex);   // last level: "play again" just resets it
+    }
+  }
+
+  function go(delta) {
+    var n = lvIndex + delta;
+    if (n < 0 || n >= LEVELS.length) return;
+    lvIndex = n;
+    build(lvIndex);
+  }
+
+  /* ---------------------------------------------------------------- events */
+
+  function bind(id, fn) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  }
+
+  bind('btnPrev',    function () { go(-1); });
+  bind('btnNext',    function () { go(1); });
+  bind('btnUndo',    undo);
+  bind('btnRestart', function () { build(lvIndex); });
+  bind('btnUp',      function () { move(-1, 0); });
+  bind('btnDown',    function () { move(1, 0); });
+  bind('btnLeft',    function () { move(0, -1); });
+  bind('btnRight',   function () { move(0, 1); });
+  bind('dlgNext',    advance);
+  bind('btnClose',   closeDialog);
+
+  // Clicking the dimmed backdrop closes the dialog; clicking inside does not.
+  overlayEl.addEventListener('click', function (ev) {
+    if (ev.target === overlayEl) closeDialog();
+  });
+
+  window.addEventListener('keydown', function (ev) {
+    var k = ev.key;
+    var lower = String(k || '').toLowerCase();
+
+    if (k === 'Escape') { closeDialog(); return; }
+    if (lower === 'u') { undo(); return; }
+    if (lower === 'r') { build(lvIndex); return; }
+
+    var dr = 0, dc = 0;
+    if (k === 'ArrowUp' || lower === 'w') dr = -1;
+    else if (k === 'ArrowDown' || lower === 's') dr = 1;
+    else if (k === 'ArrowLeft' || lower === 'a') dc = -1;
+    else if (k === 'ArrowRight' || lower === 'd') dc = 1;
+    else return;
+
+    ev.preventDefault();
+    move(dr, dc);
+  });
+
+  // Swipe anywhere on the board on touch devices.
+  stageEl.addEventListener('touchstart', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (t) touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+
+  stageEl.addEventListener('touchend', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!touchStart || !t) return;
+    var dx = t.clientX - touchStart.x;
+    var dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;   // a tap, not a swipe
+    if (Math.abs(dx) > Math.abs(dy)) move(0, dx > 0 ? 1 : -1);
+    else move(dy > 0 ? 1 : -1, 0);
+  }, { passive: true });
+
+  window.addEventListener('resize', function () {
+    if (rows && cols) resizeStage();
+  });
+
+  T.onChange(function () {
+    updateHud();
+    if (won) finish();
+  });
+
+  /* ------------------------------------------------------------------ boot */
+
+  // Initialize the game first, then apply the language (project convention).
+  build(lvIndex);
+  T.start();
+})();
+</script>
+</body>
+</html>

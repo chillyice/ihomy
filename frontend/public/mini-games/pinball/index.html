@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinball · 弹球台</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --screen: #070b1c;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 640px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(520px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-weight: 600; opacity: .72; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2a3350;
+    background: #f1f4fc;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 8px 13px;
+    cursor: pointer;
+    transition: transform .06s ease, background .12s ease;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button:hover { background: #e7ecfa; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:disabled { background: var(--accent); }
+  button.flip { min-width: 96px; }
+
+  .stage { display: block; width: 100%; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--screen);
+    border-radius: 14px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  .info {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 18px;
+    margin: 8px 0 0;
+    line-height: 1.5;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 11, 28, .55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 520px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 10px; font-size: 12px; }
+    button.flip { min-width: 78px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+    <span class="stat"><small data-i18n="ball"></small> <b id="ball">1 / 3</b></span>
+    <span class="stat"><small data-i18n="streak"></small> <b id="streak">&times;1</b></span>
+    <span class="stat"><small data-i18n="charge"></small> <b id="charge">0%</b></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="480" height="720"></canvas>
+  </div>
+
+  <p class="info" id="msg"></p>
+
+  <div class="bar">
+    <button id="btnLeft" class="flip" disabled></button>
+    <button id="btnLaunch" class="primary" disabled></button>
+    <button id="btnRight" class="flip" disabled></button>
+  </div>
+
+  <div class="bar">
+    <button id="btnNew"></button>
+  </div>
+</div>
+
+<!-- Start overlay: the required visible entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown after the last ball drains. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Pinball - a single-file, zero-dependency, canvas-rendered pinball table.
+ *
+ * The table is a FIXED logical canvas of exactly 480 x 720 px (CSS scales it to
+ * fit). The whole simulation runs on ONE requestAnimationFrame clock: no browser
+ * timer API is used anywhere, so the headless PB.tick() path and the on-screen
+ * loop advance the exact same update(dt).
+ *
+ * Physics:
+ *   - Fixed-step integration. update() -> per-frame sub-steps of at most
+ *     PHYS_STEP = 1/240 s; the sub-step count is clamped per frame so a huge dt
+ *     (a backgrounded tab) can never hang the loop.
+ *   - The ball core (stepBallOnce) is shared by the live loop and the public,
+ *     pure stepBall(state, dt, world).
+ *   - Geometry is owned by the W/H/BALL_R/... constants and is NEVER read back
+ *     from the canvas (the drawing calls never feed numbers back into the sim).
+ *
+ * Determinism:
+ *   - Every random draw comes from one seeded mulberry32 stream, reset by
+ *     newGame({ seed }). Driving the game through PB.tick(seconds, step) with a
+ *     fixed step makes a whole game bit-for-bit reproducible.
+ *   - stepBall() is a pure function: same state + dt + world -> identical output.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants (geometry is owned here - never read back from the canvas)
+   * ==================================================================== */
+
+  var W = 480;                    // logical table width (px)
+  var H = 720;                    // logical table height (px)
+  var BALL_R = 9;                 // ball radius (px)
+  var GRAVITY = 900;              // downward acceleration (px/s^2)
+  var MAX_SPEED = 1400;           // hard ball speed cap (px/s)
+  var PHYS_STEP = 1 / 240;        // s (physics sub-step; also the no-tunnel bound)
+  var MAX_SUBSTEPS = 240;         // sub-steps per chunk; CHUNK = MAX_SUBSTEPS * PHYS_STEP
+  var CHUNK = MAX_SUBSTEPS * PHYS_STEP; // s = 1 (largest span one update()/stepBall() chunk covers)
+  var DRAIN_Y = 700;              // ball centre y past this is lost (px)
+  var DRAIN_X0 = 150;             // geometric drain gap left edge (px, documented)
+  var DRAIN_X1 = 330;             // geometric drain gap right edge (px, documented)
+  var BALLS = 3;                  // balls per game
+  var DEFAULT_STEP = 1 / 60;      // s (default tick() sub-step)
+
+  var FLIPPER_LEN = 70;           // flipper capsule length (px)
+  var FLIPPER_R = 7;              // flipper capsule radius (px)
+  var FLIPPER_REST_ANGLE = 0.45;  // rad (left flipper rest angle; right is mirrored)
+  var FLIPPER_ACTIVE_ANGLE = -0.55; // rad (left flipper active angle; right mirrored)
+  var FLIPPER_SPEED = 18;         // rad/s (finite angular speed)
+  var FLIPPER_KICK = 260;         // extra px/s added along the contact normal on a swing
+  var FLIP_RESTITUTION = 0.7;     // flipper bounce damping
+
+  var BUMPER_R = 22;              // bumper radius (px)
+  var BUMPER_KICK = 320;          // px/s outward kick on a bumper hit
+  var BUMPER_REST = 0.9;          // bumper bounce restitution
+  var BUMPER_BASE = 100;          // base bumper score (before the streak multiplier)
+
+  var WALL_REST = 0.86;           // wall bounce restitution
+  /* No air drag: it would break the free-fall calibration (a ball must gain
+   * exactly GRAVITY px/s per second). Energy is bounded instead by restitution
+   * < 1 on every collider plus the MAX_SPEED clamp after each sub-step. */
+  var DRAG = 0;                   // 1/s velocity damping (kept at 0; see note)
+
+  var STALL_SEC = 6;              // s under STALL_SPEED before a nudge is applied
+  var STALL_SPEED = 30;           // px/s "barely moving" threshold
+  var STALL_NUDGE = 120;          // px/s impulse applied by the stall guard
+  var STREAK_TIMEOUT = 3.5;       // s with no scoring contact -> streak resets
+  var STREAK_STEP = 0.25;         // multiplier increase per consecutive bumper hit
+  var STREAK_MAX_MULT = 5;        // multiplier ceiling
+  var BONUS_CHANCE = 0.1;         // probability of a bumper bonus (seeded stream)
+  var BONUS_POINTS = 500;         // points when the bonus fires
+
+  var LAUNCH_MIN = 700;           // px/s plunger speed at charge 0
+  var LAUNCH_MAX = 1300;          // px/s plunger speed at charge 1
+  var CHARGE_RATE = 1;            // charge units per second while held
+  var AUTO_LAUNCH_SEC = 1.5;      // s in the lane before an auto full-power launch
+  var BALL_MAX_SEC = 8;           // s a ball may live untouched before it drains
+  var NUDGE_MAX = 3;              // nudges per ball before TILT
+  var NUDGE_IMPULSE = 180;        // px/s vertical nudge impulse
+  var NUDGE_SIDE = 60;            // px/s lateral nudge impulse
+  var STORE_KEY = 'litegame_pinball_best';
+
+  /* ======================================================================
+   * 2. i18n (shared zero-dependency module: ../assets/i18n.js)
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:    { en: 'Pinball', zh: '弹球台' },
+    tip: {
+      en: 'Hold Space (or the Launch button) to charge the plunger, release to fire the ball up the lane. Flick the flippers to keep it alive and rack up the streak multiplier.',
+      zh: '按住空格（或“发射”键）给弹射器蓄力，松开把球射上右侧通道。拨动挡板让球别掉下去，并靠连击倍率累积高分。'
+    },
+    score:    { en: 'Score', zh: '得分' },
+    best:     { en: 'Best', zh: '最高' },
+    ball:     { en: 'Ball', zh: '球' },
+    streak:   { en: 'Streak', zh: '连击' },
+    charge:   { en: 'Charge', zh: '蓄力' },
+    launch:   { en: 'Launch', zh: '发射' },
+    charging: { en: 'Charging', zh: '蓄力中' },
+    newgame:  { en: 'New game', zh: '新游戏' },
+    start:    { en: 'Start game', zh: '开始游戏' },
+    again:    { en: 'Play again', zh: '再来一局' },
+    left:     { en: '\u25c0 Left', zh: '\u25c0 左' },
+    right:    { en: 'Right \u25b6', zh: '右 \u25b6' },
+    readySub: {
+      en: 'Three balls, three bumpers, two flippers. Charge, launch, and keep the ball off the drain.',
+      zh: '三个球、三个弹珠、两块挡板。蓄力、发射，别让球掉进底洞。'
+    },
+    readyInfo: { en: 'Press Start, then charge the plunger.', zh: '点击“开始游戏”，再给弹射器蓄力。' },
+    msgLaunch: { en: 'Hold Space / Launch to charge ({c}%), release to fire.', zh: '按住空格 / 发射键蓄力（{c}%），松开即发射。' },
+    msgPlaying: { en: 'Flippers: A / D (or arrows). Nudge: W / S.', zh: '挡板：A / D（或方向键）。撞台：W / S。' },
+    msgPaused: { en: 'Paused.', zh: '已暂停。' },
+    msgOver:   { en: 'Game over.', zh: '游戏结束。' },
+    overTitle: { en: 'Game over', zh: '游戏结束' },
+    overSub:   { en: 'Final score {n}. Best {b}.', zh: '最终得分 {n}。最高 {b}。' },
+    ballFmt:   { en: '{n} / {t}', zh: '{n} / {t}' },
+    streakFmt: { en: '\u00d7{m}', zh: '\u00d7{m}' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  cv.width = W;
+  cv.height = H;
+
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var ballEl = document.getElementById('ball');
+  var streakEl = document.getElementById('streak');
+  var chargeEl = document.getElementById('charge');
+  var msgEl = document.getElementById('msg');
+  var btnLeft = document.getElementById('btnLeft');
+  var btnLaunch = document.getElementById('btnLaunch');
+  var btnRight = document.getElementById('btnRight');
+  var btnNew = document.getElementById('btnNew');
+  var startOverlayEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var overlayEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+
+  /* ======================================================================
+   * 4. Pure math (side-effect free, deterministic, NaN-safe)
+   *
+   * Every function here NEVER mutates its arguments and NEVER returns NaN for
+   * degenerate input (zero-length segment, zero radius, coincident centres).
+   * ==================================================================== */
+
+  function num(v, fallback) {
+    return (typeof v === 'number' && isFinite(v)) ? v : (fallback || 0);
+  }
+
+  function clamp(v, lo, hi) {
+    if (!isFinite(v)) return lo;
+    return v < lo ? lo : (v > hi ? hi : v);
+  }
+
+  /* Closest point on segment AB to P. Degenerate AB (A == B) yields t = 0. */
+  function segmentClosestPoint(px, py, ax, ay, bx, by) {
+    px = num(px); py = num(py); ax = num(ax); ay = num(ay); bx = num(bx); by = num(by);
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    var t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+    t = clamp(t, 0, 1);
+    var x = ax + dx * t, y = ay + dy * t;
+    var ex = px - x, ey = py - y;
+    return { x: x, y: y, t: t, dist: Math.sqrt(ex * ex + ey * ey) };
+  }
+
+  /* Circle (cx,cy,r) vs segment AB. Returns null or {nx,ny,depth,t}; the normal
+   * points FROM the segment TOWARD the circle (i.e. the push-out direction). */
+  function circleVsSegment(cx, cy, r, ax, ay, bx, by) {
+    var cp = segmentClosestPoint(cx, cy, ax, ay, bx, by);
+    var depth = num(r) - cp.dist;
+    if (!(depth > 0)) return null;
+    var nx, ny;
+    if (cp.dist > 1e-9) {
+      nx = (num(cx) - cp.x) / cp.dist;
+      ny = (num(cy) - cp.y) / cp.dist;
+    } else {
+      var dx = num(bx) - num(ax), dy = num(by) - num(ay);
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 1e-9) { nx = -dy / len; ny = dx / len; } else { nx = 1; ny = 0; }
+    }
+    return { nx: nx, ny: ny, depth: depth, t: cp.t };
+  }
+
+  /* Circle A vs circle B. Returns null or {nx,ny,depth}; the normal points FROM
+   * B TOWARD A (the push-out direction for A). Coincident centres -> n = (1,0). */
+  function circleVsCircle(ax, ay, ar, bx, by, br) {
+    ax = num(ax); ay = num(ay); ar = num(ar); bx = num(bx); by = num(by); br = num(br);
+    var dx = ax - bx, dy = ay - by;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    var depth = (ar + br) - d;
+    if (!(depth > 0)) return null;
+    var nx, ny;
+    if (d > 1e-9) { nx = dx / d; ny = dy / d; } else { nx = 1; ny = 0; }
+    return { nx: nx, ny: ny, depth: depth };
+  }
+
+  /* Circle vs axis-aligned box. Returns null or {nx,ny,depth}; the normal points
+   * away from the box (push-out direction for the circle). */
+  function circleVsAabb(cx, cy, r, minX, minY, maxX, maxY) {
+    cx = num(cx); cy = num(cy); r = num(r);
+    minX = num(minX); minY = num(minY); maxX = num(maxX); maxY = num(maxY);
+    if (maxX < minX) { var t = minX; minX = maxX; maxX = t; }
+    if (maxY < minY) { var u = minY; minY = maxY; maxY = u; }
+    var qx = clamp(cx, minX, maxX), qy = clamp(cy, minY, maxY);
+    var dx = cx - qx, dy = cy - qy;
+    var d2 = dx * dx + dy * dy;
+    if (d2 > r * r) return null;
+    if (d2 > 1e-18) {
+      var d = Math.sqrt(d2);
+      return { nx: dx / d, ny: dy / d, depth: r - d };
+    }
+    /* Centre is inside the box: escape along the least-penetrating face. */
+    var left = cx - minX, right = maxX - cx, top = cy - minY, bottom = maxY - cy;
+    var m = Math.min(left, right, top, bottom);
+    var nx = 0, ny = 0;
+    if (m === left) nx = -1; else if (m === right) nx = 1;
+    else if (m === top) ny = -1; else ny = 1;
+    return { nx: nx, ny: ny, depth: r + m };
+  }
+
+  /* Reflect (vx,vy) about normal (nx,ny) with the given restitution. Pure. */
+  function reflect(vx, vy, nx, ny, restitution) {
+    vx = num(vx); vy = num(vy); nx = num(nx); ny = num(ny); restitution = num(restitution);
+    var vn = vx * nx + vy * ny;
+    var k = (1 + restitution) * vn;
+    return { vx: vx - k * nx, vy: vy - k * ny };
+  }
+
+  /* Seeded generator factory (mulberry32). Pure: no external state. */
+  function mulberry32(seed) {
+    var a = (seed >>> 0) || 1;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Points for the (streak)-th consecutive bumper hit (0 = first hit). */
+  function bumperScore(streak) {
+    var s = (typeof streak === 'number' && isFinite(streak) && streak > 0) ? streak : 0;
+    var mult = Math.min(1 + STREAK_STEP * s, STREAK_MAX_MULT);
+    return Math.round(BUMPER_BASE * mult);
+  }
+
+  /* Plunger speed as a pure function of charge in [0,1]. Straight up the lane. */
+  function launchVelocity(charge) {
+    var c = (typeof charge === 'number' && isFinite(charge)) ? clamp(charge, 0, 1) : 0;
+    var speed = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * c;
+    return { vx: 0, vy: -speed };
+  }
+
+  /* Maximum per-sub-step displacement (px). Must stay below thinnestCollider().
+   * This bound holds for ANY dt: both stepBall() and update() advance the model
+   * in chunks of at most CHUNK = MAX_SUBSTEPS * PHYS_STEP, sub-stepping each
+   * chunk so h <= PHYS_STEP - so a 5 s step is integrated as 1 s chunks,
+   * never as a single long step. */
+  function maxStepDisplacement() { return MAX_SPEED * PHYS_STEP; }
+
+  /* Thinnest collider the ball can meet (a wall segment => 2 * ball radius). */
+  function thinnestCollider() { return 2 * BALL_R; }
+
+  /* Max speed a flipper contact can impart (a hard clamp after every collision). */
+  function energyCeiling() { return MAX_SPEED; }
+
+  /* ======================================================================
+   * 5. Table geometry (declared once; read-only after load)
+   *
+   * The contour is a list of wall segments. The bottom funnels leave a gap in
+   * the middle (DRAIN_X0..DRAIN_X1) - the "drain". A separate narrow lane on
+   * the right (x 420..456) is where the ball is launched.
+   * ==================================================================== */
+
+  var WALLS = [
+    { ax: 24,  ay: 140, bx: 24,  by: 540 },   // left wall
+    { ax: 24,  ay: 540, bx: 150, by: 648 },   // left funnel
+    { ax: 24,  ay: 140, bx: 150, by: 60 },    // top-left slope
+    { ax: 150, ay: 60,  bx: 330, by: 60 },    // top crown
+    { ax: 330, ay: 60,  bx: 456, by: 140 },   // top-right slope
+    { ax: 456, ay: 140, bx: 456, by: 660 },   // right outer wall (lane, right side)
+    { ax: 420, ay: 180, bx: 420, by: 660 },   // lane inner wall
+    { ax: 420, ay: 660, bx: 456, by: 660 },   // lane floor
+    { ax: 420, ay: 560, bx: 330, by: 648 }    // right funnel
+  ];
+
+  var BUMPERS = [
+    { x: 240, y: 270, r: BUMPER_R },
+    { x: 130, y: 320, r: BUMPER_R },
+    { x: 330, y: 390, r: BUMPER_R }
+  ];
+
+  var LANE_X = 438;   // ball x while waiting in the launch lane
+  var LANE_Y = 650;   // ball y resting on the plunger
+
+  var flipperL = {
+    side: 'left', x: 160, y: 600, len: FLIPPER_LEN, r: FLIPPER_R,
+    restAngle: FLIPPER_REST_ANGLE, activeAngle: FLIPPER_ACTIVE_ANGLE,
+    angle: FLIPPER_REST_ANGLE, target: FLIPPER_REST_ANGLE, omega: 0, pressed: false
+  };
+  var flipperR = {
+    side: 'right', x: 320, y: 600, len: FLIPPER_LEN, r: FLIPPER_R,
+    restAngle: Math.PI - FLIPPER_REST_ANGLE, activeAngle: Math.PI - FLIPPER_ACTIVE_ANGLE,
+    angle: Math.PI - FLIPPER_REST_ANGLE, target: Math.PI - FLIPPER_REST_ANGLE, omega: 0, pressed: false
+  };
+
+  function flipperTip(f, angle) {
+    return { x: f.x + f.len * Math.cos(angle), y: f.y + f.len * Math.sin(angle) };
+  }
+
+  /* Project the flipper's angle `t` seconds ahead under its CURRENT motion.
+   * NOT pure with respect to time: it reads the live flipperL/flipperR state
+   * (f.angle, f.target). For a pure projection use the `angle` carried inside
+   * a world() snapshot and step it yourself. */
+  function flipperAngle(side, t) {
+    var f = (side === 'right') ? flipperR : flipperL;
+    var cur = f.angle, tgt = f.target;
+    var step = FLIPPER_SPEED * num(t);
+    if (cur < tgt) return Math.min(tgt, cur + step);
+    if (cur > tgt) return Math.max(tgt, cur - step);
+    return tgt;
+  }
+
+  function flipperSnapshot(f) {
+    return {
+      side: f.side, x: f.x, y: f.y, len: f.len, r: f.r,
+      restAngle: f.restAngle, activeAngle: f.activeAngle,
+      angle: f.angle, omega: f.omega, target: f.target, pressed: f.pressed
+    };
+  }
+
+  /* A fresh, plain snapshot of the world - what stepBall() consumes. */
+  function world() {
+    var i, walls = [], bumpers = [];
+    for (i = 0; i < WALLS.length; i++) {
+      var w = WALLS[i];
+      walls.push({ ax: w.ax, ay: w.ay, bx: w.bx, by: w.by });
+    }
+    for (i = 0; i < BUMPERS.length; i++) {
+      var b = BUMPERS[i];
+      bumpers.push({ x: b.x, y: b.y, r: b.r, score: BUMPER_BASE });
+    }
+    return {
+      walls: walls,
+      bumpers: bumpers,
+      flippers: [flipperSnapshot(flipperL), flipperSnapshot(flipperR)],
+      drain: { y: DRAIN_Y, x0: DRAIN_X0, x1: DRAIN_X1 }
+    };
+  }
+
+  /* ======================================================================
+   * 6. Live state
+   * ==================================================================== */
+
+  var phase = 'ready';            // 'ready' | 'playing' | 'paused' | 'over'
+  var score = 0;
+  var best = 0;
+  var streak = 0;
+  var ballsLeft = BALLS;
+  var awaitingLaunch = true;
+  var ballInPlay = false;
+  var charge = 0;
+  var charging = false;
+  var nudges = 0;
+  var seed = 1;
+  var clock = 0;                  // model clock (s)
+  var ticks = 0;
+  var stallClock = 0;
+  var lastScoreClock = 0;
+  var laneClock = 0;
+  var ballClock = 0;              // s the current ball has been in play untouched
+  var over = false;
+  var fx = [];
+  var eventLog = [];
+  var rng = { seed: 1, calls: 0, fn: null };
+  var ball = { x: LANE_X, y: LANE_Y, vx: 0, vy: 0, r: BALL_R, dead: false };
+  var running = true;
+  var lastT = 0;
+
+  function setSeed(s) {
+    var v = (typeof s === 'number' && isFinite(s)) ? (s | 0) : 1;
+    if (v === 0) v = 1;
+    rng.seed = v >>> 0;
+    rng.calls = 0;
+    rng.fn = mulberry32(rng.seed);
+    seed = rng.seed;
+  }
+  /* Pull one draw from the live game stream (the ONLY source of randomness). */
+  function nextRandom() { rng.calls += 1; return rng.fn(); }
+
+  function log(type, extra) {
+    var entry = { t: Math.round(clock * 1000) / 1000, type: type };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) entry[k] = extra[k];
+      }
+    }
+    eventLog.push(entry);
+    if (eventLog.length > 60) eventLog.shift();
+    return entry;
+  }
+
+  /* ======================================================================
+   * 7. Physics core (stepBallOnce is shared by the loop and stepBall)
+   * ==================================================================== */
+
+  /* Sub-step count for a span of at most CHUNK; h = span / n <= PHYS_STEP. */
+  function subStepCount(dt) {
+    var n = Math.ceil(dt / PHYS_STEP);
+    if (!(n >= 1)) n = 1;
+    if (n > MAX_SUBSTEPS) n = MAX_SUBSTEPS;   // safety net; callers pass dt <= CHUNK
+    return n;
+  }
+
+  function clampSpeed(b) {
+    var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if (!isFinite(sp)) { b.vx = 0; b.vy = 0; return; }
+    if (sp > MAX_SPEED) { var k = MAX_SPEED / sp; b.vx *= k; b.vy *= k; }
+  }
+
+  /* One sub-step of the ball: gravity, integration, then every collision.
+   * Mutates `b` (internal use only) and returns the event list for the step. */
+  function stepBallOnce(b, h, w) {
+    var events = [];
+    if (!(h > 0)) return events;
+
+    b.vy += GRAVITY * h;
+    var damp = 1 - DRAG * h;
+    if (!(damp > 0)) damp = 0;
+    b.vx *= damp; b.vy *= damp;
+
+    b.x += b.vx * h;
+    b.y += b.vy * h;
+
+    var i, hit;
+
+    if (w && w.walls) {
+      for (i = 0; i < w.walls.length; i++) {
+        var s = w.walls[i];
+        hit = circleVsSegment(b.x, b.y, b.r, s.ax, s.ay, s.bx, s.by);
+        if (hit) {
+          b.x += hit.nx * hit.depth; b.y += hit.ny * hit.depth;
+          var rv = reflect(b.vx, b.vy, hit.nx, hit.ny, WALL_REST);
+          b.vx = rv.vx; b.vy = rv.vy;
+          events.push({ type: 'wall', x: b.x, y: b.y });
+        }
+      }
+    }
+
+    if (w && w.bumpers) {
+      for (i = 0; i < w.bumpers.length; i++) {
+        var bm = w.bumpers[i];
+        hit = circleVsCircle(b.x, b.y, b.r, bm.x, bm.y, bm.r);
+        if (hit) {
+          b.x += hit.nx * hit.depth; b.y += hit.ny * hit.depth;
+          var rb = reflect(b.vx, b.vy, hit.nx, hit.ny, BUMPER_REST);
+          b.vx = rb.vx + hit.nx * BUMPER_KICK;
+          b.vy = rb.vy + hit.ny * BUMPER_KICK;
+          events.push({ type: 'bumper', i: i, x: b.x, y: b.y, nx: hit.nx, ny: hit.ny });
+        }
+      }
+    }
+
+    if (w && w.flippers) {
+      for (i = 0; i < w.flippers.length; i++) {
+        var fl = w.flippers[i];
+        var ang = (typeof fl.angle === 'number' && isFinite(fl.angle)) ? fl.angle : fl.restAngle;
+        var tip = flipperTip(fl, ang);
+        hit = circleVsSegment(b.x, b.y, b.r + fl.r, fl.x, fl.y, tip.x, tip.y);
+        if (hit) {
+          b.x += hit.nx * hit.depth; b.y += hit.ny * hit.depth;
+          var cpx = b.x - hit.nx * b.r;
+          var cpy = b.y - hit.ny * b.r;
+          var om = (typeof fl.omega === 'number' && isFinite(fl.omega)) ? fl.omega : 0;
+          /* Speed of the flipper surface at the contact point (rigid rotation). */
+          var vpx = -om * (cpy - fl.y);
+          var vpy = om * (cpx - fl.x);
+          var rl = reflect(b.vx - vpx, b.vy - vpy, hit.nx, hit.ny, FLIP_RESTITUTION);
+          b.vx = vpx + rl.vx;
+          b.vy = vpy + rl.vy;
+          if (Math.abs(om) > 1e-6) { b.vx += hit.nx * FLIPPER_KICK; b.vy += hit.ny * FLIPPER_KICK; }
+          events.push({ type: 'flipper', side: fl.side, x: b.x, y: b.y, moving: Math.abs(om) > 1e-6 });
+        }
+      }
+    }
+
+    /* A flipper can inject energy, so clamp the magnitude after every step:
+     * a ball resting on an oscillating flipper can never exceed MAX_SPEED. */
+    clampSpeed(b);
+
+    if (w && w.drain && isFinite(w.drain.y) && b.y > w.drain.y) {
+      b.dead = true;
+      events.push({ type: 'drain', x: b.x, y: b.y });
+    }
+    return events;
+  }
+
+  /* Pure integrator: given a ball state, a dt and a world snapshot, return the
+   * next ball state plus every event that happened. No module state is read,
+   * no Math.random is used: same inputs -> byte-identical output. */
+  function stepBall(state, dt, worldIn) {
+    var st = state || {};
+    var b = {
+      x: num(st.x), y: num(st.y), vx: num(st.vx), vy: num(st.vy),
+      r: (isFinite(st.r) && st.r > 0) ? st.r : BALL_R,
+      dead: false
+    };
+    var w = worldIn || world();
+    var events = [];
+    var D = (typeof dt === 'number' && isFinite(dt) && dt > 0) ? dt : 0;
+    /* Chunk so every sub-step h <= PHYS_STEP, for ANY dt (no tunnelling and no
+     * dropped time): 5 s becomes five 1 s chunks, each fully integrated. */
+    var left = D;
+    while (left > 1e-9) {
+      var c = left > CHUNK ? CHUNK : left;
+      var n = subStepCount(c);
+      var h = c / n;
+      for (var i = 0; i < n && !b.dead; i++) {
+        var ev = stepBallOnce(b, h, w);
+        for (var e = 0; e < ev.length; e++) events.push(ev[e]);
+      }
+      left -= c;
+      if (b.dead) break;
+    }
+    return { ball: { x: b.x, y: b.y, vx: b.vx, vy: b.vy }, events: events };
+  }
+
+  /* ======================================================================
+   * 8. Flippers, launching, nudging, and the ball lifecycle
+   * ==================================================================== */
+
+  function advanceFlipper(f, dt) {
+    var prev = f.angle;
+    var step = FLIPPER_SPEED * dt;
+    if (f.angle < f.target) f.angle = Math.min(f.target, f.angle + step);
+    else if (f.angle > f.target) f.angle = Math.max(f.target, f.angle - step);
+    f.omega = dt > 0 ? (f.angle - prev) / dt : 0;
+  }
+
+  function setFlipper(side, on) {
+    var f = (side === 'right') ? flipperR : flipperL;
+    f.pressed = !!on;
+    f.target = on ? f.activeAngle : f.restAngle;
+    return getState();
+  }
+
+  function resetBallToLane() {
+    ball.x = LANE_X; ball.y = LANE_Y;
+    ball.vx = 0; ball.vy = 0; ball.dead = false;
+    awaitingLaunch = true;
+    ballInPlay = false;
+    charge = 0;
+    charging = false;
+    nudges = 0;
+    stallClock = 0;
+    laneClock = 0;
+    ballClock = 0;
+  }
+
+  /* Plunger: hold to charge, release to fire. A release always launches. */
+  function chargePlunger(on) {
+    if (phase !== 'playing' || !awaitingLaunch) { charging = false; return getState(); }
+    charging = !!on;
+    if (!charging) return launch(charge);
+    laneClock = 0;
+    return getState();
+  }
+
+  function launch(c) {
+    if (phase !== 'playing' || !awaitingLaunch) return getState();
+    var v = launchVelocity(c);
+    ball.vx = v.vx;
+    ball.vy = v.vy;
+    awaitingLaunch = false;
+    ballInPlay = true;
+    charging = false;
+    charge = 0;
+    stallClock = 0;
+    ballClock = 0;
+    log('launch', { charge: Math.round(clamp(c, 0, 1) * 100) });
+    updateHud();
+    return getState();
+  }
+
+  function nudge(dir) {
+    if (phase !== 'playing' || awaitingLaunch) return getState();
+    nudges += 1;
+    if (nudges > NUDGE_MAX) { loseBall('tilt'); return getState(); }
+    var isDown = (dir === 'down' || dir === 1);
+    if (isDown) {
+      ball.vy += NUDGE_IMPULSE;
+    } else {
+      ball.vy -= NUDGE_IMPULSE;
+      ball.vx += (ball.x < W / 2 ? NUDGE_SIDE : -NUDGE_SIDE);
+    }
+    clampSpeed(ball);
+    stallClock = 0;
+    ballClock = 0;
+    log('nudge', { n: nudges, dir: isDown ? 'down' : 'up' });
+    updateHud();
+    return getState();
+  }
+
+  function loseBall(reason) {
+    log(reason);
+    streak = 0;
+    ballsLeft -= 1;
+    if (ballsLeft > 0) {
+      resetBallToLane();
+    } else {
+      if (ballsLeft < 0) ballsLeft = 0;
+      phase = 'over';
+      over = true;
+      bestSave();
+    }
+    updateHud();
+  }
+
+  /* ======================================================================
+   * 9. Effects, event handling, stall guard, bounds
+   * ==================================================================== */
+
+  function addFx(x, y, color, life) {
+    fx.push({ x: num(x), y: num(y), color: color || '#ffffff', t: 0, life: life || 0.4 });
+    if (fx.length > 24) fx.shift();
+  }
+
+  function updateFx(dt) {
+    for (var i = fx.length - 1; i >= 0; i--) {
+      fx[i].t += dt;
+      if (fx[i].t >= fx[i].life) fx.splice(i, 1);
+    }
+  }
+
+  function handleBallEvents(events) {
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i];
+      if (e.type === 'bumper') {
+        var pts = bumperScore(streak);
+        score += pts;
+        streak += 1;
+        lastScoreClock = clock;
+        addFx(e.x, e.y, '#ffd58a');
+        /* Seeded jitter (<= 2%): deterministic, and never grows the speed. */
+        var j = (nextRandom() - 0.5) * 0.02;
+        ball.vx *= (1 + j);
+        ball.vy *= (1 + j);
+        clampSpeed(ball);           // keep the hard cap after the jitter
+        if (nextRandom() < BONUS_CHANCE) {
+          score += BONUS_POINTS;
+          addFx(e.x, e.y, '#8ef0a0', 0.6);
+          log('bonus', { p: BONUS_POINTS });
+        }
+        if (score > best) { best = score; bestSave(); }
+        log('bumper', { i: e.i, pts: pts, streak: streak });
+      } else if (e.type === 'flipper') {
+        lastScoreClock = clock;
+        /* Only a MOVING flipper counts as the player engaging the ball; a ball
+         * just resting on a still flipper must not keep the lifetime alive. */
+        if (e.moving) ballClock = 0;
+        addFx(e.x, e.y, '#8fe3ff', 0.3);
+      } else if (e.type === 'wall') {
+        addFx(e.x, e.y, '#39456e', 0.25);
+      } else if (e.type === 'drain') {
+        loseBall('drain');
+        return;
+      }
+    }
+  }
+
+  function updateStall(dt) {
+    var sp = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (isFinite(sp) && sp < STALL_SPEED) stallClock += dt;
+    else stallClock = 0;
+    if (stallClock > STALL_SEC) {
+      ball.vx += (ball.x < W / 2 ? 1 : -1) * STALL_NUDGE;
+      ball.vy -= STALL_NUDGE;
+      clampSpeed(ball);
+      stallClock = 0;
+      log('stall');
+    }
+  }
+
+  function checkBounds() {
+    if (!isFinite(ball.x) || !isFinite(ball.y) || !isFinite(ball.vx) || !isFinite(ball.vy) ||
+        ball.x < -80 || ball.x > W + 80 || ball.y < -400 || ball.y > H + 200) {
+      log('respawn');
+      resetBallToLane();
+    }
+  }
+
+  /* ======================================================================
+   * 10. update(dt) - the ONE model step shared by the rAF loop and tick()
+   * ==================================================================== */
+
+  /* Advance the model by `dt` real seconds, chunked so a single chunk never
+   * exceeds CHUNK = MAX_SUBSTEPS * PHYS_STEP (= 1 s). This keeps every physics
+   * sub-step at h <= PHYS_STEP for ANY dt, and never drops simulated time. */
+  function update(dt) {
+    if (!(dt > 0) || !isFinite(dt)) { updateOnce(0); return; }
+    var left = dt;
+    while (left > 1e-9) {
+      var c = left > CHUNK ? CHUNK : left;
+      updateOnce(c);
+      left -= c;
+    }
+  }
+
+  /* One model step of at most CHUNK seconds - the shared rAF / tick body. */
+  function updateOnce(dt) {
+    if (!(dt > 0) || !isFinite(dt)) dt = 0;
+    clock += dt;
+
+    if (phase === 'playing') {
+      if (awaitingLaunch) {
+        advanceFlipper(flipperL, dt);
+        advanceFlipper(flipperR, dt);
+        if (charging) {
+          charge = clamp(charge + CHARGE_RATE * dt, 0, 1);
+          laneClock = 0;
+        } else {
+          laneClock += dt;
+          if (laneClock > AUTO_LAUNCH_SEC) launch(1);
+        }
+      } else {
+        stepBallLive(dt);
+        /* Bounded ball lifetime: bumpers inject energy, so a ball left alone
+         * can settle into a stable orbit that never drains. The moment the
+         * player touches the ball (flipper contact / nudge) ballClock resets,
+         * so only an UNTOUCHED ball is capped - skilled juggling is unbounded. */
+        if (phase === 'playing' && !awaitingLaunch) {
+          /* A weak/wasted plunge that falls back into the lane re-arms the
+           * plunger, instead of trapping the ball until the time cap. */
+          if (ball.x > 421 && ball.y > 600 && Math.hypot(ball.vx, ball.vy) < 60) {
+            resetBallToLane();
+            log('replunge');
+            updateHud();
+          } else {
+            ballClock += dt;
+            if (ballClock > BALL_MAX_SEC) {
+              loseBall('timeout');
+            } else {
+              updateStall(dt);
+              checkBounds();
+            }
+          }
+        }
+      }
+      if (clock - lastScoreClock > STREAK_TIMEOUT) streak = 0;
+    }
+
+    updateFx(dt);
+  }
+
+  /* The live ball integrator: fresh world + fresh flipper angles each sub-step,
+   * so a fast-swinging flipper can never be missed between frames. Called only
+   * from updateOnce(), so dt (hence h) is already capped at CHUNK/PHYS_STEP. */
+  function stepBallLive(dt) {
+    var n = dt > 0 ? subStepCount(dt) : 1;
+    var h = n > 0 ? dt / n : 0;
+    for (var i = 0; i < n; i++) {
+      advanceFlipper(flipperL, h);
+      advanceFlipper(flipperR, h);
+      var ev = stepBallOnce(ball, h, world());
+      handleBallEvents(ev);
+      if (ball.dead) break;
+    }
+    ball.dead = false;
+  }
+
+  /* Deterministic advance for the test bridge: no rAF, no wall clock. `seconds`
+   * is real seconds split into `step` sub-steps, each running the same update();
+   * the value-cached HUD is refreshed exactly once at the end. */
+  function tick(seconds, step) {
+    var real = (typeof seconds === 'number' && isFinite(seconds)) ? seconds : 0;
+    var s = (typeof step === 'number' && step > 0) ? step : DEFAULT_STEP;
+    var n = real > 0 ? Math.max(1, Math.round(real / s)) : 0;
+    var d = n > 0 ? real / n : 0;
+    for (var i = 0; i < n; i++) { ticks += 1; update(d); }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 11. Best score (localStorage, always wrapped in try/catch)
+   * ==================================================================== */
+
+  function bestLoad() {
+    try {
+      var v = localStorage.getItem(STORE_KEY);
+      var n = v === null ? 0 : parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    } catch (e) { return 0; }
+  }
+
+  /* Authoritative best writer: folds the current score into `best` and ALWAYS
+   * persists it, so it is reached even when `best` was already advanced live by
+   * a bumper hit (the old `if (score > best)` guard never fired on game over). */
+  function bestSave() {
+    try {
+      best = Math.max(best, score);
+      localStorage.setItem(STORE_KEY, String(best));
+    } catch (e) { /* storage unavailable - keep running */ }
+  }
+
+  /* ======================================================================
+   * 12. Lifecycle: newGame / start / pause / proceed
+   * ==================================================================== */
+
+  function ballNo() {
+    var n = BALLS - ballsLeft + 1;
+    if (n < 1) n = 1;
+    if (n > BALLS) n = BALLS;
+    return n;
+  }
+
+  function newGame(opts) {
+    opts = opts || {};
+    setSeed(opts.seed === undefined || opts.seed === null ? 1 : opts.seed);
+    score = 0;
+    streak = 0;
+    ballsLeft = BALLS;
+    over = false;
+    phase = 'ready';
+    clock = 0;
+    ticks = 0;
+    stallClock = 0;
+    lastScoreClock = 0;
+    laneClock = 0;
+    nudges = 0;
+    charge = 0;
+    charging = false;
+    fx = [];
+    eventLog = [];
+    best = bestLoad();
+    resetBallToLane();
+    resetHudCache();
+    updateHud();
+    return getState();
+  }
+
+  function beginPlay() {
+    phase = 'playing';
+    over = false;
+    resetBallToLane();
+    updateHud();
+    return getState();
+  }
+
+  function start() { return beginPlay(); }
+
+  function togglePause() {
+    if (phase === 'playing') phase = 'paused';
+    else if (phase === 'paused') phase = 'playing';
+    updateHud();
+    return getState();
+  }
+
+  function pause() { if (phase === 'playing') { phase = 'paused'; updateHud(); } return getState(); }
+  function resume() { if (phase === 'paused') { phase = 'playing'; updateHud(); } return getState(); }
+
+  function proceed() {
+    if (phase === 'ready') beginPlay();
+    else if (phase === 'paused') togglePause();
+    else if (phase === 'over') { newGame({ seed: seed }); beginPlay(); }
+  }
+
+  /* ======================================================================
+   * 13. State snapshot + queries
+   * ==================================================================== */
+
+  function flipperState(f) {
+    return {
+      angle: f.angle, target: f.target, pressed: f.pressed,
+      restAngle: f.restAngle, activeAngle: f.activeAngle
+    };
+  }
+
+  function logSnapshot() {
+    var out = [];
+    for (var i = 0; i < eventLog.length; i++) {
+      var e = eventLog[i], c = {};
+      for (var k in e) if (Object.prototype.hasOwnProperty.call(e, k)) c[k] = e[k];
+      out.push(c);
+    }
+    return out;
+  }
+
+  function getState() {
+    return {
+      phase: phase,
+      score: score,
+      best: Math.max(best, score),
+      ballsLeft: ballsLeft,
+      ballNo: ballNo(),
+      streak: streak,
+      ball: { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy },
+      flippers: { left: flipperState(flipperL), right: flipperState(flipperR) },
+      seed: seed,
+      rng: { seed: rng.seed, calls: rng.calls },
+      rngDraws: rng.calls,
+      charge: charge,
+      nudges: nudges,
+      awaitingLaunch: awaitingLaunch,
+      pause: (phase === 'paused'),
+      over: over,
+      clock: Math.round(clock * 1000) / 1000,
+      ticks: ticks,
+      log: logSnapshot()
+    };
+  }
+
+  /* ======================================================================
+   * 14. HUD - value-cached, refreshed from updateHud() ONLY.
+   *
+   * Every write to a HUD node lives inside updateHud(); event handlers only
+   * mutate state and call updateHud(). resetHudCache() forces a rewrite (used
+   * on language change and on newGame).
+   * ==================================================================== */
+
+  var hudCache = {
+    score: null, best: null, ball: null, streak: null, charge: null, msg: null,
+    launchTxt: null, launchDis: null, flipDis: null,
+    leftTxt: null, rightTxt: null, newTxt: null, startLbl: null,
+    showStart: null, showRes: null, ovTitle: null, ovSub: null, ovBtn: null
+  };
+
+  function resetHudCache() {
+    for (var k in hudCache) {
+      if (Object.prototype.hasOwnProperty.call(hudCache, k)) hudCache[k] = null;
+    }
+  }
+
+  function updateHud() {
+    var c = hudCache;
+
+    if (c.score !== score) { scoreEl.textContent = String(score); c.score = score; }
+
+    var shownBest = Math.max(best, score);
+    if (c.best !== shownBest) { bestEl.textContent = String(shownBest); c.best = shownBest; }
+
+    var ballTxt = T.t('ballFmt', { n: ballNo(), t: BALLS });
+    if (c.ball !== ballTxt) { ballEl.textContent = ballTxt; c.ball = ballTxt; }
+
+    var mult = Math.round(Math.min(1 + STREAK_STEP * streak, STREAK_MAX_MULT) * 100) / 100;
+    var stTxt = T.t('streakFmt', { m: mult });
+    if (c.streak !== stTxt) { streakEl.textContent = stTxt; c.streak = stTxt; }
+
+    var chTxt = Math.round(charge * 100) + '%';
+    if (c.charge !== chTxt) { chargeEl.textContent = chTxt; c.charge = chTxt; }
+
+    var msg;
+    if (phase === 'ready') msg = T.t('readyInfo');
+    else if (phase === 'paused') msg = T.t('msgPaused');
+    else if (phase === 'over') msg = T.t('msgOver');
+    else if (awaitingLaunch) msg = T.t('msgLaunch', { c: Math.round(charge * 100) });
+    else msg = T.t('msgPlaying');
+    if (c.msg !== msg) { msgEl.textContent = msg; c.msg = msg; }
+
+    var launchTxt = charging ? T.t('charging') : T.t('launch');
+    if (c.launchTxt !== launchTxt) { btnLaunch.textContent = launchTxt; c.launchTxt = launchTxt; }
+    var launchDis = !(phase === 'playing' && awaitingLaunch);
+    if (c.launchDis !== launchDis) { btnLaunch.disabled = launchDis; c.launchDis = launchDis; }
+
+    var flipDis = !(phase === 'playing');
+    if (c.flipDis !== flipDis) {
+      btnLeft.disabled = flipDis;
+      btnRight.disabled = flipDis;
+      c.flipDis = flipDis;
+    }
+
+    var leftTxt = T.t('left');
+    if (c.leftTxt !== leftTxt) { btnLeft.textContent = leftTxt; c.leftTxt = leftTxt; }
+    var rightTxt = T.t('right');
+    if (c.rightTxt !== rightTxt) { btnRight.textContent = rightTxt; c.rightTxt = rightTxt; }
+
+    var newTxt = T.t('newgame');
+    if (c.newTxt !== newTxt) { btnNew.textContent = newTxt; c.newTxt = newTxt; }
+
+    var startLbl = T.t('start');
+    if (c.startLbl !== startLbl) { btnStart.textContent = startLbl; c.startLbl = startLbl; }
+
+    var showStart = (phase === 'ready');
+    if (c.showStart !== showStart) {
+      if (showStart) startOverlayEl.classList.add('show'); else startOverlayEl.classList.remove('show');
+      c.showStart = showStart;
+    }
+    var showRes = (phase === 'over');
+    if (c.showRes !== showRes) {
+      if (showRes) overlayEl.classList.add('show'); else overlayEl.classList.remove('show');
+      c.showRes = showRes;
+    }
+    if (showRes) {
+      var ot = T.t('overTitle');
+      var os = T.t('overSub', { n: score, b: Math.max(best, score) });
+      var ob = T.t('again');
+      if (c.ovTitle !== ot) { ovTitleEl.textContent = ot; c.ovTitle = ot; }
+      if (c.ovSub !== os) { ovSubEl.textContent = os; c.ovSub = os; }
+      if (c.ovBtn !== ob) { ovBtnEl.textContent = ob; c.ovBtn = ob; }
+    }
+  }
+
+  /* ======================================================================
+   * 15. Rendering (canvas only - nothing here touches a DOM node or reads
+   *     any size back from the canvas).
+   * ==================================================================== */
+
+  function drawWalls() {
+    ctx.strokeStyle = '#3a4a86';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (var i = 0; i < WALLS.length; i++) {
+      var w = WALLS[i];
+      ctx.beginPath();
+      ctx.moveTo(w.ax, w.ay);
+      ctx.lineTo(w.bx, w.by);
+      ctx.stroke();
+    }
+    /* The drain gap between the funnel ends, marked for clarity. */
+    ctx.strokeStyle = 'rgba(255,90,120,0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(DRAIN_X0, 654);
+    ctx.lineTo(DRAIN_X1, 654);
+    ctx.stroke();
+  }
+
+  function drawBumpers() {
+    for (var i = 0; i < BUMPERS.length; i++) {
+      var b = BUMPERS[i];
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#2b2255';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ffd58a';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffe6b8';
+      ctx.fill();
+    }
+  }
+
+  function drawFlipper(f) {
+    var tip = flipperTip(f, f.angle);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = f.pressed ? '#ffd58a' : '#8fa2d8';
+    ctx.lineWidth = f.r * 2;
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.y);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#c9d3f0';
+    ctx.fill();
+  }
+
+  function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r + 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(150,190,255,0.18)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#e9f1ff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ball.x - ball.r * 0.32, ball.y - ball.r * 0.32, ball.r * 0.36, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  function drawCharge() {
+    var full = 118;                       // meter height (px)
+    var x = 462, y0 = 540;
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(x, y0 - full, 8, full);
+    ctx.fillStyle = '#8ef0a0';
+    ctx.fillRect(x, y0 - full * clamp(charge, 0, 1), 8, full * clamp(charge, 0, 1));
+  }
+
+  function drawFx() {
+    for (var i = 0; i < fx.length; i++) {
+      var f = fx[i];
+      var k = f.t / f.life;
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, 4 + k * 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0f22';
+    ctx.fillRect(0, 0, W, H);
+
+    /* Faint grid for depth. */
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx <= W; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (var gy = 0; gy <= H; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    drawWalls();
+    drawBumpers();
+    drawFlipper(flipperL);
+    drawFlipper(flipperR);
+    drawCharge();
+    drawBall();
+    drawFx();
+
+    if (phase === 'paused') {
+      ctx.fillStyle = 'rgba(7,11,28,0.55)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(T.t('msgPaused'), W / 2, H / 2);
+    }
+  }
+
+  /* ======================================================================
+   * 16. Input (keyboard on BOTH document and window; pointer on the buttons)
+   * ==================================================================== */
+
+  /* The event object is shared between the document and window dispatches, so
+   * one marker dedupes the two registrations (a real key bubbles to both). */
+  function onKeyDown(ev) {
+    if (ev && ev.__pbSeen) return;
+    if (ev) ev.__pbSeen = true;
+    var k = ev && ev.key;
+    if (k === 'a' || k === 'A' || k === 'ArrowLeft') { setFlipper('left', true); return; }
+    if (k === 'd' || k === 'D' || k === 'ArrowRight') { setFlipper('right', true); return; }
+    if (k === 'w' || k === 'W') { nudge('up'); return; }
+    if (k === 's' || k === 'S') { nudge('down'); return; }
+    if (k === ' ' || k === 'Spacebar') {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      chargePlunger(true);
+      return;
+    }
+    if (k === 'Enter') { proceed(); return; }
+    if (k === 'p' || k === 'P') { togglePause(); return; }
+    if (k === 'r' || k === 'R') { newGame({ seed: seed }); beginPlay(); return; }
+  }
+
+  function onKeyUp(ev) {
+    var k = ev && ev.key;
+    if (k === 'a' || k === 'A' || k === 'ArrowLeft') { setFlipper('left', false); return; }
+    if (k === 'd' || k === 'D' || k === 'ArrowRight') { setFlipper('right', false); return; }
+    if (k === ' ' || k === 'Spacebar') { chargePlunger(false); return; }
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  function bindHold(el, on, off) {
+    el.addEventListener('pointerdown', function (ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      on();
+    });
+    el.addEventListener('pointerup', function () { off(); });
+    el.addEventListener('pointercancel', function () { off(); });
+    el.addEventListener('pointerleave', function () { off(); });
+  }
+
+  bindHold(btnLeft,
+    function () { setFlipper('left', true); },
+    function () { setFlipper('left', false); });
+  bindHold(btnRight,
+    function () { setFlipper('right', true); },
+    function () { setFlipper('right', false); });
+
+  /* A plain click toggles a flipper (mouse / keyboard-accessibility path). */
+  btnLeft.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    setFlipper('left', !flipperL.pressed);
+  });
+  btnRight.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    setFlipper('right', !flipperR.pressed);
+  });
+
+  btnLaunch.addEventListener('pointerdown', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    chargePlunger(true);
+  });
+  btnLaunch.addEventListener('pointerup', function () { chargePlunger(false); });
+  btnLaunch.addEventListener('pointercancel', function () { chargePlunger(false); });
+  btnLaunch.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (phase === 'playing' && awaitingLaunch && !charging) launch(1);
+  });
+
+  btnNew.addEventListener('click', function () { newGame({ seed: seed }); beginPlay(); });
+  btnStart.addEventListener('click', function () { beginPlay(); });
+  ovBtnEl.addEventListener('click', function () { newGame({ seed: seed }); beginPlay(); });
+
+  /* ======================================================================
+   * 17. rAF loop (single clock - no browser timer API is used anywhere)
+   * ==================================================================== */
+
+  function loop(ts) {
+    if (!running) return;
+    var dt;
+    if (typeof ts === 'number' && ts > 0 && lastT > 0) dt = (ts - lastT) / 1000;
+    else dt = DEFAULT_STEP;                 // zero/absent timestamp => first frame
+    if (typeof ts === 'number' && ts > 0) lastT = ts;
+    if (!isFinite(dt) || dt <= 0) dt = DEFAULT_STEP;
+    if (dt > 0.05) dt = 0.05;               // clamp big hitches / tab restores
+    update(dt);
+    updateHud();                            // value-cached DOM refresh every frame
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 18. Test bridge (window.PB) + boot
+   * ==================================================================== */
+
+  function toLogical(clientX, clientY) {
+    var rect = (cv && cv.getBoundingClientRect) ? cv.getBoundingClientRect() : null;
+    var rw = rect ? rect.width : 0;
+    var rh = rect ? rect.height : 0;
+    var sx = (rw > 0) ? (W / rw) : 1;       // 0-width safe: fall back to 1:1
+    var sy = (rh > 0) ? (H / rh) : 1;
+    var x = (num(clientX) - (rect ? rect.left : 0)) * sx;
+    var y = (num(clientY) - (rect ? rect.top : 0)) * sy;
+    if (!isFinite(x)) x = 0;
+    if (!isFinite(y)) y = 0;
+    return { x: x, y: y };
+  }
+
+  window.PB = {
+    /* constants */
+    constants: {
+      W: W, H: H, BALL_R: BALL_R, GRAVITY: GRAVITY, MAX_SPEED: MAX_SPEED,
+      PHYS_STEP: PHYS_STEP, DRAIN_Y: DRAIN_Y, DRAIN_X0: DRAIN_X0, DRAIN_X1: DRAIN_X1,
+      BALLS: BALLS, DEFAULT_STEP: DEFAULT_STEP, MAX_SUBSTEPS: MAX_SUBSTEPS,
+      FLIPPER_LEN: FLIPPER_LEN, FLIPPER_R: FLIPPER_R,
+      FLIPPER_REST_ANGLE: FLIPPER_REST_ANGLE, FLIPPER_ACTIVE_ANGLE: FLIPPER_ACTIVE_ANGLE,
+      FLIPPER_SPEED: FLIPPER_SPEED, FLIPPER_KICK: FLIPPER_KICK, FLIP_RESTITUTION: FLIP_RESTITUTION,
+      BUMPER_R: BUMPER_R, BUMPER_KICK: BUMPER_KICK, BUMPER_REST: BUMPER_REST, BUMPER_BASE: BUMPER_BASE,
+      WALL_REST: WALL_REST, DRAG: DRAG,
+      STALL_SEC: STALL_SEC, STALL_SPEED: STALL_SPEED, STALL_NUDGE: STALL_NUDGE,
+      STREAK_TIMEOUT: STREAK_TIMEOUT, STREAK_STEP: STREAK_STEP, STREAK_MAX_MULT: STREAK_MAX_MULT,
+      BONUS_CHANCE: BONUS_CHANCE, BONUS_POINTS: BONUS_POINTS,
+      LAUNCH_MIN: LAUNCH_MIN, LAUNCH_MAX: LAUNCH_MAX, CHARGE_RATE: CHARGE_RATE,
+      AUTO_LAUNCH_SEC: AUTO_LAUNCH_SEC, BALL_MAX_SEC: BALL_MAX_SEC, NUDGE_MAX: NUDGE_MAX,
+      NUDGE_IMPULSE: NUDGE_IMPULSE, NUDGE_SIDE: NUDGE_SIDE,
+      LANE_X: LANE_X, LANE_Y: LANE_Y
+    },
+
+    /* world */
+    world: function () { return world(); },
+
+    /* deterministic randomness */
+    mulberry32: function (s) { return mulberry32(s); },
+    nextRandom: function () { return nextRandom(); },
+
+    /* pure geometry / maths */
+    segmentClosestPoint: function (px, py, ax, ay, bx, by) {
+      return segmentClosestPoint(px, py, ax, ay, bx, by);
+    },
+    circleVsSegment: function (cx, cy, r, ax, ay, bx, by) {
+      return circleVsSegment(cx, cy, r, ax, ay, bx, by);
+    },
+    circleVsCircle: function (ax, ay, ar, bx, by, br) {
+      return circleVsCircle(ax, ay, ar, bx, by, br);
+    },
+    circleVsAabb: function (cx, cy, r, minX, minY, maxX, maxY) {
+      return circleVsAabb(cx, cy, r, minX, minY, maxX, maxY);
+    },
+    reflect: function (vx, vy, nx, ny, restitution) {
+      return reflect(vx, vy, nx, ny, restitution);
+    },
+    /* flipperAngle reads the flipper's LIVE state (angle/target), so it is not
+     * pure with respect to time - see the note on its definition above. */
+    flipperAngle: function (side, t) { return flipperAngle(side, t); },
+    /* pure maths */
+    launchVelocity: function (charge) { return launchVelocity(charge); },
+    bumperScore: function (streak) { return bumperScore(streak); },
+
+    /* pure physics */
+    stepBall: function (state, dt, worldIn) { return stepBall(state, dt, worldIn); },
+    maxStepDisplacement: function () { return maxStepDisplacement(); },
+    thinnestCollider: function () { return thinnestCollider(); },
+    energyCeiling: function () { return energyCeiling(); },
+
+    /* coordinate mapping */
+    toLogical: function (clientX, clientY) { return toLogical(clientX, clientY); },
+
+    /* queries */
+    getState: function () { return getState(); },
+    hudCache: function () {
+      var out = {};
+      for (var k in hudCache) {
+        if (Object.prototype.hasOwnProperty.call(hudCache, k)) out[k] = hudCache[k];
+      }
+      return out;
+    },
+    log: function () { return logSnapshot(); },
+
+    /* lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    start: function () { return start(); },
+    pause: function () { return pause(); },
+    resume: function () { return resume(); },
+    togglePause: function () { return togglePause(); },
+
+    /* input */
+    setFlipper: function (side, on) { return setFlipper(side, on); },
+    chargePlunger: function (on) { return chargePlunger(on); },
+    launch: function (charge) { return launch(charge); },
+    nudge: function (dir) { return nudge(dir); },
+
+    /* deterministic advance */
+    tick: function (seconds, step) { return tick(seconds, step); }
+  };
+
+  /* Re-localise dynamic text (HUD + overlays) on language change. Exactly ONE
+   * onChange callback is registered. */
+  T.onChange(function () {
+    resetHudCache();
+    updateHud();
+  });
+
+  newGame({ seed: 1 });
+  T.start();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
