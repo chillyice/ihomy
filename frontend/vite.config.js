@@ -59,6 +59,8 @@ export default defineConfig(({ mode }) => {
                 // 麻将/扑克牌面图集 2.3MB:只在牌类游戏页按需加载,不进预缓存
                 // (预缓存会让每个访客首装多下 2.3MB,workbox 默认也会因 >2MiB 直接构建失败)
                 globIgnores: ['ruffle/**', 'emulatorjs/**', 'mini-games/**'],
+                // iframe 里的静态小游戏是独立的页面导航,不能被 SPA 的离线兜底顶成 /index.html(会显示成首页)
+                navigateFallbackDenylist: [/^\/mini-games\//],
                 runtimeCaching: [
                   {
                     // 缓存 GET 接口(离线浏览/弱网);排除敏感接口:保险箱、认证、运维、个人资料
