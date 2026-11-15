@@ -1,7 +1,6 @@
 <template>
-  <div class="sol-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-    <div class="sol-head">
-      <div class="sol-title">{{ $t('games.solitaire.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
+  <div class="sol-card game-surface" @contextmenu.prevent @dblclick.prevent>
+    <div class="sol-toolbar">
       <div class="sol-stats">
         <div class="sol-stat">
           <span class="sol-stat-label">{{ $t('games.solitaire.score') }}</span>
@@ -20,19 +19,18 @@
           <b class="sol-stat-value">{{ formatClock(elapsed) }}</b>
         </div>
       </div>
-    </div>
-
-    <div class="sol-actions">
-      <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
-        <el-option :value="1" :label="$t('games.solitaire.draw1')" />
-        <el-option :value="3" :label="$t('games.solitaire.draw3')" />
-      </el-select>
-      <el-button size="small" round @click="showHint">{{ $t('games.solitaire.hint') }}</el-button>
-      <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
-        $t('games.solitaire.undo')
-      }}</el-button>
-      <el-button size="small" round @click="autoFinishAll">{{ $t('games.solitaire.autoFinish') }}</el-button>
-      <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+      <div class="sol-actions">
+        <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
+          <el-option :value="1" :label="$t('games.solitaire.draw1')" />
+          <el-option :value="3" :label="$t('games.solitaire.draw3')" />
+        </el-select>
+        <el-button size="small" round @click="showHint">{{ $t('games.solitaire.hint') }}</el-button>
+        <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
+          $t('games.solitaire.undo')
+        }}</el-button>
+        <el-button size="small" round @click="autoFinishAll">{{ $t('games.solitaire.autoFinish') }}</el-button>
+        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+      </div>
     </div>
 
     <GameRoomBar
@@ -47,7 +45,7 @@
       @leave="play.leave"
     />
 
-    <div ref="feltEl" class="sol-felt" :style="feltStyle">
+    <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.solitaire.title')">
       <div class="sol-row sol-top">
         <div class="sol-slot">
           <div
@@ -87,7 +85,7 @@
               @pointerdown="idx === wasteCards.length - 1 && startDrag({ type: 'waste' }, $event)"
               @click.stop="idx === wasteCards.length - 1 && onWasteClick()"
             >
-              <PlayingCard :card="card" />
+              <PlayingCard :card="card" :index-layout="idx < wasteCards.length - 1 ? 'fan' : ''" />
             </div>
           </template>
           <div v-else class="sol-empty"></div>
@@ -134,7 +132,7 @@
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
           >
-            <PlayingCard v-if="card.faceUp" :card="card" />
+            <PlayingCard v-if="card.faceUp" :card="card" :index-layout="ci < pile.length - 1 ? 'stack' : ''" />
           </div>
         </div>
       </div>
@@ -262,7 +260,6 @@ const layout = computed(() =>
     gap: gap.value,
     topUnits: CARD_RATIO,
     rowGap: 10,
-    piles: game.value.tableau,
   }),
 )
 const feltStyle = computed(() => ({
@@ -271,7 +268,9 @@ const feltStyle = computed(() => ({
   '--sol-gap': `${gap.value}px`,
 }))
 const margins = computed(() =>
-  game.value.tableau.map((pile) => pileSteps(pile, layout.value.units).map((step) => `-${((CARD_RATIO - step) * 100).toFixed(2)}%`)),
+  game.value.tableau.map((pile) =>
+    pileSteps(pile, layout.value.units, layout.value.cardW).map((step) => `-${((CARD_RATIO - step) * 100).toFixed(2)}%`),
+  ),
 )
 
 let resizeObserver = null

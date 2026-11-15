@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageEl" class="page game-page">
+  <div ref="pageEl" class="page game-page game-page-readable">
     <!-- 顶栏:返回 + 全屏 + 宽屏(与连连看/物品定位同构) -->
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
       <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
@@ -27,161 +27,165 @@
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
           <span class="sd-timer">{{ timeText }}</span>
+          <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
         </div>
       </div>
 
-      <div class="sd-stats">
-        <span class="sd-stat">
-          <span class="sd-stat-label">{{ $t('games.sudoku.blanks') }}</span>
-          <b>{{ blanksLeft }}</b>
-        </span>
-        <span class="sd-stat" :class="{ warn: conflictCount > 0 }">
-          <span class="sd-stat-label">{{ $t('games.sudoku.conflicts') }}</span>
-          <b>{{ conflictCount }}</b>
-        </span>
-        <span v-if="hintsUsed" class="sd-stat">
-          <span class="sd-stat-label">{{ $t('games.sudoku.hints') }}</span>
-          <b>{{ hintsUsed }}</b>
-        </span>
-      </div>
+      <div class="sd-layout">
+        <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
+          <template v-if="variant === 'SKYSCRAPER'">
+            <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
+              <span v-if="value" class="sd-sky sd-sky-top" :style="{ gridColumnStart: String(col + 2), gridRowStart: '1' }">{{
+                value
+              }}</span>
+            </template>
+            <template v-for="(value, col) in skyBottom" :key="'sky-b' + col">
+              <span v-if="value" class="sd-sky sd-sky-bottom" :style="{ gridColumnStart: String(col + 2), gridRowStart: '11' }">{{
+                value
+              }}</span>
+            </template>
+            <template v-for="(value, row) in skyLeft" :key="'sky-l' + row">
+              <span v-if="value" class="sd-sky sd-sky-left" :style="{ gridColumnStart: '1', gridRowStart: String(row + 2) }">{{
+                value
+              }}</span>
+            </template>
+            <template v-for="(value, row) in skyRight" :key="'sky-r' + row">
+              <span v-if="value" class="sd-sky sd-sky-right" :style="{ gridColumnStart: '11', gridRowStart: String(row + 2) }">{{
+                value
+              }}</span>
+            </template>
+          </template>
 
-      <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
-        <template v-if="variant === 'SKYSCRAPER'">
-          <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
-            <span v-if="value" class="sd-sky sd-sky-top" :style="{ gridColumnStart: String(col + 2), gridRowStart: '1' }">{{ value }}</span>
-          </template>
-          <template v-for="(value, col) in skyBottom" :key="'sky-b' + col">
-            <span v-if="value" class="sd-sky sd-sky-bottom" :style="{ gridColumnStart: String(col + 2), gridRowStart: '11' }">{{
-              value
-            }}</span>
-          </template>
-          <template v-for="(value, row) in skyLeft" :key="'sky-l' + row">
-            <span v-if="value" class="sd-sky sd-sky-left" :style="{ gridColumnStart: '1', gridRowStart: String(row + 2) }">{{
-              value
-            }}</span>
-          </template>
-          <template v-for="(value, row) in skyRight" :key="'sky-r' + row">
-            <span v-if="value" class="sd-sky sd-sky-right" :style="{ gridColumnStart: '11', gridRowStart: String(row + 2) }">{{
-              value
-            }}</span>
-          </template>
-        </template>
-
-        <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
-          <button
-            v-for="(value, index) in board"
-            :key="index"
-            type="button"
-            class="sd-cell"
-            :class="cellClass(index)"
-            :aria-label="cellLabel(index, value)"
-            @click="select(index)"
-            @pointerdown="onCellPressStart(index, $event)"
-            @pointerup="onCellPressEnd"
-            @pointerleave="onCellPressEnd"
-            @pointercancel="onCellPressEnd"
-          >
-            <template v-if="variant === 'KILLER'">
-              <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
-              <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
-              <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
-              <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
-              <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
-            </template>
-            <template v-if="variant === 'WINDOW'">
-              <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
-              <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
-              <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
-              <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
-            </template>
-            <template v-if="variant === 'DRAGON'">
-              <i v-if="dragonSide(index, 't')" class="sd-dragon sd-dragon-t" aria-hidden="true"></i>
-              <i v-if="dragonSide(index, 'b')" class="sd-dragon sd-dragon-b" aria-hidden="true"></i>
-              <i v-if="dragonSide(index, 'l')" class="sd-dragon sd-dragon-l" aria-hidden="true"></i>
-              <i v-if="dragonSide(index, 'r')" class="sd-dragon sd-dragon-r" aria-hidden="true"></i>
-            </template>
-            <template v-if="variant === 'THERMO' && thermoInfo[index]">
-              <i
-                v-if="thermoInfo[index].prev"
-                class="sd-thermo-seg"
-                :class="'sd-thermo-to-' + thermoInfo[index].prev"
-                aria-hidden="true"
-              ></i>
-              <i
-                v-if="thermoInfo[index].next"
-                class="sd-thermo-seg"
-                :class="'sd-thermo-to-' + thermoInfo[index].next"
-                aria-hidden="true"
-              ></i>
-              <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
-            </template>
-            <template v-if="variant === 'PALINDROME' && palInfo[index]">
-              <i
-                v-if="palInfo[index].prev"
-                class="sd-thermo-seg sd-pal-seg"
-                :class="'sd-thermo-to-' + palInfo[index].prev"
-                aria-hidden="true"
-              ></i>
-              <i
-                v-if="palInfo[index].next"
-                class="sd-thermo-seg sd-pal-seg"
-                :class="'sd-thermo-to-' + palInfo[index].next"
-                aria-hidden="true"
-              ></i>
-              <i v-if="palInfo[index].end" class="sd-pal-dot" aria-hidden="true"></i>
-            </template>
-            <i v-if="variant === 'ARITHMETIC' && arithInfo[index]" :class="arithCellClass(index)" aria-hidden="true"></i>
-            <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
-            <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
-            <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
-            <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
-            <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
-            <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
-            <Transition name="sd-pop" mode="out-in">
-              <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
-              <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
-                <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
-              </span>
-            </Transition>
-          </button>
+          <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
+            <button
+              v-for="(value, index) in board"
+              :key="index"
+              type="button"
+              class="sd-cell"
+              :class="cellClass(index)"
+              :aria-label="cellLabel(index, value)"
+              @click="select(index)"
+              @pointerdown="onCellPressStart(index, $event)"
+              @pointerup="onCellPressEnd"
+              @pointerleave="onCellPressEnd"
+              @pointercancel="onCellPressEnd"
+            >
+              <template v-if="variant === 'KILLER'">
+                <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
+                <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
+                <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
+                <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
+                <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
+              </template>
+              <template v-if="variant === 'WINDOW'">
+                <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
+                <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
+                <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
+                <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
+              </template>
+              <template v-if="variant === 'DRAGON'">
+                <i v-if="dragonSide(index, 't')" class="sd-dragon sd-dragon-t" aria-hidden="true"></i>
+                <i v-if="dragonSide(index, 'b')" class="sd-dragon sd-dragon-b" aria-hidden="true"></i>
+                <i v-if="dragonSide(index, 'l')" class="sd-dragon sd-dragon-l" aria-hidden="true"></i>
+                <i v-if="dragonSide(index, 'r')" class="sd-dragon sd-dragon-r" aria-hidden="true"></i>
+              </template>
+              <template v-if="variant === 'THERMO' && thermoInfo[index]">
+                <i
+                  v-if="thermoInfo[index].prev"
+                  class="sd-thermo-seg"
+                  :class="'sd-thermo-to-' + thermoInfo[index].prev"
+                  aria-hidden="true"
+                ></i>
+                <i
+                  v-if="thermoInfo[index].next"
+                  class="sd-thermo-seg"
+                  :class="'sd-thermo-to-' + thermoInfo[index].next"
+                  aria-hidden="true"
+                ></i>
+                <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
+              </template>
+              <template v-if="variant === 'PALINDROME' && palInfo[index]">
+                <i
+                  v-if="palInfo[index].prev"
+                  class="sd-thermo-seg sd-pal-seg"
+                  :class="'sd-thermo-to-' + palInfo[index].prev"
+                  aria-hidden="true"
+                ></i>
+                <i
+                  v-if="palInfo[index].next"
+                  class="sd-thermo-seg sd-pal-seg"
+                  :class="'sd-thermo-to-' + palInfo[index].next"
+                  aria-hidden="true"
+                ></i>
+                <i v-if="palInfo[index].end" class="sd-pal-dot" aria-hidden="true"></i>
+              </template>
+              <i v-if="variant === 'ARITHMETIC' && arithInfo[index]" :class="arithCellClass(index)" aria-hidden="true"></i>
+              <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
+              <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
+              <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
+              <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
+              <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
+              <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
+              <Transition name="sd-pop" mode="out-in">
+                <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
+                <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
+                  <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
+                </span>
+              </Transition>
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div class="sd-tools">
-        <button type="button" class="sd-tool" :class="{ active: notesMode }" @click="notesMode = !notesMode">
-          {{ $t('games.sudoku.notes') }}
-        </button>
-        <button type="button" class="sd-tool" :class="{ active: quickFill }" @click="toggleQuickFill">
-          {{ $t('games.sudoku.quickFill') }}
-        </button>
-        <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
-        <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
-          {{ $t('games.sudoku.undo') }}
-        </button>
-        <button type="button" class="sd-tool" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
-        <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
-      </div>
-
-      <div class="sd-numpad">
-        <button
-          v-for="n in 9"
-          :key="n"
-          type="button"
-          class="sd-num"
-          :class="{ done: remaining[n] <= 0, active: quickFill ? activeNumber === n : focusDigit === n }"
-          :disabled="remaining[n] <= 0"
-          @click="pickNumber(n)"
-        >
-          <b>{{ n }}</b>
-          <span class="sd-num-left">{{ remaining[n] > 0 ? remaining[n] : '' }}</span>
-        </button>
-      </div>
-
-      <div class="sd-hint">
-        {{ $t('games.sudoku.tip') }}
-      </div>
-      <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
-        {{ $t('games.sudoku.variantTip.' + variant) }}
+        <div class="sd-panel">
+          <div class="sd-stats">
+            <span class="sd-stat">
+              <span class="sd-stat-label">{{ $t('games.sudoku.blanks') }}</span>
+              <b>{{ blanksLeft }}</b>
+            </span>
+            <span class="sd-stat" :class="{ warn: conflictCount > 0 }">
+              <span class="sd-stat-label">{{ $t('games.sudoku.conflicts') }}</span>
+              <b>{{ conflictCount }}</b>
+            </span>
+            <span v-if="hintsUsed" class="sd-stat">
+              <span class="sd-stat-label">{{ $t('games.sudoku.hints') }}</span>
+              <b>{{ hintsUsed }}</b>
+            </span>
+          </div>
+          <div class="sd-numpad">
+            <button
+              v-for="n in 9"
+              :key="n"
+              type="button"
+              class="sd-num"
+              :class="{ done: remaining[n] <= 0, active: quickFill ? activeNumber === n : focusDigit === n }"
+              :disabled="remaining[n] <= 0"
+              @click="pickNumber(n)"
+            >
+              <b>{{ n }}</b>
+              <span class="sd-num-left">{{ remaining[n] > 0 ? remaining[n] : '' }}</span>
+            </button>
+          </div>
+          <div class="sd-tools">
+            <button type="button" class="sd-tool" :class="{ active: notesMode }" :aria-pressed="notesMode" @click="notesMode = !notesMode">
+              {{ $t('games.sudoku.notes') }}
+            </button>
+            <button type="button" class="sd-tool" :class="{ active: quickFill }" :aria-pressed="quickFill" @click="toggleQuickFill">
+              {{ $t('games.sudoku.quickFill') }}
+            </button>
+            <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
+            <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
+              {{ $t('games.sudoku.undo') }}
+            </button>
+            <button type="button" class="sd-tool" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
+            <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
+          </div>
+          <details class="sd-help">
+            <summary>{{ $t('games.sudoku.controlsHelp') }}</summary>
+            <p>{{ $t('games.sudoku.tip') }}</p>
+          </details>
+          <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
+            {{ $t('games.sudoku.variantTip.' + variant) }}
+          </div>
+        </div>
       </div>
 
       <Transition name="game-overlay">
@@ -253,7 +257,7 @@ const LONG_PRESS_MS = 500
 
 const pageEl = ref(null)
 const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, fit: false })
 
 const variant = ref('CLASSIC')
 const difficulty = ref('MEDIUM')
@@ -1196,10 +1200,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 18px 16px 16px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
+  gap: 12px;
+  container: sudoku / inline-size;
   color: var(--color-text-primary, #2b2b2b);
   --sd-line: rgba(0, 0, 0, 0.12);
   --sd-line-strong: rgba(0, 0, 0, 0.32);
@@ -1228,7 +1230,8 @@ onBeforeUnmount(() => {
   border-radius: 0;
   justify-content: flex-start;
   overflow-y: auto;
-  padding-top: 28px;
+  padding: clamp(12px, 2vw, 24px);
+  background: var(--color-bg);
 }
 
 .sd-head {
@@ -1248,6 +1251,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .sd-variant {
   width: 140px;
@@ -1264,7 +1269,9 @@ onBeforeUnmount(() => {
 
 .sd-stats {
   display: flex;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
   width: 100%;
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
@@ -1283,22 +1290,49 @@ onBeforeUnmount(() => {
   color: #d64c4c;
 }
 
+.sd-layout {
+  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 212px), 520px));
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.sd-panel {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+}
+@container sudoku (min-width: 550px) {
+  .sd-layout {
+    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 166px), 540px)) minmax(0, 232px);
+    justify-content: center;
+    gap: clamp(16px, 4cqi, 36px);
+  }
+  .sd-layout .sd-frame {
+    width: 100%;
+  }
+  .sd-panel .sd-numpad {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sd-panel .sd-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* 棋盘外框:摩天楼要用四边留出提示轨道,其余变体只有中间 9×9 */
 .sd-frame {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   grid-template-rows: repeat(9, minmax(0, 1fr));
-  width: min(100%, 520px);
+  width: var(--sd-frame-size);
   aspect-ratio: 1;
 }
 .sd-frame.with-clues {
   --sd-clue-track: clamp(15px, 4.2vw, 24px);
   grid-template-columns: var(--sd-clue-track) repeat(9, minmax(0, 1fr)) var(--sd-clue-track);
   grid-template-rows: var(--sd-clue-track) repeat(9, minmax(0, 1fr)) var(--sd-clue-track);
-  width: min(100%, 556px);
-}
-.sd-card:fullscreen .sd-frame {
-  width: min(78vh, 86vw);
 }
 
 .sd-board {
@@ -1831,12 +1865,18 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #8a8a8a);
 }
 
+.sd-help,
 .sd-hint {
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
   line-height: 1.6;
-  max-width: 520px;
+}
+.sd-help summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.sd-help p {
+  margin: 4px 0 0;
 }
 
 .sd-overlay {
@@ -1845,7 +1885,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--overlay-scrim);
+  backdrop-filter: var(--overlay-blur);
   border-radius: 14px;
   z-index: 5;
 }
@@ -1905,10 +1946,7 @@ html.dark .sd-stat.warn b {
   color: #ff9a9a;
 }
 
-@media (max-width: 560px) {
-  .sd-card {
-    padding: 14px 10px;
-  }
+@container sudoku (max-width: 549px) {
   .sd-title {
     font-size: 17px;
   }

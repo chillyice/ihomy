@@ -339,7 +339,7 @@ html.theme-warm .gc-pin .page-toolbar .tb-right {
   }
 }
 
-/* 物品定位页:顶栏胞吐进顶栏后容器样式(.fp-topbar 的 scoped 样式不匹配 Teleport 后元素) + 画板铺满 gc-main + 边缘渐变融入背景 */
+/* 物品定位页:顶栏胞吐进顶栏后容器样式(.fp-topbar 的 scoped 样式不匹配 Teleport 后元素) + 画板铺满 gc-main */
 html.theme-warm .gc-pin .fp-topbar {
   display: flex;
   align-items: center;
@@ -361,6 +361,15 @@ html.theme-warm .gc-pin .fp-topbar {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+.page.game-page-readable {
+  overflow: visible;
+}
+@media (max-width: 560px) {
+  .game-page-readable > .game-surface,
+  .game-page-readable > .cards-stage {
+    margin-inline: 8px;
+  }
 }
 /* 宽屏模式:隐藏侧栏、放开内容宽度上限;不触发浏览器全屏,顶栏与返回键仍然可用 */
 html.game-wide .gc-side {
@@ -416,13 +425,6 @@ html.theme-warm .fp-page {
 html.theme-warm .fp-main {
   border-radius: 0;
 }
-html.theme-warm .fp-main::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow: inset 0 0 56px 24px var(--color-bg);
-}
 
 /* 内容页 sticky 侧栏(设置导航/博客分类/文章目录):暖居下顶部偏移归零——
  * gc-main 是滚动容器,顶栏已被隔离在容器之外;sticky 相对滚动容器的内容顶定位,
@@ -435,8 +437,8 @@ html.theme-warm .ops-tabs .el-tabs__header {
   top: 0;
 }
 
-/* 内容页:gc-main 滚动区上下边缘渐变(同物品定位页「边缘融入背景」),内容滚动不再硬切;物品定位页自带画板渐变,排除 */
-html.theme-warm .gc-main:not(:has(.fp-page)) {
+/* 内容区滚动边缘过渡;画板和需要完整显示的游戏面板保持清晰。 */
+html.theme-warm .gc-main:not(:has(.fp-page, .game-page-readable)) {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
 }

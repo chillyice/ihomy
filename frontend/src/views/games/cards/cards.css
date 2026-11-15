@@ -1,6 +1,4 @@
-/* 纸牌类游戏(Klondike 接龙 / 蜘蛛纸牌)共用的牌桌皮肤与固定一屏布局。
- * 牌宽由组件按可用宽高算好后写进 --sol-card-w;叠牌步进由行内 margin-top 控制,
- * 所以这里只负责视觉,不再写死 aspect-ratio 与固定负边距。 */
+/* 接龙、蜘蛛纸牌和自由纸牌共用的牌桌。 */
 
 .sol-card {
   position: relative;
@@ -9,34 +7,24 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 100%;
+  flex: 1 0 0;
   min-height: 0;
-  padding: 10px 12px 12px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
   color: var(--color-text-primary, #2b2b2b);
   box-sizing: border-box;
 }
 
-.sol-head {
+.sol-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-.sol-title {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  white-space: nowrap;
+  gap: 8px 14px;
 }
 .sol-stats {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  justify-content: flex-end;
 }
 .sol-stat {
   display: flex;
@@ -62,29 +50,24 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  justify-content: flex-end;
   flex-wrap: wrap;
-  flex: 0 0 auto;
+}
+.sol-actions .el-button {
+  margin-inline-start: 0;
 }
 .sol-draw {
   width: 104px;
-  margin-right: auto;
-}
-.fc-hint {
-  margin-right: auto;
 }
 
 .sol-felt {
-  flex: 1 1 auto;
+  flex: 1 0 200px;
   width: 100%;
-  min-height: 0;
   padding: 10px;
   border-radius: 12px;
   background: radial-gradient(120% 140% at 50% 0%, #2f7a58 0%, #1f5c41 55%, #174a34 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: auto;
+  scrollbar-gutter: stable;
   box-sizing: border-box;
 }
 .sol-row {
@@ -143,6 +126,7 @@
   color: #c0392b;
 }
 .sol-cardface.back {
+  touch-action: manipulation;
   background: repeating-linear-gradient(45deg, #2c5f9e 0 6px, #244f85 6px 12px), #244f85;
   box-shadow:
     inset 0 0 0 3px #f2f2f2,
@@ -156,6 +140,11 @@
     0 4px 10px rgba(0, 0, 0, 0.32);
   transform: translateY(-2px);
 }
+.sol-tableau .sol-cardface {
+  /* 位移会盖住相邻牌标;选中和提示靠描边。 */
+  transform: none;
+}
+
 .sol-corner {
   position: absolute;
   top: 4%;
@@ -232,7 +221,7 @@
   --fan-index: 0;
   position: absolute;
   top: 0;
-  left: calc(var(--fan-index, 0) * var(--sol-card-w, 80px) * 0.26);
+  left: calc(var(--fan-index, 0) * max(15px, var(--sol-card-w, 80px) * 0.26));
   width: 100%;
   transition: left 0.16s var(--ease-soft);
 }
@@ -299,6 +288,40 @@ body.card-dragging .sol-cardface {
   object-fit: cover;
   pointer-events: none;
   user-select: none;
+}
+.pc-face-indexed .pc-img {
+  clip-path: inset(0 0 0 max(14px, 16%));
+}
+.pc-face-indexed .pc-corner-tl {
+  display: none;
+}
+.pc-index {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #fffdf7;
+  color: #252930;
+  font-weight: 700;
+  font-size: clamp(11px, calc(var(--sol-card-w, 80px) * 0.22), 14px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.pc-index i {
+  font-style: normal;
+}
+.pc-face.red .pc-index {
+  color: #aa252b;
+}
+.pc-index-fan {
+  flex-direction: column;
+  gap: 0;
+  padding-inline: 1px;
+  font-size: 10px;
 }
 .pc-corner {
   position: absolute;
@@ -496,12 +519,6 @@ html.dark .sol-overlay {
 }
 
 @media (max-width: 560px) {
-  .sol-card {
-    padding: 8px 8px 10px;
-  }
-  .sol-title {
-    font-size: 17px;
-  }
   .sol-stat {
     padding: 2px 6px;
   }
@@ -516,13 +533,5 @@ html.dark .sol-overlay {
 @media (max-height: 760px) {
   .sol-tip {
     display: none;
-  }
-}
-@media (max-height: 620px) {
-  .sol-title {
-    font-size: 16px;
-  }
-  .sol-head {
-    gap: 6px;
   }
 }

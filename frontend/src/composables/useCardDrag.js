@@ -2,6 +2,7 @@
 // 指针按下后先不进入拖拽态,超过阈值才把牌组提起来;未超过阈值时仍交给 click 完成点选/双击。
 // 落点用 elementFromPoint 找最近的 [data-drop] 容器,牌桌只需在列/花色堆/空格上标 data 属性。
 import { reactive } from 'vue'
+import { FACEUP_INDEX_HEIGHT, FACEUP_STEP } from '@/utils/games/cardLayout'
 
 const THRESHOLD = 6
 const CLICK_SUPPRESS_MS = 320
@@ -96,7 +97,7 @@ export function useCardDrag({ getCards, onDrop, threshold = THRESHOLD }) {
       startX: event.clientX,
       startY: event.clientY,
       cardW: rect.width,
-      step: Math.max(8, rect.width * 0.42),
+      step: Math.max(FACEUP_INDEX_HEIGHT, rect.width * FACEUP_STEP),
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
       started: false,

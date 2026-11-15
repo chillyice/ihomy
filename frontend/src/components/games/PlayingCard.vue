@@ -1,5 +1,5 @@
 <template>
-  <span class="pc-face" :class="{ red: isRed }">
+  <span class="pc-face" :class="{ red: isRed, 'pc-face-indexed': indexLayout }">
     <img v-if="faceSrc" class="pc-img" :src="faceSrc" :alt="cardLabel" draggable="false" />
     <!-- 缺图兜底:四角点数 + 按点数铺开的花色图案(J/Q/K 用字母宫格) -->
     <template v-else>
@@ -23,6 +23,10 @@
         </i>
       </span>
     </template>
+    <span v-if="indexLayout" class="pc-index" :class="'pc-index-' + indexLayout" aria-hidden="true">
+      <b>{{ rankLabel }}</b
+      ><i>{{ suitSymbol }}</i>
+    </span>
   </span>
 </template>
 
@@ -36,6 +40,7 @@ import { isCourtCard, pipPoints } from '@/utils/games/cardPips'
 
 const props = defineProps({
   card: { type: Object, required: true },
+  indexLayout: { type: String, default: '' },
 })
 
 const SUIT_SYMBOL = { S: '♠', H: '♥', D: '♦', C: '♣' }

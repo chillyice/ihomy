@@ -1300,7 +1300,8 @@ export default {
       win: 'Solved!',
       winMeta: 'Time {time} · Hints {hints}',
       playAgain: 'Play again',
-      tip: 'Pick a cell, then use the keyboard or the pad below; tap a pad digit or a digit on the board to highlight its placements and range; turn on Quick fill to select a digit first and tap cells to place it (existing digits can be overwritten); long-press a cell with a single note to place that digit; diagonal mode also needs 1-9 on both diagonals, killer cages hold non-repeating digits summing to the label',
+      controlsHelp: 'Controls',
+      tip: 'Select a cell and enter a number with the keyboard or number pad. Select a number to highlight its placements and related cells. In Quick fill, choose a number first, then tap cells to enter or replace it. Press and hold a cell with one note to enter that number.',
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
     },
@@ -1453,6 +1454,8 @@ export default {
       right: 'Right',
     },
     mahjong: {
+      discards: '{name}’s discards ({n})',
+      handCount: 'Hand {n}',
       title: 'Mahjong',
       desc: '136 tiles, four sets plus a pair (or seven pairs) wins; pick rules before the deal — chi, kongs and the 258 pair; up to four players',
       start: 'Deal me in',

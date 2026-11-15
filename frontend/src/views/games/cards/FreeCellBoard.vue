@@ -1,7 +1,6 @@
 <template>
-  <div class="sol-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-    <div class="sol-head">
-      <div class="sol-title">{{ $t('games.freecell.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
+  <div class="sol-card game-surface" @contextmenu.prevent @dblclick.prevent>
+    <div class="sol-toolbar">
       <div class="sol-stats">
         <div class="sol-stat">
           <span class="sol-stat-label">{{ $t('games.freecell.moves') }}</span>
@@ -16,15 +15,14 @@
           <b class="sol-stat-value">{{ formatClock(elapsed) }}</b>
         </div>
       </div>
-    </div>
-
-    <div class="sol-actions">
-      <el-button size="small" round class="fc-hint" @click="showHint">{{ $t('games.freecell.hint') }}</el-button>
-      <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
-        $t('games.freecell.undo')
-      }}</el-button>
-      <el-button size="small" round @click="autoFinishAll">{{ $t('games.freecell.autoFinish') }}</el-button>
-      <el-button type="primary" size="small" round @click="startNew">{{ $t('games.freecell.newGame') }}</el-button>
+      <div class="sol-actions">
+        <el-button size="small" round @click="showHint">{{ $t('games.freecell.hint') }}</el-button>
+        <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
+          $t('games.freecell.undo')
+        }}</el-button>
+        <el-button size="small" round @click="autoFinishAll">{{ $t('games.freecell.autoFinish') }}</el-button>
+        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.freecell.newGame') }}</el-button>
+      </div>
     </div>
 
     <GameRoomBar
@@ -39,7 +37,7 @@
       @leave="play.leave"
     />
 
-    <div ref="feltEl" class="sol-felt" :style="feltStyle">
+    <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.freecell.title')">
       <div class="sol-row sol-top fc-top">
         <div
           v-for="(card, cell) in game.freeCells"
@@ -107,7 +105,7 @@
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci)"
           >
-            <PlayingCard :card="card" />
+            <PlayingCard :card="card" :index-layout="ci < pile.length - 1 ? 'stack' : ''" />
           </div>
         </div>
       </div>
@@ -232,7 +230,6 @@ const layout = computed(() =>
     gap: gap.value,
     topUnits: CARD_RATIO,
     rowGap: 10,
-    piles: game.value.tableau,
   }),
 )
 const feltStyle = computed(() => ({
@@ -241,7 +238,9 @@ const feltStyle = computed(() => ({
   '--sol-gap': `${gap.value}px`,
 }))
 const margins = computed(() =>
-  game.value.tableau.map((pile) => pileSteps(pile, layout.value.units).map((step) => `-${((CARD_RATIO - step) * 100).toFixed(2)}%`)),
+  game.value.tableau.map((pile) =>
+    pileSteps(pile, layout.value.units, layout.value.cardW).map((step) => `-${((CARD_RATIO - step) * 100).toFixed(2)}%`),
+  ),
 )
 
 let resizeObserver = null
