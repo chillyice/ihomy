@@ -10,6 +10,8 @@
           :condition="condition"
           :night="isNight"
           :wind-scale="windScale"
+          :wind-deg="windDeg"
+          :wind-dir="windDir"
           :precip-level="precipLevel"
           :animated="prefs.animation"
         />
@@ -133,6 +135,12 @@ const windScale = computed(() => {
   const n = Number.parseFloat(nowFull.value.windScale ?? weather.value?.windScale)
   return Number.isFinite(n) ? n : 0
 })
+// 风向给天气场景用:wind360 是「来向」角度,没有它时退回中文风向由场景自己解析
+const windDeg = computed(() => {
+  const n = Number.parseFloat(nowFull.value.wind360)
+  return Number.isFinite(n) ? n : null
+})
+const windDir = computed(() => String(nowFull.value.windDir || weather.value?.windDir || ''))
 // 太阳场景由后端 sun-info 驱动;天气还没回来时按本地小时兜底
 const isNight = computed(() => sunLight?.sunScene?.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
 const familyName = computed(() => appStore.familyName)
