@@ -7,8 +7,8 @@
     <transition name="morning-fade">
       <div v-if="visible" class="morning-overlay" role="dialog" aria-modal="true" :aria-label="$t('morning.overlayLabel')" @wheel.stop>
         <MorningScene
-          :condition="condition"
-          :night="isNight"
+          :condition="sceneCondition"
+          :night="sceneNight"
           :wind-scale="windScale"
           :wind-deg="windDeg"
           :wind-dir="windDir"
@@ -20,6 +20,7 @@
           <header class="mo-head">
             <div v-if="cardOn('greeting')" class="mo-greeting">{{ greeting }}</div>
             <div v-if="cardOn('greeting') && familyName" class="mo-family">{{ familyName }}</div>
+            <span v-if="previewing" class="mo-preview-tag">{{ $t('morning.previewTag', { scene: sceneText }) }}</span>
             <el-button class="mo-close" text circle :aria-label="$t('morning.close')" @click="close">
               <el-icon><Close /></el-icon>
             </el-button>
@@ -92,7 +93,17 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { planApi, reminderApi } from '@/api'
 import { buildAgenda } from '@/utils/agenda'
 import { isBusyScreen } from '@/utils/screensaver'
-import { loadLastShown, loadPrefs, markShown, prefsTick, previewTick, shouldShowMorning, todayKey } from '@/utils/morning'
+import {
+  clearPreviewScene,
+  loadLastShown,
+  loadPrefs,
+  markShown,
+  prefsTick,
+  previewScene,
+  previewTick,
+  shouldShowMorning,
+  todayKey,
+} from '@/utils/morning'
 import MorningScene from './MorningScene.vue'
 
 const VISIBLE_TODOS = 6
@@ -130,6 +141,10 @@ const weather = computed(() => sunLight?.weather?.value || null)
 const weatherDetail = computed(() => sunLight?.weatherDetail?.value || null)
 const nowFull = computed(() => weather.value?.nowFull || weatherDetail.value?.nowFull || {})
 const condition = computed(() => String(weather.value?.condition || 'clear'))
+// 设置页预览时可以临时指定天气时段,只影响这一次预览(不落盘、不改真实天气)
+const previewing = computed(() => !!previewScene.value.condition)
+const sceneCondition = computed(() => previewScene.value.condition || condition.value)
+const sceneNight = computed(() => (typeof previewScene.value.night === 'boolean' ? previewScene.value.night : isNight.value))
 const precipLevel = computed(() => weather.value?.precipLevel ?? 2)
 const windScale = computed(() => {
   const n = Number.parseFloat(nowFull.value.windScale ?? weather.value?.windScale)
@@ -145,7 +160,7 @@ const windDir = computed(() => String(nowFull.value.windDir || weather.value?.wi
 const isNight = computed(() => sunLight?.sunScene?.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
 const familyName = computed(() => appStore.familyName)
 
-const conditionText = computed(() => {
+const conditionLabel = (c) => {
   const map = {
     clear: t('morning.weatherClear'),
     cloud: t('morning.weatherCloud'),
@@ -154,8 +169,10 @@ const conditionText = computed(() => {
     fog: t('morning.weatherFog'),
     thunder: t('morning.weatherThunder'),
   }
-  return map[condition.value] || ''
-})
+  return map[c] || ''
+}
+const conditionText = computed(() => conditionLabel(condition.value))
+const sceneText = computed(() => conditionLabel(sceneCondition.value))
 
 const tempText = computed(() => {
   const n = Number(weather.value?.temp)
@@ -256,6 +273,8 @@ const stopClock = () => {
 const show = (preview = false) => {
   if (visible.value) return
   if (!preview && !shouldShowMorning(context())) return
+  // 正常首屏一律用真实天气:清掉可能残留的预览场景
+  if (!preview) clearPreviewScene()
   visible.value = true
   if (typeof document !== 'undefined') document.documentElement.classList.add('morning-open')
   startClock()
@@ -273,6 +292,7 @@ const close = () => {
   if (!visible.value) return
   visible.value = false
   stopClock()
+  clearPreviewScene()
   if (typeof document !== 'undefined') document.documentElement.classList.remove('morning-open')
 }
 
@@ -424,6 +444,18 @@ onBeforeUnmount(() => {
 }
 .mo-close:hover {
   color: #fff;
+}
+/* 设置页预览场景时的角标:说明画面是挑的场景,天气数字仍是实况 */
+.mo-preview-tag {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(8px);
 }
 
 .mo-main {

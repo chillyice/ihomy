@@ -2,11 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   DEFAULT_PREFS,
   MORNING_CARDS,
+  MORNING_SCENES,
+  clearPreviewScene,
   loadLastShown,
   loadPrefs,
   markShown,
   normalizePrefs,
+  previewScene,
   savePrefs,
+  setPreviewScene,
   shouldShowMorning,
   todayKey,
 } from './morning'
@@ -69,6 +73,23 @@ describe('loadPrefs / savePrefs / 每日标记', () => {
     markShown('2026-11-16')
     expect(loadLastShown()).toBe('2026-11-16')
     expect(todayKey(new Date(2026, 10, 16))).toBe('2026-11-16')
+  })
+})
+
+// 设置页的「预览场景」只影响紧接着的一次预览:认白名单、不改真实天气、可清空
+describe('previewScene', () => {
+  it('只接受已知天气码,未知回落跟随实况', () => {
+    expect(MORNING_SCENES).toContain('cloud')
+    setPreviewScene('rain', true)
+    expect(previewScene.value).toEqual({ condition: 'rain', night: true })
+    setPreviewScene('nope', 'x')
+    expect(previewScene.value).toEqual({ condition: '', night: null })
+  })
+
+  it('clearPreviewScene 回到跟随实况', () => {
+    setPreviewScene('snow', false)
+    clearPreviewScene()
+    expect(previewScene.value).toEqual({ condition: '', night: null })
   })
 })
 
