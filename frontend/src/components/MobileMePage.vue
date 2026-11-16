@@ -59,6 +59,11 @@
         <span class="me-row-text">{{ $t('mobile.language') }}</span>
         <span class="me-row-value">{{ locale === 'en' ? 'EN' : '中' }}</span>
       </div>
+      <div v-a11y-click class="me-row" @click="openEditor">
+        <span class="me-row-icon">📱</span>
+        <span class="me-row-text">{{ $t('mobile.tabEditTitle') }}</span>
+        <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
+      </div>
     </div>
 
     <!-- 功能入口 -->
@@ -99,12 +104,14 @@ import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
+import { useMobileTabs } from '@/composables/useMobileTabs'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const { locale, t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
+const { openEditor } = useMobileTabs()
 
 const userInfo = computed(() => userStore.userInfo)
 const themeStore = useThemeStore()

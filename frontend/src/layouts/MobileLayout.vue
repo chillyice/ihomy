@@ -1,5 +1,5 @@
 <template>
-  <div class="mobile-layout">
+  <div class="mobile-layout" :class="{ 'has-tabbar': showTabBar }">
     <!-- 首页路由:三 Tab 模式 -->
     <template v-if="isHomeRoute">
       <!-- KeepAlive 保住三个 Tab 的组件状态(筛选/输入),切换只做轻量过渡,不重新拉数据 -->
@@ -16,7 +16,6 @@
           </KeepAlive>
         </Transition>
       </div>
-      <MobileTabBar :model-value="activeTab" @update:model-value="onTabPick" />
     </template>
 
     <!-- 子页面:顶部返回栏 + router-view(页面切换带方向感的淡入) -->
@@ -35,6 +34,10 @@
       </div>
     </template>
 
+    <!-- 底部导航:五格可自定义,站内页面常驻(沉浸页与登录页除外) -->
+    <MobileTabBar v-if="showTabBar" :items="tabs" :active-code="activeCode" :capturing="capturing" @pick="onTabPick" @edit="openEditor" />
+    <MobileTabEditor v-model="editorOpen" />
+
     <BackToTop />
     <InstallPrompt />
     <MusicPlayer v-if="floatsStore.music" />
@@ -42,10 +45,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import MobileTabBar from '@/components/MobileTabBar.vue'
+import MobileTabEditor from '@/components/MobileTabEditor.vue'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileHomeFeed from '@/components/MobileHomeFeed.vue'
 import MobileMoreGrid from '@/components/MobileMoreGrid.vue'
@@ -54,12 +59,21 @@ import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
+import { isMobileTabActive } from '@/utils/mobileTabs'
+import { quickCapture, resetQuickAlbumCache } from '@/utils/quickCapture'
+import { resetPrefCache } from '@/utils/userPref'
+import { useMobileTabs, resetMobileTabsSync } from '@/composables/useMobileTabs'
+import { useUserStore } from '@/stores/user'
 import { useFloatsStore } from '@/stores/floats'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const floatsStore = useFloatsStore()
+const userStore = useUserStore()
 const activeTab = ref('home')
+
+const { tabs, editorOpen, openEditor, ensureSynced } = useMobileTabs()
 
 // 三个 Tab 常驻缓存,切换时只换当前组件;KeepAlive 保证筛选/输入等状态不丢
 const tabComponent = computed(() => ({ home: MobileHomeFeed, more: MobileMoreGrid, me: MobileMePage })[activeTab.value])
@@ -67,6 +81,8 @@ const tabComponent = computed(() => ({ home: MobileHomeFeed, more: MobileMoreGri
 // ========== 左右滑动切 Tab ==========
 // 触摸手势只做「意图识别」,不 preventDefault:纵向滚动、内部横滑列表都保持浏览器原生行为。
 const TAB_ORDER = ['home', 'more', 'me']
+// 只有还在底栏上的外壳 Tab 才允许滑到:用户把「更多」换掉后,首页左滑应直接到「我的」而不是进一个没有入口的幽灵页
+const tabOrder = computed(() => TAB_ORDER.filter((t) => t === activeTab.value || tabs.value.some((i) => i.shellTab === t)))
 // 点底栏用轻位移过渡,滑动按方向给左右推入,方向感与手势一致
 const tabTransition = ref('mobile-tab')
 // 每个 Tab 记住离开时的滚动位置,切回来不从头开始(否则从「我的」切回首页会跳到半截)
@@ -93,13 +109,11 @@ const SWIPE_IGNORE_SELECTOR = [
 ].join(', ')
 
 const startTabSwitch = (next, transition = 'mobile-tab') => {
-  if (!TAB_ORDER.includes(next) || next === activeTab.value) return
+  if (!tabOrder.value.includes(next) || next === activeTab.value) return
   tabScroll[activeTab.value] = window.scrollY
   tabTransition.value = transition
   activeTab.value = next
 }
-
-const onTabPick = (next) => startTabSwitch(next)
 
 const restoreTabScroll = () => {
   window.scrollTo(0, tabScroll[activeTab.value] || 0)
@@ -152,14 +166,67 @@ const onTouchEnd = (e) => {
   if (Date.now() - start.at > 650) return
   // 横向位移足够、且明显大于纵向,才认成切 Tab
   if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.2) return
-  const idx = TAB_ORDER.indexOf(activeTab.value)
+  const idx = tabOrder.value.indexOf(activeTab.value)
   const nextIdx = dx < 0 ? idx + 1 : idx - 1
-  if (nextIdx < 0 || nextIdx >= TAB_ORDER.length) return
-  startTabSwitch(TAB_ORDER[nextIdx], dx < 0 ? 'mobile-tab-next' : 'mobile-tab-prev')
+  if (nextIdx < 0 || nextIdx >= tabOrder.value.length) return
+  startTabSwitch(tabOrder.value[nextIdx], dx < 0 ? 'mobile-tab-next' : 'mobile-tab-prev')
 }
 
 // 首页判据与页头标题键都在 utils/mobileNav.js(纯函数,带单测);路由把 '/' 重定向到 '/home',两者都要认
 const isHomeRoute = computed(() => isMobileHomePath(route.path))
+
+// 沉浸页(阅读器/游戏等)与登录类页面不挂底栏:这些页面需要整屏或本就无站内导航
+const HIDE_TABBAR_PATHS = ['/login', '/reset-password']
+const showTabBar = computed(() => !route.meta.immersive && !HIDE_TABBAR_PATHS.includes(route.path))
+
+// 当前高亮:首页看三 Tab,子页面按路由前缀匹配(详情页也点亮所属入口)
+const activeCode = computed(() => {
+  if (isHomeRoute.value) return activeTab.value
+  const hit = tabs.value.find((item) => isMobileTabActive(item, route.path))
+  return hit ? hit.code : ''
+})
+
+// ========== 底栏交互 ==========
+const capturing = ref(false)
+
+const onTabPick = (code) => {
+  const item = tabs.value.find((i) => i.code === code)
+  if (!item) return
+  if (item.capture) {
+    runQuickCapture()
+    return
+  }
+  if (item.shellTab) {
+    if (!isHomeRoute.value) router.push('/home')
+    startTabSwitch(item.shellTab)
+    return
+  }
+  if (route.path !== item.path) router.push(item.path)
+}
+
+const runQuickCapture = async () => {
+  if (capturing.value) return
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning(t('mobile.captureLogin'))
+    router.push('/login')
+    return
+  }
+  capturing.value = true
+  try {
+    const res = await quickCapture(t('mobile.captureAlbum'))
+    if (!res.skipped) ElMessage.success(t('mobile.captureDone'))
+  } catch (e) {
+    if (e && e.code === 'cancel') return
+    if (e && e.code === 'unavailable') {
+      ElMessage.warning(t('mobile.captureUnavailable'))
+      return
+    }
+    console.warn('[mobile] quick capture failed', e)
+    ElMessage.error(t('album.captureFailed'))
+  } finally {
+    capturing.value = false
+  }
+}
 
 const pageTitle = computed(() => {
   const key = mobileHeaderTitleKey(route.path)
@@ -172,6 +239,20 @@ watch(
     window.scrollTo(0, 0)
   },
 )
+
+// 换账号(退出)后清掉「随手拍」相册缓存,避免下一个登录者往上一家的相册里传;
+// 登录后补一次底栏偏好同步(游客阶段 ensureSynced 会直接返回,不会把本机当已对齐)
+watch(
+  () => userStore.isLoggedIn,
+  (v) => {
+    resetMobileTabsSync()
+    resetPrefCache()
+    resetQuickAlbumCache()
+    if (v) ensureSynced()
+  },
+)
+
+onMounted(ensureSynced)
 </script>
 
 <style scoped>
@@ -187,6 +268,10 @@ watch(
 .mobile-sub-content {
   padding-top: calc(48px + env(safe-area-inset-top, 0px));
   min-height: 100vh;
+}
+/* 子页面也常驻底栏:留出与首页同一份高度,避免最后一行被加号挡住 */
+.has-tabbar .mobile-sub-content {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
 }
 /* 回顶按钮让开底栏:底栏高 56px,再留 14px 呼吸位,避免压住「我的」Tab 的点击区 */
 .mobile-layout :deep(.back-to-top) {

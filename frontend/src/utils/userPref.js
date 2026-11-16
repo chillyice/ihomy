@@ -145,6 +145,16 @@ export function flushPref(serverKey) {
   }
 }
 
+/** 退出登录 / 切换账号时清掉会话级缓存:否则下一个账号会拿到上一个账号的偏好映射 */
+export function resetPrefCache() {
+  pending.clear()
+  uploaded.clear()
+  timers.forEach((timer) => clearTimeout(timer))
+  timers.clear()
+  remotePromise = null
+  remoteMap = null
+}
+
 /** App.vue 挂载时调一次:页面隐藏或关闭前把未发的那次上传发出去 */
 export function initPrefSync() {
   if (typeof window === 'undefined') return
