@@ -92,8 +92,8 @@
         <div v-if="waitingHost" class="table-waiting">{{ $t('games.mahjong.waitingHost') }}</div>
         <template v-else>
           <!-- 平面牌桌(窗口不透视):对家在上 / 上家在左 / 下家在右 / 我在下;
-               牌本身带立方体挤出(顶面+侧棱),全部花色朝向观看者;
-               吃碰杠副露横排跟在手牌旁;中央 = 牌河 + 东南西北风位 + 双骰 + 实时牌墙 -->
+               牌面是纯平面白牌(只有描边与浅投影),各花色朝向观看者;
+               吃碰杠副露紧贴手牌横排;中央 = 牌河 + 东南西北风位 + 双骰 + 实时牌墙 -->
           <div class="mj-stage">
             <div class="mj-table">
               <!-- 对家(上):牌背横排 + 副露横排 -->
@@ -1635,8 +1635,7 @@ onBeforeUnmount(() => {
 }
 
 /* 牌面:开源 SVG 贴进白底牌身;白板留白,资源缺失时退回「数字 + 花色」文本。
-   立体感 = 麻将牌立方体:本体是正面,::before 顶面高光条、::after 右侧棱厚边,
-   窗口本身不透视,立体全在牌上 */
+   牌身保持纯平面——只有描边和一层极浅投影,不做顶面条 / 侧棱的假立体 */
 .tile {
   position: relative;
   display: inline-flex;
@@ -1644,44 +1643,16 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 44px;
   height: 60px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #fdfcf7 0%, #f1eddf 88%, #ddd6c2 100%);
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 3px 0 #c9c1ab,
-    0 4px 5px rgba(0, 0, 0, 0.22);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fdfcf7 0%, #f2eee2 100%);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
   color: #1b2b33;
   cursor: pointer;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease;
   flex: none;
-}
-/* 立方体顶面:亮色条浮在牌身上缘 */
-.tile::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: 2px;
-  right: 2px;
-  height: 4px;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, #fffef9 0%, #efe9d6 100%);
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
-  pointer-events: none;
-}
-/* 立方体右侧棱:深一档的厚度边 */
-.tile::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  bottom: -3px;
-  right: -3px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: linear-gradient(90deg, #d8d1bb 0%, #b7ae94 100%);
-  pointer-events: none;
 }
 .tile .tile-img {
   display: block;
@@ -1722,20 +1693,11 @@ onBeforeUnmount(() => {
   color: #2471a3;
 }
 
-/* 小牌(河里/副露):立方体挤出按比例缩小 */
+/* 小牌(河里/副露) */
 .tile.mini {
   width: 30px;
   height: 42px;
   cursor: default;
-}
-.tile.mini::before {
-  top: -3px;
-  height: 3px;
-}
-.tile.mini::after {
-  right: -2px;
-  bottom: -2px;
-  width: 2px;
 }
 .tile.mini .tile-num {
   font-size: 14px;
@@ -1747,7 +1709,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-/* 牌背:深色底 + 中央回形纹(纯 CSS,不引素材);叠放省空间 */
+/* 牌背:深色底 + 中央回形纹(纯 CSS,不引素材);平面牌背,靠描边分张 */
 .tile.back {
   background:
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.16) 0 8%, transparent 9%),
@@ -1756,33 +1718,17 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 0 0 3px rgba(255, 255, 255, 0.1),
-    0 2px 0 #143530,
-    0 3px 4px rgba(0, 0, 0, 0.3);
+    0 1px 2px rgba(0, 0, 0, 0.26);
   cursor: default;
 }
-.tile.back::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(46, 110, 94, 0.55) 100%);
-}
-.tile.back::after {
-  background: linear-gradient(90deg, #1d4a40 0%, #12332c 100%);
-}
-/* 侧向立体手牌(左右家):横躺的牌一片片叠起来,顶面受光、底边落影 */
+/* 侧向牌背(左右家):横躺的牌一片片叠起来,只留描边 */
 .tile.back.side {
   width: 34px;
   height: 13px;
   border-radius: 3px;
 }
-.tile.back.side::before {
-  top: -2px;
-  height: 2px;
-}
-.tile.back.side::after {
-  bottom: -2px;
-  top: 1px;
-  width: 2px;
-}
 
-/* 牌桌舞台:桌面按恒定宽高比居中;窗口平面化不透视,立体感全在牌与牌墙上 */
+/* 牌桌舞台:桌面按恒定宽高比居中;窗口平面化不透视,牌面也是纯平面 */
 .mj-stage {
   flex: 1;
   min-height: 0;
@@ -1924,12 +1870,12 @@ html.dark .mj-table {
   font-weight: 700;
   line-height: 1.6;
 }
-/* 对家:牌背横排 + 副露横排同一行 */
+/* 对家:牌背横排 + 副露横排同一行(手牌与副露紧凑挨在一起) */
 .side-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
   max-width: 100%;
   flex-wrap: wrap;
@@ -1939,7 +1885,7 @@ html.dark .mj-table {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
   max-width: 100%;
 }
@@ -1956,10 +1902,10 @@ html.dark .mj-table {
   line-height: 1.6;
   vertical-align: 1px;
 }
-/* 对家:横排牌背平铺(不叠,像摆在桌上) */
+/* 对家:横排牌背平铺,一张挨一张 */
 .mj-backs {
   display: inline-flex;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   max-width: 340px;
   overflow: hidden;
@@ -1968,15 +1914,22 @@ html.dark .mj-table {
   width: 21px;
   height: 29px;
   flex: none;
-  border-radius: 4px;
+  border-radius: 3px;
 }
-/* 左右家:侧向立体手牌竖排(横躺的牌一片片) */
+/* 相邻牌共用一条描边,排成一条不留缝 */
+.mj-backs .tile.back + .tile.back {
+  margin-left: -1px;
+}
+/* 左右家:侧向牌背竖排,紧挨成一条 */
 .mj-backs-col {
   display: inline-flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   max-height: 300px;
   overflow: hidden;
+}
+.mj-backs-col .tile.back + .tile.back {
+  margin-top: -1px;
 }
 .mj-backs-col .tile.back.side {
   flex: none;
@@ -2108,15 +2061,12 @@ html.dark .mj-table {
 .river-right {
   grid-area: rr;
 }
-/* 牌河小牌:留出底边厚度,读数清晰又像立在桌上;最新一张放大到下一张出牌才恢复 */
+/* 牌河小牌:纯平面,最新一张描金放大到下一张出牌才恢复 */
 .mj-river .tile.mini {
   width: 100%;
   height: 100%;
   border-radius: 3px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 2px 0 #c9c1ab,
-    0 3px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
   transition: transform 0.14s var(--ease-soft);
 }
 .mj-river .tile.latest {
@@ -2125,9 +2075,7 @@ html.dark .mj-table {
   background: #fff4d7;
   transform: scale(1.3);
   z-index: 1;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 6px 14px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
 }
 /* 中央信息:风位罗盘 + 双骰 + 余牌/规则/回合 */
 .mj-hub {
@@ -2247,7 +2195,7 @@ html.dark .rules-chip {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   max-width: 100%;
   padding: 3px 4px;
   border-radius: 10px;
@@ -2256,23 +2204,26 @@ html.dark .rules-chip {
 }
 .meld-group {
   display: inline-flex;
-  gap: 1px;
+  gap: 0;
   padding: 1px;
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.2);
+}
+.meld-group .tile.mini + .tile.mini {
+  margin-left: -1px;
 }
 .meld-row .tile.mini {
   width: 20px;
   height: 28px;
   border-radius: 3px;
-  box-shadow: 0 1px 0 #a29c8b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
-/* 我方:副露与手牌同排并置(副露在左,手牌在右),窄容器可换行 */
+/* 我方:副露与手牌同排并置(副露在左,手牌在右),整副手牌紧凑连成一条 */
 .my-row {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 12px;
+  gap: 6px;
   max-width: 100%;
   flex-wrap: wrap;
   position: relative;
@@ -2303,24 +2254,24 @@ html.dark .rules-chip {
 .hand-row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: 0;
   justify-content: center;
   align-items: flex-end;
   max-width: 100%;
 }
-/* 手牌永远一排:宽度随容器自动缩放,不换行不出滚动条 */
+/* 手牌永远一排:宽度随容器自动缩放,不换行不出滚动条;牌与牌紧挨 */
 .tile.hand {
-  width: min(52px, calc((100cqi - 58px) / 14));
+  width: min(54px, calc((100cqi - 40px) / 14));
   height: auto;
   aspect-ratio: 11 / 15;
   padding: 0;
 }
+.tile.hand + .tile.hand {
+  margin-left: -1px;
+}
 .tile.hand.drawn {
   transform: translateY(-8px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 3px 0 #c9c1ab,
-    0 8px 12px rgba(var(--color-brand-rgb), 0.5);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
 }
 .tile.hand:not(:disabled):hover {
   transform: translateY(-5px);
