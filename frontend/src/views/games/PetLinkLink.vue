@@ -69,7 +69,7 @@
         <div class="board-scroll" ref="boardScrollRef">
           <div class="board-scale" :style="{ width: scaledW + 'px', height: scaledH + 'px' }">
             <div class="board-wrap" :class="{ 'is-frozen': animating || paused }" :style="{ transform: `scale(${boardScale})` }">
-              <div class="board" ref="boardEl">
+              <div class="board" ref="boardEl" :class="{ 'is-hinting': hinted.length > 0 }">
                 <button
                   v-for="cell in cells"
                   :key="cell.tid ? 't' + cell.tid : 'e' + cell.idx"
@@ -91,6 +91,7 @@
 
               <svg class="board-line" :viewBox="`0 0 ${svgW} ${svgH}`">
                 <polyline v-if="linePoints" :points="linePoints" class="line" />
+                <polyline v-if="hintPoints" :points="hintPoints" class="line line-hint" />
               </svg>
 
               <Transition name="game-overlay">
@@ -235,6 +236,7 @@ const TIME_BONUS = 3 // 每消除一对补充 3 秒(原件 36 帧)
 const BASE_SHUFFLE = 6
 const MATCH_LINE_MS = 150 // 消除连线展示时长(原 280,贴近原版 12fps 连线瞬时节奏)
 const MATCH_FLIP_MS = 120 // 消除后牌位滑行动画时长(原 220)
+const HINT_MS = 2400 // 提示高亮停留时长(原 1600,太短还没找到牌就灭了)
 
 // 40 种宠物(按 sprite 149 帧序),用 import.meta.glob 按文件名排序加载
 const petModules = import.meta.glob('@/assets/games/petlink/*.png', { eager: true, import: 'default' })
@@ -260,6 +262,7 @@ const paused = ref(false)
 const won = ref(false)
 const lost = ref(false)
 const linePoints = ref('')
+const hintPoints = ref('')
 const rewardMsg = ref('')
 // 封面读到的可续存档(点「继续游戏」才真正装载)
 const savedState = ref(null)
@@ -345,7 +348,7 @@ function applyRoomState(state) {
   won.value = !!state.won
   lost.value = !!state.lost
   linePoints.value = ''
-  hinted.value = []
+  clearHint()
   if (won.value || lost.value) stopTicker()
 }
 
@@ -584,7 +587,7 @@ const applySavedState = (saved) => {
   timeLeft.value = saved.timeLeft
   paused.value = saved.paused
   anchorClearAll()
-  hinted.value = []
+  clearHint()
   animating.value = false
   won.value = false
   lost.value = false
@@ -615,7 +618,7 @@ function onClick(i, remote = false, remoteUid = null) {
     // 合作模式:非房主只上报意图,盘面由房主统一改动后再广播回来;
     // 本地先乐观预选(自己的锚点),房主快照到达后以权威值覆盖
     if (frozen.value) return
-    hinted.value = []
+    clearHint()
     if (selected.value === -1) {
       selected.value = i
       playClick()
@@ -629,7 +632,7 @@ function onClick(i, remote = false, remoteUid = null) {
   }
   if (frozen.value) return
   if (!board.value[i]) return
-  hinted.value = []
+  clearHint()
   // 房主按操作者分开记账(remote=成员 op,本地=房主自己),各自维护自己的锚点
   const uid = remote ? remoteUid : play.myId
   const cur = anchorGet(uid)
@@ -692,15 +695,26 @@ async function match(a, b, path) {
   }
 }
 
+// 提示:高亮那一对 + 其余牌压暗成聚光灯 + 虚线画出可连路径。
+// 只加光环不够看——棋盘列间距 2px、行间距 0,相邻牌会把光环盖掉,手机缩放后更糊。
 function doHint() {
   if (frozen.value) return
   const pair = findAnyPair()
   if (!pair) return
-  hinted.value = [...pair]
+  const [a, b] = pair
+  const path = findPetLinkPath(board.value, Math.floor(a / COLS), a % COLS, Math.floor(b / COLS), b % COLS)
+  hinted.value = [a, b]
+  hintPoints.value = path ? path.map(([r, c]) => `${centerX(c)},${centerY(r)}`).join(' ') : ''
   clearTimeout(hintTimer)
-  hintTimer = setTimeout(() => {
-    hinted.value = []
-  }, 1600)
+  hintTimer = setTimeout(clearHint, HINT_MS)
+}
+
+/** 清掉提示高亮与路径(点击、重排、换关、恢复存档都走这里) */
+function clearHint() {
+  clearTimeout(hintTimer)
+  hintTimer = null
+  hinted.value = []
+  hintPoints.value = ''
 }
 
 function doShuffle() {
@@ -720,7 +734,7 @@ function applyShuffle() {
   shufflesLeft.value -= 1
   // 盘面洗过了:所有人的锚点都作废(旧格子位置已失效)
   anchorClearAll()
-  hinted.value = []
+  clearHint()
 }
 
 // ---------- 消除后牌位移动 ----------
@@ -769,7 +783,7 @@ function debugJump(lv) {
   shufflesLeft.value = DEBUG_SHUFFLES
   timeLeft.value = LEVEL_TIME
   anchorClearAll()
-  hinted.value = []
+  clearHint()
   animating.value = false
   won.value = false
   lost.value = false
@@ -872,7 +886,7 @@ async function levelComplete() {
   board.value = buildBoard(level.value)
   timeLeft.value = LEVEL_TIME
   anchorClearAll()
-  hinted.value = []
+  clearHint()
   startTicker()
   saveState()
 }
@@ -969,7 +983,7 @@ function restart() {
   shufflesLeft.value = BASE_SHUFFLE
   timeLeft.value = LEVEL_TIME
   anchorClearAll()
-  hinted.value = []
+  clearHint()
   animating.value = false
   paused.value = false
   won.value = false
@@ -1076,7 +1090,7 @@ onBeforeUnmount(() => {
   if (roomTimer) clearTimeout(roomTimer)
   saveState()
   stopTicker()
-  clearTimeout(hintTimer)
+  clearHint()
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', updateBoardScale)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
@@ -1346,11 +1360,26 @@ function onKeydown(e) {
   transform-origin: top left;
 }
 .board {
+  position: relative; /* 提示压暗层的定位基准 */
   display: grid;
   grid-template-columns: repeat(14, 42px);
   grid-auto-rows: 40px;
   column-gap: 2px;
   row-gap: 0;
+}
+/* 提示聚光灯:其余牌压暗(0 行距下光环会被相邻牌盖住,压暗才看得清) */
+.board::after {
+  content: '';
+  position: absolute;
+  inset: -44px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.66);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.board.is-hinting::after {
+  opacity: 1;
 }
 .tile {
   display: flex;
@@ -1393,16 +1422,32 @@ function onKeydown(e) {
   cursor: default;
 }
 .tile.is-hint {
-  animation: hintPulse 0.8s ease-in-out infinite;
-  border-color: #cc0066;
+  /* 压暗层之上 + 放大出格 + 实心洋红描边,缩放到手机尺寸也认得出 */
+  z-index: 3;
+  border-color: #ff2d8f;
+  background: #fff;
+  transform: scale(1.1);
+  box-shadow:
+    0 0 0 3px #ff2d8f,
+    0 0 14px 4px rgba(255, 45, 143, 0.85);
+  animation: hintPulse 0.72s ease-in-out infinite;
+}
+.tile.is-hint .pet {
+  filter: drop-shadow(0 0 3px rgba(255, 45, 143, 0.9)) brightness(1.12) saturate(1.15);
 }
 @keyframes hintPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(204, 0, 102, 0.6);
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 3px #ff2d8f,
+      0 0 10px 3px rgba(255, 45, 143, 0.9);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(204, 0, 102, 0.25);
+    transform: scale(1.16);
+    box-shadow:
+      0 0 0 3px #ffd6ea,
+      0 0 20px 8px rgba(255, 45, 143, 0.6);
   }
 }
 .board-line {
@@ -1412,6 +1457,7 @@ function onKeydown(e) {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 3; /* 高亮牌与提示路径都要压在提示压暗层之上 */
 }
 .board-line .line {
   fill: none;
@@ -1420,6 +1466,20 @@ function onKeydown(e) {
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 4px rgba(0, 153, 255, 0.8));
+}
+/* 提示路径:洋红流动虚线,与消除瞬间的蓝色实线区分(方头笔帽,圆头会把虚线撑成实线) */
+.board-line .line-hint {
+  stroke: #ff2d8f;
+  stroke-width: 4;
+  stroke-linecap: butt;
+  stroke-dasharray: 7 7;
+  animation: hintDash 0.6s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(255, 45, 143, 0.95));
+}
+@keyframes hintDash {
+  to {
+    stroke-dashoffset: -28;
+  }
 }
 .board-wrap.is-frozen .tile {
   cursor: default;
