@@ -61,7 +61,8 @@ export function useDragResize(initial) {
     startY = 0,
     startPos = { x: 0, y: 0 },
     startSize = { w: 0, h: 0 }
-  let captureEl = null
+  let pointerId = null
+  let pointerTarget = null
 
   // 置顶:拖拽或 resize 时调用,提升 z-index(不超过光影层)
   const bringToFront = () => {
@@ -107,8 +108,15 @@ export function useDragResize(initial) {
   /** 当前缩放方向(按下时定死):n/s/e/w 的组合,如 ne/nw/se/sw/纯边 */
   let resizeDir = 'se'
 
-  /** 指针捕获期间移动/抬起都派发到捕获元素上,直接改 pos/size */
   const onPointerMove = (e) => {
+    if (e.pointerId !== pointerId) return
+    if (!dragging.value && !resizing.value) {
+      if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) return
+      dragging.value = true
+      bringToFront()
+      capturePointer()
+    }
+
     const vw = window.innerWidth
     const vh = window.innerHeight
     if (dragging.value) {
@@ -156,18 +164,17 @@ export function useDragResize(initial) {
   }
 
   const stopListening = () => {
-    if (captureEl) {
-      captureEl.removeEventListener('pointermove', onPointerMove)
-      captureEl.removeEventListener('pointerup', onPointerUp)
-      captureEl.removeEventListener('pointercancel', onPointerUp)
-      try {
-        if (captureEl.hasPointerCapture?.(0)) captureEl.releasePointerCapture(0)
-      } catch (e) {}
-      captureEl = null
-    }
+    if (pointerId === null) return
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+    window.removeEventListener('pointercancel', onPointerUp)
+    if (pointerTarget.hasPointerCapture?.(pointerId)) pointerTarget.releasePointerCapture(pointerId)
+    pointerId = null
+    pointerTarget = null
   }
 
-  const onPointerUp = () => {
+  const onPointerUp = (e) => {
+    if (e.pointerId !== pointerId) return
     if (dragging.value || resizing.value) {
       save()
       haptic('tap')
@@ -178,43 +185,42 @@ export function useDragResize(initial) {
     stopListening()
   }
 
-  const beginPointer = (e) => {
-    captureEl = e.currentTarget
-    captureEl.addEventListener('pointermove', onPointerMove)
-    captureEl.addEventListener('pointerup', onPointerUp)
-    captureEl.addEventListener('pointercancel', onPointerUp)
+  const capturePointer = () => {
     try {
-      captureEl.setPointerCapture(e.pointerId)
-    } catch (e2) {}
+      pointerTarget.setPointerCapture(pointerId)
+    } catch (e) {}
+  }
+
+  const beginPointer = (e) => {
+    if (pointerId !== null || e.isPrimary === false || e.button !== 0) return false
+    pointerId = e.pointerId
+    pointerTarget = e.currentTarget
+    startX = e.clientX
+    startY = e.clientY
+    startPos = { ...pos.value }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+    return true
   }
 
   const onDragStart = (e) => {
-    if (e.target.classList.contains('resize-handle')) return
-    // 拖拽把手容器里常有真实按钮(如浮窗标题栏的关闭):点按钮不能变成拖拽,
-    // 否则指针被捕获吞掉 click,「点关闭没反应」就是这么来的
-    if (e.target.closest?.('button, .el-button, a, input, textarea, select, label')) return
-    dragging.value = true
-    bringToFront()
-    startX = e.clientX
-    startY = e.clientY
-    startPos = { ...pos.value }
-    e.preventDefault()
-    // 拖拽开始才捕获指针挂监听器,空闲无 listener(参考 AvatarCropper.vue 的写法)
-    beginPointer(e)
+    if (e.target.classList.contains('resize-handle')) return false
+    // 悬浮球本身可拖；标题栏里的关闭按钮等子控件保留各自的交互。
+    const control = e.target.closest?.('button, .el-button, a, input, textarea, select, label')
+    if (control && control !== e.currentTarget) return false
+    return beginPointer(e)
   }
   /** dir:n/s/e/w 及组合(ne/nw/se/sw…),决定缩放时移动哪些边 */
   const onResizeStart = (e, dir = 'se') => {
+    if (!beginPointer(e)) return
     resizeDir = dir
     resizing.value = true
     bringToFront()
-    startX = e.clientX
-    startY = e.clientY
-    startPos = { ...pos.value }
     startSize = { ...size.value }
     e.preventDefault()
     e.stopPropagation()
-    // resize 开始才捕获指针挂监听器
-    beginPointer(e)
+    capturePointer()
   }
   const reset = () => {
     const rect = clampFloatRect(

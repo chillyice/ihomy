@@ -4,9 +4,9 @@
      桌面端可拖到窗口底部的删除区松手隐藏(stores/floats.js 开关),聊天室页可重新开启。 -->
 <template>
   <template v-if="show">
-    <!-- 移动端:悬浮球 + 半屏抽屉(拍板 #3) -->
-    <template v-if="isMobile">
-      <div v-if="expanded" class="chat-float-sheet">
+    <template v-if="expanded">
+      <!-- 移动端:半屏抽屉 -->
+      <div v-if="isMobile" class="chat-float-sheet">
         <div class="sheet-head">
           <span class="sheet-title">{{ $t('chat.roomTitle') }}</span>
           <el-button text circle size="small" @click="collapse">
@@ -15,16 +15,9 @@
         </div>
         <ChatPanel />
       </div>
-      <button v-else type="button" class="chat-float-ball mobile-ball" @pointerdown="onBallDown" @pointerup="onBallUp">
-        <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
-          <el-icon :size="22"><ChatDotRound /></el-icon>
-        </el-badge>
-      </button>
-    </template>
 
-    <!-- 桌面端:可拖拽缩放面板 + 可拖拽球 -->
-    <template v-else>
-      <div v-if="expanded" class="chat-float-panel" :style="panelStyle">
+      <!-- 桌面端:可拖拽缩放面板 -->
+      <div v-else class="chat-float-panel" :style="panelStyle">
         <div class="panel-head" @pointerdown="onPanelDown">
           <span class="panel-title">{{ $t('chat.roomTitle') }}</span>
           <el-button text circle size="small" @click="collapse">
@@ -32,21 +25,30 @@
           </el-button>
         </div>
         <ChatPanel />
-        <!-- 四角 + 四边缩放把手 -->
+        <!-- 四角和四边的透明缩放区 -->
         <div
           v-for="dir in RESIZE_DIRS"
           :key="dir"
-          class="resize-handle"
+          class="chat-resize-zone"
           :class="'dir-' + dir"
           @pointerdown="onResizeStart($event, dir)"
         ></div>
       </div>
-      <button v-else type="button" class="chat-float-ball" :style="ballStyle" @pointerdown="onBallDown" @pointerup="onBallUp">
-        <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
-          <el-icon :size="22"><ChatDotRound /></el-icon>
-        </el-badge>
-      </button>
     </template>
+    <button
+      v-else
+      type="button"
+      class="chat-float-ball"
+      :style="ballStyle"
+      :aria-label="$t('chat.roomTitle')"
+      @pointerdown="onBallDown"
+      @pointerup="onBallUp"
+      @click="onBallClick"
+    >
+      <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
+        <el-icon :size="22"><ChatDotRound /></el-icon>
+      </el-badge>
+    </button>
 
     <!-- 拖到底部删除区:桌面端拖球/拖面板时出现,松手即隐藏浮窗(可在聊天室重新开启) -->
     <FloatDeleteDock :active="dockActive" :over="dockOver" />
@@ -86,7 +88,6 @@ const PANEL_POS_KEY = 'ihomy:chat:panel:v1'
 const BALL_SIZE = 48
 const PANEL_W = 360
 const PANEL_H = 520
-/** 缩放把手方向:四角 + 四边 */
 const RESIZE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
 const { t } = useI18n()
@@ -106,8 +107,8 @@ const immersiveRoute = computed(() => route.path.startsWith('/games') || route.p
 
 // 球位置(持久化);面板位置/尺寸也持久化(四角四边缩放后的窗口形态跟着走)
 const ball = useDragResize({
-  x: Math.max(16, window.innerWidth - 84),
-  y: Math.max(80, window.innerHeight - 200),
+  x: Math.max(16, window.innerWidth - (isMobile.value ? BALL_SIZE + 16 : 84)),
+  y: Math.max(80, window.innerHeight - (isMobile.value ? BALL_SIZE + 68 : 200)),
   w: BALL_SIZE,
   h: BALL_SIZE,
   storageKey: FLOAT_POS_KEY,
@@ -115,6 +116,7 @@ const ball = useDragResize({
 const {
   pos: panelPos,
   size: panelSize,
+  dragging: panelDragging,
   onDragStart,
   onResizeStart,
 } = useDragResize({
@@ -134,31 +136,31 @@ const panelStyle = computed(() => ({
   zIndex: 'var(--z-float)',
 }))
 
-// 球:按下记起点,抬起位移 <6px 视为点击展开(否则是拖拽)
-let ballDown = null
+// 松手时记录拖动状态，拦住随拖动产生的 click，同时保留键盘激活。
+let ignoreBallClick = false
 const onBallDown = (e) => {
-  ballDown = { x: e.clientX, y: e.clientY }
-  ball.onDragStart(e)
-  if (!isMobile.value) trackToDock(e)
+  if (!ball.onDragStart(e)) return
+  ignoreBallClick = false
+  if (!isMobile.value) trackToDock(e, ball.dragging)
 }
 const onBallUp = (e) => {
-  if (ballDown && Math.hypot(e.clientX - ballDown.x, e.clientY - ballDown.y) < 6) expand()
-  ballDown = null
+  if (e.isPrimary && e.button === 0) ignoreBallClick = ball.dragging.value
+}
+const onBallClick = (e) => {
+  if (e.detail === 0 || !ignoreBallClick) expand()
+  ignoreBallClick = false
 }
 
-// 拖到底部删除:useDragResize 只报位置不报指针,这里补一份窗口级指针监听(位移过 6px 才算拖动)
+// 删除区与 useDragResize 共用拖动判定，从指针位置判断是否进入底部热区。
 const { active: dockActive, over: dockOver, begin: dockBegin, update: dockUpdate, end: dockEnd, cancel: dockCancel } = useFloatDelete()
 let detachTrack = null
-const trackToDock = (e) => {
-  if (e.pointerType === 'mouse' && e.button !== 0) return
+const trackToDock = (e, dragging) => {
   detachTrack?.()
   const id = e.pointerId
-  const origin = { x: e.clientX, y: e.clientY }
   let moved = false
   const onMove = (ev) => {
-    if (ev.pointerId !== id) return
+    if (ev.pointerId !== id || !dragging.value) return
     if (!moved) {
-      if (Math.hypot(ev.clientX - origin.x, ev.clientY - origin.y) < 6) return
       moved = true
       dockBegin()
     }
@@ -167,6 +169,7 @@ const trackToDock = (e) => {
   const onUp = (ev) => {
     if (ev.pointerId !== id) return
     detach()
+    dockUpdate(ev.clientY)
     if (dockEnd()) removeFloat()
   }
   const onCancel = (ev) => {
@@ -188,8 +191,7 @@ const trackToDock = (e) => {
 
 // 面板只能从标题栏拖;拖动与 useDragResize 共用同一次 pointerdown
 const onPanelDown = (e) => {
-  onDragStart(e)
-  trackToDock(e)
+  if (onDragStart(e)) trackToDock(e, panelDragging)
 }
 
 const removeFloat = () => {
@@ -305,12 +307,6 @@ onBeforeUnmount(() => {
 .chat-float-ball:hover {
   transform: translateY(-2px);
 }
-.mobile-ball {
-  right: 16px;
-  bottom: 68px; /* 避开 56px 底栏(MusicPlayer 先例) */
-  left: auto;
-  top: auto;
-}
 .ball-badge :deep(.el-badge__content) {
   z-index: 1;
 }
@@ -347,83 +343,63 @@ onBeforeUnmount(() => {
   min-height: 0;
   padding: 6px 12px 10px;
 }
-.resize-handle {
+.chat-resize-zone {
   position: absolute;
   touch-action: none; /* 缩放把手 */
   z-index: 1;
 }
-/* 四角:可见的斜角标记 */
-.resize-handle.dir-se {
+/* 四角 */
+.chat-resize-zone.dir-se {
   right: 0;
   bottom: 0;
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
 }
-.resize-handle.dir-sw {
+.chat-resize-zone.dir-sw {
   left: 0;
   bottom: 0;
   width: 16px;
   height: 16px;
   cursor: nesw-resize;
 }
-.resize-handle.dir-ne {
+.chat-resize-zone.dir-ne {
   right: 0;
   top: 0;
   width: 16px;
   height: 16px;
   cursor: nesw-resize;
 }
-.resize-handle.dir-nw {
+.chat-resize-zone.dir-nw {
   left: 0;
   top: 0;
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
 }
-.resize-handle.dir-nw::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 8px;
-  height: 8px;
-  border-left: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
-  border-top: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
-}
-.resize-handle.dir-se::after {
-  content: '';
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
-  border-bottom: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
-}
-/* 四边:细长热区(面板 overflow:hidden,把手内贴边放置) */
-.resize-handle.dir-n {
+/* 四边的热区贴面板内缘 */
+.chat-resize-zone.dir-n {
   left: 12px;
   right: 12px;
   top: 0;
   height: 6px;
   cursor: ns-resize;
 }
-.resize-handle.dir-s {
+.chat-resize-zone.dir-s {
   left: 12px;
   right: 12px;
   bottom: 0;
   height: 6px;
   cursor: ns-resize;
 }
-.resize-handle.dir-e {
+.chat-resize-zone.dir-e {
   top: 12px;
   bottom: 12px;
   right: 0;
   width: 6px;
   cursor: ew-resize;
 }
-.resize-handle.dir-w {
+.chat-resize-zone.dir-w {
   top: 12px;
   bottom: 12px;
   left: 0;
