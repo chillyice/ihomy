@@ -78,6 +78,16 @@ file:
 # 外挂文件中的敏感凭证可用 ENC(...) 格式 AES-GCM 加密,盐值存 sys_parameter 表(aes-salt),首次启动自动生成
 # 加密工具:启动后调用 GET /api/ops/crypto/encrypt?plaintext=xxx 生成密文(OPS 角色)
 app:
+  # 站内备份/迁移(V12.54):dir 留空 = uploads 同级 backups(生产 /opt/ihomy/backups)。
+  # 备份根不要放进 uploads,也就能保证备份包不被 nginx /files/ 直接访问。
+  backup:
+    dir:
+    # 开始备份前要求磁盘至少剩这么多 GB(另加 256MB 缓冲)
+    min-free-gb: 1
+    # 备份根实际占用上限(硬链接已去重);超限时拒绝新任务,先在列表里删旧备份
+    max-total-gb: 20
+    # 站内下载 zip 的体积上限;更大的包请直接在服务器上复制备份目录
+    download-max-gb: 4
   captcha-fixed-code:
   # 跨域白名单(逗号分隔):生产域名 + 开发前端地址;经 external.yml 按环境覆盖
   # https://localhost 是 Android 客户端壳的固定 origin(Capacitor androidScheme=https + hostname=localhost),

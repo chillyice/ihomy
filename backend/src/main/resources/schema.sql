@@ -3074,3 +3074,35 @@ CREATE TABLE `family_game_room_round` (
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房间对局成绩(一起玩排行榜)';
 
+-- ------------------------------------------------------------
+-- 85. sys_backup_job 备份与迁移任务(V12.54):站内备份/迁移的执行记录。
+--     目录与文件是事实,本表只记状态与统计;status=PURGED 表示文件已清理但保留审计。
+--     scope=INSTANCE 为全实例(OPS),scope=FAMILY 为单家庭导出(家长)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_backup_job`;
+CREATE TABLE `sys_backup_job` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `kind`            VARCHAR(20)  NOT NULL COMMENT '类型:BASIC基础/CONTENT内容/FULL全量/MIGRATION迁移包',
+  `scope`           VARCHAR(20)  NOT NULL DEFAULT 'INSTANCE' COMMENT '范围:INSTANCE全实例/FAMILY单家庭',
+  `trigger_type`    VARCHAR(20)  NOT NULL DEFAULT 'MANUAL' COMMENT '触发:MANUAL手动/SCHEDULED定时',
+  `status`          VARCHAR(20)  NOT NULL DEFAULT 'RUNNING' COMMENT '状态:RUNNING执行中/SUCCESS成功/FAILED失败/PURGED已清理',
+  `family_id`       BIGINT       DEFAULT NULL COMMENT '家庭导出时的家庭ID(全实例为NULL)',
+  `operator_id`     BIGINT       DEFAULT NULL COMMENT '发起人用户ID(定时任务为NULL)',
+  `dir_name`        VARCHAR(120) NOT NULL COMMENT '备份目录名(位于备份根目录下)',
+  `size_bytes`      BIGINT       NOT NULL DEFAULT 0 COMMENT '快照逻辑字节(含增量硬链接)',
+  `db_bytes`        BIGINT       NOT NULL DEFAULT 0 COMMENT '数据库转储字节',
+  `file_count`      INT          NOT NULL DEFAULT 0 COMMENT '文件数量',
+  `db_row_count`    BIGINT       NOT NULL DEFAULT 0 COMMENT '数据库行数合计',
+  `duration_ms`     BIGINT       NOT NULL DEFAULT 0 COMMENT '耗时毫秒',
+  `message`         VARCHAR(1000) DEFAULT NULL COMMENT '失败原因或摘要',
+  `manifest_sha256` CHAR(64)     DEFAULT NULL COMMENT 'meta.json 的 SHA-256(完整性校验用)',
+  `started_at`      DATETIME     NOT NULL COMMENT '开始时间',
+  `finished_at`     DATETIME     DEFAULT NULL COMMENT '结束时间',
+  `purged_at`       DATETIME     DEFAULT NULL COMMENT '备份文件清理时间',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_kind_status` (`kind`, `status`),
+  KEY `idx_scope_family` (`scope`, `family_id`, `created_at`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份与迁移任务记录';
+

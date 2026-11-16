@@ -70,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **102 张表**,前缀:`sys_` 29(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 45(家庭事务)、`content_` 22(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
+- **103 张表**,前缀:`sys_` 30(系统/账号/权限/配置/存储/备份)、`report_` 5(报表/日志)、`family_` 45(家庭事务)、`content_` 22(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish/book` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC);`family_vault_item` 只有 PRIVATE/FAMILY 两档。清单见 需求 §6.4。
@@ -210,6 +210,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **Redis 只绑回环 + 强密码**:`-p 127.0.0.1:6379:6379` + `--requirepass`(写在**镜像名之后**);镜像固定 tag(当前 `redis:8.10.3`),加速器缺新 tag 时经 daocloud 拉取后 `docker tag` 回原名;**改密顺序**:external.yml → 停后端 → 重建容器 → 起后端 → 冒烟(踩坑速查 §7.17)。
 - SSH 统一 **19068**(禁 22),ssh/scp 都带 `-p 19068`;配 fail2ban 与自动安全更新。
 - 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑(生产已安装 `ihomy-backup.timer` 并验证);恢复 `scripts/prod-restore.sh <dump> <目标库>`。
+- **站内备份与迁移(V12.54)**:运维页配策略(基础数据每天 / 内容数据每天 + uploads 硬链接增量 / 全量每周;GFS 日·周·月保留,迁移包不自动清理),产物落 uploads 同级 `backups/`(**不进 nginx `/files/`**);**站内只导出,恢复在服务器按包内 `RESTORE.md` 做**,不做全库覆盖恢复;家庭导出 `family:manage`、恢复需全新空实例(保留原始 ID)。细则与限额见 `docs/数据备份与迁移.md`。
 - **生产只留构建产物**:`/opt/ihomy` 部署后仅保留 `backend/target/ihomy-backend.jar`、`frontend/dist`、`config/external.yml`(+`mysql/my.cnf`)、`uploads/`、`backups/`、`logs/`、`VERSION`、`scripts/prod-backup.sh`/`prod-restore.sh`;源码/docs/.git 不在服务器,构建与上传一律走本地 `scripts/deploy.ps1`。部署成功后脚本会删除 `dist.bak`/`jar.bak`。
 - **重装/新服务器四条必查**(nginx `mime.types` 有 `.mjs`、站点 conf 有 gzip、静态缓存排除 `/api/`+`/files/`、媒体播放地址同为 HTTPS):见 踩坑速查 §7.1/§7.3/§7.10。
 - **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;不带内容哈希的运行时换版本必须带 `?v=` 破缓存(踩坑速查 §7.2/§3.55)。

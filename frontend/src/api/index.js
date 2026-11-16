@@ -582,6 +582,23 @@ export const opsApi = {
   ossIgnore: (id, ignored) => request.put(`/ops/oss/${id}/ignore`, null, { params: { ignored } }),
   ossAssess: (id) => request.post(`/ops/oss/${id}/assess`, null, { timeout: 120000 }),
   ossUpgrade: (id) => request.post(`/ops/oss/${id}/upgrade`),
+  // 备份与迁移(V12.54):全实例备份、定时策略、下载/校验/删除
+  backupOverview: () => request.get('/ops/backup/overview'),
+  backupPolicy: () => request.get('/ops/backup/policy'),
+  saveBackupPolicy: (data) => request.put('/ops/backup/policy', data),
+  backupJobs: (params) => request.get('/ops/backup/jobs', { params }),
+  createBackupJob: (kind) => request.post('/ops/backup/jobs', { kind }),
+  verifyBackupJob: (id) => request.post(`/ops/backup/jobs/${id}/verify`),
+  deleteBackupJob: (id) => request.delete(`/ops/backup/jobs/${id}`),
+  downloadBackupJob: (id) => request.get(`/ops/backup/jobs/${id}/download`, { responseType: 'blob', timeout: 0 }),
+}
+
+// 家庭数据导出(V12.54):家长把本家庭数据与引用文件打成迁移包(只导出,不站内导入)
+export const familyBackupApi = {
+  jobs: (params) => request.get('/backup/jobs', { params }),
+  createJob: () => request.post('/backup/jobs'),
+  downloadJob: (id) => request.get(`/backup/jobs/${id}/download`, { responseType: 'blob', timeout: 0 }),
+  deleteJob: (id) => request.delete(`/backup/jobs/${id}`),
 }
 
 // 家谱(家庭隐私数据,需登录)

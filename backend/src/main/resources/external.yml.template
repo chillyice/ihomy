@@ -45,6 +45,13 @@ logging:
 
 # === 应用差异化配置 ===
 app:
+  # 站内备份/迁移(可选覆盖,基线见 application.yml):
+  #   dir 留空 = uploads 同级 backups;min-free-gb/max-total-gb/download-max-gb 为容量保护阈值
+  # backup:
+  #   dir: /opt/ihomy/backups
+  #   min-free-gb: 1
+  #   max-total-gb: 20
+  #   download-max-gb: 4
   captcha-fixed-code:          # 开发可填固定验证码方便测试;生产必须留空(随机验证码)
   # 跨域白名单(逗号分隔):本地前端地址 + 客户端壳固定 origin(Android https://localhost / iOS capacitor://localhost)。
   # ⚠ 生产 external.yml 若覆盖本项,必须同时保留两个 origin,否则 App 登录/接口预检全部失败。

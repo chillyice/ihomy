@@ -1,5 +1,5 @@
 <!-- 运维管理页(V3.8):仅 OPS 角色可见。标签聚合外壳:
-     资源总览 / 服务器状态 / 访问统计 / 操作日志 / 详细日志 / 异常预警 / AI 统计 / 和风天气 / 开源组件台账。
+     资源总览 / 服务器状态 / 访问统计 / 操作日志 / 详细日志 / 异常预警 / AI 统计 / 和风天气 / 开源组件台账 / 备份与迁移。
      各标签内容拆为 tabs/ 下的子组件,首次切到该标签才挂载(onMounted 取数),离开后保留状态。 -->
 <template>
   <div class="page">
@@ -50,6 +50,10 @@
       <el-tab-pane v-if="showSystemTabs" :label="$t('ops.oss.title')" name="oss" lazy>
         <OpsOss />
       </el-tab-pane>
+
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.backup.title')" name="backup" lazy>
+        <OpsBackup />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -70,6 +74,7 @@ import OpsKada from './tabs/OpsKada.vue'
 import OpsAi from './tabs/OpsAi.vue'
 import OpsWeather from './tabs/OpsWeather.vue'
 import OpsOss from './tabs/OpsOss.vue'
+import OpsBackup from './tabs/OpsBackup.vue'
 
 // 运维管理:数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
 const route = useRoute()
