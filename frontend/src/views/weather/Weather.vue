@@ -249,7 +249,7 @@
           </div>
         </div>
 
-        <!-- 10 天预报:单列全宽;每行统一「日期 / 白天天气 / 温度」,点行展开当天详情 -->
+        <!-- 10 天预报:单列全宽;每行统一「日期 / 白天+夜间天气 / 温度」,点行展开当天详情 -->
         <div v-if="detail?.daily?.length" class="card">
           <div class="section-label">{{ $t('weatherPage.daily') }}</div>
           <div class="wt-daily">
@@ -267,8 +267,16 @@
                     <span class="wt-day-wd">{{ fmtWeekday(row.fxDate) }}</span>
                   </span>
                   <span class="wt-day-weather">
-                    <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
-                    <span class="wt-day-weather-text">{{ row.textDay }}</span>
+                    <span class="wt-wx wt-wx-day">
+                      <span class="wt-wx-label">{{ $t('weatherPage.dayWeather') }}</span>
+                      <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
+                      <span class="wt-wx-text">{{ row.textDay }}</span>
+                    </span>
+                    <span class="wt-wx wt-wx-night">
+                      <span class="wt-wx-label">{{ $t('weatherPage.nightWeatherShort') }}</span>
+                      <i :class="'qi-' + row.iconNight" class="wt-td-icon"></i>
+                      <span class="wt-wx-text">{{ row.textNight }}</span>
+                    </span>
                   </span>
                   <span class="wt-trange">
                     <span class="wt-lo">{{ row.tempMin }}°</span>
@@ -1355,14 +1363,28 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 14px;
   font-size: 13px;
   min-width: 0;
+}
+/* 白天 / 夜间两份并排(窄屏改为上下两行) */
+.wt-wx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.wt-wx-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
 .wt-day-weather .wt-td-icon {
   flex: 0 0 auto;
 }
-.wt-day-weather-text {
+.wt-wx-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1465,6 +1487,15 @@ onBeforeUnmount(() => {
   .wt-day-md {
     font-size: 12.5px;
   }
+  .wt-day-weather {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+  }
+  .wt-wx {
+    justify-content: flex-start;
+    flex: 0 0 auto;
+  }
   .wt-trange .wt-lo,
   .wt-trange .wt-hi {
     min-width: 22px;
@@ -1487,6 +1518,10 @@ onBeforeUnmount(() => {
     gap: 5px;
   }
   .wt-trange .wt-tbar-track {
+    display: none;
+  }
+  /* 超窄屏放不下「白天/夜间」字样,只留图标 + 天气文字 */
+  .wt-wx-label {
     display: none;
   }
 }

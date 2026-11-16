@@ -5976,7 +5976,9 @@ export default {
     chartView: '折线',
     cardsView: '卡片',
     daily: '10 天预报',
+    dayWeather: '白天',
     nightWeather: '夜间天气',
+    nightWeatherShort: '夜间',
     uv: '紫外线',
     sunSunset: '日出 / 日落',
     // 日月与晨昏(V9.92):纯天文计算,取自 /public/sun-info(SolarUtil 的 NOAA/Meeus 实现),不依赖天气 API

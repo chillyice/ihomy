@@ -6043,7 +6043,9 @@ export default {
     chartView: 'Chart',
     cardsView: 'Cards',
     daily: '10-Day Forecast',
+    dayWeather: 'Day',
     nightWeather: 'Night',
+    nightWeatherShort: 'Night',
     uv: 'UV',
     sunSunset: 'Sunrise / Sunset',
     // Sun, moon & twilight (V9.92): pure astronomy from /public/sun-info (SolarUtil, NOAA/Meeus), no weather API needed
