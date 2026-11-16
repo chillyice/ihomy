@@ -34,22 +34,6 @@
       </div>
     </PageToolbar>
 
-    <!-- 分类筛选:只列出当前有游戏的分类,带数量;「全部」恒在第一 -->
-    <div v-if="categoryChips.length > 1" class="game-cats">
-      <button
-        v-for="c in categoryChips"
-        :key="c.value"
-        type="button"
-        class="game-cat"
-        :class="{ active: activeCategory === c.value }"
-        :aria-pressed="activeCategory === c.value"
-        @click="activeCategory = c.value"
-      >
-        {{ c.label }}
-        <span class="game-cat-count">{{ c.count }}</span>
-      </button>
-    </div>
-
     <!-- 进行中的「一起玩」房间:点一下直接进大厅,不用翻邀请卡 -->
     <div v-if="activeRooms.length" class="room-strip">
       <button
@@ -66,7 +50,27 @@
       </button>
     </div>
 
-    <div v-loading="loading" class="tool-grid">
+    <!-- 分类总览:先挑分类,点进去才看这一类里的游戏(只列当前有游戏的分类) -->
+    <div v-if="!activeCategory" v-loading="loading" class="game-cat-grid">
+      <button v-for="c in categoryTiles" :key="c.value" type="button" class="game-cat-card card" @click="activeCategory = c.value">
+        <span class="game-cat-name">{{ c.label }}</span>
+        <span class="game-cat-meta">{{ $t('games.categoryGamesCount', { n: c.count }) }}</span>
+        <span class="game-cat-samples">{{ c.samples.join(' / ') }}</span>
+      </button>
+      <div v-if="!loading && !categoryTiles.length" class="tool-empty">{{ $t('games.empty') }}</div>
+    </div>
+
+    <!-- 进了分类:一行返回 + 当前分类 -->
+    <div v-else class="game-cat-head">
+      <el-button text size="small" class="game-cat-back" @click="activeCategory = ''">
+        <el-icon><ArrowLeft /></el-icon>
+        {{ $t('games.allCategories') }}
+      </el-button>
+      <span class="game-cat-current">{{ categoryText(activeCategory) }}</span>
+      <span class="game-cat-meta">{{ $t('games.categoryGamesCount', { n: visibleTotal }) }}</span>
+    </div>
+
+    <div v-if="activeCategory" v-loading="loading" class="tool-grid">
       <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
       <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card" @click="$router.push(b.path)">
         <div class="tool-icon">
@@ -116,10 +120,7 @@
         </div>
       </div>
 
-      <div v-if="!loading && games.length === 0 && !activeSeries && activeCategory === 'ALL'" class="tool-empty">
-        {{ $t('games.empty') }}
-      </div>
-      <div v-else-if="!loading && visibleTotal === 0" class="tool-empty">{{ $t('games.emptyFiltered') }}</div>
+      <div v-if="!loading && visibleTotal === 0" class="tool-empty">{{ $t('games.emptyFiltered') }}</div>
     </div>
 
     <!-- 导入对话框(游戏文件 / 网页游戏两种方式) -->
@@ -240,6 +241,7 @@ import {
   Sunny,
   VideoPlay,
   ArrowRight,
+  ArrowLeft,
   MoreFilled,
   Grid,
   Cpu,
@@ -295,7 +297,7 @@ const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:ma
 
 const games = ref([])
 const loading = ref(false)
-const activeCategory = ref('ALL')
+const activeCategory = ref('')
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
 
@@ -453,14 +455,18 @@ const categoryPool = computed(() =>
 )
 const categoryCounts = computed(() => countGameCategories(categoryPool.value))
 
-/** 筛选条只显示有游戏的分类(含固定入口),避免一排空分类 */
-const categoryChips = computed(() => {
-  const chips = [{ value: 'ALL', label: t('games.allGames'), count: categoryPool.value.length }]
-  for (const c of GAME_CATEGORIES) {
-    if (categoryCounts.value[c] > 0) chips.push({ value: c, label: categoryText(c), count: categoryCounts.value[c] })
-  }
-  return chips
-})
+/** 分类总览:每个分类一张卡(数量 + 前几个游戏名),点进去才看游戏列表;空分类不出现 */
+const categoryTiles = computed(() =>
+  GAME_CATEGORIES.filter((c) => categoryCounts.value[c] > 0).map((c) => {
+    const items = categoryPool.value.filter((it) => normalizeGameCategory(it.category) === c)
+    return {
+      value: c,
+      label: categoryText(c),
+      count: items.length,
+      samples: items.slice(0, 3).map((it) => (it.titleKey ? t(it.titleKey) : it.name)),
+    }
+  }),
+)
 
 /** 选了系列时只看系列内的导入游戏(固定入口不属于任何系列) */
 const visibleBuiltins = computed(() => (activeSeries.value ? [] : builtinGames.filter((b) => inGameCategory(b, activeCategory.value))))
@@ -469,10 +475,10 @@ const visibleGames = computed(() =>
 )
 const visibleTotal = computed(() => visibleBuiltins.value.length + visibleGames.value.length)
 
-// 切换系列后,原分类在新范围内可能没有游戏,回落到「全部」分类
+// 切换系列后,原分类在新范围内可能没有游戏,回到分类总览
 watch(activeSeries, () => {
-  if (activeCategory.value !== 'ALL' && !categoryCounts.value[activeCategory.value]) {
-    activeCategory.value = 'ALL'
+  if (activeCategory.value && !categoryCounts.value[activeCategory.value]) {
+    activeCategory.value = ''
   }
 })
 
@@ -558,9 +564,9 @@ const load = async () => {
   try {
     const list = (await gameApi.list()) || []
     games.value = list.map((g) => ({ ...g, category: normalizeGameCategory(g.category) }))
-    // 选中的分类/系列被删空时回到「全部」,避免停留在空白的筛选结果
-    if (activeCategory.value !== 'ALL' && !categoryCounts.value[activeCategory.value]) {
-      activeCategory.value = 'ALL'
+    // 选中的分类被删空时回到分类总览,避免停留在空白列表
+    if (activeCategory.value && !categoryCounts.value[activeCategory.value]) {
+      activeCategory.value = ''
     }
     if (activeSeries.value && activeSeries.value !== UNSERIES && !seriesOptions.value.includes(activeSeries.value)) {
       activeSeries.value = ''
@@ -763,41 +769,65 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.game-cats {
+.game-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+  min-height: 80px;
+}
+.game-cat-card {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 18px;
+  min-height: 104px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text);
+  transition:
+    transform 0.2s ease,
+    border-color 0.16s ease;
+}
+.game-cat-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-accent);
+}
+.game-cat-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.game-cat-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+}
+.game-cat-samples {
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  opacity: 0.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.game-cat-head {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
 }
-.game-cat {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 1.4;
-  cursor: pointer;
-  transition:
-    color 0.16s ease,
-    border-color 0.16s ease,
-    background-color 0.16s ease;
+.game-cat-back {
+  padding-left: 0;
 }
-.game-cat:hover {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-}
-.game-cat.active {
-  color: var(--color-brand-text);
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-}
-.game-cat-count {
-  font-size: 11px;
-  opacity: 0.75;
+.game-cat-current {
+  font-size: 15px;
+  font-weight: 600;
 }
 .game-series-filter {
   width: 150px;

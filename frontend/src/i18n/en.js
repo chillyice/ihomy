@@ -1158,7 +1158,8 @@ export default {
         cancelled: 'Cancelled',
       },
     },
-    allGames: 'All',
+    allCategories: 'All categories',
+    categoryGamesCount: '{n} games',
     categoryLabel: 'Category',
     seriesLabel: 'Series',
     allSeries: 'All series',
@@ -1324,7 +1325,7 @@ export default {
     },
     sudoku: {
       title: 'Sudoku',
-      desc: 'Classic / diagonal / window / jigsaw / dragon / inequality / odd-even / killer / anti-knight / anti-king / anti-bishop / thermo / consecutive / non-consecutive / XV / skyscraper / arithmetic / palindrome with notes / hints / undo',
+      desc: 'Fill a 9×9 grid with 1-9 so every row, column and 3×3 box has no repeats',
       variant: {
         CLASSIC: 'Classic',
         DIAGONAL: 'Diagonal',

@@ -1152,7 +1152,8 @@ export default {
         cancelled: '已取消',
       },
     },
-    allGames: '全部',
+    allCategories: '全部分类',
+    categoryGamesCount: '{n} 个游戏',
     categoryLabel: '分类',
     seriesLabel: '系列',
     allSeries: '全部系列',
@@ -1317,7 +1318,7 @@ export default {
     },
     sudoku: {
       title: '数独',
-      desc: '标准 / 对角线 / 窗口 / 不规则 / 九龙 / 不等式 / 奇偶 / 杀手 / 反马步 / 反王步 / 无象 / 温度计 / 连续 / 不连续 / 罗马 / 摩天楼 / 等差 / 回文，笔记 / 提示 / 撤销',
+      desc: '在 9×9 的方格里填 1-9，每行、每列、每个 3×3 宫都不重复',
       variant: {
         CLASSIC: '标准',
         DIAGONAL: '对角线',
