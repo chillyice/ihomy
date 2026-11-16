@@ -66,6 +66,8 @@ public class ScheduleService {
     private final FamilyPlanMapper planMapper;
     private final FamilyPlanTaskMapper planTaskMapper;
     private final AnniversaryService anniversaryService;
+    /** 无日期计划/子任务的唯一口径(与 /plan/today 的 undated 段共用) */
+    private final FamilyPlanService familyPlanService;
     /** 亲友圈分享给本家庭的纪念日/提醒只读并入(标记 readOnly,不进闹钟、不可勾完成) */
     private final AudienceService audienceService;
     /** 只读来源实现列表(贷款/理财/食材),顺序由各实现的 @Order 决定 */
@@ -93,7 +95,7 @@ public class ScheduleService {
         days.values().forEach(ScheduleService::sortDay);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("days", days);
-        data.put("undated", anniversaryOnly ? List.of() : collectUndatedPlans(familyId));
+        data.put("undated", anniversaryOnly ? List.of() : familyPlanService.undated(familyId));
         return data;
     }
 
@@ -321,23 +323,6 @@ public class ScheduleService {
             item.put("done", t.getDone() != null && t.getDone() == 1);
             items.add(item);
         }
-    }
-
-    /** 无日期计划(待安排):进行中且没有目标日 */
-    private List<Map<String, Object>> collectUndatedPlans(Long familyId) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (familyId == null) return result;
-        for (FamilyPlan p : planMapper.selectList(new LambdaQueryWrapper<FamilyPlan>()
-                .eq(FamilyPlan::getFamilyId, familyId)
-                .eq(FamilyPlan::getStatus, DictConst.PLAN_ACTIVE)
-                .isNull(FamilyPlan::getTargetDate))) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", p.getId());
-            item.put("title", p.getTitle());
-            item.put("createdAt", p.getCreatedAt() == null ? null : p.getCreatedAt().toLocalDate().toString());
-            result.add(item);
-        }
-        return result;
     }
 
     /** 批量取计划关联提醒的时刻(一次查询,同一天多条取最早) */

@@ -44,6 +44,7 @@
         <div v-show="activeId === 'profile'"><ProfileSettings /></div>
         <div v-show="activeId === 'family'"><FamilySettings /></div>
         <div v-show="activeId === 'ai'"><AiSettings /></div>
+        <div v-show="activeId === 'backup'"><BackupSettings /></div>
         <div v-show="activeId === 'pointsRule'"><PointsRuleSettings /></div>
         <!-- 首页内容:每日内容 + 天气(天气仅家长可配) -->
         <div v-show="activeId === 'content'">
@@ -52,10 +53,11 @@
         </div>
         <div v-show="activeId === 'media'"><MediaSettings /></div>
         <template v-if="activeId === 'storage'"><StorageView /></template>
-        <!-- 外观与显示:光照/主题 + 显示模式 + 屏保(仅手机端) -->
+        <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
         <div v-show="activeId === 'appearance'">
           <div id="settings-light"><LightSettings /></div>
           <div id="settings-display"><ModeSettings /></div>
+          <div id="settings-morning"><MorningSettings /></div>
           <div v-if="isMobile" id="settings-screensaver"><ScreensaverSettings /></div>
         </div>
         <div v-show="activeId === 'client'"><AppSettings /></div>
@@ -75,12 +77,14 @@ import StorageView from '@/views/storage/Storage.vue'
 import ProfileSettings from './settings/ProfileSettings.vue'
 import FamilySettings from './settings/FamilySettings.vue'
 import AiSettings from './settings/AiSettings.vue'
+import BackupSettings from './settings/BackupSettings.vue'
 import PointsRuleSettings from './settings/PointsRuleSettings.vue'
 import DailySettings from './settings/DailySettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
+import MorningSettings from './settings/MorningSettings.vue'
 import ScreensaverSettings from './settings/ScreensaverSettings.vue'
 import AppSettings from './settings/AppSettings.vue'
 import { isNativeApp } from '@/utils/platform'
@@ -96,6 +100,7 @@ const PANELS = [
   { id: 'family', icon: '🏠', labelKey: 'settings.cat.family' },
   { id: 'pointsRule', icon: '🏅', labelKey: 'settings.cat.pointsRule', perm: 'points:manage' },
   { id: 'ai', icon: '🤖', labelKey: 'settings.cat.ai', perm: 'family:manage' },
+  { id: 'backup', icon: '💾', labelKey: 'settings.cat.backup', perm: 'family:manage' },
   { id: 'content', icon: '📅', labelKey: 'settings.cat.content' },
   { id: 'media', icon: '🎬', labelKey: 'settings.cat.media' },
   { id: 'storage', icon: '🗄️', labelKey: 'settings.cat.storage' },
@@ -106,7 +111,7 @@ const PANELS = [
 // 分组顺序:账号 → 家庭 → 内容与媒体 → 外观与设备
 const GROUPS = [
   { key: 'account', labelKey: 'settings.group.account', ids: ['profile'] },
-  { key: 'family', labelKey: 'settings.group.family', ids: ['family', 'pointsRule', 'ai'] },
+  { key: 'family', labelKey: 'settings.group.family', ids: ['family', 'pointsRule', 'ai', 'backup'] },
   { key: 'content', labelKey: 'settings.group.content', ids: ['content', 'media', 'storage'] },
   { key: 'device', labelKey: 'settings.group.device', ids: ['appearance', 'client'] },
 ]

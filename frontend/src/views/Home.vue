@@ -107,7 +107,9 @@
                     <span class="tr-dot" :class="r.kind"></span>
                     <span class="tr-title">{{ r.title }}</span>
                     <span v-if="r.overdueDays" class="tr-overdue">{{ $t('plan.today.overdue', { n: r.overdueDays }) }}</span>
-                    <span class="tr-kind" :class="r.kind">{{ r.kind === 'plan' ? $t('plan.tagPlan') : $t('plan.tagReminder') }}</span>
+                    <span class="tr-kind" :class="r.kind">{{
+                      r.kind === 'plan' ? $t('plan.tagPlan') : r.kind === 'task' ? $t('plan.tagTodo') : $t('plan.tagReminder')
+                    }}</span>
                     <span class="tr-time">{{ r.time }}</span>
                   </div>
                 </div>

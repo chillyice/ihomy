@@ -75,8 +75,9 @@ export function shouldSuppress(ctx = {}) {
 }
 
 // 这些浮层 z-index ≥ 屏保(--z-immersive 150),屏保出现会被压在下面,必须先让位。
-// EP 弹窗/抽屉/确认框都挂在 .el-overlay;照片查看器与聊天半屏面板各有自己的根类。
-const BUSY_SELECTORS = ['.el-overlay', '.photo-viewer', '.chat-float-sheet', '.cmd-scrim']
+// EP 弹窗/抽屉/确认框都挂在 .el-overlay;照片查看器与聊天半屏面板各有自己的根类;
+// 每日首屏早安页同样占满一屏,屏保不许盖上来。
+const BUSY_SELECTORS = ['.el-overlay', '.photo-viewer', '.chat-float-sheet', '.cmd-scrim', '.morning-overlay']
 
 export function isBusyScreen() {
   if (typeof document === 'undefined' || !document.querySelector) return false

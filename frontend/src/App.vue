@@ -42,6 +42,9 @@
         <SiteFooter v-if="!immersive" />
       </template>
     </template>
+    <!-- 每日首屏早安页(手机/桌面同一份):每天第一次进站时盖一层全屏,内部自守卫登录态/
+         纯 OPS/首登改密/儿童模式/通话/独立页/沉浸页/弹窗,并自带「今天看过」记账 -->
+    <MorningOverlay v-if="routeReady && !standalone && userStore.isLoggedIn" />
     <!-- 首登强制改密(种子账号):全局弹窗,由 store 标记驱动 -->
     <ChangePasswordDialog />
     <!-- 网页端新版本提示(仅 Web):线上 dist 已更新就提示刷新,别让 PWA 预缓存拖着跑旧 bundle -->
@@ -93,6 +96,8 @@ const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPa
 import MobileLayout from '@/layouts/MobileLayout.vue'
 // 手机端空闲屏保:只在手机分支挂载并懒加载,桌面端不下载该 chunk
 const ScreensaverOverlay = defineAsyncComponent(() => import('@/components/screensaver/ScreensaverOverlay.vue'))
+// 每日首屏早安页:全端共用,懒加载(天气动效与看板取数只在真正展示时才需要)
+const MorningOverlay = defineAsyncComponent(() => import('@/components/morning/MorningOverlay.vue'))
 // 应用内更新弹窗:内部 import Capacitor 插件,必须懒加载且只在壳内渲染
 const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdateDialog.vue'))
 // 壳内判定(静态读一次,不随运行期变化)

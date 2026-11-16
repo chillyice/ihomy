@@ -73,7 +73,15 @@
             @toggle-task="onToggleTask"
           />
           <!-- 宽屏把「待安排」收进右列底部(当日面板之后);窄屏同一位置,顺序与旧版一致 -->
-          <ScheduleUndated v-if="showUndated" :items="undated" @arrange="openPlanEditor" @edit="openPlanEditor" @delete="onDeleteUndated" />
+          <ScheduleUndated
+            v-if="showUndated"
+            :items="undated"
+            @arrange="openPlanEditor"
+            @edit="openPlanEditor"
+            @delete="onDeleteUndated"
+            @toggle="onToggleUndated"
+            @open-plan="openUndatedPlan"
+          />
         </div>
       </div>
 
@@ -108,6 +116,8 @@
         @arrange="openPlanEditor"
         @edit="openPlanEditor"
         @delete="onDeleteUndated"
+        @toggle="onToggleUndated"
+        @open-plan="openUndatedPlan"
       />
     </div>
 
@@ -518,9 +528,23 @@ const onDeleteUndated = async (p) => {
     type: 'warning',
     closeOnClickModal: true,
   })
-  await planApi.remove(p.id)
+  if (p.kind === 'PLAN_TASK') await planApi.deleteTask(p.id)
+  else await planApi.remove(p.id)
   ElMessage.success(t('common.deleted'))
   await reloadAll()
+}
+
+// 待安排里的无日期计划/子任务都直接勾完成;子任务完成后由后端同步父计划状态
+const onToggleUndated = async (p) => {
+  if (p.kind === 'PLAN_TASK') await planApi.updateTask(p.id, { done: p.done ? 0 : 1 })
+  else await planApi.update(p.id, { status: p.done ? 'ACTIVE' : 'DONE' })
+  await reloadAll()
+}
+
+const openUndatedPlan = (p) => {
+  if (!p.planId) return
+  detailRef.value = { kind: 'PLAN', id: p.planId }
+  detailVisible.value = true
 }
 
 const onSaved = async (payload) => {

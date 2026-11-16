@@ -36,6 +36,24 @@ describe('buildAgenda 今日列表合并', () => {
     expect(rows.find((r) => r.title === '吃药').fromPlan).toBe(false)
   })
 
+  it('并入无日期待办,排在有时间的条目之后', () => {
+    const rows = buildAgenda({
+      ...today,
+      undated: [
+        { kind: 'PLAN', id: 3, title: '整理书架', done: false },
+        { kind: 'PLAN_TASK', id: 4, planId: 3, planTitle: '整理书架', title: '买标签', done: false },
+      ],
+    })
+    expect(rows.map((r) => r.title)).toEqual(['吃药', '换季大扫除', '接孩子', '交水电费', '整理书架', '买标签'])
+    expect(rows.find((r) => r.title === '整理书架')).toMatchObject({ undated: true, sourceKind: 'PLAN', kind: 'plan' })
+    expect(rows.find((r) => r.title === '买标签')).toMatchObject({
+      undated: true,
+      sourceKind: 'PLAN_TASK',
+      kind: 'task',
+      planId: 3,
+    })
+  })
+
   it('limit 截断;空数据返回空数组', () => {
     expect(buildAgenda(today, 2)).toHaveLength(2)
     expect(buildAgenda()).toEqual([])

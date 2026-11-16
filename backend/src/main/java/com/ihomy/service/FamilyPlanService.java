@@ -157,7 +157,58 @@ public class FamilyPlanService {
         Map<String, Object> result = new HashMap<>();
         result.put("plans", planRows);
         result.put("reminders", reminderRows);
+        // 无日期待办:首页今日卡、屏保看板与早安页都要能看到并勾选,不能只在日程页「待安排」里出现
+        result.put("undated", undated(familyId));
         result.put("events", homeStatsService.upcomingEvents(familyId, TODAY_EVENT_LIMIT));
+        return result;
+    }
+
+    /**
+     * 待安排:进行中的无日期计划 + 这些计划下没有截止日且未完成的子任务。
+     * 日程页「待安排」、/plan/today 的 undated 段共用这一份口径,禁止再各写一套。
+     */
+    public List<Map<String, Object>> undated(Long familyId) {
+        if (familyId == null) return List.of();
+        List<FamilyPlan> plans = planMapper.selectList(new LambdaQueryWrapper<FamilyPlan>()
+                .eq(FamilyPlan::getFamilyId, familyId)
+                .eq(FamilyPlan::getStatus, DictConst.PLAN_ACTIVE));
+        if (plans.isEmpty()) return List.of();
+
+        Map<Long, FamilyPlan> byId = plans.stream()
+                .collect(Collectors.toMap(FamilyPlan::getId, p -> p));
+        List<Map<String, Object>> result = new ArrayList<>();
+        plans.stream()
+                .filter(p -> p.getTargetDate() == null)
+                .sorted(Comparator.comparing(FamilyPlan::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(FamilyPlan::getId))
+                .forEach(p -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("kind", "PLAN");
+                    item.put("id", p.getId());
+                    item.put("title", p.getTitle());
+                    item.put("createdAt", p.getCreatedAt() == null ? null : p.getCreatedAt().toLocalDate().toString());
+                    item.put("done", false);
+                    result.add(item);
+                });
+
+        for (PlanTask t : taskMapper.selectList(new LambdaQueryWrapper<PlanTask>()
+                .in(PlanTask::getPlanId, byId.keySet())
+                .isNull(PlanTask::getDueDate)
+                .eq(PlanTask::getDone, 0)
+                .orderByDesc(PlanTask::getCreatedAt)
+                .orderByAsc(PlanTask::getId))) {
+            FamilyPlan parent = byId.get(t.getPlanId());
+            if (parent == null || (t.getDone() != null && t.getDone() != 0)) continue;
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("kind", "PLAN_TASK");
+            item.put("id", t.getId());
+            item.put("planId", t.getPlanId());
+            item.put("planTitle", parent.getTitle());
+            item.put("title", t.getTitle());
+            item.put("createdAt", t.getCreatedAt() == null ? null : t.getCreatedAt().toLocalDate().toString());
+            item.put("done", false);
+            result.add(item);
+        }
         return result;
     }
 

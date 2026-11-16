@@ -358,6 +358,31 @@ class FamilyPlanServiceTest {
     }
 
     @Test
+    void undatedIncludesUnscheduledPlanAndItsUndatedTask() {
+        FamilyPlan plan = plan(null, DictConst.PLAN_ACTIVE);
+        when(planMapper.selectList(any())).thenReturn(List.of(plan));
+        PlanTask task = new PlanTask();
+        task.setId(21L);
+        task.setPlanId(PLAN_ID);
+        task.setTitle("买收纳盒");
+        task.setDone(0);
+        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+
+        List<Map<String, Object>> rows = service.undated(FAMILY);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0)).containsEntry("kind", "PLAN")
+                .containsEntry("id", PLAN_ID)
+                .containsEntry("title", "换季大扫除");
+        assertThat(rows.get(1)).containsEntry("kind", "PLAN_TASK")
+                .containsEntry("id", 21L)
+                .containsEntry("planId", PLAN_ID)
+                .containsEntry("planTitle", "换季大扫除")
+                .containsEntry("title", "买收纳盒")
+                .containsEntry("done", false);
+    }
+
+    @Test
     void listAttachesRemindTimeInOneBatch() {
         FamilyPlan p = plan(LocalDate.now(), DictConst.PLAN_ACTIVE);
         p.setId(1L);

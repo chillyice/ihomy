@@ -51,9 +51,10 @@ class ScheduleServiceTest {
     private final FamilyPlanTaskMapper planTaskMapper = mock(FamilyPlanTaskMapper.class);
     private final AnniversaryService anniversaryService = mock(AnniversaryService.class);
     private final AudienceService audienceService = mock(AudienceService.class);
+    private final FamilyPlanService familyPlanService = mock(FamilyPlanService.class);
     private final ScheduleSourceProvider sourceProvider = mock(ScheduleSourceProvider.class);
     private final ScheduleService service = new ScheduleService(
-            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService, audienceService,
+            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService, familyPlanService, audienceService,
             List.of(sourceProvider));
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
@@ -307,8 +308,10 @@ class ScheduleServiceTest {
         when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         FamilyPlan dated = plan(1L, "换滤芯", LocalDate.of(2026, 10, 30), DictConst.PLAN_ACTIVE);
         FamilyPlan undated = plan(2L, "学做三道新菜", null, DictConst.PLAN_ACTIVE);
-        // 取数顺序:先按目标日取计划(1),再取无日期计划(2);已取消的由 SQL 条件排除,不在此列
-        when(planMapper.selectList(any())).thenReturn(List.of(dated, undated), List.of(undated));
+        // 无日期段由 FamilyPlanService 统一提供(含无日期子任务),本用例只验证聚合结果
+        when(planMapper.selectList(any())).thenReturn(List.of(dated, undated));
+        when(familyPlanService.undated(FAMILY)).thenReturn(List.of(Map.of(
+                "kind", "PLAN", "id", 2L, "title", "学做三道新菜", "createdAt", "2026-10-12", "done", false)));
         Reminder planReminder = reminder(11L, DictConst.REPEAT_ONCE, LocalDate.of(2026, 10, 30), LocalTime.of(9, 0), 0);
         planReminder.setPlanId(1L);
         when(reminderMapper.selectList(any())).thenReturn(List.of(planReminder));
@@ -337,7 +340,8 @@ class ScheduleServiceTest {
                 .containsEntry("done", false);
 
         assertThat(undated(result)).hasSize(1);
-        assertThat(undated(result).get(0)).containsEntry("title", "学做三道新菜")
+        assertThat(undated(result).get(0)).containsEntry("kind", "PLAN")
+                .containsEntry("title", "学做三道新菜")
                 .containsEntry("createdAt", "2026-10-12");
     }
 

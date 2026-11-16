@@ -352,7 +352,7 @@
               v-a11y-click
               @click="!editMode && $router.push('/plan?tab=today')"
             >
-              <span class="gc-ic">{{ r.kind === 'plan' ? '📋' : '🔔' }}</span>
+              <span class="gc-ic">{{ r.kind === 'reminder' ? '🔔' : '📋' }}</span>
               <span class="gc-val">{{ r.title }}</span>
               <span class="gc-muted">{{ r.time || (r.overdueDays ? $t('plan.today.overdue', { n: r.overdueDays }) : '') }}</span>
             </div>

@@ -133,6 +133,17 @@ html.theme-warm *::after {
   -webkit-backdrop-filter: none !important;
 }
 
+/* 每日首屏早安页展开时锁住背后页面滚动(它自己是 fixed 全屏,内部区域单独滚);
+   同时收起站点光影层——它画在弹窗之上,会盖到早安页的天气场景里 */
+html.morning-open,
+html.morning-open body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.morning-open .sun-light-layer {
+  display: none;
+}
+
 /* 暗色模式:夜色深蓝 */
 html.dark {
   --color-primary: #e8dcc8;
