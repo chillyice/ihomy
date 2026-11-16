@@ -1877,6 +1877,14 @@ html.dark .mj-table {
   grid-area: right;
   justify-self: end;
 }
+/* 我方:占满底部整行,副露/手牌/操作纵向居中排布(缺了 grid-area 会被自动排进左下角一格) */
+.mj-bottom {
+  grid-area: bottom;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .seat-tag {
   display: inline-flex;
   align-items: center;
