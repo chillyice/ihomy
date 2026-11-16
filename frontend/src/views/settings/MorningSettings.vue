@@ -45,7 +45,7 @@
         <div class="setting-row mo-scene-row">
           <el-select v-model="sceneCondition" class="mo-scene-select">
             <el-option :label="$t('morning.sceneLive')" value="live" />
-            <el-option v-for="c in MORNING_SCENES" :key="c" :label="$t(SCENE_LABELS[c])" :value="c" />
+            <el-option v-for="c in MORNING_SCENES" :key="c" :label="$t(MORNING_SCENE_LABELS[c])" :value="c" />
           </el-select>
           <el-radio-group v-model="scenePeriod">
             <el-radio-button value="live">{{ $t('morning.periodLive') }}</el-radio-button>
@@ -66,22 +66,13 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { loadPrefs, MORNING_CARDS, MORNING_SCENES, requestPreview, savePrefs, setPreviewScene } from '@/utils/morning'
+import { loadPrefs, MORNING_CARDS, MORNING_SCENE_LABELS, MORNING_SCENES, requestPreview, savePrefs, setPreviewScene } from '@/utils/morning'
 
 const CARD_LABELS = {
   greeting: 'morning.cardGreeting',
   date: 'morning.cardDate',
   todo: 'morning.cardTodo',
   weather: 'morning.cardWeather',
-}
-
-const SCENE_LABELS = {
-  clear: 'morning.weatherClear',
-  cloud: 'morning.weatherCloud',
-  rain: 'morning.weatherRain',
-  snow: 'morning.weatherSnow',
-  fog: 'morning.weatherFog',
-  thunder: 'morning.weatherThunder',
 }
 
 const prefs = reactive(loadPrefs())

@@ -13,7 +13,7 @@
           :wind-scale="windScale"
           :wind-deg="windDeg"
           :wind-dir="windDir"
-          :precip-level="precipLevel"
+          :precip-level="scenePrecipLevel"
           :animated="prefs.animation"
         />
 
@@ -99,16 +99,19 @@ import {
   loadLastShown,
   loadPrefs,
   markShown,
+  MORNING_SCENE_LABELS,
   prefsTick,
   previewScene,
   previewTick,
   shouldShowMorning,
   todayKey,
 } from '@/utils/morning'
+import { resolveMorningWeather } from '@/utils/morningWeather'
 import MorningScene from './MorningScene.vue'
 
 const VISIBLE_TODOS = 6
 const CLOCK_MS = 15000
+const PREVIEW_PRECIP = { rain: 3, snow: 2, thunder: 4 }
 
 const { t } = useI18n()
 const route = useRoute()
@@ -141,12 +144,16 @@ const clock = computed(() => {
 const weather = computed(() => sunLight?.weather?.value || null)
 const weatherDetail = computed(() => sunLight?.weatherDetail?.value || null)
 const nowFull = computed(() => weather.value?.nowFull || weatherDetail.value?.nowFull || {})
-const condition = computed(() => String(weather.value?.condition || 'clear'))
+const condition = computed(() => resolveMorningWeather(weather.value))
 // 设置页预览时可以临时指定天气时段,只影响这一次预览(不落盘、不改真实天气)
 const previewing = computed(() => !!previewScene.value.condition)
 const sceneCondition = computed(() => previewScene.value.condition || condition.value)
 const sceneNight = computed(() => (typeof previewScene.value.night === 'boolean' ? previewScene.value.night : isNight.value))
-const precipLevel = computed(() => weather.value?.precipLevel ?? 2)
+// 预览雨雪时使用该场景的强度,避免当地没有降水导致无动效。
+const scenePrecipLevel = computed(() => {
+  if (previewing.value) return PREVIEW_PRECIP[sceneCondition.value] ?? 0
+  return weather.value?.precipLevel ?? 2
+})
 const windScale = computed(() => {
   const n = Number.parseFloat(nowFull.value.windScale ?? weather.value?.windScale)
   return Number.isFinite(n) ? n : 0
@@ -162,19 +169,8 @@ const sunScene = computed(() => (sunLight?.sunInfo?.value?.slots?.length ? sunLi
 const isNight = computed(() => sunScene.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
 const familyName = computed(() => appStore.familyName)
 
-const conditionLabel = (c) => {
-  const map = {
-    clear: t('morning.weatherClear'),
-    cloud: t('morning.weatherCloud'),
-    rain: t('morning.weatherRain'),
-    snow: t('morning.weatherSnow'),
-    fog: t('morning.weatherFog'),
-    thunder: t('morning.weatherThunder'),
-  }
-  return map[c] || ''
-}
-const conditionText = computed(() => conditionLabel(condition.value))
-const sceneText = computed(() => conditionLabel(sceneCondition.value))
+const conditionText = computed(() => t(MORNING_SCENE_LABELS[condition.value]))
+const sceneText = computed(() => t(MORNING_SCENE_LABELS[sceneCondition.value]))
 
 const tempText = computed(() => {
   const n = Number(weather.value?.temp)

@@ -43,7 +43,16 @@ export const previewTick = ref(0)
 
 // 设置页「预览场景」:只影响紧接着的那一次预览,不落 localStorage、不改真实天气。
 // condition 为空串 = 跟随实况;night 为 null = 跟随后端 sun-info 的昼夜判定。
-export const MORNING_SCENES = ['clear', 'cloud', 'rain', 'snow', 'fog', 'thunder']
+export const MORNING_SCENE_LABELS = {
+  clear: 'morning.weatherClear',
+  cloud: 'morning.weatherCloud',
+  overcast: 'morning.weatherOvercast',
+  rain: 'morning.weatherRain',
+  snow: 'morning.weatherSnow',
+  fog: 'morning.weatherFog',
+  thunder: 'morning.weatherThunder',
+}
+export const MORNING_SCENES = Object.keys(MORNING_SCENE_LABELS)
 export const previewScene = ref({ condition: '', night: null })
 
 export function setPreviewScene(condition = '', night = null) {
