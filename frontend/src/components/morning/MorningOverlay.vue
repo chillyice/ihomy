@@ -9,6 +9,7 @@
         <MorningScene
           :condition="sceneCondition"
           :night="sceneNight"
+          :sun-scene="sunScene"
           :wind-scale="windScale"
           :wind-deg="windDeg"
           :wind-dir="windDir"
@@ -156,8 +157,9 @@ const windDeg = computed(() => {
   return Number.isFinite(n) ? n : null
 })
 const windDir = computed(() => String(nowFull.value.windDir || weather.value?.windDir || ''))
-// 太阳场景由后端 sun-info 驱动;天气还没回来时按本地小时兜底
-const isNight = computed(() => sunLight?.sunScene?.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
+// 没有 sun-info 时,光影的初始场景并不代表实况,昼夜按本地小时兜底。
+const sunScene = computed(() => (sunLight?.sunInfo?.value?.slots?.length ? sunLight.sunScene.value : null))
+const isNight = computed(() => sunScene.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
 const familyName = computed(() => appStore.familyName)
 
 const conditionLabel = (c) => {
