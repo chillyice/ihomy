@@ -3,7 +3,9 @@
      风力 ≥3 级时加吹过的落叶;夜间换深色天空与星月。
      粒子数量固定、只跑 transform/opacity 的 CSS 动画;关闭动效或系统「减少动态效果」时静止。 -->
 <template>
-  <div class="ms" :class="[`ms-${scene}`, { 'ms-night': night, 'ms-static': !animated }]" aria-hidden="true">
+  <!-- 天气修饰类统一加 ms-cond- 前缀:根元素与内部元素(.ms-cloud/.ms-rain/.ms-snow/.ms-fog)
+       同名会把整屏根节点套上云/雨雪的图形样式,表现为画面中间一大团模糊椭圆。 -->
+  <div class="ms" :class="[`ms-cond-${scene}`, { 'ms-night': night, 'ms-static': !animated }]" aria-hidden="true">
     <div class="ms-sky"></div>
 
     <!-- 晴/夜:太阳或月亮 + 光柱 + 星星 -->
@@ -102,14 +104,16 @@ const stars = Array.from({ length: 38 }, (_, i) => ({
   },
 }))
 
-const clouds = Array.from({ length: 5 }, (_, i) => ({
+const clouds = Array.from({ length: 4 }, (_, i) => ({
   id: 'c' + i,
   style: {
-    left: pct(rand(-18, 82)),
-    top: pct(rand(2, 38)),
-    width: px(rand(280, 520)),
-    height: px(rand(120, 210)),
-    opacity: rand(0.35, 0.8).toFixed(2),
+    left: pct(rand(-14, 76)),
+    // 云只待在天空上层,别落到画面中部挡住文字与待办卡
+    top: pct(rand(0, 19)),
+    // 宽度同时受 px 上限与屏宽百分比约束:手机上不会一朵云占满整屏又变成一个「大团」
+    width: `min(${px(rand(220, 380))}, ${Math.round(rand(38, 62))}vw)`,
+    height: `min(${px(rand(120, 176))}, ${Math.round(rand(17, 27))}vw)`,
+    opacity: rand(0.45, 0.85).toFixed(2),
     animationDuration: sec(rand(55, 120)),
     animationDelay: sec(-rand(0, 90)),
   },
@@ -183,22 +187,22 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
   left: 0;
   transition: background 1.2s ease;
 }
-.ms-clear .ms-sky {
+.ms-cond-clear .ms-sky {
   background: linear-gradient(180deg, #4a9fe0 0%, #8ec9f2 42%, #d9f0ff 100%);
 }
-.ms-cloud .ms-sky {
+.ms-cond-cloud .ms-sky {
   background: linear-gradient(180deg, #7d91a6 0%, #a9bac9 55%, #d8e2e9 100%);
 }
-.ms-rain .ms-sky {
+.ms-cond-rain .ms-sky {
   background: linear-gradient(180deg, #3d4d60 0%, #5f7288 52%, #8b9caa 100%);
 }
-.ms-snow .ms-sky {
+.ms-cond-snow .ms-sky {
   background: linear-gradient(180deg, #7b90a5 0%, #b6c7d7 52%, #edf5fb 100%);
 }
-.ms-fog .ms-sky {
+.ms-cond-fog .ms-sky {
   background: linear-gradient(180deg, #8a98a4 0%, #bdc8d0 58%, #e4eaee 100%);
 }
-.ms-thunder .ms-sky {
+.ms-cond-thunder .ms-sky {
   background: linear-gradient(180deg, #1d2531 0%, #374657 55%, #586879 100%);
 }
 
@@ -206,15 +210,15 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
 .ms-night .ms-sky {
   background: linear-gradient(180deg, #0a1226 0%, #162642 55%, #2b3d5c 100%);
 }
-.ms-night.ms-clear .ms-sky {
+.ms-night.ms-cond-clear .ms-sky {
   background: linear-gradient(180deg, #081124 0%, #10203c 48%, #24395c 100%);
 }
-.ms-night.ms-rain .ms-sky,
-.ms-night.ms-thunder .ms-sky {
+.ms-night.ms-cond-rain .ms-sky,
+.ms-night.ms-cond-thunder .ms-sky {
   background: linear-gradient(180deg, #0d1420 0%, #1d2a3a 55%, #33414f 100%);
 }
-.ms-night.ms-snow .ms-sky,
-.ms-night.ms-fog .ms-sky {
+.ms-night.ms-cond-snow .ms-sky,
+.ms-night.ms-cond-fog .ms-sky {
   background: linear-gradient(180deg, #18222f 0%, #2c3b4d 55%, #46566a 100%);
 }
 
@@ -226,16 +230,24 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
   width: clamp(150px, 21vw, 250px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, #fffdf2 0%, #ffeda8 34%, rgba(255, 222, 140, 0.55) 56%, transparent 74%);
-  box-shadow: 0 0 110px 55px rgba(255, 234, 170, 0.5);
+  /* 明确的日盘边缘 + 一圈不扩散的柔光,避免变成一团糊在中景的大光斑 */
+  background: radial-gradient(
+    circle,
+    #fffdf4 0%,
+    #fff3c4 42%,
+    rgba(255, 232, 160, 0.85) 62%,
+    rgba(255, 226, 148, 0.35) 74%,
+    transparent 82%
+  );
+  box-shadow: 0 0 70px 18px rgba(255, 234, 170, 0.42);
   animation: ms-sun-breathe 9s ease-in-out infinite alternate;
 }
 .ms-night .ms-sun {
   right: 14%;
   top: 8%;
   width: clamp(100px, 14vw, 170px);
-  background: radial-gradient(circle at 36% 34%, #f7faff 0%, #d6e0f2 42%, rgba(190, 205, 232, 0.35) 62%, transparent 76%);
-  box-shadow: 0 0 90px 28px rgba(190, 210, 255, 0.32);
+  background: radial-gradient(circle at 38% 36%, #fbfdff 0%, #dbe5f5 46%, rgba(196, 210, 234, 0.55) 66%, transparent 80%);
+  box-shadow: 0 0 56px 12px rgba(190, 210, 255, 0.3);
   animation-duration: 14s;
 }
 
@@ -245,19 +257,20 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
   right: -60vmax;
   width: 160vmax;
   height: 160vmax;
-  background: repeating-conic-gradient(from 0deg, rgba(255, 246, 220, 0.16) 0deg 2.5deg, transparent 2.5deg 15deg);
-  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.72) 30%, transparent 68%);
-  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.72) 30%, transparent 68%);
+  background: repeating-conic-gradient(from 0deg, rgba(255, 246, 220, 0.14) 0deg 2.5deg, transparent 2.5deg 15deg);
+  /* 遮罩只留靠近太阳的一圈,光柱从日盘向外散开,不在画面中部结成一个圆盘 */
+  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.45) 24%, transparent 52%);
+  mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.45) 24%, transparent 52%);
   mix-blend-mode: screen;
   animation: ms-ray-spin 150s linear infinite;
 }
-.ms-cloud .ms-rays {
+.ms-cond-cloud .ms-rays {
   opacity: 0.5;
 }
-.ms-rain .ms-rays,
-.ms-snow .ms-rays,
-.ms-fog .ms-rays,
-.ms-thunder .ms-rays {
+.ms-cond-rain .ms-rays,
+.ms-cond-snow .ms-rays,
+.ms-cond-fog .ms-rays,
+.ms-cond-thunder .ms-rays {
   display: none;
 }
 .ms-night .ms-rays {
@@ -284,7 +297,8 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
   animation-direction: alternate;
 }
 
-/* ===== 云 ===== */
+/* ===== 云 =====
+   一朵云由 5 团交叠的圆组成,不再用单个椭圆渐变(那在大屏/竖屏上会被看成画面中间一个灰白色大椭圆)。 */
 .ms-clouds {
   position: absolute;
   top: 0;
@@ -293,24 +307,27 @@ const leaves = Array.from({ length: 14 }, (_, i) => ({
   left: 0;
 }
 .ms-cloud {
+  --cloud: 255, 255, 255;
   position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.45) 46%, transparent 72%);
-  filter: blur(10px);
+  background:
+    radial-gradient(circle at 16% 74%, rgba(var(--cloud), 0.95) 0 13%, transparent 33%),
+    radial-gradient(circle at 36% 52%, rgba(var(--cloud), 0.97) 0 19%, transparent 41%),
+    radial-gradient(circle at 58% 44%, rgba(var(--cloud), 0.98) 0 22%, transparent 45%),
+    radial-gradient(circle at 79% 62%, rgba(var(--cloud), 0.95) 0 16%, transparent 38%),
+    radial-gradient(circle at 50% 76%, rgba(var(--cloud), 0.98) 0 25%, transparent 49%);
+  filter: blur(6px);
   animation-name: ms-cloud-drift;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   animation-direction: alternate;
 }
 .ms-night .ms-cloud {
-  background: radial-gradient(ellipse at center, rgba(190, 205, 226, 0.5) 0%, rgba(160, 180, 210, 0.24) 48%, transparent 72%);
+  --cloud: 196, 210, 232;
 }
-.ms-rain .ms-cloud,
-.ms-thunder .ms-cloud {
-  background: radial-gradient(ellipse at center, rgba(206, 218, 230, 0.5) 0%, rgba(150, 168, 186, 0.28) 48%, transparent 72%);
-}
-.ms-thunder .ms-cloud {
-  filter: blur(14px);
+.ms-cond-rain .ms-cloud,
+.ms-cond-thunder .ms-cloud {
+  --cloud: 206, 218, 230;
+  filter: blur(9px);
   opacity: 0.75;
 }
 
