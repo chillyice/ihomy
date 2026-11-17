@@ -17,8 +17,8 @@ export const CELLS = SIZE * SIZE
 export const DIFFICULTIES = {
   EASY: 40,
   MEDIUM: 48,
-  HARD: 52,
-  EXPERT: 56,
+  HARD: 56,
+  EXPERT: 58,
 }
 
 export const DIFFICULTY_KEYS = Object.keys(DIFFICULTIES)
@@ -804,6 +804,318 @@ export function countSolutions(input, limit = 2, opts = {}) {
   return aborted ? -1 : count
 }
 
+// ---------- 人解技巧评级 ----------
+
+/**
+ * 人解技巧阶梯:值 = 解完这道题用到的最高阶技巧。
+ * 1 唯一余数 / 2 唯一位置 / 3 区块摒除(宫线互斥) / 4 数对(裸对、隐对) /
+ * 5 X-Wing / 6 以上都推不动,必须试探。
+ * 生成器按难度卡这个区间,「专家」不再是一路唯一位置就能推完的题。
+ */
+export const RATING_TIER = {
+  NAKED_SINGLE: 1,
+  HIDDEN_SINGLE: 2,
+  LOCKED_CANDIDATES: 3,
+  SUBSET: 4,
+  X_WING: 5,
+  GUESS: 6,
+}
+
+/** 难度 → 允许的评级区间;相邻两档不重叠,保证层与层之间有区分度 */
+const TIER_BANDS = {
+  EASY: { min: 1, max: 2 },
+  MEDIUM: { min: 1, max: 2 },
+  HARD: { min: 3, max: 4 },
+  EXPERT: { min: 5, max: 6 },
+}
+
+/** 评级重试轮数:越难的档越难命中,多挖几轮;简单档基本一轮就中 */
+const RATING_ATTEMPTS = { EASY: 3, MEDIUM: 4, HARD: 16, EXPERT: 18 }
+
+/** 只按盘面数字定难度的变体:挖空后按人解技巧评级卡档(其余变体自带额外线索,仍按挖空数) */
+const RATED_VARIANTS = new Set(['CLASSIC', 'DIAGONAL', 'WINDOW', 'ODD_EVEN'])
+
+/**
+ * 用技巧阶梯给题面评级(不含试探):返回 { tier, solved }。
+ * extraGroups/regions/parity 与生成口径一致——附加约束组当额外单元、异形区替代九宫、
+ * 奇偶标记当候选限制,因此这些变体也能用同一把尺子。
+ */
+export function ratePuzzle(puzzle, { extraGroups = null, regions = null, parity = null } = {}) {
+  const board = puzzle.slice()
+  const unitGroups = [...rowGroups, ...colGroups, ...(regions && regions.length ? regions : BOX_GROUPS), ...(extraGroups || [])]
+  const membership = Array.from({ length: CELLS }, () => [])
+  unitGroups.forEach((cells, gi) => {
+    for (const cell of cells) membership[cell].push(gi)
+  })
+  const lineGroups = [...rowGroups, ...colGroups]
+  // 复用求解器的组掩码:给定数字本身冲突时直接判「需要试探」,不参与评级
+  const groupMasks = buildMasks(board, extraGroups, regions)
+  if (!groupMasks) return { tier: RATING_TIER.GUESS, solved: false }
+  const { rows, cols, units, unitOf, extras: extraMasks, membership: extraMember } = groupMasks
+  const cand = new Array(CELLS).fill(0)
+  let filled = 0
+  for (let i = 0; i < CELLS; i++) {
+    const v = board[i]
+    if (v) {
+      filled += 1
+      continue
+    }
+    let mask = ALL & ~(rows[(i / SIZE) | 0] | cols[i % SIZE] | units[unitOf[i]])
+    if (extraMasks && extraMember[i].length) {
+      for (const g of extraMember[i]) mask &= ~extraMasks[g]
+    }
+    if (parity) {
+      if (parity[i] === 1) mask &= ODD_MASK
+      else if (parity[i] === 2) mask &= EVEN_MASK
+    }
+    if (!mask) return { tier: RATING_TIER.GUESS, solved: false }
+    cand[i] = mask
+  }
+
+  const placeAt = (cell, value) => {
+    board[cell] = value
+    cand[cell] = 0
+    filled += 1
+    const bit = 1 << (value - 1)
+    for (const gi of membership[cell]) {
+      for (const other of unitGroups[gi]) if (!board[other]) cand[other] &= ~bit
+    }
+  }
+
+  const fillNakedSingles = () => {
+    let changed = false
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i]) continue
+      const mask = cand[i]
+      if (mask && (mask & (mask - 1)) === 0) {
+        placeAt(i, BIT_VALUE[mask])
+        changed = true
+      }
+    }
+    return changed
+  }
+
+  const fillHiddenSingles = () => {
+    let changed = false
+    for (const cells of unitGroups) {
+      for (let v = 1; v <= SIZE; v++) {
+        const bit = 1 << (v - 1)
+        let spot = -1
+        let count = 0
+        let placed = false
+        for (const cell of cells) {
+          if (board[cell] === v) {
+            placed = true
+            break
+          }
+          if (!board[cell] && cand[cell] & bit) {
+            spot = cell
+            count += 1
+          }
+        }
+        if (placed || count !== 1) continue
+        placeAt(spot, v)
+        changed = true
+      }
+    }
+    return changed
+  }
+
+  // 区块摒除:某数字在一个单元里的候选全落到同一条行/列(或反过来,某行里全落进同一单元)
+  // 就把这条线/这个单元之外的该数字删掉。单元与线互斥的写法对异形区、对角线同样成立。
+  const eliminateLockedCandidates = () => {
+    for (const unit of unitGroups) {
+      if (lineGroups.includes(unit)) continue
+      const unitSet = new Set(unit)
+      for (const line of lineGroups) {
+        const lineSet = new Set(line)
+        for (let v = 1; v <= SIZE; v++) {
+          const bit = 1 << (v - 1)
+          let unitSpots = 0
+          let confinedToLine = true
+          for (const cell of unit) {
+            if (board[cell] || !(cand[cell] & bit)) continue
+            unitSpots += 1
+            if (!lineSet.has(cell)) confinedToLine = false
+          }
+          if (unitSpots >= 2 && confinedToLine) {
+            let changed = false
+            for (const cell of line) {
+              if (board[cell] || unitSet.has(cell) || !(cand[cell] & bit)) continue
+              cand[cell] &= ~bit
+              changed = true
+            }
+            if (changed) return true
+          }
+          let lineSpots = 0
+          let confinedToUnit = true
+          for (const cell of line) {
+            if (board[cell] || !(cand[cell] & bit)) continue
+            lineSpots += 1
+            if (!unitSet.has(cell)) confinedToUnit = false
+          }
+          if (lineSpots >= 2 && confinedToUnit) {
+            let changed = false
+            for (const cell of unit) {
+              if (board[cell] || lineSet.has(cell) || !(cand[cell] & bit)) continue
+              cand[cell] &= ~bit
+              changed = true
+            }
+            if (changed) return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
+  // 数对:裸对(两格候选完全相同且仅两数)与隐对(两个数字只落在这两格)
+  const eliminateSubsets = () => {
+    for (const unit of unitGroups) {
+      const byMask = new Map()
+      for (const cell of unit) {
+        if (board[cell]) continue
+        const mask = cand[cell]
+        if (popcount(mask) !== 2) continue
+        const list = byMask.get(mask)
+        if (list) list.push(cell)
+        else byMask.set(mask, [cell])
+      }
+      for (const [mask, cells] of byMask) {
+        if (cells.length !== 2) continue
+        let changed = false
+        for (const cell of unit) {
+          if (board[cell] || cell === cells[0] || cell === cells[1]) continue
+          if (cand[cell] & mask) {
+            cand[cell] &= ~mask
+            changed = true
+          }
+        }
+        if (changed) return true
+      }
+      const spots = []
+      for (let v = 1; v <= SIZE; v++) {
+        const bit = 1 << (v - 1)
+        const list = []
+        for (const cell of unit) if (!board[cell] && cand[cell] & bit) list.push(cell)
+        spots.push(list)
+      }
+      for (let v1 = 0; v1 < SIZE; v1++) {
+        const s1 = spots[v1]
+        if (s1.length !== 2) continue
+        for (let v2 = v1 + 1; v2 < SIZE; v2++) {
+          const s2 = spots[v2]
+          if (s2.length !== 2 || s2[0] !== s1[0] || s2[1] !== s1[1]) continue
+          const keep = (1 << v1) | (1 << v2)
+          let changed = false
+          for (const cell of s1) {
+            if (cand[cell] !== keep) {
+              cand[cell] = keep
+              changed = true
+            }
+          }
+          if (changed) return true
+        }
+      }
+    }
+    return false
+  }
+
+  // X-Wing:某数字在两条平行线上都只剩同样两条交叉线上的两格,交叉线上的其余该数字可删
+  const eliminateXWings = () => {
+    for (const base of [rowGroups, colGroups]) {
+      const cross = base === rowGroups ? colGroups : rowGroups
+      const crossOf = base === rowGroups ? (cell) => cell % SIZE : (cell) => (cell / SIZE) | 0
+      for (let v = 1; v <= SIZE; v++) {
+        const bit = 1 << (v - 1)
+        const doubled = []
+        for (let b = 0; b < SIZE; b++) {
+          const list = []
+          for (const cell of base[b]) if (!board[cell] && cand[cell] & bit) list.push(cell)
+          if (list.length === 2) doubled.push({ line: base[b], spots: list.map(crossOf) })
+        }
+        for (let a = 0; a < doubled.length; a++) {
+          for (let b = a + 1; b < doubled.length; b++) {
+            const first = doubled[a]
+            const second = doubled[b]
+            if (first.spots[0] !== second.spots[0] || first.spots[1] !== second.spots[1]) continue
+            let changed = false
+            for (const ci of first.spots) {
+              for (const cell of cross[ci]) {
+                if (board[cell] || first.line.includes(cell) || second.line.includes(cell)) continue
+                if (cand[cell] & bit) {
+                  cand[cell] &= ~bit
+                  changed = true
+                }
+              }
+            }
+            if (changed) return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
+  let tier = 0
+  for (let guard = 0; guard < 400; guard++) {
+    if (fillNakedSingles()) {
+      tier = Math.max(tier, RATING_TIER.NAKED_SINGLE)
+      continue
+    }
+    if (fillHiddenSingles()) {
+      tier = Math.max(tier, RATING_TIER.HIDDEN_SINGLE)
+      continue
+    }
+    if (eliminateLockedCandidates()) {
+      tier = Math.max(tier, RATING_TIER.LOCKED_CANDIDATES)
+      continue
+    }
+    if (eliminateSubsets()) {
+      tier = Math.max(tier, RATING_TIER.SUBSET)
+      continue
+    }
+    if (eliminateXWings()) {
+      tier = Math.max(tier, RATING_TIER.X_WING)
+      continue
+    }
+    break
+  }
+  const solved = filled === CELLS
+  return { tier: solved ? Math.max(tier, RATING_TIER.NAKED_SINGLE) : RATING_TIER.GUESS, solved }
+}
+
+/**
+ * 标准盘面按评级出题:同一终盘挖两次仍不达标就换终盘(同终盘的挖空命中率会趋同),
+ * 命中难度区间立即收;全都不中时留最接近区间的一档(EXPERT 偏低优先留更高阶,简单档反之)。
+ */
+function digRatedStandard(difficulty, random, extraGroups, parityFor) {
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  const band = TIER_BANDS[difficulty] || TIER_BANDS.MEDIUM
+  const attempts = RATING_ATTEMPTS[difficulty] || 4
+  let best = null
+  let current = null
+  for (let i = 0; i < attempts; i++) {
+    if (i % 2 === 0) {
+      const solution = generateSolution(random, extraGroups.length ? extraGroups : null)
+      current = { solution, parity: parityFor ? parityFor(solution) : null }
+    }
+    const { solution, parity } = current
+    const digOpts = {
+      extraGroups: extraGroups.length ? extraGroups : undefined,
+      parity: parity || undefined,
+    }
+    const { puzzle, blanks } = digHoles(solution, targetBlanks, random, digOpts)
+    const { tier } = ratePuzzle(puzzle, { extraGroups, parity })
+    if (tier >= band.min && tier <= band.max) return { solution, parity, puzzle, blanks }
+    const gap = tier < band.min ? band.min - tier : tier > band.max ? tier - band.max : 0
+    if (!best || gap < best.gap || (gap === best.gap && (tier > best.tier || (tier === best.tier && blanks > best.blanks)))) {
+      best = { solution, parity, puzzle, blanks, tier, gap }
+    }
+  }
+  return best
+}
+
 /**
  * 生成一个完整终盘(随机回溯,同一次调用内确定)。
  * extraGroups:附加约束组(如对角线);regions:替代九宫的不规则区;
@@ -901,13 +1213,28 @@ export function generatePuzzle(difficulty = 'MEDIUM', random = Math.random, { va
   if (variant === 'ARITHMETIC') return generateArithmetic(difficulty, random)
   if (variant === 'PALINDROME') return generatePalindrome(difficulty, random)
   const extraGroups = extraGroupsFor(variant)
-  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
-  const solution = generateSolution(random, extraGroups.length ? extraGroups : null)
-  const parity = variant === 'ODD_EVEN' ? generateParity(solution, random, difficulty) : null
-  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, {
-    extraGroups: extraGroups.length ? extraGroups : undefined,
-    parity: parity || undefined,
-  })
+  // 盘面数字就是全部线索的变体:按人解技巧评级卡档;其余变体自带额外线索,仍按挖空数
+  const rated = RATED_VARIANTS.has(variant)
+  let puzzle
+  let blanks
+  let solution
+  let parity
+  if (rated) {
+    const result = digRatedStandard(
+      difficulty,
+      random,
+      extraGroups,
+      variant === 'ODD_EVEN' ? (board) => generateParity(board, random, difficulty) : null,
+    )
+    ;({ puzzle, blanks, solution, parity } = result)
+  } else {
+    solution = generateSolution(random, extraGroups.length ? extraGroups : null)
+    parity = variant === 'ODD_EVEN' ? generateParity(solution, random, difficulty) : null
+    ;({ puzzle, blanks } = digHoles(solution, DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM, random, {
+      extraGroups: extraGroups.length ? extraGroups : undefined,
+      parity: parity || undefined,
+    }))
+  }
   return {
     variant,
     puzzle,

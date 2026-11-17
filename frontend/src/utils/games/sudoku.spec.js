@@ -26,6 +26,8 @@ import {
   isValidSkyscrapers,
   notesOf,
   pickHintIndex,
+  RATING_TIER,
+  ratePuzzle,
   regionIndexOf,
   visibilityCount,
 } from './sudoku'
@@ -77,6 +79,63 @@ describe('数独生成', () => {
     board[0] = 5
     board[1] = 5 // 同一行两个 5
     expect(countSolutions(board, 2)).toBe(0)
+  })
+})
+
+describe('数独难度评级', () => {
+  it('简单/中档只用唯一余数、唯一位置就能推完', () => {
+    for (const difficulty of ['EASY', 'MEDIUM']) {
+      for (const seed of [5, 6, 7]) {
+        const { puzzle } = generatePuzzle(difficulty, seeded(seed))
+        const { tier, solved } = ratePuzzle(puzzle)
+        expect(solved).toBe(true)
+        expect(tier).toBeLessThanOrEqual(RATING_TIER.HIDDEN_SINGLE)
+      }
+    }
+  })
+
+  it('困难档必须动到区块摒除/数对,且不越到专家档', () => {
+    for (const seed of [6, 8, 10, 12, 14]) {
+      const { puzzle, blanks } = generatePuzzle('HARD', seeded(seed))
+      const { tier } = ratePuzzle(puzzle)
+      expect(tier).toBeGreaterThanOrEqual(RATING_TIER.LOCKED_CANDIDATES)
+      expect(tier).toBeLessThanOrEqual(RATING_TIER.SUBSET)
+      expect(blanks).toBeLessThanOrEqual(DIFFICULTIES.HARD)
+    }
+  })
+
+  it('专家档超出数对/X-Wing 的推导范围,不靠试探推不完', () => {
+    for (const seed of [5, 6, 7]) {
+      const { puzzle } = generatePuzzle('EXPERT', seeded(seed))
+      const { tier, solved } = ratePuzzle(puzzle)
+      expect(solved).toBe(false)
+      expect(tier).toBeGreaterThanOrEqual(RATING_TIER.X_WING)
+    }
+  })
+
+  it('带冲突给定的盘面不会被当成已解', () => {
+    const board = emptyBoard()
+    board[0] = 5
+    board[1] = 5
+    expect(ratePuzzle(board).solved).toBe(false)
+  })
+
+  it('变体口径:附加组/异形区/奇偶标记都能评级,填完的终盘恒为最低档', () => {
+    for (const variant of ['DIAGONAL', 'WINDOW', 'ODD_EVEN', 'JIGSAW']) {
+      const p = generatePuzzle('EXPERT', seeded(5), { variant })
+      const extraGroups = extraGroupsFor(variant)
+      const rated = ratePuzzle(p.puzzle, {
+        extraGroups: extraGroups.length ? extraGroups : null,
+        regions: p.regions || null,
+        parity: p.parity || null,
+      })
+      expect(rated.tier).toBeGreaterThanOrEqual(RATING_TIER.NAKED_SINGLE)
+      expect(rated.tier).toBeLessThanOrEqual(RATING_TIER.GUESS)
+    }
+    expect(ratePuzzle(generateSolution(seeded(3)))).toEqual({
+      tier: RATING_TIER.NAKED_SINGLE,
+      solved: true,
+    })
   })
 })
 
