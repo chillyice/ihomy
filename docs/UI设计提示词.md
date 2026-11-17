@@ -910,6 +910,86 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 8. **浮窗删除**:拖动时进入视口下方 260px 浮出删除条、底部 104px 发亮判删,位移不到 6px 不算;删除条常驻渲染只切 class(避免后台标签页 rAF 冻结卡在 `opacity:0`),层级 `--z-float-top: 63`。
 9. **画中画入口**:播放器角落「小窗播放」按钮,不支持时提示;进入小窗的是**整个播放页**,文案不要承诺「视频画面单独小窗」。
 
+## 35. 游戏房间与牌桌(补充 §31)
+
+1. **房间条**:`components/games/GameRoomBar.vue` 的 `.room-bar` 是整桌上方常驻条——`container-type:inline-size`、`align-self:stretch`、`margin-bottom:10px`、圆角 12、品牌色 8% 底 + 30% 描边、13px 字号;内部 `.room-bar-inner` flex + `gap:8px 10px` + `flex-wrap:wrap` + `padding:8px 14px`;`@container (max-width:560px)` 时收到 `padding:6px 10px`、房间名省略号、动作换行;`.room-bar-tag` 999px 胶囊 / 12px / 600,COOP 房间整条转绿。**条高必须实测回写 `--room-bar-h`(offsetHeight + marginBottom 向上取整)**,棋盘类页面按它扣减可用高度,不许写死数字。
+2. **一起玩席位**:游戏列表工具栏 `.room-toolbar-btn` 点击时——已有 `PLAYING` 房间直接进房(直进,不弹确认),否则 `roomApi.create({gameCode: lastRoomGame()})`,首次默认 petlink;座位上限按游戏(4 人或 6 人),房主可换局(`setGame`),他人只读;席位满时后来者进旁观,输入禁用但画面同步。
+3. **房间排行榜与再来一局**:结算覆盖在当前局上(不跳新页),按座位列出名次/得分/状态;只有房主显示「再来一局」(`again` 重置 round),其余人显示等待;中途离开用「退出对局」而不是直接返回,保证服务端席位回收。
+4. **麻将牌桌几何**:`.mj-stage{flex:1;min-height:0;position:relative;overflow:hidden}`;`.mj-table` 绝对定位 `left/top:50%` + `translate(-50%,-50%) scale(var(--mj-scale))`,基准 **960×720**,`grid-template-areas:'top top top' 'left center right' 'bottom bottom bottom'`、列 `104px minmax(0,1fr) 104px`、`gap:6px 8px`、`padding:16px`、圆角 22;`--mj-scale` 由 ResizeObserver 按 `min(stage宽/桌宽, stage高/桌高)` 计算,牌桌自身永不滚动。绒布 `--mj-felt-a:#3f7d5c` / `--mj-felt-b:#28553f`(深色 `#294f3f`/`#16302a`),木边三层内嵌环 2px `#8a5a30` / 6px / 9px `#5a3a1f`。
+5. **座位朝向**:自己恒在下、对面在上、两侧牌河整体旋转 ±90°(牌面朝内);弃牌区 `--mj-river-w:30px` / `--mj-river-h:42px`,**最新一张** `.mj-river .tile.latest` 用 `outline:2px solid #efca83;outline-offset:-2px` + 底 `#fff4d7`;牌墙 `.wall-tile` 横 20×10、竖 10×20,只做示意不做点击。
+6. **手牌与操作**:手牌最多 14 张,单张宽 `min(54px, calc((100cqi - 40px)/14))`、`gap:0`、相邻 `margin-left:-1px`,宁可挤成一条也不换行;出牌/吃/碰/杠/胡操作区放底部独立 `grid-area:bottom`,**不许绝对定位盖住手牌**;吃碰杠先出候选层再确认;庄家标记金色;规则预设(推倒胡/口口胡/普通)只在建房与房间设置里选,局内不切换。
+7. **飞行棋盘面**:SVG 盘 + `.ludo-hits` 覆盖层透明按钮(热区与格同大,pointer 事件落在按钮上);尺寸 `--ludo-board-max: min(620px, calc(100dvh - 230px - var(--room-bar-h,0px)))`,全屏 `min(780px, calc(84dvh - 84px - var(--room-bar-h,0px)))`;只有 `(max-width:860px) and (orientation:portrait)` 才上下堆叠(侧栏移到盘下、盘高再扣 475px),横屏保持左右。
+8. **扑克牌桌**:`.cards-stage{flex:1 1 320px;min-height:0;flex-direction:column;gap:8px}`;全屏 `padding:clamp(8px,2vw,20px)` + `overflow:auto`;绒布 `#1e6b3d` 圆角 12;牌面圆角 `clamp(3px, calc(var(--sol-card-w,80px)*0.05), 7px)`;列宽/列数/间距只由 `--sol-card-w` / `--sol-cols` / `--sol-gap` 驱动;拖拽 6px 起手、松手 320ms 内吞一次 click,拖影 `CardDragGhost`,扇叠层级用 `--fan-index`。
+9. **单机对抗牌局**:`components/games/FightTable.vue` 一手牌先给牌数 `--fc-hand-n`,再由它推步长 `--fc-step: clamp(13px, calc((100vw - 72px)/var(--fc-hand-n,20)), 30px)`、牌宽 `--fc-card-w: clamp(30px, calc(var(--fc-step)*2.1), 56px)`、叠放负边距 `margin-left: calc(var(--fc-step) - var(--fc-card-w))`;`@media (max-height:520px)` 再压牌高,横屏矮视口不出内部滚动条。
+
+## 36. 游戏页与沉浸态(补充 §31)
+
+1. **触发条件**:移动端进 `/games/**` 由 `isMobileGamePath()` 判定,给 `html` 加 `game-mobile-immersive`——`overflow:hidden`、`overscroll-behavior:none`,站点顶栏/底栏/返回顶部/页脚/侧栏全部 `display:none !important`,`.mobile-layout` 与 `.mobile-sub-content` 高 `100dvh`,`.page` 高 `100%` + 四边 `env(safe-area-inset-*)` + `overflow:hidden`。
+2. **左上角唯一返回**:手机整屏下只保留一个返回按钮(`MobileGameChrome.vue` 的 `.mgc-btn`,38×38、圆角 999、`rgba(var(--color-card-rgb),.92)` 底 + 55% 描边 + 投影、图标 18px、`:active` 缩到 0.94),固定 `top/left = env(safe-area-inset-*) + 8px`,层级 `--z-float`;此时不渲染页面标题与面包屑。
+3. **工具栏浮动**:其余动作收进右上 `.game-topbar`(fixed,`top/right = env(safe-area-inset-*) + 8px`,`max-width: calc(100vw - 104px)`),容器透明且 `pointer-events:none`、子元素 `pointer-events:auto`;按钮 34px 胶囊、圆角 999;窄屏隐藏 `.gt-label` / `.wg-btn-label` / `.dg-btn-label` 文字与副标题,只留图标。
+4. **方向自适应**:竖横屏一律等比缩放,不做重排;双栏页(飞行棋等)只在竖屏且 ≤860px 才堆叠;横屏优先把高度让给棋盘,判据写进媒体查询而不是 JS 分支。
+5. **一屏适配**:可读型页面(列表/详情/下载页)内容区 `flex:1 1 auto;min-height:0` 并在卡片内滚;可缩放型(棋盘/牌桌)外层 `flex:1 0 auto`,内层按实测舞台尺寸 `min(w/W, h/H)` 缩放;**不得因为缩放出现第二层滚动条**,整页也不滚。
+6. **全屏**:仅非原生壳且 `document.documentElement.requestFullscreen` 存在时显示按钮,调用带 `{navigationUI:'hide'}`;全屏下工具栏仍 fixed(不随内容滚走);全屏内 `el-select` 必须 `:teleported="!isFullscreen"`。
+7. **退出收口**:返回/退全屏/摘 `game-mobile-immersive`/结束一场对局四件事统一走 `composables/useGameExit.js`,页面里不许各写一套 `router.back()`。
+
+## 37. 小游戏入口与分类
+
+1. **两级分类进入**:首页游戏区先是分类卡网格 `.game-cat-grid`(`repeat(auto-fill,minmax(200px,1fr))`、`gap:12px`、`margin-bottom:16px`、`min-height:80px`),点分类下钻到该类的游戏列表;二级页顶部 `.game-cat-head`(返回 + 当前分类名),右侧 `.game-series-filter` 150px;当前分类卡加 `.current`。
+2. **分类卡样式**:`.game-cat-card` 为 flex column + `gap:4px` + `padding:16px 18px` + `min-height:104px` + `font:inherit`;名称 16px/600、元信息 `.game-cat-meta` 12px/0.85、样例 `.game-cat-samples` 12px/1.5 两行截断/0.65 且 `margin-top:auto` 贴底;hover 只 `translateY(-3px)` + 主色描边渐变,不叠阴影。
+3. **卡片去按钮**:游戏卡整卡 `@click` 直接进游戏,**不再放「开始/进入」按钮**;需要多入口的(纸牌两级:牌桌 → 具体玩法)由分类页承担,卡片只留人数、时长等元信息。
+4. **桌面游戏下载页**:`views/games/DesktopGame.vue` 根 `.page.desktop-game-page`,工具栏只留下载主按钮;正文 `.dg-body{max-width:720px;margin:0 auto}`,卡 `.dg-card{padding:20px 22px 18px}`;名称 17px/600、副标题 12px、描述 13px/1.7/`pre-wrap`;要点 `.dg-tip{padding:10px 12px;border-left:3px solid var(--color-primary);background:var(--color-bg-2)}`;步骤 13px/1.8、备注 12px;≤640px 隐藏 `.dg-btn-label`。
+5. **静态游戏壳**:网页游戏与外部静态游戏一律站内 iframe(`/games/web/{id}`、`/games/embed/:slug`),工具栏固定为 返回/标题/刷新/外部打开/页内全屏/全屏;舞台 `.wg-stage.card.game-surface`;缩放走 `useIframeFit`(`scale k` + 宽度补偿 `1/k`,最多 4 轮,300ms 复测,跨域直接跳过)。
+6. **加载失败兜底**:iframe 加载失败显示 `.wg-cover`(说明 + 重试 + 外部打开),**不要自动退站或跳登录页**;`navigateFallbackDenylist` 必须覆盖 `/games/embed`。
+
+## 38. 每日早安页
+
+1. **覆盖层与容器**:`.morning-overlay` fixed 四边(`top/right/bottom/left` 全部显式写)、`z-index:var(--z-immersive)`、`overflow:hidden`、白字、`user-select:none`;内容 `.mo-body` 居中 `max-width:1080px`,`padding:clamp(20px,4vw,40px) clamp(18px,4vw,40px) calc(clamp(20px,4vw,40px) + env(safe-area-inset-bottom))`。
+2. **场景类名**:`components/morning/MorningScene.vue` 根 `.ms`,天气态用 `ms-cond-*` 前缀(前缀缺一个 `ms-` 就会整块不生效),夜间 `ms-night`、静帧 `ms-still`;照片层 `.ms-photo` 加载完才挂 `.ms-loaded` 淡入;太阳 `.ms-solar/-glow/-sun-disc`、云 `.ms-cloud-field/.ms-cloud`、雷电 `.ms-lightning/.ms-strike/.ms-flash/.ms-bolt`、粒子 `.ms-motion/.ms-particle`、压暗 `.ms-scrim`。
+3. **云层**:`RandomClouds.vue` **只做云层**,不接管背景;每朵 `.rc-cloud` 由 8–11 个径向渐变叠 7–30px 模糊构成,桌面 11 朵、阴天遮挡约 87%;漂移时长 `210s × 0.8^风速档`,风速按 360° 分解成 x/y 两轴位移;42% 档视为静止;取样用 bag 保证不连续出同一朵;晴朗/少云才渲染,雨雪雾改由场景层表现。
+4. **背景组**:`backdrops.js` 用 `import.meta.glob('../../assets/morning/*-{day,night}{,-alt}.webp')` 收图,一个场景 = `stem.webp` + `-alt.webp` 两张(共 28 张,其中 12 张为实拍照片);选图按「日期 + 天气 + 白天/夜间」取,禁止写死单图,也不要运行时拼文件名。
+5. **与光尘同源**:早安页的太阳方位/云影方向必须与站内光影一致(同一份 `/public/sun-info`),打开时 `.morning-open` 隐藏站内光影层,避免两套光叠在照片上。
+6. **内容块**:四个可关块(问候/时钟/天气/今日待办);头部 `.mo-head`(问候 `.mo-greeting` + 家庭名 `.mo-family` + 关闭 `.mo-close`);主区 `.mo-main` → `.mo-hero`(时钟 `.mo-clock`/`.mo-time` + 日期 `.mo-date` + 天气 `.mo-weather`)与 `.mo-todo`(行 `.mo-row`、来源点 `.mo-dot`、空态 `.mo-empty`、更多 `.mo-more`);底部 `.mo-foot`(开始一天 `.mo-start` + 次要链接 `.mo-link`);≤640px hero 改单列、待办列表 `max-height:32vh`。
+7. **预览与记忆**:设置页「预览今日场景」用 `MORNING_SCENES` 现算一个**只存内存**的场景(不写 `localStorage`),盖上 `.mo-preview-tag` 标明是预览,关掉即丢;偏好键 `ihomy:morning:v1`、上次场景 `ihomy:morning:last` 两个分开存。
+
+## 39. 聊天室与浮窗
+
+1. **标题不重复**:房间名/家庭名在面板只出现一次——`chat.title`、`chat.roomTitle`、`chat.rail.family` 三处口径互斥,侧栏已显示家庭名时标题栏不再重复。
+2. **家人头像**:消息发送者统一用 `Sender(name, avatar)`(头像 `el-avatar :src`,取不到回退首字母);同一人连续消息只在首条显示头像与名字,后续行缩进对齐;头像尺寸沿用 `main.css` 标尺,不在组件里写 px。
+3. **表情**:`utils/chatEmoji.js` 定义 70 个表情;弹层 `:width="296"`,`.emoji-panel` 8 列 grid + `max-height:216px` 滚动,`.emoji-item` 18px 字号 + 圆角 8;表情插入到光标位置,不整段替换输入框内容。
+4. **新消息浮标**:不在底部且有他人新消息时显示 `.msg-jump`(文案「N 条新消息」),点击滚到锚点并清除;新到气泡加 `.msg-flash` 高亮 1.6s 后移除;**自己发的消息既不计入 N 也不触发高亮**(`liveNew` 只统计他人)。
+5. **字体设置**:`utils/chatStyle.js` 字号 12–20、默认 14;文字颜色 7 档(跟随主题 + `#d94b3f`/`#e07b21`/`#2f9b62`/`#2f7fe0`/`#7a5af5`/`#d6417f`);存 `ihomy:chat:text:v1`,运行时只写 `--chat-font-size` / `--chat-color` 两个变量,组件内禁止写死字号。
+6. **侧栏宽度**:会话侧栏 40–280px,且必须给消息区留 200px(`min(280, total-200)`),宽度存 `ihomy:chat:rail:w:v1`;宽度 <104px 进 `.chat-rail.narrow` 只显示头像;`.rail-resizer` 走 Pointer 事件 + `touch-action:none`,不用鼠标事件。
+7. **浮窗拖动与缩放**:浮窗自身 6px 判定为 dock(收纳)阈值,移动端底部 64px 为删除区;缩放手柄 `.chat-resize-zone` 四角 16×16、四边 6px、透明且默认不显形(悬停/拖动才可见);位置存 `ihomy:chat:panel:v1`,展开面板 360×520。
+8. **移动端半屏抽屉**:展开时给 `html` 加 `chat-sheet-open`,`--chat-sheet-h: 52vh`(支持 dvh 时 `52dvh`),页面底部补 `calc(var(--chat-sheet-h) + env(safe-area-inset-bottom) + 12px)` 内边距,最后一条消息不被抽屉遮住;面板 `max-width:min(360px, calc(100vw - 36px))`。
+
+## 40. 移动端底栏与屏保
+
+1. **五个槽位**:`utils/mobileTabs.js` 固定 5 槽(4 个页面 + 中间拍照键),`useMobileTabs.js` 读偏好,编辑用 `MobileTabEditor.vue`;本机键 `ihomy:mobile:tabs:v1`、账号同步键 `mobile.tabs.v1`;取到的配置不足 5 槽时用默认项补位,不渲染空槽。
+2. **底栏尺寸**:bar 高 `calc(56px + env(safe-area-inset-bottom))`;普通项图标 22px、文字 11px/1.1 上下排列,选中项转主色并高亮图标;激活指示条 3px。
+3. **拍照键**:`.tab-item.is-capture` 不参与等分、只居中;`.capture-btn` 50×50、`margin-top:-34px` 上凸、圆形(brand→primary 160° 渐变)、3px `rgba(255,255,255,.92)` 白边(深色改卡片色)、阴影 `0 6px 16px brand/.42, 0 2px 6px black/.12`、`:active` 缩到 0.92;上传中用 `.capture-spinner`(20px)替图标并禁用重复点击。
+4. **屏保两模式**:`components/screensaver/ScreensaverOverlay.vue` 根 `.ss`;照片模式 `.ss-photo-mode`(`.ss-photo` + `.ss-photo-scrim` 压暗 + `.ss-clock/.ss-meta/.ss-weather/.ss-temp`),看板模式 `.ss-board`(头部 `.ss-board-head` + 卡片 `.ss-card` 与列表行 `.ss-row`);层级 `--z-immersive`。
+5. **点击不穿透**:覆盖层上任意点击/触摸只做唤醒,处理函数必须 `stopPropagation` 且**不 `preventDefault`**(保留滚动与手势);唤醒后立即卸载覆盖层,不留透明遮罩挡下面的点击。
+6. **空闲判定**:沿用 `BG_IDLE_MS`(默认 60s)与 `BUSY_SELECTORS` 口径——播放中、输入中、弹窗打开不触发;开关与模式存 `ihomy:screensaver:v1`。
+
+## 41. 备份与迁移界面
+
+1. **运维页四段式**:`views/ops/tabs/OpsBackup.vue` = 概览 `.backup-summary`(4 张 `.backup-stat.card`:占用 / 磁盘可用 / 下次执行 / 最近成功)→ 动作行 `.filter-row.backup-actions`(立即备份基础数据 / 内容数据 / 全量 / 生成迁移包 + 刷新)→ 策略卡 `.card.backup-policy`(`.section-label` + `el-form label-width="150px"`)→ 任务表 + `.backup-pager`。
+2. **策略表单**:启用开关;cron 六段式输入 `.cron-input.mono`(占位 `0 30 2 * * *`),每日配 `.time-input`、每周配 `.dow-input`(只填星期);保留策略 `.retention-row` 用 `el-input-number` 并给死区间——基础日备 1–90 天、周备 0–52、月备 0–24;全量周备 1–52、月备 0–36;家庭包 1–365 天、保留 1–20 份。
+3. **规则提示**:表单下方 `.backup-rule` 实时把当前选择拼成一句人话(多久备一次、留几份),不弹窗、不写表名或内部键名。
+4. **任务表**:列固定为 类型/状态/触发/开始/耗时/大小/文件数/行数/说明;状态用 tag(成功/失败/进行中),只有成功行才出下载按钮(图标按钮 + tooltip);失败原因写进「说明」列,不弹全局报错;删除走 `ElMessageBox` 二次确认。
+5. **迁移包只导出**:站内不提供「一键恢复」——下载后按包内 `RESTORE.md` 在服务器导入;家庭侧 `BackupSettings.vue`(`?tab=backup`)必须显式写明这句。
+6. **限额不在界面猜**:后端门槛(磁盘可用 <1GB、备份总量 >20GB 拒绝新备份,单包 >4GB 拒绝下载)只在触发失败时以任务说明/错误提示呈现,界面不显示推算的剩余额度或进度预估。
+7. **家庭侧样式**:设置页分类「备份」= `.card.settings-card` + `.section-label` 竖线标题 + `.share-tip` 说明 + `el-alert type="info" .backup-rules` 规则条 + 生成按钮(生成中 `.backup-running` 并禁用)+ 任务列表 + 恢复提示 `.share-tip.backup-restore`。
+
+## 42. 资源列表与长按多选
+
+1. **长按进多选**:`composables/usePickSelect.js` 统一——按住 450ms(`PICK_PRESS_MS`)进入选择态,位移超阈值取消,进入时轻震并吞掉紧随的一次 click;移动端长按只是加速通道,桌面仍保留工具栏「选择」按钮。
+2. **选择态行**:选中行 = `pick-badge` 圆标 + 1.5px 主色描边 + 主色 10% 底;选中粒度是整行,不做行内多选;工具栏同步换成 选中计数 + 取消 + 删除所选(危险)。
+3. **视图模式**:`composables/useViewMode.js` 以 `ihomy:view:<pageKey>` 记忆,默认 `grid`;切换只改渲染分支、不重新请求;刷新后保持上次模式。
+4. **资源行规格**:`.resource-list` 竖排 `gap:6px`;`.rl-row` 横排 `gap:12px` + `padding:8px 12px` + 圆角 12 + hover 主色 6%;`.rl-thumb` 56×56 圆角 10;`.rl-name` 14px、`.rl-meta` 12px 次要色;选择态下 `.pick-badge` 改 `position:static` 占位到行尾(不浮在缩略图上);`.rl-actions` 靠右且只用图标按钮。
+5. **列表留白**:暖居主题物品列表 `html.theme-warm .fp-list` padding 24px,≤768px 收到 16px;其余页面沿用 `.page` 标尺,不在页面容器里再叠一层 padding。
+6. **批量操作文案**:跨类型选中时按钮文案区分实际动作(如映射相册显示「解除映射」),确认框给出数量;一次操作完成即退出选择态,不做持久记忆。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
