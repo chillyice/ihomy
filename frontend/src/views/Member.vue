@@ -25,6 +25,9 @@
               <code>{{ c.code }}</code>
               <span class="invite-uses">{{ t('member.usesCount', { used: c.usedCount, max: c.maxUses }) }}</span>
               <span class="invite-expire">{{ t('member.expireAt', { time: formatDate(c.expiresAt) }) }}</span>
+              <el-button size="small" text type="primary" @click="copyInviteLink(c)">
+                {{ t('member.copyInviteLink') }}
+              </el-button>
             </div>
           </div>
         </div>
@@ -95,6 +98,17 @@
     </el-tabs>
 
     <el-dialog v-model="searchVisible" append-to-body :title="t('member.joinFamily')" width="440px">
+      <!-- 私密家庭搜不到,凭邀请码直接加入;公开家庭再走搜索+申请 -->
+      <div class="join-by-code">
+        <div class="join-code-row">
+          <el-input v-model="joinCode" :placeholder="t('member.joinCodePlaceholder')" clearable maxlength="40" @keyup.enter="joinByCode" />
+          <el-button type="primary" :loading="joining" :disabled="!joinCode.trim()" @click="joinByCode">
+            {{ t('member.joinByCode') }}
+          </el-button>
+        </div>
+        <div class="share-tip">{{ t('member.joinCodeHint') }}</div>
+      </div>
+      <el-divider class="join-divider" />
       <el-input v-model="keyword" :placeholder="t('member.searchPlaceholder')" clearable @keyup.enter="doSearch">
         <template #append>
           <el-button @click="doSearch">{{ t('common.search') }}</el-button>
@@ -126,7 +140,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { memberApi, familyApi } from '@/api'
+import { authApi, memberApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import { resolvePresence } from '@/utils/presence'
@@ -249,6 +263,56 @@ const applyFamily = async (f) => {
   await familyApi.apply(f.id, '')
   ElMessage.success(t('member.applySubmitted'))
   f.pending = true
+}
+
+// ---------- 凭邀请码加入(私密家庭搜不到,靠对方的码直接进) ----------
+const joinCode = ref('')
+const joining = ref(false)
+
+const joinByCode = async () => {
+  const code = joinCode.value.trim()
+  if (!code || joining.value) return
+  joining.value = true
+  try {
+    await authApi.join(code)
+    ElMessage.success(t('member.joinCodeOk'))
+    joinCode.value = ''
+    searchVisible.value = false
+  } finally {
+    joining.value = false
+  }
+}
+
+/** 复制统一入口:内嵌壳/局域网 http 下 navigator.clipboard 不可用,退回 execCommand(与 FamilySettings 同款) */
+const copyText = async (text) => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch (e) {
+    /* 走 execCommand 兜底 */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch (e) {
+    return false
+  }
+}
+
+/** 邀请码一键复制注册链接:家人打开即进注册页并预填邀请码(Login 支持 ?invite=) */
+const copyInviteLink = async (c) => {
+  const url = `${location.origin}/login?invite=${encodeURIComponent(c.code)}`
+  const ok = await copyText(url)
+  if (ok) ElMessage.success(t('member.inviteLinkCopied'))
 }
 
 // OWNER 审核入家申请:通过则对方成为 MEMBER
@@ -396,6 +460,23 @@ onMounted(load)
   font-size: 12px;
 }
 
+/* 加入对话框:邀请码直入区(私密家庭搜不到,先给码的入口) */
+.join-by-code {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.join-code-row {
+  display: flex;
+  gap: 8px;
+}
+.join-code-row .el-input {
+  flex: 1;
+}
+.join-divider {
+  margin: 12px 0;
+}
+
 @media (max-width: 768px) {
   .member-row {
     flex-wrap: wrap;
@@ -414,6 +495,9 @@ onMounted(load)
     justify-content: flex-end;
   }
   .search-item {
+    flex-wrap: wrap;
+  }
+  .join-code-row {
     flex-wrap: wrap;
   }
 }

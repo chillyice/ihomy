@@ -1,4 +1,7 @@
 :root {
+  /* 顶部安全区:安卓壳内 SystemBars 会把真实 insets 内联成 html 的同名变量(env() 在
+   * 部分 Android WebView 上恒为 0,顶栏按钮会顶进系统状态栏),壳内内联值覆盖此处兜底 */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --color-primary: #3a2e22;
   --color-accent: #a8483a;
   --color-bg: #ede4d3;
@@ -467,7 +470,8 @@ html.game-mobile-immersive .mobile-sub-content .page {
   height: 100% !important;
   min-height: 0 !important;
   margin: 0;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px) !important;
   overflow: hidden;
 }
 html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
@@ -495,7 +499,7 @@ html.game-mobile-immersive .mobile-sub-content .page.game-page-readable > .cards
 /* 游戏页顶栏:不再占布局高度,只把额外动作(重载/开外部/存档等)浮到右上角 */
 html.game-mobile-immersive .game-topbar {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 8px);
   right: calc(env(safe-area-inset-right, 0px) + 8px);
   left: auto;
   width: auto;
@@ -1035,7 +1039,7 @@ html.dark .section-label {
   }
   /* 移动端子页面:顶部已有 fixed header,补顶部间距 */
   .mobile-sub-content .page {
-    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    padding-top: calc(8px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   }
   /* 移动端隐藏光影测试控制台 */
   .light-test-console {
@@ -2458,7 +2462,7 @@ html.pull-refresh-host {
 .pull-refresh-indicator {
   position: fixed;
   left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 54px);
   z-index: var(--z-toast);
   display: flex;
   align-items: center;

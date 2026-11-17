@@ -22,6 +22,7 @@ import top.ihomy.app.speech.SpeechPlugin;
 import top.ihomy.app.updater.AutoUpdateWorker;
 import top.ihomy.app.updater.UpdaterPlugin;
 import top.ihomy.app.widget.WidgetBridgePlugin;
+import top.ihomy.app.window.WindowBarsPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -55,6 +56,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CallPermissionPlugin.class);
         // 画中画:播放中离开 App 时整页缩进小窗(前端播放态驱动,平时离开就是普通后台)
         registerPlugin(PipPlugin.class);
+        // 窗口底色:状态栏/手势条露出的底色跟页面走(targetSdk 36 上 setStatusBarColor 已失效)
+        registerPlugin(WindowBarsPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);

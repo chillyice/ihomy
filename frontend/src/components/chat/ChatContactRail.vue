@@ -1,19 +1,22 @@
 <template>
-  <!-- 聊天对象列:家庭聊天室 + 本家成员 + 亲友圈(圈内家庭→成员);点成员开私聊 -->
+  <!-- 聊天对象列:本家(家庭头像入口+成员) + 亲友圈(圈内家庭→成员);点成员开私聊 -->
   <aside class="chat-rail" :class="{ narrow }">
-    <button
-      type="button"
-      class="rail-item rail-family"
-      :class="{ active: chatStore.activePeer == null && chatStore.activeRoomId == null }"
-      @click="chatStore.closeDm()"
-    >
-      <el-icon :size="16"><HomeFilled /></el-icon>
-      <span class="rail-name">{{ $t('chat.rail.family') }}</span>
-      <span v-if="chatStore.unread" class="rail-badge">{{ chatStore.unread > 99 ? '99+' : chatStore.unread }}</span>
-    </button>
-
-    <div class="rail-group-label">{{ $t('chat.rail.members') }}</div>
     <div v-loading="loading" class="rail-scroll">
+      <!-- 本家:与圈内家庭同构(分组头 + 家庭入口 + 成员),头像用家庭封面 -->
+      <div class="rail-group-label">{{ ownFamilyName }}</div>
+      <button
+        type="button"
+        class="rail-item rail-room rail-family"
+        :class="{ active: chatStore.activePeer == null && chatStore.activeRoomId == null }"
+        @click="chatStore.closeDm()"
+      >
+        <img v-if="chatStore.ownFamily.coverImage" class="rail-avatar" :src="chatStore.ownFamily.coverImage" :alt="ownFamilyName" />
+        <span v-else class="rail-room-icon"
+          ><el-icon :size="16"><HomeFilled /></el-icon
+        ></span>
+        <span class="rail-name">{{ ownFamilyName }}</span>
+        <span v-if="chatStore.unread" class="rail-badge">{{ chatStore.unread > 99 ? '99+' : chatStore.unread }}</span>
+      </button>
       <button
         v-for="m in ownMembers"
         :key="'own' + m.id"
@@ -34,7 +37,7 @@
       <template v-for="c in circles" :key="c.id">
         <div class="rail-group-label">{{ c.name }}</div>
         <template v-for="f in circleFamilies(c)" :key="f.familyId">
-          <!-- 亲友圈家庭聊天室入口:圈内家庭可读可发言,未读单独计数 -->
+          <!-- 亲友圈家庭聊天室入口:圈内家庭可读可发言,未读单独计数;家庭头像用家庭封面 -->
           <button
             type="button"
             class="rail-item rail-room"
@@ -42,7 +45,10 @@
             :title="f.alias || f.familyName"
             @click="openRoom(f)"
           >
-            <el-icon class="rail-room-icon" :size="16"><HomeFilled /></el-icon>
+            <img v-if="f.coverImage" class="rail-avatar" :src="f.coverImage" :alt="f.alias || f.familyName" />
+            <span v-else class="rail-room-icon"
+              ><el-icon :size="16"><HomeFilled /></el-icon
+            ></span>
             <span class="rail-name">{{ f.alias || f.familyName }}</span>
             <span v-if="roomUnread(f.familyId)" class="rail-badge">
               {{ roomUnread(f.familyId) > 99 ? '99+' : roomUnread(f.familyId) }}
@@ -62,7 +68,6 @@
               <span v-else class="rail-avatar rail-avatar-text">{{ (m.name || '?').charAt(0) }}</span>
             </UserPresenceDot>
             <span class="rail-name">{{ m.name }}</span>
-            <span class="rail-family-tag">{{ f.alias || f.familyName }}</span>
             <span v-if="peerUnread(m.id)" class="rail-badge">{{ peerUnread(m.id) > 99 ? '99+' : peerUnread(m.id) }}</span>
           </button>
           <div v-if="familyLoading(f.familyId)" v-loading="true" class="rail-family-loading" />
@@ -79,8 +84,9 @@
 // 联系人数据:本家成员一次拉;圈内家庭挂出后懒加载各自成员(同圈可见名单口径)。
 // 未读数读 store(dmUnread),WS 实时增量已由 store 维护。
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { HomeFilled } from '@element-plus/icons-vue'
-import { circleApi, memberApi } from '@/api'
+import { circleApi, familyApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { resolvePresence } from '@/utils/presence'
@@ -91,6 +97,7 @@ defineProps({ narrow: { type: Boolean, default: false } })
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const ownMembers = ref([])
@@ -100,7 +107,9 @@ const familyMembersMap = ref({})
 const myId = computed(() => userStore.userInfo?.id)
 const circleFamilies = (c) => (c.families || []).filter((f) => !f.self)
 const memberName = (m) => m.nickname || m.username || '?'
-const familyMembers = (familyId) => familyMembersMap.value[familyId] || []
+const ownFamilyName = computed(() => chatStore.ownFamily.name || t('chat.rail.family'))
+// 圈内家庭成员:列表里有自己(同圈可见名单口径),渲染时剔除
+const familyMembers = (familyId) => (familyMembersMap.value[familyId] || []).filter((m) => m.id !== myId.value)
 const familyLoaded = (familyId) => familyMembersMap.value[familyId] != null
 const familyLoading = (familyId) => familyMembersMap.value[familyId] === 'loading'
 const isActivePeer = (id) => chatStore.activePeer != null && Number(chatStore.activePeer) === Number(id)
@@ -137,9 +146,13 @@ const ensureCircleMembers = async () => {
 const load = async () => {
   loading.value = true
   try {
-    const [members, circleList] = await Promise.allSettled([memberApi.list(), circleApi.list()])
+    const [members, circleList, family] = await Promise.allSettled([memberApi.list(), circleApi.list(), familyApi.get()])
     ownMembers.value = (members.status === 'fulfilled' ? members.value : []).filter((m) => m.id !== myId.value) || []
     circles.value = circleList.status === 'fulfilled' ? circleList.value || [] : []
+    // 本家分组头/家庭头像与会话标题共用:名称取不到时回落 i18n 的「家庭」
+    if (family.status === 'fulfilled' && family.value) {
+      chatStore.ownFamily = { name: family.value.name || '', coverImage: family.value.coverImage || '' }
+    }
     ensureCircleMembers()
   } finally {
     loading.value = false
@@ -210,6 +223,18 @@ onMounted(load)
   object-fit: cover;
   display: block;
 }
+/* 家庭入口没配封面时的图标兜底:占满 24px 方位,与头像同宽保证对齐 */
+.rail-room-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
 .rail-avatar-text {
   display: flex;
   align-items: center;
@@ -225,15 +250,6 @@ onMounted(load)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.rail-family-tag {
-  flex: none;
-  max-width: 52px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--color-text-secondary);
 }
 .rail-badge {
   flex: none;
@@ -254,14 +270,14 @@ onMounted(load)
 .rail-family-loading {
   height: 28px;
 }
-/* 拖到只剩头像宽:收起文字与分组标题,未读缩成头像上的小红点 */
+/* 拖到只剩头像宽:收起文字与分组标题,未读缩成头像上的小红点。
+   内边距补齐 1px 分隔线,让头像在整条栏位里真正居中 */
 .chat-rail.narrow {
-  padding-right: 2px;
+  padding-right: 1px;
   margin-right: 0;
 }
 .chat-rail.narrow .rail-group-label,
-.chat-rail.narrow .rail-name,
-.chat-rail.narrow .rail-family-tag {
+.chat-rail.narrow .rail-name {
   display: none;
 }
 .chat-rail.narrow .rail-item {
@@ -283,9 +299,6 @@ onMounted(load)
 @media (max-width: 768px) {
   .chat-rail {
     width: 132px;
-  }
-  .rail-family-tag {
-    display: none;
   }
 }
 </style>

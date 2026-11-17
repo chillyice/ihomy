@@ -2,7 +2,9 @@
 <resources>
 
     <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+    <!-- DayNight:窗口背景跟系统深浅色走。targetSdk 36 强制 edge-to-edge 后,状态栏露出的
+         底色=窗口背景,亮色主题会在深色页面下衬出白条(配合 IhomyWindowBars 由前端刷页面底色) -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>

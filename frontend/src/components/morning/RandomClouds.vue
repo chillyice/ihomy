@@ -42,13 +42,13 @@ const wind = computed(() => {
 const drift = computed(() => morningWindVector(props.windDeg, props.windDir))
 
 // ===== 云的配色(上亮下暗,给云团体积感) =====
-// 阴天/雨天是「满天阴云」,云本身是灰的:比天顶亮、比地平线暗,不要用纯白(叠几层会糊成一片白)
+// 阴天/雨天/雪天/雷雨是「满天乌云」:云是灰的且少掺白,比天顶亮、比地平线暗
 const DAY_TONES = {
   clear: { hi: [255, 255, 255], lo: [210, 224, 238] },
   cloud: { hi: [228, 235, 243], lo: [146, 161, 179] },
-  overcast: { hi: [206, 214, 224], lo: [118, 130, 146] },
-  rain: { hi: [210, 220, 232], lo: [110, 124, 143] },
-  snow: { hi: [246, 250, 255], lo: [170, 187, 205] },
+  overcast: { hi: [188, 197, 209], lo: [104, 116, 134] },
+  rain: { hi: [190, 202, 216], lo: [98, 112, 133] },
+  snow: { hi: [222, 231, 240], lo: [150, 164, 184] },
   fog: { hi: [244, 247, 250], lo: [176, 186, 196] },
   thunder: { hi: [150, 164, 182], lo: [62, 75, 93] },
 }
@@ -64,18 +64,22 @@ const NIGHT_TONES = {
 
 const mixRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t))
 
-// 叠在天气照片上的云保留亮部与阴影的对比。夜间和雷雨少掺白，贴近底图的光照。
+// 阴雨雷雪:整片天铺乌云,亮部也要压暗(少掺白)
+const DENSE_SCENES = ['overcast', 'rain', 'snow', 'thunder']
+
+// 叠在天气照片上的云保留亮部与阴影的对比。夜间/雷雨/乌云场景少掺白，贴近底图的光照。
 const cloudTone = () => {
   const base = (props.night ? NIGHT_TONES : DAY_TONES)[props.scene] || DAY_TONES.clear
+  const whiteMix = props.night || props.scene === 'thunder' ? 0.16 : DENSE_SCENES.includes(props.scene) ? 0.28 : 0.49
   return {
-    hi: mixRgb(base.hi, [255, 255, 255], props.night || props.scene === 'thunder' ? 0.16 : 0.49),
+    hi: mixRgb(base.hi, [255, 255, 255], whiteMix),
     lo: mixRgb(base.lo, props.night ? [16, 22, 34] : [58, 70, 88], 0.25),
   }
 }
 
 /**
- * 云的种类:同一片天里混着不同形态才像真的。
- * 每种天气给一组权重,抽签决定这一朵画成什么云。
+ * 云的种类:每轮只画同一种(同一次天空里云型一致),从该天气的候选表按权重抽签定这一轮的云种。
+ * 每次换天气/昼夜都会重抽,不同轮次之间形态会换。
  */
 const CLOUD_KINDS = {
   clear: [
@@ -102,8 +106,7 @@ const CLOUD_KINDS = {
   ],
   snow: [
     ['stratus', 2],
-    ['cumulus', 2],
-    ['nimbostratus', 1],
+    ['nimbostratus', 2],
     ['altocumulus', 1],
   ],
   fog: [
@@ -129,20 +132,16 @@ const KIND_SHAPE = {
   fogbank: { ratio: [0.16, 0.28], w: [88, 132], px: [660, 1260], op: [0.42, 0.62] },
 }
 
-/** 按权重抽一种云;整片天用抽样袋循环,保证相邻几朵不是同一种 */
-function makeKindBag(count) {
+/** 本轮的云种:按权重抽一种,整片天只画这一种 */
+function pickRoundKind() {
   const table = CLOUD_KINDS[props.scene] || CLOUD_KINDS.cloud
-  const bag = []
-  table.forEach(([kind, weight]) => {
-    for (let i = 0; i < weight; i++) bag.push(kind)
-  })
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(rand(0, i + 1))
-    const tmp = bag[i]
-    bag[i] = bag[j]
-    bag[j] = tmp
+  const total = table.reduce((sum, [, w]) => sum + w, 0)
+  let roll = Math.random() * total
+  for (const [kind, w] of table) {
+    roll -= w
+    if (roll < 0) return kind
   }
-  return Array.from({ length: count }, (_, i) => bag[i % bag.length])
+  return table[0][0]
 }
 
 const layer = ref(null)
@@ -159,11 +158,27 @@ watch(
       clearTimeout(timer)
     })
 
-    const overcast = ['cloud', 'overcast', 'rain', 'thunder'].includes(props.scene)
-    const count = props.scene === 'clear' ? (compact ? 3 : 4) : compact ? 6 : overcast ? 9 : 7
-    const kinds = makeKindBag(count)
+    // 数量口径:晴少量点缀;多云稍多;阴/雨/雪/雷「天空遍布乌云」铺满整片天
+    const dense = DENSE_SCENES.includes(props.scene)
+    const count =
+      props.scene === 'clear'
+        ? compact
+          ? 3
+          : 4
+        : dense
+          ? compact
+            ? 9
+            : 13
+          : props.scene === 'cloud'
+            ? compact
+              ? 7
+              : 11
+            : compact
+              ? 5
+              : 7
+    const kind = pickRoundKind()
     const tone = cloudTone()
-    const fleet = kinds.map((kind, i) => {
+    const fleet = Array.from({ length: count }, (_, i) => {
       const shape = KIND_SHAPE[kind]
       const depth = rand(0.62, 1.18)
       const wPct = rand(...shape.w)
@@ -172,7 +187,8 @@ watch(
       const width = compact ? 224 : 320
       const height = Math.max(56, Math.round(width * ratio))
       const low = kind === 'fogbank' || props.scene === 'fog'
-      const heightBand = low ? [34, 61] : shape.tall ? [16, 28] : [8, overcast ? 44 : 34]
+      // 乌云场景纵向铺满天空,不再挤在顶部一条带里
+      const heightBand = low ? [34, 61] : dense ? [4, 54] : shape.tall ? [16, 28] : [8, 34]
       return {
         kind,
         seed: Math.floor(rand(0, 4294967296)),

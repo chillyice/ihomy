@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
   .chat-toast {
     right: 12px;
     left: 12px;
-    top: calc(12px + env(safe-area-inset-top, 0px));
+    top: calc(12px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
     max-width: none;
   }
 }

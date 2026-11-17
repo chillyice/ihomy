@@ -34,8 +34,8 @@ const goHome = () => router.push('/')
   top: 0;
   left: 0;
   right: 0;
-  height: calc(48px + env(safe-area-inset-top, 0px));
-  padding-top: env(safe-area-inset-top, 0px);
+  height: calc(48px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   gap: 4px;

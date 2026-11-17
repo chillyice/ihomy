@@ -7,15 +7,17 @@ export const MORNING_KEY = 'ihomy:morning:v1'
 export const MORNING_LAST_KEY = 'ihomy:morning:last'
 export const MORNING_CARDS = ['greeting', 'date', 'todo', 'weather']
 
-// 背景云层样式:photo = 天气照片 + 云精灵贴图(默认);random = 纯代码生成的随机柔边云
-export const MORNING_CLOUD_STYLES = ['photo', 'random']
+// 组件大小档位(时钟/天气/待办三张卡):sm 小 / md 标准 / lg 大
+export const MORNING_CARD_SIZES = ['sm', 'md', 'lg']
+/** 可调大小的卡片(问候语是全宽文本,不参与) */
+export const MORNING_SIZED_CARDS = ['date', 'weather', 'todo']
 
 export const DEFAULT_PREFS = {
   enabled: true,
   greeting: '',
   animation: true,
-  cloudStyle: 'photo',
   cards: { greeting: true, date: true, todo: true, weather: true },
+  sizes: { date: 'md', weather: 'md', todo: 'md' },
 }
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -27,19 +29,23 @@ export function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** 归一化偏好:卡片只认白名单,问候语限长,其余回落默认值 */
+/** 归一化偏好:卡片/大小档只认白名单,问候语限长,其余回落默认值 */
 export function normalizePrefs(raw) {
   const src = isObj(raw) ? raw : {}
   const cards = {}
   MORNING_CARDS.forEach((k) => {
     cards[k] = isObj(src.cards) && typeof src.cards[k] === 'boolean' ? src.cards[k] : DEFAULT_PREFS.cards[k]
   })
+  const sizes = {}
+  MORNING_SIZED_CARDS.forEach((k) => {
+    sizes[k] = isObj(src.sizes) && MORNING_CARD_SIZES.includes(src.sizes[k]) ? src.sizes[k] : DEFAULT_PREFS.sizes[k]
+  })
   return {
     enabled: typeof src.enabled === 'boolean' ? src.enabled : DEFAULT_PREFS.enabled,
     greeting: typeof src.greeting === 'string' ? src.greeting.slice(0, 60) : '',
     animation: typeof src.animation === 'boolean' ? src.animation : DEFAULT_PREFS.animation,
-    cloudStyle: MORNING_CLOUD_STYLES.includes(src.cloudStyle) ? src.cloudStyle : DEFAULT_PREFS.cloudStyle,
     cards,
+    sizes,
   }
 }
 
@@ -81,7 +87,12 @@ export function loadPrefs() {
 export function savePrefs(patch = {}) {
   const cur = loadPrefs()
   const p = isObj(patch) ? patch : {}
-  const next = normalizePrefs({ ...cur, ...p, cards: { ...cur.cards, ...(isObj(p.cards) ? p.cards : {}) } })
+  const next = normalizePrefs({
+    ...cur,
+    ...p,
+    cards: { ...cur.cards, ...(isObj(p.cards) ? p.cards : {}) },
+    sizes: { ...cur.sizes, ...(isObj(p.sizes) ? p.sizes : {}) },
+  })
   try {
     localStorage.setItem(MORNING_KEY, JSON.stringify(next))
   } catch (e) {}

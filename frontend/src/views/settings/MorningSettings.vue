@@ -1,9 +1,9 @@
-<!-- 每日早安设置(所有客户端「外观与显示」里):开关、问候语、显示内容、天气动效、预览。
+<!-- 每日早安设置(所有客户端「外观与显示」里):只留总开关 + 编辑入口。
+     开关之外的配置(问候语/显示组件/组件大小/动效/预览)都收进编辑弹窗,
      偏好只存本机 localStorage(utils/morning.js),改动即落盘,没有保存按钮。 -->
 <template>
-  <div class="card settings-card">
+  <div class="card settings-card mo-settings">
     <div class="section-label">{{ $t('morning.settingsTitle') }}</div>
-    <p class="share-tip mo-lead">{{ $t('morning.lead') }}</p>
 
     <el-form label-position="top" class="settings-form">
       <el-form-item>
@@ -14,6 +14,15 @@
         <div class="share-tip">{{ $t('morning.enableHint') }}</div>
       </el-form-item>
 
+      <el-form-item>
+        <el-button @click="editorVisible = true">{{ $t('morning.editEntry') }}</el-button>
+      </el-form-item>
+    </el-form>
+  </div>
+
+  <!-- 编辑早安页:显示什么组件 / 显示什么内容 / 组件大小,附场景预览 -->
+  <el-dialog v-model="editorVisible" :title="$t('morning.editorTitle')" width="dialog-md" append-to-body>
+    <el-form label-position="top" class="settings-form">
       <el-form-item :label="$t('morning.greetingLabel')">
         <el-input
           v-model="prefs.greeting"
@@ -23,14 +32,23 @@
           :placeholder="$t('morning.greetingPlaceholder')"
           @change="persist"
         />
-        <div class="share-tip">{{ $t('morning.greetingHint') }}</div>
       </el-form-item>
 
       <el-form-item :label="$t('morning.cards')">
         <el-checkbox-group v-model="cardList">
           <el-checkbox v-for="c in MORNING_CARDS" :key="c" :value="c">{{ $t(CARD_LABELS[c]) }}</el-checkbox>
         </el-checkbox-group>
-        <div class="share-tip">{{ $t('morning.cardsHint') }}</div>
+      </el-form-item>
+
+      <el-form-item :label="$t('morning.cardSize')">
+        <div v-for="k in MORNING_SIZED_CARDS" :key="k" class="mo-size-row">
+          <span class="mo-size-label">{{ $t(CARD_LABELS[k]) }}</span>
+          <el-radio-group v-model="prefs.sizes[k]" size="small" @change="persist">
+            <el-radio-button v-for="s in MORNING_CARD_SIZES" :key="s" :value="s">
+              {{ $t(`morning.size${s.charAt(0).toUpperCase() + s.slice(1)}`) }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
       </el-form-item>
 
       <el-form-item>
@@ -38,20 +56,6 @@
           <el-switch v-model="prefs.animation" @change="persist" />
           <span class="setting-label">{{ $t('morning.animation') }}</span>
         </div>
-        <div class="share-tip">{{ $t('morning.animationHint') }}</div>
-      </el-form-item>
-
-      <!-- 云层样式二选一:两个开关永远只有一个开着,关掉当前这个就自动落到另一种 -->
-      <el-form-item :label="$t('morning.cloudStyle')">
-        <div class="setting-row">
-          <el-switch v-model="photoCloud" />
-          <span class="setting-label">{{ $t('morning.cloudStylePhoto') }}</span>
-        </div>
-        <div class="setting-row mo-cloud-row">
-          <el-switch v-model="randomCloud" />
-          <span class="setting-label">{{ $t('morning.cloudStyleRandom') }}</span>
-        </div>
-        <div class="share-tip">{{ $t('morning.cloudStyleHint') }}</div>
       </el-form-item>
 
       <el-form-item :label="$t('morning.previewScene')">
@@ -66,20 +70,28 @@
             <el-radio-button value="night">{{ $t('morning.periodNight') }}</el-radio-button>
           </el-radio-group>
         </div>
-        <div class="share-tip">{{ $t('morning.previewSceneHint') }}</div>
-      </el-form-item>
-
-      <el-form-item>
-        <el-button @click="onPreview">{{ $t('morning.preview') }}</el-button>
-        <div class="share-tip">{{ $t('morning.previewHint') }}</div>
+        <div class="mo-preview-row">
+          <el-button type="primary" plain @click="onPreview">{{ $t('morning.preview') }}</el-button>
+          <span class="share-tip">{{ $t('morning.previewHint') }}</span>
+        </div>
       </el-form-item>
     </el-form>
-  </div>
+  </el-dialog>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { loadPrefs, MORNING_CARDS, MORNING_SCENE_LABELS, MORNING_SCENES, requestPreview, savePrefs, setPreviewScene } from '@/utils/morning'
+import {
+  loadPrefs,
+  MORNING_CARDS,
+  MORNING_CARD_SIZES,
+  MORNING_SCENES,
+  MORNING_SCENE_LABELS,
+  MORNING_SIZED_CARDS,
+  requestPreview,
+  savePrefs,
+  setPreviewScene,
+} from '@/utils/morning'
 
 const CARD_LABELS = {
   greeting: 'morning.cardGreeting',
@@ -89,6 +101,7 @@ const CARD_LABELS = {
 }
 
 const prefs = reactive(loadPrefs())
+const editorVisible = ref(false)
 
 // 预览场景只存在本页内存里:一是调视觉用的,二是不该悄悄改掉真实天气
 const sceneCondition = ref('live')
@@ -99,24 +112,10 @@ const persist = () => {
     enabled: prefs.enabled,
     greeting: prefs.greeting,
     animation: prefs.animation,
-    cloudStyle: prefs.cloudStyle,
     cards: { ...prefs.cards },
+    sizes: { ...prefs.sizes },
   })
 }
-
-// 云层样式:两个开关互斥,关掉当前这个就切到另一种(始终有一种生效)
-const pickCloudStyle = (style, on) => {
-  prefs.cloudStyle = on ? style : style === 'photo' ? 'random' : 'photo'
-  persist()
-}
-const photoCloud = computed({
-  get: () => prefs.cloudStyle === 'photo',
-  set: (on) => pickCloudStyle('photo', on),
-})
-const randomCloud = computed({
-  get: () => prefs.cloudStyle === 'random',
-  set: (on) => pickCloudStyle('random', on),
-})
 
 // 勾选=显示;取消勾选写回 false(允许全关,只留背景与「开始今天」)
 const cardList = computed({
@@ -140,8 +139,9 @@ const onPreview = () => {
 </script>
 
 <style scoped>
-.mo-lead {
-  margin: 0 0 12px;
+/* 与上面的「显示模式」框拉开一档距离(反馈:贴太近) */
+.mo-settings {
+  margin-top: 16px;
 }
 
 /* 控件行:开关/下拉/分段按钮统一水平排列,窄屏自动换行 */
@@ -150,23 +150,38 @@ const onPreview = () => {
   align-items: center;
   gap: 10px;
 }
-/* 两个云层样式开关上下排开时留一点间距 */
-.mo-cloud-row {
-  margin-top: 6px;
-}
 .setting-label {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text);
 }
 
-/* 预览场景:天气下拉 + 时段分段,两者各自撑开但不挤成一行 */
+/* 组件大小:每张卡一行(卡名 + 三档单选) */
+.mo-size-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0;
+}
+.mo-size-label {
+  width: 72px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* 预览场景:天气下拉 + 时段分段 + 预览按钮 */
 .mo-scene-row {
   flex-wrap: wrap;
   row-gap: 8px;
 }
 .mo-scene-select {
   width: 168px;
+}
+.mo-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .settings-form .el-form-item {
@@ -177,6 +192,9 @@ const onPreview = () => {
 @media (max-width: 768px) {
   .mo-scene-select {
     width: 100%;
+  }
+  .mo-size-row {
+    flex-wrap: wrap;
   }
 }
 </style>

@@ -51,6 +51,8 @@ export const useChatStore = defineStore('chat', {
     roomLoaded: {},
     /** 我可见的聊天室概要:familyId(字符串)→ {familyId,familyName,alias,coverImage,self} */
     roomsMeta: {},
+    /** 本家家庭元数据(名称/封面):左列分组头与会话标题共用,对象列加载时回填 */
+    ownFamily: { name: '', coverImage: '' },
     /** 当前正在看的亲友圈家庭房间 id(null=本家) */
     activeRoomId: null,
     /** 当前家庭房间展示名(打开房间时传入,标题用) */
@@ -579,6 +581,7 @@ export const useChatStore = defineStore('chat', {
       this.roomUnread = {}
       this.roomLoaded = {}
       this.roomsMeta = {}
+      this.ownFamily = { name: '', coverImage: '' }
       this.activeRoomId = null
       this.activeRoomName = ''
       this.activePeer = null

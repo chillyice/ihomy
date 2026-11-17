@@ -1,47 +1,9 @@
-<!-- 聊天输入区:工具条在上(图片/站内/链接/游戏邀请/通话),输入行在下;/chat 页与浮窗共用 -->
+<!-- 聊天输入区:工具条在上(字体/表情/图片/站内/游戏邀请/通话/链接),输入行在下;/chat 页与浮窗共用 -->
 <template>
   <div class="chat-composer">
     <div class="composer-toolbar">
-      <el-tooltip :content="$t('chat.composer.image')" placement="top">
-        <el-button text circle :disabled="!connected || uploading" @click="fileInput?.click()">
-          <el-icon><Picture /></el-icon>
-        </el-button>
-      </el-tooltip>
-      <el-tooltip :content="$t('chat.composer.objects')" placement="top">
-        <el-button text circle :disabled="!connected" @click="pickerVisible = true">
-          <el-icon><FolderOpened /></el-icon>
-        </el-button>
-      </el-tooltip>
-      <el-tooltip :content="$t('chat.composer.link')" placement="top">
-        <el-button text circle :disabled="!connected" @click="openLink">
-          <el-icon><Link /></el-icon>
-        </el-button>
-      </el-tooltip>
-      <el-tooltip :content="$t('chat.composer.game')" placement="top">
-        <el-button text circle :disabled="!connected" @click="gameVisible = true">
-          <el-icon><Trophy /></el-icon>
-        </el-button>
-      </el-tooltip>
-      <el-tooltip :content="$t('chat.composer.call')" placement="top">
-        <el-button text circle :disabled="!connected" @click="openCall">
-          <el-icon><Phone /></el-icon>
-        </el-button>
-      </el-tooltip>
-      <!-- 常用表情:点一下插到光标处,按普通文本发送 -->
-      <el-popover v-model:visible="emojiVisible" placement="top" :width="296" :title="$t('chat.composer.emojiTitle')" trigger="click">
-        <template #reference>
-          <el-button text circle :disabled="!connected" :title="$t('chat.composer.emoji')" :aria-label="$t('chat.composer.emoji')">
-            <span class="emoji-anchor">🙂</span>
-          </el-button>
-        </template>
-        <div class="emoji-panel">
-          <button v-for="e in CHAT_EMOJI" :key="e" type="button" class="emoji-item" :aria-label="e" @click="insertEmoji(e)">
-            {{ e }}
-          </button>
-        </div>
-      </el-popover>
       <!-- 聊天字体:字号对全部消息生效,颜色只管自己的气泡(本机记忆) -->
-      <el-popover v-model:visible="textStyleVisible" placement="top-end" :width="264" trigger="click">
+      <el-popover v-model:visible="textStyleVisible" placement="top-start" :width="264" trigger="click">
         <template #reference>
           <el-button text circle :title="$t('chat.composer.text')" :aria-label="$t('chat.composer.text')">
             <el-icon><Brush /></el-icon>
@@ -82,6 +44,44 @@
           <el-button text size="small" @click="resetTextStyle">{{ $t('chat.composer.fontReset') }}</el-button>
         </div>
       </el-popover>
+      <!-- 常用表情:点一下插到光标处,按普通文本发送 -->
+      <el-popover v-model:visible="emojiVisible" placement="top" :width="296" :title="$t('chat.composer.emojiTitle')" trigger="click">
+        <template #reference>
+          <el-button text circle :disabled="!connected" :title="$t('chat.composer.emoji')" :aria-label="$t('chat.composer.emoji')">
+            <span class="emoji-anchor">🙂</span>
+          </el-button>
+        </template>
+        <div class="emoji-panel">
+          <button v-for="e in CHAT_EMOJI" :key="e" type="button" class="emoji-item" :aria-label="e" @click="insertEmoji(e)">
+            {{ e }}
+          </button>
+        </div>
+      </el-popover>
+      <el-tooltip :content="$t('chat.composer.image')" placement="top">
+        <el-button text circle :disabled="!connected || uploading" @click="fileInput?.click()">
+          <el-icon><Picture /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip :content="$t('chat.composer.objects')" placement="top">
+        <el-button text circle :disabled="!connected" @click="pickerVisible = true">
+          <el-icon><FolderOpened /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip :content="$t('chat.composer.game')" placement="top">
+        <el-button text circle :disabled="!connected" @click="gameVisible = true">
+          <el-icon><Trophy /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip :content="$t('chat.composer.call')" placement="top">
+        <el-button text circle :disabled="!connected" @click="openCall">
+          <el-icon><Phone /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip :content="$t('chat.composer.link')" placement="top">
+        <el-button text circle :disabled="!connected" @click="openLink">
+          <el-icon><Link /></el-icon>
+        </el-button>
+      </el-tooltip>
     </div>
 
     <!-- 待发送卡片草稿(分享注入/站内选择/游戏邀请) -->

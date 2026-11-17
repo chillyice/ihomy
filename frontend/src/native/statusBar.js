@@ -5,13 +5,20 @@
 // (旋转/系统深色切换/字体缩放)时重放;legacy 的 @capacitor/status-bar 不记忆,
 // 事件过后会被 SystemBars 的默认值(DEFAULT=跟系统)盖回去。
 //
-// 底色只在「内容没有延伸到状态栏之下」时才刷:内容能延伸到底时条底透明、直接看到页面
-// 自身底色(theme 的 --color-bg 或独立页根底色),多刷一层反而会盖住页面顶部;
-// 老 WebView(<140)里 WebView 被系统顶下来,那条露出的是窗口背景(跟系统深浅色走),
-// 必须由我们自己刷成页面底色,否则和主题撞色。
-import { SystemBars, SystemBarsStyle } from '@capacitor/core'
+// Android 的窗口底色(decorView)必须由我们自己刷:IhomyWindowBars 把页面根底色刷进窗口,
+// 状态栏/手势条露出来的就是页面底色。原因有二——targetSdk 36 上 setStatusBarColor 已是
+// 废弃且不生效的 API;主题 windowBackground 跟系统深浅色走,华为的深色模式不给应用写
+// uiMode,主题永远停在亮色白底,白底 + 浅色图标就是一片看不见。
+//
+// 内容延伸到状态栏之下时条底透明、直接看到页面自身底色(theme 的 --color-bg 或独立页
+// 根底色);老 WebView(<140)里 WebView 被系统顶下来,那条露出的是窗口背景,同样被
+// IhomyWindowBars 兜住。legacy setBackgroundColor 只在 Android<15 上真正生效,一并保留。
+import { SystemBars, SystemBarsStyle, registerPlugin } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
 import { isAndroidApp, isNativeApp } from '@/utils/platform'
+
+// 窗口底色插件(Android):decorView.setBackgroundColor,详见 window/WindowBarsPlugin.java
+const IhomyWindowBars = registerPlugin('IhomyWindowBars')
 
 // 页面根底色不透明度低于此值视为「没铺底」,继续往上找
 const ALPHA_FLOOR = 0.5
@@ -85,6 +92,8 @@ async function apply() {
   try {
     await SystemBars.setStyle({ style: light ? SystemBarsStyle.Light : SystemBarsStyle.Dark })
     if (isAndroidApp()) {
+      // 窗口底色恒等于页面底色:无论内容是否延伸到状态栏之下,条底都不能再靠主题兜
+      if (color) await IhomyWindowBars.setBackgroundColor({ color }).catch(() => {})
       if (under) await StatusBar.setOverlaysWebView({ overlay: true })
       else if (color) await StatusBar.setBackgroundColor({ color })
     }

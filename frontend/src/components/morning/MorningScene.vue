@@ -18,27 +18,7 @@
       </div>
     </div>
 
-    <RandomClouds
-      v-if="cloudStyle === 'random'"
-      :scene="scene"
-      :night="night"
-      :wind-scale="windScale"
-      :wind-deg="windDeg"
-      :wind-dir="windDir"
-      :animated="animated"
-    />
-    <div v-else :key="sceneKey" class="ms-cloud-field">
-      <img
-        v-for="({ image, style }, i) in movingClouds"
-        :key="i"
-        class="ms-cloud morning-cloud-motion"
-        :src="image"
-        :style="style"
-        alt=""
-        decoding="async"
-        @animationend="recycleCloud($event, i)"
-      />
-    </div>
+    <RandomClouds :scene="scene" :night="night" :wind-scale="windScale" :wind-deg="windDeg" :wind-dir="windDir" :animated="animated" />
 
     <div v-if="animated && scene === 'thunder'" :key="'storm-' + sceneKey" class="ms-lightning">
       <div v-for="(style, i) in strikes" :key="i" class="ms-strike" :style="style">
@@ -58,14 +38,10 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { MORNING_SCENES } from '@/utils/morning'
 import { getSunScene } from '@/utils/windowLight'
-import cloudPuff from '@/assets/morning/cloud-puff.webp'
-import cloudVeil from '@/assets/morning/cloud-veil.webp'
 import lightning from '@/assets/morning/lightning.webp'
 import { pickMorningBackdrop } from './backdrops'
-import { morningWindVector, sampleCloudFlight } from './cloudMotion'
-import { useCloudFlights } from './useCloudFlights'
+import { morningWindVector } from './cloudMotion'
 import RandomClouds from './RandomClouds.vue'
-import './cloudMotion.css'
 
 const props = defineProps({
   condition: { type: String, default: 'clear' },
@@ -76,8 +52,6 @@ const props = defineProps({
   windDir: { type: String, default: '' },
   precipLevel: { type: [Number, String], default: 2 },
   animated: { type: Boolean, default: true },
-  // 云层样式:photo = 照片底图 + 云朵贴图;random = 同一张照片底图上叠代码生成的随机云
-  cloudStyle: { type: String, default: 'photo' },
 })
 
 const photo = ref('')
@@ -137,64 +111,7 @@ const level = computed(() => bound(props.precipLevel, 6, 2))
 
 const drift = computed(() => morningWindVector(props.windDeg, props.windDir))
 
-// 每种天气规定云的密度和高度,具体大小、位置与形状每次重新抽取。
-const SKY_LAYERS = {
-  clear: [
-    [cloudVeil, 68, 17, 42, 0.32],
-    [cloudVeil, 27, 31, 32, 0.24],
-  ],
-  cloud: [
-    [cloudPuff, 23, 16, 62, 0.84],
-    [cloudPuff, 83, 32, 55, 0.74],
-    [cloudVeil, 53, 13, 82, 0.52],
-  ],
-  overcast: [
-    [cloudVeil, 20, 5, 106, 0.74],
-    [cloudVeil, 80, 22, 115, 0.62],
-    [cloudVeil, 45, 39, 93, 0.5],
-  ],
-  rain: [
-    [cloudVeil, 24, 11, 104, 0.64],
-    [cloudVeil, 72, 31, 92, 0.6],
-  ],
-  snow: [
-    [cloudVeil, 43, 10, 114, 0.6],
-    [cloudVeil, 66, 32, 83, 0.48],
-  ],
-  fog: [
-    [cloudVeil, 29, 64, 120, 0.48],
-    [cloudVeil, 72, 76, 132, 0.43],
-  ],
-  thunder: [
-    [cloudVeil, 30, 8, 101, 0.66],
-    [cloudVeil, 74, 26, 110, 0.62],
-  ],
-}
-const { clouds, movingClouds, recycleCloud } = useCloudFlights(drift, wind)
 const strikes = shallowRef([])
-
-function createClouds() {
-  const horizontalShift = rand(-14, 14)
-  return SKY_LAYERS[scene.value].map(([image, left, top, width, opacity], index) => {
-    const size = width * rand(0.76, 1.24)
-    const heightBand = [Math.max(2, top - 16), top + 16]
-    const speedBias = 1 + index * 0.18
-    return {
-      image,
-      heightBand,
-      speedBias,
-      rest: { x: Math.max(2, Math.min(98, left + horizontalShift + rand(-16, 16))), y: Math.max(1, top + rand(-8, 8)) },
-      flight: sampleCloudFlight(heightBand, speedBias, index),
-      style: {
-        width: `clamp(${size * 3.6}px, ${size}vw, ${size * 15}px)`,
-        '--track-opacity': opacity * rand(0.8, 1.08),
-        '--cloud-flip': Math.random() < 0.5 ? -1 : 1,
-        '--cloud-height': rand(0.76, 1.18),
-        '--cloud-tilt': rand(-6, 6) + 'deg',
-      },
-    }
-  })
-}
 
 function createStrikes() {
   const period = rand(13.5, 17.5)
@@ -208,13 +125,12 @@ function createStrikes() {
   }))
 }
 
-// 同一场景固定素材；实况风刷新时只更新运动参数。
+// 同一场景固定素材；云层由 RandomClouds 自管,这里只换底图与闪电。
 watch(
   sceneKey,
   () => {
     photo.value = pickMorningBackdrop(scene.value, props.night)
     loadedPhoto.value = ''
-    clouds.value = createClouds()
     strikes.value = scene.value === 'thunder' ? createStrikes() : []
   },
   { immediate: true },
@@ -308,26 +224,6 @@ watch(
 }
 .ms-loaded {
   opacity: 1;
-}
-.ms-cloud-field {
-  position: absolute;
-  inset: 0;
-}
-.ms-cloud {
-  --cloud-flip: 1;
-  --cloud-height: 1;
-  --cloud-tilt: 0deg;
-  --track-shape: rotate(var(--cloud-tilt)) scale(var(--cloud-flip), var(--cloud-height));
-  height: auto;
-  filter: blur(clamp(1px, 0.15vw, 2px));
-}
-.ms-cond-overcast .ms-cloud,
-.ms-cond-rain .ms-cloud,
-.ms-cond-thunder .ms-cloud {
-  filter: brightness(0.76) saturate(0.66) blur(1px);
-}
-.ms-night .ms-cloud {
-  filter: brightness(0.39) saturate(0.75) blur(1px);
 }
 /* 上缘外同一点发出光晕和光束；水平位置与入射方向继续沿用光尘。 */
 .ms-solar {

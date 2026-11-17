@@ -15,7 +15,6 @@
           :wind-dir="windDir"
           :precip-level="scenePrecipLevel"
           :animated="prefs.animation"
-          :cloud-style="prefs.cloudStyle"
         />
 
         <div class="mo-body">
@@ -30,12 +29,12 @@
 
           <main class="mo-main">
             <div class="mo-hero">
-              <section v-if="cardOn('date')" class="mo-block mo-clock">
+              <section v-if="cardOn('date')" class="mo-block mo-clock" :class="sizeClass('date')">
                 <div class="mo-time">{{ clock.time }}</div>
                 <div class="mo-date">{{ clock.date }} · {{ clock.week }}</div>
               </section>
 
-              <section v-if="cardOn('weather')" class="mo-block mo-weather">
+              <section v-if="cardOn('weather')" class="mo-block mo-weather" :class="sizeClass('weather')">
                 <template v-if="weather">
                   <div class="mo-temp">{{ tempText }}</div>
                   <div class="mo-weather-text">
@@ -48,7 +47,7 @@
               </section>
             </div>
 
-            <section v-if="cardOn('todo')" class="mo-todo">
+            <section v-if="cardOn('todo')" class="mo-todo" :class="sizeClass('todo')">
               <div class="mo-todo-title">{{ $t('morning.todayTodo') }}</div>
               <ul v-if="todoRows.length" class="mo-list">
                 <li v-for="it in todoRows" :key="it.key" class="mo-row" :class="{ done: it.done }">
@@ -212,6 +211,8 @@ const greeting = computed(() => {
 })
 
 const cardOn = (id) => prefs.cards[id] !== false
+// 组件大小档(sm/md/lg):落成 CSS 类,字号在样式里乘 --mo-scale
+const sizeClass = (id) => `mo-size-${prefs.sizes?.[id] || 'md'}`
 const todoRows = computed(() => agenda.value.slice(0, VISIBLE_TODOS))
 const moreCount = computed(() => Math.max(0, agenda.value.length - VISIBLE_TODOS))
 
@@ -476,8 +477,15 @@ onBeforeUnmount(() => {
 .mo-block {
   min-width: 0;
 }
+/* 组件大小档(编辑早安页里选):字号乘 --mo-scale,sm=小 md=标准 lg=大 */
+.mo-size-sm {
+  --mo-scale: 0.72;
+}
+.mo-size-lg {
+  --mo-scale: 1.25;
+}
 .mo-time {
-  font-size: clamp(58px, 12vw, 128px);
+  font-size: calc(clamp(58px, 12vw, 128px) * var(--mo-scale, 1));
   font-weight: 200;
   line-height: 0.92;
   letter-spacing: 0.01em;
@@ -486,14 +494,14 @@ onBeforeUnmount(() => {
 }
 .mo-date {
   margin-top: 10px;
-  font-size: clamp(14px, 2vw, 19px);
+  font-size: calc(clamp(14px, 2vw, 19px) * var(--mo-scale, 1));
   opacity: 0.85;
 }
 .mo-weather {
   text-align: right;
 }
 .mo-temp {
-  font-size: clamp(40px, 7vw, 76px);
+  font-size: calc(clamp(40px, 7vw, 76px) * var(--mo-scale, 1));
   font-weight: 300;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -501,7 +509,7 @@ onBeforeUnmount(() => {
 }
 .mo-weather-text {
   margin-top: 8px;
-  font-size: clamp(15px, 2vw, 20px);
+  font-size: calc(clamp(15px, 2vw, 20px) * var(--mo-scale, 1));
   opacity: 0.92;
 }
 .mo-city {
@@ -509,7 +517,7 @@ onBeforeUnmount(() => {
 }
 .mo-weather-sub {
   margin-top: 6px;
-  font-size: clamp(12.5px, 1.5vw, 15px);
+  font-size: calc(clamp(12.5px, 1.5vw, 15px) * var(--mo-scale, 1));
   opacity: 0.72;
 }
 
@@ -544,7 +552,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: clamp(14px, 1.7vw, 16px);
+  font-size: calc(clamp(14px, 1.7vw, 16px) * var(--mo-scale, 1));
   min-width: 0;
 }
 .mo-row:last-child {

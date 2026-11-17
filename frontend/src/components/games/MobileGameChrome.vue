@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .mobile-game-chrome {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 8px);
   left: calc(env(safe-area-inset-left, 0px) + 8px);
   z-index: var(--z-float);
   display: flex;

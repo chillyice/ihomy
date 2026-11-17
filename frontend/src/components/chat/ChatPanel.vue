@@ -33,12 +33,14 @@
           >
             {{ $t('chat.rail.backFamily') }}
           </button>
+          <!-- 连接状态挂在会话头(框体)上:圆点+短文案,不占消息区之外的独立一行 -->
+          <span class="conn-chip" :class="connected ? 'ok' : 'bad'">
+            <span class="conn-dot" aria-hidden="true"></span>
+            {{ connected ? $t('chat.connected') : connecting ? $t('chat.connecting') : $t('chat.reconnecting') }}
+          </span>
         </div>
         <ChatMessages />
         <ChatComposer />
-        <div class="conn-hint" :class="connected ? 'ok' : 'bad'">
-          {{ connected ? $t('chat.connected') : connecting ? $t('chat.connecting') : $t('chat.reconnecting') }}
-        </div>
       </div>
     </div>
   </div>
@@ -50,6 +52,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Expand, Fold } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
+import { familyApi } from '@/api'
 import { useDevice } from '@/composables/useDevice'
 import { SOCKET_STATUS } from '@/composables/useChatSocket'
 import ChatContactRail from '@/components/chat/ChatContactRail.vue'
@@ -148,14 +151,24 @@ onBeforeUnmount(() => {
   railObserver = null
 })
 
-// 会话标题:本家聊天室 / 亲友圈家庭房间名 / 私聊对方名(打开会话时由对象列传入 store)
+// 会话标题:本家聊天室(显示本家家庭名) / 亲友圈家庭房间名 / 私聊对方名(打开会话时由对象列传入 store)
 const conversationTitle = computed(() => {
   if (chatStore.activePeer != null) {
     return chatStore.activePeerName || t('chat.dm.fallbackTitle', { id: chatStore.activePeer })
   }
   if (chatStore.activeRoomId != null) return chatStore.activeRoomName || t('chat.roomTitle')
-  return t('chat.roomTitle')
+  return chatStore.ownFamily.name || t('chat.roomTitle')
 })
+
+// 对象列收起时它不会加载本家资料:标题缺家庭名就补一次(幂等,有名字就不拉)
+if (!chatStore.ownFamily.name) {
+  familyApi
+    .get()
+    .then((f) => {
+      if (f?.name) chatStore.ownFamily = { name: f.name, coverImage: f.coverImage || '' }
+    })
+    .catch(() => {})
+}
 </script>
 
 <style scoped>
@@ -179,6 +192,7 @@ const conversationTitle = computed(() => {
   min-height: 0;
 }
 .rail-resizer {
+  position: relative;
   flex: none;
   width: 8px;
   margin: 0 -4px;
@@ -188,8 +202,27 @@ const conversationTitle = computed(() => {
   background: transparent;
   transition: background var(--dur-fast) ease;
 }
+/* 把手视觉:骑在分隔线上的一粒圆点(热区仍是 8px 全高,圆点恰好压住分隔线) */
+.rail-resizer::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--color-border);
+  transition:
+    background var(--dur-fast) ease,
+    height var(--dur-fast) ease;
+}
 .rail-resizer:hover {
   background: rgba(var(--color-brand-rgb), 0.18);
+}
+.rail-resizer:hover::before {
+  height: 48px;
+  background: var(--color-brand-text);
 }
 .chat-main-head {
   display: flex;
@@ -228,21 +261,40 @@ const conversationTitle = computed(() => {
   margin-left: auto;
   font-size: 12px;
 }
-.conn-hint {
+/* 连接状态徽标:常在会话头最右,绿点=已连接,红点=连接中/重连 */
+.conn-chip {
   flex-shrink: 0;
-  margin-top: 6px;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
-.conn-hint.ok {
-  color: var(--color-green);
+.conn-chip.ok .conn-dot {
+  background: var(--color-green);
 }
-.conn-hint.bad {
+.conn-chip.bad {
   color: var(--color-danger);
 }
+.conn-chip.bad .conn-dot {
+  background: var(--color-danger);
+  animation: conn-blink 1.2s ease-in-out infinite;
+}
+.conn-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+@keyframes conn-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
 @media (max-width: 768px) {
-  .conn-hint {
-    font-size: 11px;
-    margin-top: 4px;
+  .conn-chip {
+    font-size: 10px;
+    gap: 4px;
   }
 }
 </style>

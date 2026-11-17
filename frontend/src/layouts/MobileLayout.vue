@@ -351,7 +351,7 @@ onMounted(ensureSynced)
   min-height: 100vh;
 }
 .mobile-sub-content {
-  padding-top: calc(48px + env(safe-area-inset-top, 0px));
+  padding-top: calc(48px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   min-height: 100vh;
 }
 /* 游戏沉浸态:撤掉页头占位,整屏交给游戏(安全区由游戏页自身内边距处理) */

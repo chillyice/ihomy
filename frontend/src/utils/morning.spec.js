@@ -36,13 +36,20 @@ describe('normalizePrefs', () => {
     expect(normalizePrefs({ greeting: 'x'.repeat(80) }).greeting).toHaveLength(60)
   })
 
-  it('云层样式只认两种,未知回落到图片云', () => {
-    expect(DEFAULT_PREFS.cloudStyle).toBe('photo')
-    expect(normalizePrefs({}).cloudStyle).toBe('photo')
-    expect(normalizePrefs({ cloudStyle: 'random' }).cloudStyle).toBe('random')
-    expect(normalizePrefs({ cloudStyle: 'photo' }).cloudStyle).toBe('photo')
-    expect(normalizePrefs({ cloudStyle: 'video' }).cloudStyle).toBe('photo')
-    expect(normalizePrefs({ cloudStyle: null }).cloudStyle).toBe('photo')
+  it('组件大小档只认三档,未知回落标准档', () => {
+    expect(normalizePrefs({}).sizes).toEqual({ date: 'md', weather: 'md', todo: 'md' })
+    expect(normalizePrefs({ sizes: { date: 'lg', todo: 'sm', weather: 'xx' } }).sizes).toEqual({
+      date: 'lg',
+      todo: 'sm',
+      weather: 'md',
+    })
+    expect(normalizePrefs({ sizes: 'big' }).sizes).toEqual({ date: 'md', weather: 'md', todo: 'md' })
+  })
+
+  it('旧偏好里的云层样式字段直接忽略(图片云已下线)', () => {
+    const p = normalizePrefs({ cloudStyle: 'photo', sizes: { date: 'lg' } })
+    expect('cloudStyle' in p).toBe(false)
+    expect(p.sizes.date).toBe('lg')
   })
 })
 
@@ -59,16 +66,18 @@ describe('loadPrefs / savePrefs / 每日标记', () => {
     expect(loadLastShown()).toBe('')
   })
 
-  it('savePrefs 合并卡片并广播', () => {
+  it('savePrefs 合并卡片/大小并广播', () => {
     const store = new Map()
     globalThis.localStorage = {
       getItem: (k) => store.get(k) ?? null,
       setItem: (k, v) => store.set(k, v),
     }
-    const next = savePrefs({ enabled: false, cards: { weather: false } })
+    const next = savePrefs({ enabled: false, cards: { weather: false }, sizes: { todo: 'lg' } })
     expect(next.enabled).toBe(false)
     expect(next.cards.weather).toBe(false)
     expect(next.cards.todo).toBe(true)
+    expect(next.sizes.todo).toBe('lg')
+    expect(next.sizes.date).toBe('md')
     expect(loadPrefs()).toEqual(next)
   })
 
