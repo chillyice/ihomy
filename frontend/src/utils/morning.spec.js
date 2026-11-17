@@ -35,6 +35,15 @@ describe('normalizePrefs', () => {
     expect(normalizePrefs({ greeting: 123 }).greeting).toBe('')
     expect(normalizePrefs({ greeting: 'x'.repeat(80) }).greeting).toHaveLength(60)
   })
+
+  it('云层样式只认两种,未知回落到图片云', () => {
+    expect(DEFAULT_PREFS.cloudStyle).toBe('photo')
+    expect(normalizePrefs({}).cloudStyle).toBe('photo')
+    expect(normalizePrefs({ cloudStyle: 'random' }).cloudStyle).toBe('random')
+    expect(normalizePrefs({ cloudStyle: 'photo' }).cloudStyle).toBe('photo')
+    expect(normalizePrefs({ cloudStyle: 'video' }).cloudStyle).toBe('photo')
+    expect(normalizePrefs({ cloudStyle: null }).cloudStyle).toBe('photo')
+  })
 })
 
 describe('loadPrefs / savePrefs / 每日标记', () => {

@@ -7003,6 +7003,11 @@ export default {
     cardWeather: 'Weather & temperature',
     animation: 'Weather motion',
     animationHint: 'Turn this off to show still weather scenes.',
+    cloudStyle: 'Cloud style',
+    cloudStylePhoto: 'Photo clouds',
+    cloudStyleRandom: 'Random clouds',
+    cloudStyleHint:
+      'Photo clouds use real weather photos with cloud sprites; random clouds are drawn in code and reshape with the weather. Keep only one on.',
     previewScene: 'Preview scene',
     previewSceneHint: 'Temporarily swaps the weather for the preview only — it does not change real weather or get saved.',
     sceneLive: 'Live weather',

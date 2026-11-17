@@ -7,10 +7,14 @@ export const MORNING_KEY = 'ihomy:morning:v1'
 export const MORNING_LAST_KEY = 'ihomy:morning:last'
 export const MORNING_CARDS = ['greeting', 'date', 'todo', 'weather']
 
+// 背景云层样式:photo = 天气照片 + 云精灵贴图(默认);random = 纯代码生成的随机柔边云
+export const MORNING_CLOUD_STYLES = ['photo', 'random']
+
 export const DEFAULT_PREFS = {
   enabled: true,
   greeting: '',
   animation: true,
+  cloudStyle: 'photo',
   cards: { greeting: true, date: true, todo: true, weather: true },
 }
 
@@ -34,6 +38,7 @@ export function normalizePrefs(raw) {
     enabled: typeof src.enabled === 'boolean' ? src.enabled : DEFAULT_PREFS.enabled,
     greeting: typeof src.greeting === 'string' ? src.greeting.slice(0, 60) : '',
     animation: typeof src.animation === 'boolean' ? src.animation : DEFAULT_PREFS.animation,
+    cloudStyle: MORNING_CLOUD_STYLES.includes(src.cloudStyle) ? src.cloudStyle : DEFAULT_PREFS.cloudStyle,
     cards,
   }
 }

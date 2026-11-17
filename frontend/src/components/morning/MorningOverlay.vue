@@ -6,7 +6,8 @@
   <Teleport to="body">
     <transition name="morning-fade">
       <div v-if="visible" class="morning-overlay" role="dialog" aria-modal="true" :aria-label="$t('morning.overlayLabel')" @wheel.stop>
-        <MorningScene
+        <component
+          :is="sceneComponent"
           :condition="sceneCondition"
           :night="sceneNight"
           :sun-scene="sunScene"
@@ -108,6 +109,7 @@ import {
 } from '@/utils/morning'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import MorningScene from './MorningScene.vue'
+import MorningSceneRandom from './MorningSceneRandom.vue'
 
 const VISIBLE_TODOS = 6
 const CLOCK_MS = 15000
@@ -124,6 +126,8 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const prefs = reactive(loadPrefs())
 const visible = ref(false)
+// 云层样式:photo = 天气照片 + 云精灵贴图;random = 纯代码随机柔边云。设置页切换,本机记住。
+const sceneComponent = computed(() => (prefs.cloudStyle === 'random' ? MorningSceneRandom : MorningScene))
 const now = ref(new Date())
 const agenda = ref([])
 const toggling = ref(false)

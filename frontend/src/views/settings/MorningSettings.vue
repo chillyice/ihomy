@@ -41,6 +41,19 @@
         <div class="share-tip">{{ $t('morning.animationHint') }}</div>
       </el-form-item>
 
+      <!-- 云层样式二选一:两个开关永远只有一个开着,关掉当前这个就自动落到另一种 -->
+      <el-form-item :label="$t('morning.cloudStyle')">
+        <div class="setting-row">
+          <el-switch v-model="photoCloud" />
+          <span class="setting-label">{{ $t('morning.cloudStylePhoto') }}</span>
+        </div>
+        <div class="setting-row mo-cloud-row">
+          <el-switch v-model="randomCloud" />
+          <span class="setting-label">{{ $t('morning.cloudStyleRandom') }}</span>
+        </div>
+        <div class="share-tip">{{ $t('morning.cloudStyleHint') }}</div>
+      </el-form-item>
+
       <el-form-item :label="$t('morning.previewScene')">
         <div class="setting-row mo-scene-row">
           <el-select v-model="sceneCondition" class="mo-scene-select">
@@ -86,9 +99,24 @@ const persist = () => {
     enabled: prefs.enabled,
     greeting: prefs.greeting,
     animation: prefs.animation,
+    cloudStyle: prefs.cloudStyle,
     cards: { ...prefs.cards },
   })
 }
+
+// 云层样式:两个开关互斥,关掉当前这个就切到另一种(始终有一种生效)
+const pickCloudStyle = (style, on) => {
+  prefs.cloudStyle = on ? style : style === 'photo' ? 'random' : 'photo'
+  persist()
+}
+const photoCloud = computed({
+  get: () => prefs.cloudStyle === 'photo',
+  set: (on) => pickCloudStyle('photo', on),
+})
+const randomCloud = computed({
+  get: () => prefs.cloudStyle === 'random',
+  set: (on) => pickCloudStyle('random', on),
+})
 
 // 勾选=显示;取消勾选写回 false(允许全关,只留背景与「开始今天」)
 const cardList = computed({
@@ -121,6 +149,10 @@ const onPreview = () => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* 两个云层样式开关上下排开时留一点间距 */
+.mo-cloud-row {
+  margin-top: 6px;
 }
 .setting-label {
   font-size: 14px;
