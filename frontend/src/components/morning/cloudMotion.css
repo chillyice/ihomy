@@ -1,0 +1,44 @@
+.morning-cloud-motion {
+  --track-rest-x: 50vw;
+  --track-rest-y: 20vh;
+  --track-from-x: 50vw;
+  --track-from-y: 20vh;
+  --track-to-x: 50vw;
+  --track-to-y: 20vh;
+  --track-from-scale: 1;
+  --track-to-scale: 1;
+  --track-opacity: 0.8;
+  --track-shape: rotate(0deg);
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: var(--track-opacity);
+  transform: translate3d(var(--track-rest-x), var(--track-rest-y), 0) translate(-50%, -50%) var(--track-shape);
+  animation: morning-cloud-track linear infinite;
+}
+
+@keyframes morning-cloud-track {
+  0% {
+    transform: translate3d(var(--track-from-x), var(--track-from-y), 0) translate(-50%, -50%) scale(var(--track-from-scale))
+      var(--track-shape);
+    opacity: 0;
+  }
+  20%,
+  63% {
+    opacity: var(--track-opacity);
+  }
+  100% {
+    transform: translate3d(var(--track-to-x), var(--track-to-y), 0) translate(-50%, -50%) scale(var(--track-to-scale)) var(--track-shape);
+    opacity: 0;
+  }
+}
+
+.morning-cloud-still .morning-cloud-motion {
+  animation-name: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .morning-cloud-motion {
+    animation-name: none;
+  }
+}

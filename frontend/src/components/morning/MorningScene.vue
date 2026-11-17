@@ -1,5 +1,5 @@
 <template>
-  <div class="ms" :class="['ms-cond-' + scene, { 'ms-night': night, 'ms-still': !animated }]" aria-hidden="true">
+  <div class="ms" :class="['ms-cond-' + scene, { 'ms-night': night, 'ms-still morning-cloud-still': !animated }]" aria-hidden="true">
     <img
       v-if="photo"
       :key="photo"
@@ -13,7 +13,6 @@
     />
     <div v-if="solar" class="ms-solar" :style="solarStyle">
       <div class="ms-solar-glow"></div>
-      <div class="ms-sun-disc"></div>
       <div class="ms-source">
         <div v-for="(style, i) in rayStyles" :key="i" class="ms-ray" :style="style"></div>
       </div>
@@ -29,7 +28,15 @@
       :animated="animated"
     />
     <div v-else :key="sceneKey" class="ms-cloud-field">
-      <img v-for="({ image, style }, i) in clouds" :key="i" class="ms-cloud" :src="image" :style="style" alt="" decoding="async" />
+      <img
+        v-for="({ image, style }, i) in movingClouds"
+        :key="i"
+        class="ms-cloud morning-cloud-motion"
+        :src="image"
+        :style="style"
+        alt=""
+        decoding="async"
+      />
     </div>
 
     <div v-if="animated && scene === 'thunder'" :key="'storm-' + sceneKey" class="ms-lightning">
@@ -54,7 +61,9 @@ import cloudPuff from '@/assets/morning/cloud-puff.webp'
 import cloudVeil from '@/assets/morning/cloud-veil.webp'
 import lightning from '@/assets/morning/lightning.webp'
 import { pickMorningBackdrop } from './backdrops'
+import { cloudMotionStyle, morningWindVector } from './cloudMotion'
 import RandomClouds from './RandomClouds.vue'
+import './cloudMotion.css'
 
 const props = defineProps({
   condition: { type: String, default: 'clear' },
@@ -93,7 +102,6 @@ const solarStyle = computed(() => {
   const { source, rotation, palette, lightOpacity } = solar.value
   return {
     '--sun-x': source.x,
-    '--sun-y': source.y,
     '--sun-angle': Math.max(-52, Math.min(52, rotation)) + 'deg',
     '--sun-bloom': palette.bloom,
     '--sun-mid': palette.mid,
@@ -109,7 +117,7 @@ const rayStyles = computed(() => {
   const { rays, palette } = solar.value
   return rays.map(({ width, offset, opacity, blur }, i) => ({
     '--beam-width': beamSpan(width),
-    '--beam-offset': beamSpan(offset * 0.46),
+    '--beam-angle': -offset * 0.045 + 'deg',
     '--beam-alpha': Math.max(0.32, opacity) * (scene.value === 'cloud' ? 0.95 : 0.83),
     animationDuration: 6 + i * 1.55 + 's',
     animationDelay: -i * 1.25 + 's',
@@ -125,32 +133,7 @@ const bound = (value, max, fallback) => {
 const wind = computed(() => bound(props.windScale, 12, 0))
 const level = computed(() => bound(props.precipLevel, 6, 2))
 
-const COMPASS = [
-  '北',
-  '北东北',
-  '东北',
-  '东东北',
-  '东',
-  '东东南',
-  '东南',
-  '南东南',
-  '南',
-  '南西南',
-  '西南',
-  '西西南',
-  '西',
-  '西西北',
-  '西北',
-  '北西北',
-]
-const drift = computed(() => {
-  const numeric = Number.parseFloat(props.windDeg)
-  const from = COMPASS.indexOf(props.windDir.replace(/\s+|风$/g, ''))
-  const angle = Number.isFinite(numeric) ? numeric : from >= 0 ? from * 22.5 : 270
-  // 气象风向是来向;屏幕上向东为右、向南为下。
-  const toward = ((angle + 180) * Math.PI) / 180
-  return { x: Math.sin(toward), y: -Math.cos(toward) }
-})
+const drift = computed(() => morningWindVector(props.windDeg, props.windDir))
 
 // 每种天气规定云的密度和高度,具体大小、位置与形状每次重新抽取。
 const SKY_LAYERS = {
@@ -187,28 +170,30 @@ const SKY_LAYERS = {
 }
 const clouds = shallowRef([])
 const strikes = shallowRef([])
+const movingClouds = computed(() => {
+  const vector = drift.value
+  const level = wind.value
+  return clouds.value.map(({ image, anchor, phase, speed, style }) => ({
+    image,
+    style: { ...style, ...cloudMotionStyle(vector, level, anchor, phase, speed) },
+  }))
+})
 
 function createClouds() {
-  const { x, y } = drift.value
-  const distance = scene.value === 'fog' ? 38 : 94
   const horizontalShift = rand(-14, 14)
   return SKY_LAYERS[scene.value].map(([image, left, top, width, opacity, phase], index) => {
-    const duration = Math.max(20, 85 * 0.83 ** wind.value * (1 + index * 0.22) * rand(0.78, 1.31))
     const size = width * rand(0.76, 1.24)
     return {
       image,
+      anchor: { x: Math.max(2, Math.min(98, left + horizontalShift + rand(-16, 16))), y: Math.max(1, top + rand(-8, 8)) },
+      phase: phase + rand(-0.08, 0.08),
+      speed: (1 + index * 0.18) * rand(0.85, 1.15),
       style: {
-        left: Math.max(2, Math.min(98, left + horizontalShift + rand(-16, 16))) + '%',
-        top: Math.max(1, top + rand(-8, 8)) + '%',
         width: `clamp(${size * 3.6}px, ${size}vw, ${size * 15}px)`,
-        '--cloud-x': x * distance * rand(0.82, 1.18) + 'vw',
-        '--cloud-y': y * rand(14, 26) + 'vh',
-        '--cloud-alpha': opacity * rand(0.8, 1.08),
+        '--track-opacity': opacity * rand(0.8, 1.08),
         '--cloud-flip': Math.random() < 0.5 ? -1 : 1,
         '--cloud-height': rand(0.76, 1.18),
         '--cloud-tilt': rand(-6, 6) + 'deg',
-        animationDuration: duration + 's',
-        animationDelay: -(phase + rand(-0.12, 0.12)) * duration + 's',
       },
     }
   })
@@ -226,7 +211,7 @@ function createStrikes() {
   }))
 }
 
-// 同一场景打开期间固定素材和初始路径,实况温度或风级刷新时不重新抽签。
+// 同一场景固定素材和航道；实况风刷新时只更新运动参数。
 watch(
   sceneKey,
   () => {
@@ -332,19 +317,12 @@ watch(
   inset: 0;
 }
 .ms-cloud {
-  --cloud-x: 0vw;
-  --cloud-y: 0vh;
-  --cloud-alpha: 0.6;
   --cloud-flip: 1;
   --cloud-height: 1;
   --cloud-tilt: 0deg;
-  --cloud-shape: rotate(var(--cloud-tilt)) scale(var(--cloud-flip), var(--cloud-height));
-  position: absolute;
+  --track-shape: rotate(var(--cloud-tilt)) scale(var(--cloud-flip), var(--cloud-height));
   height: auto;
-  opacity: var(--cloud-alpha);
-  transform: translate(-50%, -50%) var(--cloud-shape);
   filter: blur(clamp(1px, 0.15vw, 2px));
-  animation: ms-cloud-drift linear infinite;
 }
 .ms-cond-overcast .ms-cloud,
 .ms-cond-rain .ms-cloud,
@@ -354,25 +332,10 @@ watch(
 .ms-night .ms-cloud {
   filter: brightness(0.39) saturate(0.75) blur(1px);
 }
-@keyframes ms-cloud-drift {
-  0% {
-    opacity: 0;
-    transform: translate(calc(-50% - var(--cloud-x) * 0.5), calc(-50% - var(--cloud-y) * 0.5)) var(--cloud-shape);
-  }
-  15%,
-  85% {
-    opacity: var(--cloud-alpha);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(calc(-50% + var(--cloud-x) * 0.5), calc(-50% + var(--cloud-y) * 0.5)) var(--cloud-shape);
-  }
-}
-
-/* 沿用光尘的水平位置与入射方向,日盘和光束在天气画面中共用上缘的光源。 */
+/* 上缘外同一点发出光晕和光束；水平位置与入射方向继续沿用光尘。 */
 .ms-solar {
   --sun-x: 50%;
-  --sun-y: -15%;
+  --sun-y: min(-28px, -5vmin);
   --sun-angle: 0deg;
   --sun-bloom: transparent;
   --sun-mid: transparent;
@@ -385,11 +348,10 @@ watch(
   mask-image: var(--solar-mask);
 }
 .ms-solar-glow,
-.ms-sun-disc,
 .ms-source {
   position: absolute;
   left: var(--sun-x);
-  top: calc(var(--sun-y) + 21%);
+  top: var(--sun-y);
 }
 .ms-solar-glow {
   width: clamp(232px, 51vmin, 530px);
@@ -400,14 +362,6 @@ watch(
   opacity: calc(var(--sun-strength) * 0.8);
   animation: ms-glow-drift 11s ease-in-out infinite alternate;
 }
-.ms-sun-disc {
-  width: clamp(19px, 2.7vmin, 29px);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 29%, #fff6dc 43%, rgba(255, 221, 166, 0.64) 58%, transparent 74%);
-  filter: blur(1.2px);
-}
 .ms-source {
   width: 0;
   height: 0;
@@ -416,7 +370,7 @@ watch(
 }
 .ms-ray {
   --beam-width: 0px;
-  --beam-offset: 0px;
+  --beam-angle: 0deg;
   --beam-alpha: 0;
   position: absolute;
   top: 0;
@@ -424,7 +378,7 @@ watch(
   width: var(--beam-width);
   height: 116vh;
   opacity: var(--beam-alpha);
-  transform: translateX(var(--beam-offset)) scaleX(0.83);
+  transform: rotate(var(--beam-angle)) scaleX(0.83);
   transform-origin: top center;
   animation: ms-beam-drift ease-in-out infinite alternate;
 }
@@ -447,21 +401,21 @@ watch(
 @keyframes ms-beam-drift {
   from {
     opacity: calc(var(--beam-alpha) * 0.57);
-    transform: translateX(var(--beam-offset)) rotate(-1.5deg) scaleX(0.7);
+    transform: rotate(calc(var(--beam-angle) - 1.5deg)) scaleX(0.7);
   }
   to {
     opacity: var(--beam-alpha);
-    transform: translateX(var(--beam-offset)) rotate(1.5deg) scaleX(1.08);
+    transform: rotate(calc(var(--beam-angle) + 1.5deg)) scaleX(1.08);
   }
 }
 @keyframes ms-beam-through-cloud {
   from {
     opacity: calc(var(--beam-alpha) * 0.28);
-    transform: translateX(var(--beam-offset)) rotate(-1.7deg) scaleX(0.68);
+    transform: rotate(calc(var(--beam-angle) - 1.7deg)) scaleX(0.68);
   }
   to {
     opacity: var(--beam-alpha);
-    transform: translateX(var(--beam-offset)) rotate(1.7deg) scaleX(1.14);
+    transform: rotate(calc(var(--beam-angle) + 1.7deg)) scaleX(1.14);
   }
 }
 
@@ -580,7 +534,6 @@ watch(
 .ms-night .ms-scrim {
   background: linear-gradient(180deg, rgba(5, 10, 22, 0.15), rgba(5, 10, 22, 0.13) 55%, rgba(5, 10, 22, 0.45));
 }
-.ms-still .ms-cloud,
 .ms-still .ms-source,
 .ms-still .ms-ray,
 .ms-still .ms-solar-glow {
@@ -592,7 +545,6 @@ watch(
   .ms-lightning {
     display: none;
   }
-  .ms-cloud,
   .ms-source,
   .ms-ray,
   .ms-solar-glow {
