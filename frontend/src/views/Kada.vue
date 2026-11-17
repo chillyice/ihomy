@@ -243,7 +243,7 @@ import { serverUrl } from '@/utils/assetUrl'
 // ⚠ 换版本时同步:version 常量、下面各包的 meta 体积、服务器上的同名文件。
 const version = '1.1.0'
 const fileSize = '14.0 MB'
-const androidVersion = '0.2.0-s4'
+const androidVersion = '0.2.0-s7'
 const androidApk = `kada-android-${androidVersion}-debug.apk`
 const repoUrl = 'https://github.com/chillyice/Kada'
 const releasesUrl = `${repoUrl}/releases`
@@ -342,7 +342,7 @@ const platforms = [
     icon: platformIcons.android,
     nameKey: 'kada.platAndroid',
     archKey: 'kada.archAndroid',
-    downloads: [{ labelKey: 'kada.dlAndroidApk', meta: '7.7 MB', href: fileUrl(androidApk), primary: true, local: true }],
+    downloads: [{ labelKey: 'kada.dlAndroidApk', meta: '8.1 MB', href: fileUrl(androidApk), primary: true, local: true }],
   },
 ]
 
