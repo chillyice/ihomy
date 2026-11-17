@@ -715,13 +715,36 @@ watch(
 .wtm-moon-days span {
   white-space: nowrap;
 }
+/* 纵屏保持三列:9 个时刻按「凌晨三档 → 日出/正午/日落 → 傍晚三档」各成一行,
+   三行之间的对称关系(天文/航海/民用)一眼能对照;两列会把同组拆散、行数也跟着变多。 */
 @media (max-width: 900px) {
   .wtm-times {
-    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+  }
+  .wtm-time {
+    padding: 5px 6px;
+  }
+  .wtm-time-t {
+    font-size: 12.5px;
+  }
+  .wtm-time-l {
+    font-size: 9.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .wtm-moon-days {
     margin-left: 0;
     justify-content: flex-start;
+  }
+}
+/* 极窄(小屏手机竖屏):再压一档内边距,保证三列不被撑破 */
+@media (max-width: 400px) {
+  .wtm-time {
+    padding: 4px 5px;
+  }
+  .wtm-time-l {
+    font-size: 9px;
   }
 }
 </style>
