@@ -72,6 +72,8 @@ const RUNTIME_VARS = {
   '--cy-sh-x': 'Chillyice 投影偏移',
   '--cy-sh-y': 'Chillyice 投影偏移',
   '--cy-warm-a': 'Chillyice 暖光强度',
+  '--chat-font-size': '聊天字号偏好(ChatMessages 按本机设置内联注入)',
+  '--chat-color': '自己气泡的文字颜色(ChatMessages 按本机设置内联注入)',
 }
 
 const isAllowedVar = (name) =>

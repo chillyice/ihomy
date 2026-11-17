@@ -1,12 +1,15 @@
 <!-- 聊天消息列表:/chat 页与全局浮窗(P2)共用。数据源 stores/chat.js,
-     新消息到达按滚动位置决定自动回底或出「新消息」浮标;气泡按 msgType 分发卡片 -->
+      新消息到达贴着底部就自动跟到底,翻历史期间累计成右上角「N 条新消息」,
+      点一下跳到这一批的第一条未读;气泡按 msgType 分发卡片 -->
 <template>
-  <div class="chat-messages">
+  <div class="chat-messages" :style="textStyleVars">
     <div ref="msgBox" class="msg-list" v-loading="loading" @scroll="onMsgScroll">
       <el-empty v-if="!loading && !messages.length" :description="$t('chat.noData')" :image-size="70" />
       <TransitionGroup name="msg" tag="div">
-        <div v-for="m in messages" :key="m.id" class="msg-row" :class="{ mine: m.senderId === myId }">
-          <el-avatar :size="30" class="msg-avatar">{{ m.senderName?.charAt(0) }}</el-avatar>
+        <div v-for="m in messages" :key="m.id" class="msg-row" :class="{ mine: m.senderId === myId }" :data-mid="m.id">
+          <el-avatar :size="30" class="msg-avatar" :src="m.senderAvatar || ''" :alt="m.senderName || ''">
+            {{ m.senderName?.charAt(0) }}
+          </el-avatar>
           <div class="msg-body">
             <div class="msg-meta">{{ m.senderName }} · {{ fmtTime(m.createdAt) }}</div>
             <div class="msg-bubble" :class="{ 'is-card': isCard(m) }">
@@ -18,48 +21,67 @@
       </TransitionGroup>
     </div>
 
-    <!-- 翻历史时的新消息浮标:点一下回到底部 -->
-    <button v-if="unreadNew > 0" type="button" class="msg-jump" @click="scrollBottom({ clearUnread: true })">
-      {{ $t('chat.newMessages', { n: unreadNew }) }}
+    <!-- 新消息浮标:窗口右上角,点一下跳到本批第一条未读(不是直接到底) -->
+    <button v-if="jumpCount > 0" type="button" class="msg-jump" :title="$t('chat.jumpUnread')" @click="jumpToFirstUnread">
+      {{ $t('chat.newMessages', { n: jumpCount }) }}
     </button>
   </div>
 </template>
 
 <script setup>
 // 消息区:仅展示与滚动,连接/收发在 stores/chat.js;卡片渲染见 cards/*
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { useChatTextStyle } from '@/composables/useChatTextStyle'
 import { MSG_TYPE } from '@/utils/chatMsg'
 import MsgCardHost from '@/components/chat/cards/MsgCardHost.vue'
 
 const userStore = useUserStore()
 const chatStore = useChatStore()
+const { style: textStyle } = useChatTextStyle()
 const myId = computed(() => userStore.userInfo?.id)
 const messages = computed(() => chatStore.activeMessages)
 // 历史没到位才转圈;WS 已经把消息推上来时不能还盖着遮罩(旧版只看 hydrated,浮窗首次展开会一直转)
 const loading = computed(() => !chatStore.activeLoaded && !messages.value.length)
 
+// 字号作用于全部消息,颜色只作用于自己的气泡(未选色时跟随主题)
+const textStyleVars = computed(() => ({
+  '--chat-font-size': `${textStyle.value.size}px`,
+  ...(textStyle.value.color ? { '--chat-color': textStyle.value.color } : {}),
+}))
+
 const msgBox = ref(null)
 // 距底多少像素内算「贴着底部」:在这个范围内收消息才自动滚
 const NEAR_BOTTOM_PX = 80
-// 用户在翻历史时累计的新消息条数,点浮标或自己滚回底部即清零
-const unreadNew = ref(0)
+// 是否贴着底部(默认贴底:进会话看最新,来新消息跟着走);用户主动往上翻历史后暂停
+let stickBottom = true
+// 翻历史期间累计的新消息 {count, firstId};自己滚回底部即清零
+const liveNew = ref(null)
 
 const isCard = (m) => m.msgType && m.msgType !== MSG_TYPE.TEXT
 
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(5, 16) : '')
 
-// WS 新消息到达(含自己发的):贴底/自己发的回底部,否则累计浮标计数。
-// 消息本体已由 store 进缓存,这里只处理滚动。
-watch(
-  () => chatStore.lastIncoming,
-  (m) => {
-    if (!m) return
-    if (m.senderId === myId.value || isNearBottom()) scrollBottom({ clearUnread: true })
-    else unreadNew.value += 1
-  },
-)
+const peerKey = computed(() => (chatStore.activePeer == null ? null : String(chatStore.activePeer)))
+
+/** 进会话时服务端报的未读锚点(家庭流 / 当前私聊) */
+const anchor = computed(() => {
+  const a = chatStore.unreadAnchor
+  if (!a || a.key !== peerKey.value) return null
+  return a
+})
+
+/** 浮标显示哪一批:翻历史期间的新消息优先,否则是进会话时的未读锚点 */
+const jumpTarget = computed(() => liveNew.value || anchor.value)
+const jumpCount = computed(() => jumpTarget.value?.count || 0)
+
+/** 是否是当前会话的消息(store 的 lastIncoming 家庭/私聊共用一份) */
+const belongsHere = (m) => {
+  if (!m) return false
+  if (m.dm && m.dm.userId != null) return peerKey.value != null && String(m.dm.userId) === peerKey.value
+  return peerKey.value == null
+}
 
 /** 是否贴着底部(必须在插入新消息之前判断:插入后高度已变) */
 const isNearBottom = () => {
@@ -68,29 +90,95 @@ const isNearBottom = () => {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
 }
 
-const scrollBottom = ({ clearUnread = false } = {}) => {
-  if (clearUnread) unreadNew.value = 0
-  requestAnimationFrame(() => {
-    if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight
-  })
+const scrollBottom = ({ smooth = false } = {}) => {
+  const el = msgBox.value
+  if (!el) return
+  if (smooth) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  else el.scrollTop = el.scrollHeight
 }
 
-/** 自己滚回底部时浮标自然消失;回调只做一次布尔判断,不需要节流 */
+/** 贴底时补一次:图片/卡片是异步撑开高度的,收完消息立刻贴底仍会被顶上一截 */
+const pinIfSticky = () => {
+  if (stickBottom) scrollBottom()
+}
+
+/** 跳到某条消息:滚到可视区上部,短暂高亮一下好找到 */
+const scrollToMessage = (id) => {
+  const el = msgBox.value
+  const row = el?.querySelector(`[data-mid="${id}"]`)
+  if (!el || !row) {
+    scrollBottom()
+    return
+  }
+  const top = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12
+  el.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  row.classList.add('msg-flash')
+  setTimeout(() => row.classList.remove('msg-flash'), 1600)
+}
+
+/** 点浮标:跳到本批第一条未读,而不是直接到底(底部永远能看到,先看从哪开始漏的) */
+const jumpToFirstUnread = () => {
+  const target = jumpTarget.value
+  if (!target) return
+  scrollToMessage(target.firstId)
+  chatStore.clearUnreadAnchor()
+  liveNew.value = null
+}
+
+// WS 新消息到达(含自己发的):贴底/自己发的回底部,否则累计浮标计数。
+// 消息本体已由 store 进缓存,这里只处理滚动。
+watch(
+  () => chatStore.lastIncoming,
+  (m) => {
+    if (!belongsHere(m)) return
+    if (m.senderId === myId.value) {
+      stickBottom = true
+      liveNew.value = null
+      scrollBottom()
+      setTimeout(pinIfSticky, 320)
+      return
+    }
+    if (stickBottom) {
+      scrollBottom()
+      setTimeout(pinIfSticky, 320)
+    } else {
+      const prev = liveNew.value
+      liveNew.value = { count: (prev?.count || 0) + 1, firstId: prev?.firstId ?? m.id }
+    }
+  },
+)
+
+/** 自己滚回底部时浮标自然消失;往上翻则暂停自动跟底 */
 const onMsgScroll = () => {
-  if (unreadNew.value > 0 && isNearBottom()) unreadNew.value = 0
+  if (isNearBottom()) {
+    stickBottom = true
+    liveNew.value = null
+  } else {
+    stickBottom = false
+  }
 }
 
 onMounted(() => {
-  scrollBottom({ clearUnread: true })
+  stickBottom = true
+  nextTick(() => {
+    scrollBottom()
+    // 首屏图片加载完会再撑高一次
+    setTimeout(pinIfSticky, 400)
+  })
 })
-onBeforeUnmount(() => {})
 
-// 切换会话(家庭⇄私聊)重置滚动与浮标
+// 切换会话(家庭⇄私聊)重置滚动与浮标;进来先看最新
+watch(peerKey, () => {
+  stickBottom = true
+  liveNew.value = null
+  nextTick(() => scrollBottom())
+})
+
+// 历史补拉完成后高度变化很大,重新贴底
 watch(
-  () => chatStore.activePeer,
+  () => messages.value.length,
   () => {
-    unreadNew.value = 0
-    scrollBottom({ clearUnread: true })
+    if (stickBottom) nextTick(pinIfSticky)
   },
 )
 </script>
@@ -160,7 +248,7 @@ watch(
   background: var(--color-card-2);
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: var(--chat-font-size, 14px);
   line-height: 1.5;
   word-break: break-word;
   display: inline-block;
@@ -169,6 +257,7 @@ watch(
 .msg-row.mine .msg-bubble {
   background: rgba(var(--color-brand-rgb), 0.16);
   text-align: left;
+  color: var(--chat-color, inherit);
 }
 /* 卡片消息去掉内边距,由卡片自带留白 */
 .msg-bubble.is-card {
@@ -179,26 +268,35 @@ watch(
   background: transparent;
 }
 
-/* 翻历史时的新消息浮标:浮在输入区上方居中 */
+/* 跳到第一条未读时闪一下,方便定位 */
+.msg-flash .msg-bubble {
+  box-shadow: 0 0 0 2px rgba(var(--color-brand-rgb), 0.55);
+  transition: box-shadow 0.3s ease;
+}
+
+/* 新消息浮标:窗口右上角,不压住最新一条 */
 .msg-jump {
   position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
+  right: 6px;
+  top: 6px;
   z-index: var(--z-action);
-  padding: 5px 14px;
-  border: none;
+  max-width: calc(100% - 12px);
+  padding: 4px 12px;
+  border: 1px solid rgba(var(--color-brand-rgb), 0.4);
   border-radius: 999px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--color-brand-text);
   background: rgba(var(--color-brand-rgb), 0.92);
   box-shadow: var(--shadow);
   transition: transform var(--dur-fast) var(--ease-soft);
 }
 .msg-jump:hover {
-  transform: translateX(-50%) translateY(-1px);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
@@ -210,7 +308,6 @@ watch(
     font-size: 11px;
   }
   .msg-bubble {
-    font-size: 14px;
     padding: 8px 10px;
   }
   .msg-bubble.is-card {

@@ -2419,3 +2419,21 @@ html.elder-mode .card,
 html.elder-mode .settings-card {
   border-width: 2px;
 }
+
+/* ===== 手机端聊天抽屉(html.chat-sheet-open 由 ChatFloat 挂/摘)=====
+   抽屉固定贴在下边缘、高度 52vh(ChatFloat 里的 --chat-sheet-h 同值),会盖住底栏;
+   内容页按抽屉高度补下边距,滚到底部也能完整看到最后一行,不必先关掉聊天。
+   抽屉本身不参与布局,「实在让不开」的页面(沉浸页/游戏页)保持被盖住即可。 */
+html.chat-sheet-open .mobile-layout .mobile-tab-content,
+html.chat-sheet-open .mobile-layout .mobile-sub-content {
+  padding-bottom: calc(var(--chat-sheet-h, 52vh) + env(safe-area-inset-bottom, 0px) + 12px);
+}
+/* 抽屉高度:ChatFloat 的 .chat-float-sheet 与上面的内容页下边距共用这一个值(移动端用 dvh,地址栏收起时更准) */
+html.chat-sheet-open {
+  --chat-sheet-h: 52vh;
+}
+@supports (height: 100dvh) {
+  html.chat-sheet-open {
+    --chat-sheet-h: 52dvh;
+  }
+}

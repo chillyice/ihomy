@@ -10,9 +10,10 @@ export const FLOAT_APPROACH_ZONE = 260
  * 浮窗「拖到底部删除」状态机(聊天浮窗 / 悬浮播放器共用)。
  * 调用顺序:拖动位移超过阈值后 begin() → 每次指针移动 update(clientY) → 松手 end() 返回是否命中。
  * begin 之前不动状态,所以「点一下悬浮球」不会被误判成删除(调用方先过 6px 位移阈值);
- * 删除条只在指针进入窗口下方 FLOAT_APPROACH_ZONE 才出现,进入 FLOAT_DELETE_ZONE 才亮。
+ * 删除条只在指针进入窗口下方 approachZone 才出现,进入 deleteZone 才亮。
+ * 手机端悬浮球本来就贴在底部,热区默认收窄一点(由调用方传参),免得随手拖一下就删掉。
  */
-export function useFloatDelete() {
+export function useFloatDelete({ deleteZone = FLOAT_DELETE_ZONE, approachZone = FLOAT_APPROACH_ZONE } = {}) {
   const dragging = ref(false)
   const active = ref(false)
   const over = ref(false)
@@ -23,8 +24,8 @@ export function useFloatDelete() {
   const update = (clientY) => {
     if (!dragging.value) return
     const fromBottom = window.innerHeight - clientY
-    active.value = fromBottom <= FLOAT_APPROACH_ZONE
-    over.value = fromBottom <= FLOAT_DELETE_ZONE
+    active.value = fromBottom <= approachZone
+    over.value = fromBottom <= deleteZone
   }
   const end = () => {
     const hit = dragging.value && over.value

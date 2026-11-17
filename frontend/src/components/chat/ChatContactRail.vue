@@ -1,6 +1,6 @@
 <template>
   <!-- 聊天对象列:家庭聊天室 + 本家成员 + 亲友圈(圈内家庭→成员);点成员开私聊 -->
-  <aside class="chat-rail">
+  <aside class="chat-rail" :class="{ narrow }">
     <button type="button" class="rail-item rail-family" :class="{ active: chatStore.activePeer == null }" @click="chatStore.closeDm()">
       <el-icon :size="16"><HomeFilled /></el-icon>
       <span class="rail-name">{{ $t('chat.rail.family') }}</span>
@@ -60,6 +60,9 @@ import { HomeFilled } from '@element-plus/icons-vue'
 import { circleApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+
+// narrow:对象列被拖到只剩头像宽时,名字/角标收起来(未读改成头像上的小红点)
+defineProps({ narrow: { type: Boolean, default: false } })
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
@@ -216,6 +219,32 @@ onMounted(load)
 }
 .rail-family-loading {
   height: 28px;
+}
+/* 拖到只剩头像宽:收起文字与分组标题,未读缩成头像上的小红点 */
+.chat-rail.narrow {
+  padding-right: 2px;
+  margin-right: 0;
+}
+.chat-rail.narrow .rail-group-label,
+.chat-rail.narrow .rail-name,
+.chat-rail.narrow .rail-family-tag {
+  display: none;
+}
+.chat-rail.narrow .rail-item {
+  position: relative;
+  justify-content: center;
+  padding: 6px 0;
+}
+.chat-rail.narrow .rail-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
 }
 @media (max-width: 768px) {
   .chat-rail {

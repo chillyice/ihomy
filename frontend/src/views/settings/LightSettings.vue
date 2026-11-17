@@ -131,6 +131,7 @@ const enterLightTest = () => {
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效。
 // 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置)、ihomy:chat:float:v1(ChatFloat 悬浮球位置)、
 // ihomy:chat:panel:v1(ChatFloat 面板位置/尺寸)、ihomy:chat:rail:v1(聊天对象列收起)、
+// ihomy:chat:rail:w:v1(聊天对象列宽度)、ihomy:chat:text:v1(聊天字号/自己气泡颜色)、
 // ihomy:games:lastRoomGame(一起玩默认游戏)、ihomy:room:autoReady(自动准备)、
 // ihomy:mahjong3d:view(立体麻将视角偏好)、
 // ihomy:call:mini:v1(通话小窗位置)、ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
@@ -153,6 +154,8 @@ const resetPanelLayout = () => {
       localStorage.removeItem('ihomy:chat:float:v1')
       localStorage.removeItem('ihomy:chat:panel:v1')
       localStorage.removeItem('ihomy:chat:rail:v1')
+      localStorage.removeItem('ihomy:chat:rail:w:v1')
+      localStorage.removeItem('ihomy:chat:text:v1')
       localStorage.removeItem('ihomy:games:lastRoomGame')
       localStorage.removeItem('ihomy:room:autoReady')
       localStorage.removeItem('ihomy:mahjong3d:view')

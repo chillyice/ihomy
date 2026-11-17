@@ -6,7 +6,7 @@
     <div class="chat-box card">
       <div class="chat-title">
         <span class="chat-title-text"
-          >{{ $t('chat.roomTitle') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span></span
+          >{{ $t('chat.title') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span></span
         >
         <!-- 浮窗开关:关掉后全局聊天浮窗不再显示;拖到底部删除条关的也是它 -->
         <label class="float-toggle">

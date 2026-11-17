@@ -52,10 +52,10 @@ public class ChatService {
         // 倒序查出,翻转为时间正序返回
         java.util.Collections.reverse(list);
 
-        Map<Long, String> names = fuzzyNames(list);
+        Map<Long, Sender> senders = messageSenders(list);
         List<Map<String, Object>> result = new ArrayList<>();
         for (ChatMessage m : list) {
-            result.add(toView(m, names));
+            result.add(toView(m, senders));
         }
         return result;
     }
@@ -75,7 +75,7 @@ public class ChatService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("unread", count);
         result.put("lastMsgId", lastId);
-        result.put("lastMsg", last == null ? null : toView(last, fuzzyNames(List.of(last))));
+        result.put("lastMsg", last == null ? null : toView(last, messageSenders(List.of(last))));
         return result;
     }
 
@@ -235,7 +235,7 @@ public class ChatService {
 
     /** 单条消息的统一视图(WS 广播与 REST 历史同构,带发送人昵称) */
     public Map<String, Object> view(ChatMessage m) {
-        return toView(m, fuzzyNames(List.of(m)));
+        return toView(m, messageSenders(List.of(m)));
     }
 
     /**
@@ -348,10 +348,10 @@ public class ChatService {
                 .orderByDesc(ChatDmMessage::getId)
                 .last("LIMIT " + Math.min(Math.max(limit, 1), 200)));
         java.util.Collections.reverse(list);
-        Map<Long, String> names = dmNames(list);
+        Map<Long, Sender> senders = dmSenders(list);
         List<Map<String, Object>> out = new ArrayList<>();
         for (ChatDmMessage m : list) {
-            Map<String, Object> v = dmView(m, names);
+            Map<String, Object> v = dmView(m, senders);
             v.put("peerId", userId.equals(m.getSenderId()) ? m.getRecipientId() : m.getSenderId());
             out.add(v);
         }
@@ -367,15 +367,17 @@ public class ChatService {
                 .last("LIMIT 500"));
         Map<Long, List<ChatDmMessage>> bySender = list.stream()
                 .collect(Collectors.groupingBy(ChatDmMessage::getSenderId, LinkedHashMap::new, Collectors.toList()));
-        Map<Long, String> names = dmNames(list);
+        Map<Long, Sender> senders = dmSenders(list);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map.Entry<Long, List<ChatDmMessage>> e : bySender.entrySet()) {
             List<ChatDmMessage> rows = e.getValue();
+            Sender sender = senders.get(e.getKey());
             Map<String, Object> v = new LinkedHashMap<>();
             v.put("userId", e.getKey());
-            v.put("name", names.getOrDefault(e.getKey(), "成员"));
+            v.put("name", sender == null || sender.name() == null ? "成员" : sender.name());
+            v.put("avatar", sender == null ? null : sender.avatar());
             v.put("unread", rows.size());
-            v.put("lastMsg", dmView(rows.get(rows.size() - 1), names));
+            v.put("lastMsg", dmView(rows.get(rows.size() - 1), senders));
             out.add(v);
         }
         return out;
@@ -446,21 +448,40 @@ public class ChatService {
         return last == null ? 0 : last.getId();
     }
 
-    /** 批查发送人昵称(避免每条消息一次查询) */
-    private Map<Long, String> fuzzyNames(List<ChatMessage> messages) {
-        if (messages.isEmpty()) {
-            return java.util.Map.of();
+    /** 发送人展示信息(昵称 + 头像):一次批查回填,避免 N+1 */
+    private record Sender(String name, String avatar) {}
+
+    /** 按发送人 id 批查展示信息;昵称缺失回退用户名,再缺回退占位名 */
+    private Map<Long, Sender> senders(List<Long> ids) {
+        List<Long> distinct = ids.stream().filter(java.util.Objects::nonNull).distinct().collect(Collectors.toList());
+        if (distinct.isEmpty()) {
+            return Map.of();
         }
-        List<Long> ids = messages.stream().map(ChatMessage::getSenderId).distinct().collect(Collectors.toList());
-        return sysUserMapper.selectBatchIds(ids).stream()
-                .collect(Collectors.toMap(SysUser::getId, SysUser::getNickname));
+        Map<Long, Sender> out = new LinkedHashMap<>();
+        for (SysUser u : sysUserMapper.selectBatchIds(distinct)) {
+            String name = u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername();
+            out.put(u.getId(), new Sender(name, u.getAvatar()));
+        }
+        return out;
     }
 
-    private Map<String, Object> toView(ChatMessage m, Map<Long, String> names) {
+    /** 消息列表里出现过的发送人 */
+    private Map<Long, Sender> messageSenders(List<ChatMessage> messages) {
+        return senders(messages.stream().map(ChatMessage::getSenderId).collect(Collectors.toList()));
+    }
+
+    /** 私聊消息里出现过的发送人 */
+    private Map<Long, Sender> dmSenders(List<ChatDmMessage> messages) {
+        return senders(messages.stream().map(ChatDmMessage::getSenderId).collect(Collectors.toList()));
+    }
+
+    private Map<String, Object> toView(ChatMessage m, Map<Long, Sender> senders) {
+        Sender sender = senders.get(m.getSenderId());
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("id", m.getId());
         v.put("senderId", m.getSenderId());
-        v.put("senderName", names.getOrDefault(m.getSenderId(), "未知成员"));
+        v.put("senderName", sender == null || sender.name() == null ? "未知成员" : sender.name());
+        v.put("senderAvatar", sender == null ? null : sender.avatar());
         v.put("content", m.getContent());
         v.put("msgType", m.getMsgType());
         v.put("payload", m.getPayload());
@@ -468,17 +489,19 @@ public class ChatService {
         return v;
     }
 
-    /** 单条私聊消息的统一视图(WS 下发与 REST 历史同构,带发送人昵称) */
+    /** 单条私聊消息的统一视图(WS 下发与 REST 历史同构,带发送人昵称与头像) */
     private Map<String, Object> dmView(ChatDmMessage m) {
-        return dmView(m, dmNames(List.of(m)));
+        return dmView(m, dmSenders(List.of(m)));
     }
 
-    private Map<String, Object> dmView(ChatDmMessage m, Map<Long, String> names) {
+    private Map<String, Object> dmView(ChatDmMessage m, Map<Long, Sender> senders) {
+        Sender sender = senders.get(m.getSenderId());
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("id", m.getId());
         v.put("senderId", m.getSenderId());
         v.put("recipientId", m.getRecipientId());
-        v.put("senderName", names.getOrDefault(m.getSenderId(), "未知成员"));
+        v.put("senderName", sender == null || sender.name() == null ? "未知成员" : sender.name());
+        v.put("senderAvatar", sender == null ? null : sender.avatar());
         v.put("content", m.getContent());
         v.put("msgType", m.getMsgType());
         v.put("payload", m.getPayload());
@@ -486,16 +509,4 @@ public class ChatService {
         return v;
     }
 
-    /** 批查私聊发送人昵称(昵称缺失回退用户名,避免 toMap 空值) */
-    private Map<Long, String> dmNames(List<ChatDmMessage> messages) {
-        if (messages.isEmpty()) {
-            return Map.of();
-        }
-        List<Long> ids = messages.stream().map(ChatDmMessage::getSenderId).distinct().collect(Collectors.toList());
-        Map<Long, String> names = new LinkedHashMap<>();
-        for (SysUser u : sysUserMapper.selectBatchIds(ids)) {
-            names.put(u.getId(), u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername());
-        }
-        return names;
-    }
 }

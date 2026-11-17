@@ -57,6 +57,11 @@ export const useChatStore = defineStore('chat', {
     floatOpen: false,
     /** 本次登录会话是否已拉过历史 */
     hydrated: false,
+    /**
+     * 进入会话时快照的未读锚点:{ key: null=家庭流 / 'peerId'=私聊, count, firstId }。
+     * 由 loadHistory / openDm 在推进已读之前算好,消息区取走后清空(「N 条新消息」跳第一条未读)。
+     */
+    unreadAnchor: null,
     /** 待发送的富内容卡片(分享注入/站内选择/游戏邀请的预填草稿,{msgType,content,payload} 已是可发送形态) */
     shareCard: null,
   }),
@@ -259,6 +264,31 @@ export const useChatStore = defineStore('chat', {
     },
 
     /**
+     * 记下「N 条新消息」的锚点:取当前会话缓存里倒数第 count 条他人消息。
+     * 未读数来自服务端(按 ID 差值估算)、缓存又只留 200 条,所以越界就退化成最早一条。
+     */
+    setUnreadAnchor(key, count) {
+      const n = Math.max(0, Number(count) || 0)
+      const target = key == null ? null : String(key)
+      const list = target == null ? this.messages : this.dmMessages[target] || []
+      const myId = useUserStore().userInfo?.id
+      const incoming = list.filter((m) => m.senderId !== myId)
+      if (!n || !incoming.length) {
+        this.unreadAnchor = null
+        return
+      }
+      // 未读数可能大于本地缓存里的条数(只留 200 条 / 含自己在别处发的),按实际能定位的条数收敛
+      const visible = Math.min(n, incoming.length)
+      const first = incoming[incoming.length - visible]
+      this.unreadAnchor = { key: target, count: visible, firstId: first.id }
+    },
+
+    /** 浮标已跳转 / 已读完:锚点作废 */
+    clearUnreadAnchor() {
+      this.unreadAnchor = null
+    },
+
+    /**
      * 打开私聊会话:切 activePeer、拉历史(拉过就跳过)、把对方发来的未读置已读。
      * name 为对方展示名(标题用,可省)。
      */
@@ -266,10 +296,12 @@ export const useChatStore = defineStore('chat', {
       if (peerId == null) return
       this.activePeer = Number(peerId)
       this.activePeerName = name || this.activePeerName || ''
+      const unreadBefore = Number(this.dmUnread[String(peerId)]) || 0
       await this.loadDmHistory(this.activePeer)
       if (this.viewing) {
         chatApi.dmRead(Number(peerId)).catch(() => {})
         this.dmUnread[String(peerId)] = 0
+        if (unreadBefore > 0) this.setUnreadAnchor(peerId, unreadBefore)
       }
     },
 
@@ -277,6 +309,7 @@ export const useChatStore = defineStore('chat', {
     closeDm() {
       this.activePeer = null
       this.activePeerName = ''
+      this.unreadAnchor = null
     },
 
     /** 拉某个私聊会话的历史(与本地缓存按 id 合并,幂等) */
@@ -367,6 +400,7 @@ export const useChatStore = defineStore('chat', {
         }
         if (un.status === 'fulfilled') {
           if (markRead) {
+            this.setUnreadAnchor(null, un.value?.unread)
             if (un.value?.lastMsgId) chatApi.read(un.value.lastMsgId).catch(() => {})
             this.unread = 0
           } else {
@@ -419,6 +453,7 @@ export const useChatStore = defineStore('chat', {
       this.activePeer = null
       this.activePeerName = ''
       this.unread = 0
+      this.unreadAnchor = null
       this.lastIncoming = null
       this.chatPageActive = false
       this.floatOpen = false

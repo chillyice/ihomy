@@ -27,6 +27,61 @@
           <el-icon><Phone /></el-icon>
         </el-button>
       </el-tooltip>
+      <!-- 常用表情:点一下插到光标处,按普通文本发送 -->
+      <el-popover v-model:visible="emojiVisible" placement="top" :width="296" :title="$t('chat.composer.emojiTitle')" trigger="click">
+        <template #reference>
+          <el-button text circle :disabled="!connected" :title="$t('chat.composer.emoji')" :aria-label="$t('chat.composer.emoji')">
+            <span class="emoji-anchor">🙂</span>
+          </el-button>
+        </template>
+        <div class="emoji-panel">
+          <button v-for="e in CHAT_EMOJI" :key="e" type="button" class="emoji-item" :aria-label="e" @click="insertEmoji(e)">
+            {{ e }}
+          </button>
+        </div>
+      </el-popover>
+      <!-- 聊天字体:字号对全部消息生效,颜色只管自己的气泡(本机记忆) -->
+      <el-popover v-model:visible="textStyleVisible" placement="top-end" :width="264" trigger="click">
+        <template #reference>
+          <el-button text circle :title="$t('chat.composer.text')" :aria-label="$t('chat.composer.text')">
+            <el-icon><Brush /></el-icon>
+          </el-button>
+        </template>
+        <div class="text-style">
+          <div class="ts-title">{{ $t('chat.composer.textTitle') }}</div>
+          <div class="ts-row">
+            <span class="ts-label">{{ $t('chat.composer.fontSize') }}</span>
+            <span class="ts-size">{{ textStyle.size }}px</span>
+          </div>
+          <el-slider
+            :model-value="textStyle.size"
+            :min="CHAT_FONT_MIN"
+            :max="CHAT_FONT_MAX"
+            :step="1"
+            show-stops
+            size="small"
+            @update:model-value="setStyle({ size: $event })"
+          />
+          <div class="ts-row">
+            <span class="ts-label">{{ $t('chat.composer.fontColor') }}</span>
+          </div>
+          <div class="ts-colors">
+            <button
+              v-for="c in CHAT_TEXT_COLORS"
+              :key="c || 'theme'"
+              type="button"
+              class="ts-color"
+              :class="{ active: textStyle.color === c, theme: !c }"
+              :style="c ? { background: c } : null"
+              @click="setStyle({ color: c })"
+            >
+              <el-icon v-if="textStyle.color === c"><Check /></el-icon>
+            </button>
+          </div>
+          <div class="ts-hint">{{ $t('chat.composer.fontHint') }}</div>
+          <el-button text size="small" @click="resetTextStyle">{{ $t('chat.composer.fontReset') }}</el-button>
+        </div>
+      </el-popover>
     </div>
 
     <!-- 待发送卡片草稿(分享注入/站内选择/游戏邀请) -->
@@ -38,10 +93,11 @@
 
     <div class="msg-input" @paste="onPaste">
       <el-input
+        ref="inputRef"
         v-model="draft"
         :placeholder="$t('chat.placeholder')"
         :disabled="!connected || uploading"
-        maxlength="2000"
+        :maxlength="DRAFT_MAX"
         show-word-limit
         @keyup.enter="onSend"
       />
@@ -108,26 +164,34 @@
 <script setup>
 // 工具条与发送逻辑:图片走既有 /file/upload 通道(流式,不新增接口);
 // 卡片/游戏/链接的负载构造在 utils/chatMsg(与后端同口径校验)
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { CircleClose, FolderOpened, Link, Paperclip, Phone, Picture, Trophy, VideoCamera } from '@element-plus/icons-vue'
+import { Brush, Check, CircleClose, FolderOpened, Link, Paperclip, Phone, Picture, Trophy, VideoCamera } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { chatApi, fileApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
 import { useUserStore } from '@/stores/user'
+import { useChatTextStyle } from '@/composables/useChatTextStyle'
 import { mediaErrorKey } from '@/composables/useWebRTC'
 import { H5_GAMES, buildCardPayload, buildGameInvitePayload, buildLinkPayload } from '@/utils/chatMsg'
+import { CHAT_EMOJI } from '@/utils/chatEmoji'
+import { CHAT_FONT_MAX, CHAT_FONT_MIN, CHAT_TEXT_COLORS } from '@/utils/chatStyle'
 import ChatObjectPicker from '@/components/chat/ChatObjectPicker.vue'
 
 const IMAGE_MAX_BYTES = 20 * 1024 * 1024
+const DRAFT_MAX = 2000
 
 const { t } = useI18n()
 const chatStore = useChatStore()
+const { style: textStyle, setStyle, reset: resetTextStyle } = useChatTextStyle()
 
 const draft = ref('')
 const uploading = ref(false)
 const fileInput = ref(null)
+const inputRef = ref(null)
+const emojiVisible = ref(false)
+const textStyleVisible = ref(false)
 const pendingCard = ref(null) // {msgType, content, payload}
 
 const pickerVisible = ref(false)
@@ -153,6 +217,29 @@ onMounted(() => {
 const setPending = ({ msgType, content, payload }) => {
   if (!payload) return
   pendingCard.value = { msgType, content: content || '', payload }
+}
+
+/** 表情插到光标处(没有选区就追加到末尾),并保持输入框聚焦好接着打字 */
+const insertEmoji = (emoji) => {
+  const el = inputRef.value?.input
+  const text = draft.value || ''
+  if (text.length + emoji.length > DRAFT_MAX) return
+  if (!el || typeof el.selectionStart !== 'number') {
+    draft.value = text + emoji
+    return
+  }
+  const start = el.selectionStart
+  const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : start
+  draft.value = text.slice(0, start) + emoji + text.slice(end)
+  nextTick(() => {
+    el.focus()
+    const pos = start + emoji.length
+    try {
+      el.setSelectionRange(pos, pos)
+    } catch (e) {
+      // 输入框已失焦或环境不支持选区:光标位置无需回填
+    }
+  })
 }
 
 /** 发送:有文字先发文字(当附言),有待发卡片则随后发出 */
@@ -419,6 +506,86 @@ const pickGame = (g) => {
 .game-pick:hover {
   transform: translateY(-2px);
   background: rgba(var(--color-brand-rgb), 0.06);
+}
+
+/* 表情:固定列宽的宫格,多了就在面板里滚动 */
+.emoji-anchor {
+  font-size: 16px;
+  line-height: 1;
+}
+.emoji-panel {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 216px;
+  overflow-y: auto;
+}
+.emoji-item {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 0;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-soft);
+}
+.emoji-item:hover {
+  background: rgba(var(--color-brand-rgb), 0.1);
+  transform: scale(1.12);
+}
+
+/* 聊天字体设置 */
+.text-style {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ts-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.ts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.ts-size {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+.ts-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ts-color {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--color-text-primary);
+}
+.ts-color.theme {
+  background: linear-gradient(135deg, var(--color-card-2) 50%, var(--color-text-primary) 50%);
+}
+.ts-color.active {
+  box-shadow: 0 0 0 2px rgba(var(--color-brand-rgb), 0.55);
+}
+.ts-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 768px) {

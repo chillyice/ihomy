@@ -8,7 +8,7 @@
       <!-- 移动端:半屏抽屉 -->
       <div v-if="isMobile" class="chat-float-sheet">
         <div class="sheet-head">
-          <span class="sheet-title">{{ $t('chat.roomTitle') }}</span>
+          <span class="sheet-title">{{ $t('chat.title') }}</span>
           <el-button text circle size="small" @click="collapse">
             <el-icon><Close /></el-icon>
           </el-button>
@@ -19,7 +19,7 @@
       <!-- 桌面端:可拖拽缩放面板 -->
       <div v-else class="chat-float-panel" :style="panelStyle">
         <div class="panel-head" @pointerdown="onPanelDown">
-          <span class="panel-title">{{ $t('chat.roomTitle') }}</span>
+          <span class="panel-title">{{ $t('chat.title') }}</span>
           <el-button text circle size="small" @click="collapse">
             <el-icon><Close /></el-icon>
           </el-button>
@@ -40,7 +40,7 @@
       type="button"
       class="chat-float-ball"
       :style="ballStyle"
-      :aria-label="$t('chat.roomTitle')"
+      :aria-label="$t('chat.title')"
       @pointerdown="onBallDown"
       @pointerup="onBallUp"
       @click="onBallClick"
@@ -79,7 +79,7 @@ import { useChatStore } from '@/stores/chat'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useDragResize } from '@/utils/useDragResize'
-import { useFloatDelete } from '@/composables/useFloatDelete'
+import { useFloatDelete, FLOAT_DELETE_ZONE } from '@/composables/useFloatDelete'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
@@ -116,7 +116,6 @@ const ball = useDragResize({
 const {
   pos: panelPos,
   size: panelSize,
-  dragging: panelDragging,
   onDragStart,
   onResizeStart,
 } = useDragResize({
@@ -141,7 +140,7 @@ let ignoreBallClick = false
 const onBallDown = (e) => {
   if (!ball.onDragStart(e)) return
   ignoreBallClick = false
-  if (!isMobile.value) trackToDock(e, ball.dragging)
+  trackToDock(e)
 }
 const onBallUp = (e) => {
   if (e.isPrimary && e.button === 0) ignoreBallClick = ball.dragging.value
@@ -151,16 +150,29 @@ const onBallClick = (e) => {
   ignoreBallClick = false
 }
 
-// 删除区与 useDragResize 共用拖动判定，从指针位置判断是否进入底部热区。
-const { active: dockActive, over: dockOver, begin: dockBegin, update: dockUpdate, end: dockEnd, cancel: dockCancel } = useFloatDelete()
+// 删除区与拖动判定各算各的:浮球/标题栏自身的位移阈值(6px)就是删除条的开关,
+// 不依赖 useDragResize 的内部状态(它只负责挪位置),这样点一下球也不会误删。
+// 手机端悬浮球本来就贴底,删除热区收窄,免得随手一拖就没了。
+const DOCK_MIN_MOVE = 6
+const MOBILE_DELETE_ZONE = 64
+const {
+  active: dockActive,
+  over: dockOver,
+  begin: dockBegin,
+  update: dockUpdate,
+  end: dockEnd,
+  cancel: dockCancel,
+} = useFloatDelete({ deleteZone: isMobile.value ? MOBILE_DELETE_ZONE : FLOAT_DELETE_ZONE })
 let detachTrack = null
-const trackToDock = (e, dragging) => {
+const trackToDock = (e) => {
   detachTrack?.()
   const id = e.pointerId
+  const origin = { x: e.clientX, y: e.clientY }
   let moved = false
   const onMove = (ev) => {
-    if (ev.pointerId !== id || !dragging.value) return
+    if (ev.pointerId !== id) return
     if (!moved) {
+      if (Math.hypot(ev.clientX - origin.x, ev.clientY - origin.y) < DOCK_MIN_MOVE) return
       moved = true
       dockBegin()
     }
@@ -169,6 +181,10 @@ const trackToDock = (e, dragging) => {
   const onUp = (ev) => {
     if (ev.pointerId !== id) return
     detach()
+    if (!moved) {
+      dockCancel()
+      return
+    }
     dockUpdate(ev.clientY)
     if (dockEnd()) removeFloat()
   }
@@ -191,7 +207,7 @@ const trackToDock = (e, dragging) => {
 
 // 面板只能从标题栏拖;拖动与 useDragResize 共用同一次 pointerdown
 const onPanelDown = (e) => {
-  if (onDragStart(e)) trackToDock(e, panelDragging)
+  if (onDragStart(e)) trackToDock(e)
 }
 
 const removeFloat = () => {
@@ -279,11 +295,23 @@ onMounted(() => {
   chatStore.ensureConnected()
 })
 
+// 手机端抽屉打开时给 <html> 挂个类:内容页按抽屉高度留出下边距,滚到底能看全(样式在 main.css)
+const sheetActive = computed(() => show.value && expanded.value && isMobile.value)
+watch(
+  sheetActive,
+  (v) => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('chat-sheet-open', v)
+  },
+  { immediate: true },
+)
+
 // 卸载兜底:拖动中被隐藏/路由切走时不残留窗口级监听与删除条
 onBeforeUnmount(() => {
   detachTrack?.()
   dockCancel()
   if (notifyTimer) clearTimeout(notifyTimer)
+  if (typeof document !== 'undefined') document.documentElement.classList.remove('chat-sheet-open')
 })
 </script>
 
@@ -413,7 +441,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 52vh;
+  height: var(--chat-sheet-h, 52vh);
   display: flex;
   flex-direction: column;
   background: var(--color-card);
