@@ -423,7 +423,7 @@ const cardLabel = (card) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .ft-last-name {
   font-weight: 700;
@@ -438,16 +438,17 @@ const cardLabel = (card) => {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
 }
+/* 上一手牌是牌桌的视觉焦点,牌面给到可读尺寸(角标点数清晰可辨) */
 .ft-mini {
   position: relative;
   display: block;
-  width: clamp(26px, 3.2vw, 40px);
+  width: clamp(34px, 4.6vw, 60px);
   aspect-ratio: 5 / 7;
-  border-radius: 4px;
+  border-radius: 5px;
   background: #fdfcf8;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.38);
   overflow: hidden;
 }
 .ft-center-empty {
