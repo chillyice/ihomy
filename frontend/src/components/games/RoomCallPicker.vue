@@ -52,7 +52,7 @@ const call = async (m) => {
     ElMessage.warning(t('games.room.callUnavailable'))
     return
   }
-  const ok = await callStore.start({ id: m.userId, name: m.name }, 'AUDIO')
+  const ok = await callStore.start([{ id: m.userId, name: m.name }], 'AUDIO')
   if (ok) open.value = false
   else ElMessage.warning(t('chat.call.startFailed'))
 }
