@@ -84,10 +84,13 @@
                 <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
               </template>
               <template v-if="variant === 'DRAGON'">
-                <i v-if="dragonSide(index, 't')" class="sd-dragon sd-dragon-t" aria-hidden="true"></i>
-                <i v-if="dragonSide(index, 'b')" class="sd-dragon sd-dragon-b" aria-hidden="true"></i>
-                <i v-if="dragonSide(index, 'l')" class="sd-dragon sd-dragon-l" aria-hidden="true"></i>
-                <i v-if="dragonSide(index, 'r')" class="sd-dragon sd-dragon-r" aria-hidden="true"></i>
+                <i
+                  v-for="dir in dragonDirs(index)"
+                  :key="dir"
+                  class="sd-thermo-seg sd-dragon-seg"
+                  :class="'sd-thermo-to-' + dir"
+                  aria-hidden="true"
+                ></i>
               </template>
               <template v-if="variant === 'THERMO' && thermoInfo[index]">
                 <i
@@ -278,9 +281,8 @@ const selected = ref(-1)
 const notesMode = ref(false)
 const quickFill = ref(false)
 const activeNumber = ref(0)
-// 焦点数字(数字盘选中或点中的棋盘数字)与「影响范围」高亮口径
+// 焦点数字(数字盘选中或点中的棋盘数字),只用来点亮盘面上的同号格
 const focusDigit = ref(0)
-const focusWide = ref(false)
 const generating = ref(false)
 const history = ref([])
 const hintsUsed = ref(0)
@@ -455,20 +457,9 @@ const timeText = computed(() => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 })
 
-// 约束邻居与高亮:笔记清理、数字影响范围共用同一份邻居口径(不规则区替代九宫、附加组计入)
+// 约束邻居与高亮:笔记清理、选中格影响范围共用同一份邻居口径(不规则区替代九宫、附加组计入)
 const peersAll = computed(() => buildPeers(currentConstraints.value))
 const selectedPeerSet = computed(() => (selected.value >= 0 ? new Set(peersAll.value[selected.value]) : null))
-// 数字盘口径:该数字所有落点 + 它们的影响范围;点棋盘数字只高亮那一个格子的邻居
-const digitPeerSet = computed(() => {
-  if (!focusWide.value || !focusDigit.value) return null
-  const value = focusDigit.value
-  const set = new Set()
-  for (let i = 0; i < CELLS; i++) {
-    if (board.value[i] !== value) continue
-    for (const peer of peersAll.value[i]) set.add(peer)
-  }
-  return set
-})
 
 const isGiven = (index) => puzzle.value[index] !== 0
 const notesList = (index) => notesOf(notes.value[index])
@@ -482,16 +473,13 @@ const cellClass = (index) => {
   const col = index % 9
   const unit = unitAt(index)
   const mark = parity.value ? parity.value[index] : 0
-  const wide = digitPeerSet.value
   return {
     given: isGiven(index),
     'edge-r': col < 8 && unitAt(index + 1) !== unit,
     'edge-b': row < 8 && unitAt(index + 9) !== unit,
     diag: variant.value === 'DIAGONAL' && (row === col || row + col === 8),
     selected: index === selected.value,
-    peer: wide
-      ? wide.has(index) && board.value[index] !== focusDigit.value
-      : selectedPeerSet.value !== null && index !== selected.value && selectedPeerSet.value.has(index),
+    peer: selectedPeerSet.value !== null && index !== selected.value && selectedPeerSet.value.has(index),
     same: focusDigit.value > 0 && board.value[index] === focusDigit.value && index !== selected.value,
     conflict: conflicts.value.has(index),
     hint: hintFlash.value === index,
@@ -523,7 +511,7 @@ const windowSide = (index, side) => {
   return col < 8 && idx[index + 1] !== g
 }
 
-// ---------- 九龙数独:九条龙形额外区域描边(在三行一带内错位咬合) ----------
+// ---------- 九龙数独:九条龙形额外区域(线穿过格子中心,格内四条半段线自然接成龙身) ----------
 const dragonIdx = computed(() => {
   if (variant.value !== 'DRAGON') return null
   const map = new Int8Array(CELLS).fill(-1)
@@ -532,17 +520,19 @@ const dragonIdx = computed(() => {
   })
   return map
 })
-const dragonSide = (index, side) => {
+const dragonDirs = (index) => {
   const idx = dragonIdx.value
-  if (!idx) return false
+  if (!idx) return []
   const g = idx[index]
-  if (g < 0) return false
+  if (g < 0) return []
   const row = Math.floor(index / 9)
   const col = index % 9
-  if (side === 't') return row > 0 && idx[index - 9] !== g
-  if (side === 'b') return row < 8 && idx[index + 9] !== g
-  if (side === 'l') return col > 0 && idx[index - 1] !== g
-  return col < 8 && idx[index + 1] !== g
+  const dirs = []
+  if (row > 0 && idx[index - 9] === g) dirs.push('t')
+  if (row < 8 && idx[index + 9] === g) dirs.push('b')
+  if (col > 0 && idx[index - 1] === g) dirs.push('l')
+  if (col < 8 && idx[index + 1] === g) dirs.push('r')
+  return dirs
 }
 
 // ---------- 不等式数独:相邻格比较符号(< > 画在右/下边,∧∨ 表示上下关系) ----------
@@ -744,8 +734,9 @@ const loadState = () => {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
     if (!raw) return null
-    // 旧版存档没有 variant 字段,一律按标准数独处理
-    const savedVariant = VARIANT_KEYS.includes(raw.variant) ? raw.variant : 'CLASSIC'
+    // 旧版存档没有 variant 字段,按标准数独处理;已下线变体的存档直接丢弃
+    if (raw.variant && !VARIANT_KEYS.includes(raw.variant)) return null
+    const savedVariant = raw.variant || 'CLASSIC'
     if (!DIFFICULTY_KEYS.includes(raw.difficulty)) return null
     if (savedVariant === 'KILLER' && !isValidCages(raw.cages)) return null
     if (savedVariant === 'JIGSAW' && !isValidRegions(raw.regions)) return null
@@ -822,7 +813,6 @@ const startNew = async () => {
   notesMode.value = false
   activeNumber.value = 0
   focusDigit.value = 0
-  focusWide.value = false
   skipClick = false
   history.value = []
   hintsUsed.value = 0
@@ -872,13 +862,11 @@ const select = (index) => {
   // 快填模式:先点数字再点格子,已有数字可覆盖(给定格不可改);同数字再点不擦除
   if (quickFill.value && activeNumber.value > 0 && !isGiven(index)) {
     focusDigit.value = activeNumber.value
-    focusWide.value = true
     if (board.value[index] !== activeNumber.value) input(activeNumber.value)
     return
   }
-  // 点棋盘上的数字:高亮该数字的落点与这一格的影响范围(与点下方数字盘同效)
+  // 点棋盘上的数字:点亮盘面上所有同号格
   focusDigit.value = board.value[index] || 0
-  focusWide.value = false
 }
 
 // 快填开关:开启后数字盘只负责选中数字,不再直接落子
@@ -886,7 +874,6 @@ const toggleQuickFill = () => {
   quickFill.value = !quickFill.value
   activeNumber.value = 0
   focusDigit.value = 0
-  focusWide.value = false
   try {
     localStorage.setItem(QUICK_FILL_KEY, quickFill.value ? '1' : '0')
   } catch (e) {
@@ -894,17 +881,15 @@ const toggleQuickFill = () => {
   }
 }
 
-// 数字盘:快填模式选中数字(再点同数字取消),常规模式直接落子;两种模式都高亮该数字的影响范围
+// 数字盘:快填模式选中数字(再点同数字取消),常规模式直接落子;两种模式都点亮该数字的落点
 const pickNumber = (n) => {
   if (won.value || generating.value) return
   if (quickFill.value) {
     activeNumber.value = activeNumber.value === n ? 0 : n
     focusDigit.value = activeNumber.value
-    focusWide.value = activeNumber.value > 0
     return
   }
   focusDigit.value = n
-  focusWide.value = true
   input(n)
 }
 
@@ -959,9 +944,8 @@ const applyErase = (index) => {
   snapshot()
   board.value[index] = 0
   notes.value[index] = 0
-  // 快填时保持已选数字的影响范围,否则清掉高亮
+  // 快填时保持已选数字的落点点亮,否则清掉高亮
   focusDigit.value = quickFill.value ? activeNumber.value : 0
-  focusWide.value = quickFill.value && activeNumber.value > 0
 }
 
 const flashCell = (index) => {
@@ -992,7 +976,6 @@ const applyPromote = (index) => {
   clearNotesAround(index, n)
   selected.value = index
   focusDigit.value = n
-  focusWide.value = false
   flashCell(index)
   if (solvedNow()) finish()
   return true
@@ -1057,7 +1040,6 @@ const applyHint = (at) => {
   hintsUsed.value += 1
   selected.value = index
   focusDigit.value = solution.value[index]
-  focusWide.value = false
   flashCell(index)
   if (solvedNow()) finish()
 }
@@ -1101,10 +1083,8 @@ const onKeydown = (event) => {
       // 快填模式下键盘也只选数字,配合点击格子落子
       activeNumber.value = activeNumber.value === n ? 0 : n
       focusDigit.value = activeNumber.value
-      focusWide.value = activeNumber.value > 0
     } else {
       focusDigit.value = n
-      focusWide.value = true
       input(n)
     }
     event.preventDefault()
@@ -1216,7 +1196,6 @@ onBeforeUnmount(() => {
   --sd-cage: rgba(184, 140, 110, 0.6);
   --sd-region: rgba(184, 140, 110, 0.06);
   --sd-window: rgba(64, 150, 170, 0.55);
-  --sd-odd: rgba(184, 140, 110, 0.26);
   --sd-thermo: rgba(208, 118, 72, 0.6);
   --sd-consec: rgba(122, 96, 184, 0.7);
   --sd-xv: rgba(62, 138, 156, 0.9);
@@ -1432,21 +1411,26 @@ onBeforeUnmount(() => {
 .sd-cell.region-tint {
   background: var(--sd-region);
 }
-/* 奇偶数独:标出奇数格底色,偶数格右上角小圆点 */
-.sd-cell.parity-odd {
-  background: var(--sd-odd);
-}
+/* 奇偶数独:奇数格右上角实心圆点、偶数格右上角空心圆环(都不用底色,免得压住高亮态) */
+.sd-cell.parity-odd::after,
 .sd-cell.parity-even::after {
   content: '';
   position: absolute;
   top: 3px;
   right: 3px;
-  width: 5px;
-  height: 5px;
+  box-sizing: border-box;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--sd-user);
-  opacity: 0.7;
   pointer-events: none;
+}
+.sd-cell.parity-odd::after {
+  background: var(--sd-user);
+  opacity: 0.75;
+}
+.sd-cell.parity-even::after {
+  border: 1.5px solid var(--sd-user);
+  opacity: 0.55;
 }
 .sd-cell.peer {
   background: var(--sd-peer);
@@ -1698,34 +1682,9 @@ onBeforeUnmount(() => {
   border-right: 2px solid var(--sd-window);
 }
 
-/* 九龙数独:九条龙形额外区域的轮廓线(比九宫细一档,避免压住宫线) */
-.sd-dragon {
-  position: absolute;
-  pointer-events: none;
-}
-.sd-dragon-t {
-  top: 0;
-  left: 0;
-  right: 0;
-  border-top: 1.5px solid var(--sd-dragon);
-}
-.sd-dragon-b {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  border-bottom: 1.5px solid var(--sd-dragon);
-}
-.sd-dragon-l {
-  top: 0;
-  bottom: 0;
-  left: 0;
-  border-left: 1.5px solid var(--sd-dragon);
-}
-.sd-dragon-r {
-  top: 0;
-  bottom: 0;
-  right: 0;
-  border-right: 1.5px solid var(--sd-dragon);
+/* 九龙数独:龙身线穿过格子中心(与温度计同一套半段线),格内数字压在线上面 */
+.sd-dragon-seg {
+  background: var(--sd-dragon);
 }
 
 /* 杀手笼:虚线框在格边内侧描出笼界,笼和标注压在笼内最左上格的角上 */
@@ -1934,7 +1893,6 @@ html.dark .sd-card {
   --sd-cage: rgba(184, 140, 110, 0.7);
   --sd-region: rgba(184, 140, 110, 0.1);
   --sd-window: rgba(96, 190, 210, 0.6);
-  --sd-odd: rgba(184, 140, 110, 0.36);
   --sd-thermo: rgba(232, 148, 100, 0.7);
   --sd-consec: rgba(160, 138, 224, 0.8);
   --sd-xv: rgba(112, 196, 214, 0.95);

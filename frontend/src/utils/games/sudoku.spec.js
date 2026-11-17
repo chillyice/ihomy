@@ -629,9 +629,9 @@ describe('数独变体(摩天楼/等差/回文)', () => {
   })
 })
 
-describe('数独变体(九龙/无象/不连续)', () => {
-  it('三种新变体都登记在 VARIANT_KEYS 里', () => {
-    for (const key of ['DRAGON', 'ANTI_BISHOP', 'NON_CONSECUTIVE']) expect(VARIANT_KEYS).toContain(key)
+describe('数独变体(九龙/不连续)', () => {
+  it('两种新变体都登记在 VARIANT_KEYS 里', () => {
+    for (const key of ['DRAGON', 'NON_CONSECUTIVE']) expect(VARIANT_KEYS).toContain(key)
   })
 
   it('九龙数独:九条龙形额外区各 9 格、连通且覆盖全盘,题目唯一解', () => {
@@ -681,24 +681,6 @@ describe('数独变体(九龙/无象/不连续)', () => {
     const conflicts = findConflicts(board, { extraGroups: extraGroupsFor('DRAGON') })
     expect(conflicts.has(group[0])).toBe(true)
     expect(conflicts.has(group[1])).toBe(true)
-  })
-
-  it('无象数独:象步隔一格的两格不同号,题目唯一解', () => {
-    const groups = extraGroupsFor('ANTI_BISHOP')
-    expect(groups.length).toBeGreaterThan(0)
-    const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(92), { variant: 'ANTI_BISHOP' })
-    for (const [a, b] of groups) expect(solution[a]).not.toBe(solution[b])
-    expect(countSolutions(puzzle, 2, { extraGroups: groups })).toBe(1)
-    expect(isSolved(solution, { extraGroups: groups })).toBe(true)
-  })
-
-  it('无象冲突:斜向隔一格同号会被标冲突', () => {
-    const board = emptyBoard()
-    board[0] = 7
-    board[20] = 7 // 0 → 20 是隔一格的象步
-    const conflicts = findConflicts(board, { extraGroups: extraGroupsFor('ANTI_BISHOP') })
-    expect(conflicts.has(0)).toBe(true)
-    expect(conflicts.has(20)).toBe(true)
   })
 
   it('不连续数独:终盘相邻格都不相差 1,题目唯一解', () => {

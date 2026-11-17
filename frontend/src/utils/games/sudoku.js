@@ -6,7 +6,7 @@
 // ANTI_KNIGHT 反马步 / ANTI_KING 反王步(斜对角不同号) / THERMO 温度计(沿线严格递增) /
 // CONSECUTIVE 连续(标记相邻格相差 1) / XV 罗马(标记相邻格和为 5 或 10) /
 // SKYSCRAPER 摩天楼(四边外围给出可见楼层数) / ARITHMETIC 等差(标记连续格成等差数列) /
-// PALINDROME 回文(标记线上的数字正反读一致) / ANTI_BISHOP 无象(象步隔一格不同号) /
+// PALINDROME 回文(标记线上的数字正反读一致) /
 // NON_CONSECUTIVE 不连续(相邻格数字差不等于 1) / DRAGON 九龙(九条龙形额外区域)。
 // 组件只负责渲染与交互,所有判定都在这里,便于单测覆盖。
 
@@ -106,7 +106,6 @@ export const VARIANT_KEYS = [
   'KILLER',
   'ANTI_KNIGHT',
   'ANTI_KING',
-  'ANTI_BISHOP',
   'THERMO',
   'CONSECUTIVE',
   'NON_CONSECUTIVE',
@@ -182,26 +181,6 @@ const ANTI_KING_GROUPS = (() => {
   return groups
 })()
 
-/** 无象数独:象步隔一格(斜向相距 2 格)的两格不能同号 */
-const ANTI_BISHOP_GROUPS = (() => {
-  const groups = []
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      const a = r * SIZE + c
-      for (const [dr, dc] of [
-        [2, 2],
-        [2, -2],
-      ]) {
-        const nr = r + dr
-        const nc = c + dc
-        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue
-        groups.push([a, nr * SIZE + nc])
-      }
-    }
-  }
-  return groups
-})()
-
 /**
  * 九龙数独:九条龙形额外区域(每条 9 格、连通),把 9×9 切成三行一带,
  * 每行按「起止点表」各切三段,使得同一带内三条龙一宽一窄互相咬合:
@@ -236,7 +215,6 @@ export function extraGroupsFor(variant) {
   if (variant === 'WINDOW') return WINDOW_GROUPS
   if (variant === 'ANTI_KNIGHT') return ANTI_KNIGHT_GROUPS
   if (variant === 'ANTI_KING') return ANTI_KING_GROUPS
-  if (variant === 'ANTI_BISHOP') return ANTI_BISHOP_GROUPS
   if (variant === 'DRAGON') return DRAGON_REGIONS
   return []
 }
