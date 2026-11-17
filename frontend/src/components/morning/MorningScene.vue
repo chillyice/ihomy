@@ -19,7 +19,16 @@
       </div>
     </div>
 
-    <div :key="sceneKey" class="ms-cloud-field">
+    <RandomClouds
+      v-if="cloudStyle === 'random'"
+      :scene="scene"
+      :night="night"
+      :wind-scale="windScale"
+      :wind-deg="windDeg"
+      :wind-dir="windDir"
+      :animated="animated"
+    />
+    <div v-else :key="sceneKey" class="ms-cloud-field">
       <img v-for="({ image, style }, i) in clouds" :key="i" class="ms-cloud" :src="image" :style="style" alt="" decoding="async" />
     </div>
 
@@ -45,6 +54,7 @@ import cloudPuff from '@/assets/morning/cloud-puff.webp'
 import cloudVeil from '@/assets/morning/cloud-veil.webp'
 import lightning from '@/assets/morning/lightning.webp'
 import { pickMorningBackdrop } from './backdrops'
+import RandomClouds from './RandomClouds.vue'
 
 const props = defineProps({
   condition: { type: String, default: 'clear' },
@@ -55,6 +65,8 @@ const props = defineProps({
   windDir: { type: String, default: '' },
   precipLevel: { type: [Number, String], default: 2 },
   animated: { type: Boolean, default: true },
+  // 云层样式:photo = 照片底图 + 云朵贴图;random = 同一张照片底图上叠代码生成的随机云
+  cloudStyle: { type: String, default: 'photo' },
 })
 
 const photo = ref('')

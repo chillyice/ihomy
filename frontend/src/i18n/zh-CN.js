@@ -6900,7 +6900,7 @@ export default {
     cloudStyle: '云层样式',
     cloudStylePhoto: '图片云',
     cloudStyleRandom: '随机云',
-    cloudStyleHint: '图片云用真实天气照片加云朵贴图;随机云全部由代码生成,天气一变云形也跟着变。两种只开一个。',
+    cloudStyleHint: '两种云共用同一张天气照片与光照,只换云层:图片云用照片里的云朵贴图,随机云由代码生成、形状随天气变化。只开一个。',
     previewScene: '预览场景',
     previewSceneHint: '只在预览里临时换一屏天气看看效果,不改真实天气,也不保存。',
     sceneLive: '跟随实况',

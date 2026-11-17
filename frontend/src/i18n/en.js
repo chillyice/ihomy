@@ -7007,7 +7007,7 @@ export default {
     cloudStylePhoto: 'Photo clouds',
     cloudStyleRandom: 'Random clouds',
     cloudStyleHint:
-      'Photo clouds use real weather photos with cloud sprites; random clouds are drawn in code and reshape with the weather. Keep only one on.',
+      'Both styles share the same weather photo and lighting; only the clouds change. Photo clouds use cloud sprites, random clouds are drawn in code and reshape with the weather. Keep only one on.',
     previewScene: 'Preview scene',
     previewSceneHint: 'Temporarily swaps the weather for the preview only — it does not change real weather or get saved.',
     sceneLive: 'Live weather',
