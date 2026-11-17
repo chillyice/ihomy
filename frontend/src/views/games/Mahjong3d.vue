@@ -159,6 +159,7 @@ import {
   mahjongAiChooseDiscard,
   mahjongAnGangKinds,
   mahjongChiOptions,
+  mahjongChiSeat,
   mahjongCounts,
   mahjongDiceFirstSeat,
   mahjongHandScore,
@@ -202,7 +203,7 @@ const playerWins = ref(0)
 const aiWins = ref(0)
 const rounds = ref(0)
 const rules = ref(normalizeMahjongRules(null))
-const rulesDraftKey = ref('tuiDaoHu')
+const rulesDraftKey = ref('puTong') // 默认普通规则(与平面麻将同序)
 const view = ref('main')
 const hoverTileId = ref(null)
 
@@ -285,7 +286,7 @@ function canSeatPong(seat, kind) {
 function canSeatChi(seat, kind) {
   if (!rules.value.allowChi) return []
   const from = lastDiscard.value?.from
-  if (from == null || seat !== (from + 3) % 4) return [] // 吃仅上家
+  if (from == null || seat !== mahjongChiSeat(from)) return [] // 吃仅上家:只有弃牌者的下家能吃
   if ((melds.value[seat]?.length || 0) >= 3) return []
   return mahjongChiOptions(mahjongCounts(hands.value[seat]), kind)
 }
@@ -519,8 +520,8 @@ function resolveClaims(fromSeat, kind, mySession) {
     const winSeats = order.filter((s) => canSeatClaimWin(s, kind))
     const gangSeats = order.filter((s) => !winSeats.includes(s) && canSeatMingGang(s, kind))
     const pongSeats = order.filter((s) => !winSeats.includes(s) && !gangSeats.includes(s) && canSeatPong(s, kind))
-    const chiSeat = order[2]
-    const chiOpts = chiSeat != null && !winSeats.includes(chiSeat) && !gangSeats.includes(chiSeat) ? canSeatChi(chiSeat, kind) : []
+    const chiSeat = mahjongChiSeat(fromSeat) // 吃仅上家:弃牌者的下家才有资格
+    const chiOpts = chiSeat >= 0 && !winSeats.includes(chiSeat) && !gangSeats.includes(chiSeat) ? canSeatChi(chiSeat, kind) : []
     const isAi = (s) => !!seatList.value.find((x) => x.seat === s)?.ai
     const humanWin = winSeats.filter((s) => !isAi(s))
     const aiWin = winSeats.find(isAi)

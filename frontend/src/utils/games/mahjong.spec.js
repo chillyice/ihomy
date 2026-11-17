@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAHJONG_PAIR_258,
   MAHJONG_PAIR_ANY,
+  MAHJONG_RULE_PRESETS,
   MAHJONG_TILE_COUNT,
   canMahjongBuGang,
   canMahjongMingGang,
@@ -16,6 +17,7 @@ import {
   mahjongAiChooseDiscard,
   mahjongAnGangKinds,
   mahjongChiOptions,
+  mahjongChiSeat,
   mahjongCounts,
   mahjongDiceFirstSeat,
   mahjongHandScore,
@@ -325,6 +327,19 @@ describe('mahjong rules (吃/杠/将牌约束)', () => {
     // 字牌不可吃
     expect(mahjongChiOptions(counts, 27)).toEqual([])
     expect(mahjongChiOptions(counts, 33)).toEqual([])
+  })
+
+  it('预设顺序:普通在第一;吃只给弃牌者的下家(即吃牌人的上家刚出牌)', () => {
+    expect(Object.keys(MAHJONG_RULE_PRESETS)[0]).toBe('puTong')
+    expect(MAHJONG_RULE_PRESETS.puTong.allowChi).toBe(true)
+    expect(MAHJONG_RULE_PRESETS.puTong.allowGang).toBe(true)
+    // 弃牌座次 → 唯一可吃座次(顺时针下一家);无弃牌不可吃
+    expect(mahjongChiSeat(0)).toBe(1)
+    expect(mahjongChiSeat(1)).toBe(2)
+    expect(mahjongChiSeat(2)).toBe(3)
+    expect(mahjongChiSeat(3)).toBe(0)
+    expect(mahjongChiSeat(-1)).toBe(-1)
+    expect(mahjongChiSeat(null)).toBe(-1)
   })
 
   it('明杠/暗杠/补杠判定', () => {

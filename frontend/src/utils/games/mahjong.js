@@ -18,11 +18,12 @@ export const MAHJONG_BASE_SCORE = 8
 export const MAHJONG_PAIR_ANY = 'any'
 export const MAHJONG_PAIR_258 = '258'
 
-/** 规则预设:推倒胡简化(默认,无吃无杠)/ 口口胡(吃碰杠全开)/ 普通(吃碰杠全开,将牌限 2/5/8) */
+/** 规则预设(顺序即开局面板顺序):普通(吃碰杠全开,将牌限 2/5/8)/ 口口胡(吃碰杠全开)/ 推倒胡简化(无吃无杠);
+ *  凡开吃的规则,吃恒定只吃上家(上一个出牌的玩家)的弃牌 */
 export const MAHJONG_RULE_PRESETS = {
-  tuiDaoHu: { key: 'tuiDaoHu', allowChi: false, allowGang: false, pairConstraint: MAHJONG_PAIR_ANY },
-  kouKouHu: { key: 'kouKouHu', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_ANY },
   puTong: { key: 'puTong', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_258 },
+  kouKouHu: { key: 'kouKouHu', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_ANY },
+  tuiDaoHu: { key: 'tuiDaoHu', allowChi: false, allowGang: false, pairConstraint: MAHJONG_PAIR_ANY },
 }
 
 /** 归一化规则参数(房间信令/本地开局共用;缺省即推倒胡简化口径) */
@@ -136,6 +137,15 @@ export function mahjongRollDice(rand = Math.random) {
 export function mahjongDiceFirstSeat(d1, d2) {
   const sum = (Math.max(1, Math.min(6, Math.round(d1) || 1)) + Math.max(1, Math.min(6, Math.round(d2) || 1))) % 4
   return sum
+}
+
+/**
+ * 吃牌资格座次:只有弃牌者的下家能吃 —— 对这位吃牌人来说,刚出牌的那位正是他的上家。
+ * 返回可吃座次;无弃牌(-1 / null)返回 -1。
+ */
+export function mahjongChiSeat(fromSeat) {
+  if (fromSeat == null || fromSeat < 0) return -1
+  return (fromSeat + 1) % 4
 }
 
 /** 实例 id 数组 → 牌种计数表(长度 34) */

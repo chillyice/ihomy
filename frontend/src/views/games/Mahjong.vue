@@ -384,6 +384,7 @@ import {
   mahjongAiChooseDiscard,
   mahjongAnGangKinds,
   mahjongChiOptions,
+  mahjongChiSeat,
   mahjongCounts,
   mahjongDiceFirstSeat,
   mahjongHandScore,
@@ -495,7 +496,7 @@ const rounds = ref(0)
 
 // ---------- 规则(按规则名单选,随房间广播) ----------
 const rules = ref(normalizeMahjongRules(null))
-const rulesDraftKey = ref('tuiDaoHu') // 开局草稿:所选规则名
+const rulesDraftKey = ref('puTong') // 开局草稿:所选规则名(默认普通规则)
 const rulesPickerOpen = ref(false) // 房间局:房主开牌前先选规则
 const claimChiOptions = ref([]) // 本机收到的吃组合候选
 const selfGangKinds = ref([]) // 本机回合内可杠(暗杠/补杠)[{ kind, type }]
@@ -779,15 +780,15 @@ function canSeatPong(seat, kind) {
   return mahjongCounts(hands.value[seat])[kind] >= 2 && (melds.value[seat]?.length || 0) < 3
 }
 
-/** 吃:仅上家可吃,规则开关 + 手里能凑出顺子组合 */
+/** 吃:仅上家(上一个出牌的玩家)可吃,规则开关 + 手里能凑出顺子组合 */
 function canSeatChi(seat, kind) {
   if (!rules.value.allowChi) return []
-  if (seat !== (lastDiscardSeat() + 3) % 4) return []
+  if (seat !== mahjongChiSeat(lastDiscardSeat())) return []
   if ((melds.value[seat]?.length || 0) >= 3) return []
   return mahjongChiOptions(mahjongCounts(hands.value[seat]), kind)
 }
 
-/** 上家(刚弃牌那位的上一位)座次 */
+/** 弃牌者座次 */
 function lastDiscardSeat() {
   return lastDiscard.value?.from ?? -1
 }
@@ -1080,9 +1081,9 @@ function resolveClaims(fromSeat, kind, mySession) {
     const winSeats = order.filter((seat) => canSeatClaimWin(seat, kind))
     const gangSeats = order.filter((seat) => !winSeats.includes(seat) && canSeatMingGang(seat, kind))
     const pongSeats = order.filter((seat) => !winSeats.includes(seat) && !gangSeats.includes(seat) && canSeatPong(seat, kind))
-    // 吃只有上家((fromSeat+3)%4)能吃
-    const chiSeat = order[2]
-    const chiOptions = chiSeat != null && !winSeats.includes(chiSeat) && !gangSeats.includes(chiSeat) ? canSeatChi(chiSeat, kind) : []
+    // 吃只有上家(上一个出牌的玩家,即弃牌者的下家)能吃
+    const chiSeat = mahjongChiSeat(fromSeat)
+    const chiOptions = chiSeat >= 0 && !winSeats.includes(chiSeat) && !gangSeats.includes(chiSeat) ? canSeatChi(chiSeat, kind) : []
     const isAiSeat = (seat) => isAutoSeat(seat)
     const humanWin = winSeats.filter((seat) => !isAiSeat(seat))
     const aiWin = winSeats.find(isAiSeat)

@@ -1594,15 +1594,16 @@ export default {
       rulesPickTitle: 'Choose the rules',
       rulesConfirm: 'Deal with these rules',
       presets: {
-        tuiDaoHu: 'Tui Dao Hu',
-        kouKouHu: 'Kou Kou Hu',
         puTong: 'Normal',
+        kouKouHu: 'Kou Kou Hu',
+        tuiDaoHu: 'Tui Dao Hu',
         custom: 'Custom',
       },
       presetDescs: {
+        puTong:
+          '4 melds + 1 pair, chi and kong allowed (chi only from the player before you), the eye must be 2/5/8; seven pairs also wins',
+        kouKouHu: '4 melds + 1 pair, chi and kong allowed (chi only from the player before you), any pair as the eye',
         tuiDaoHu: '4 melds + 1 pair, no chi or kong, any pair as the eye',
-        kouKouHu: '4 melds + 1 pair, chi and kong allowed, any pair as the eye',
-        puTong: '4 melds + 1 pair, chi and kong allowed, the eye must be 2/5/8; seven pairs also wins',
       },
       rulesHint: 'A meld is a run (e.g. 3-4-5 in one suit) or a triplet (e.g. three White Dragons); the eye is a pair of identical tiles',
       chi: 'Chi',
