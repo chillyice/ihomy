@@ -181,7 +181,7 @@ const windName = (seat) => t(`games.mahjong.honor.${WIND_KEYS[((seat % 4) + 4) %
 const pageEl = ref(null)
 const gameCardEl = ref(null)
 const stageEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, fit: false })
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, scale: false })
 
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended

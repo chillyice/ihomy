@@ -25,7 +25,8 @@ class GameCategoryTest {
     @Test
     void allCategoriesAreUniqueAndEndWithOther() {
         assertThat(GameCategory.ALL).doesNotHaveDuplicates();
-        assertThat(GameCategory.ALL).hasSize(9);
+        assertThat(GameCategory.ALL).hasSize(11);
+        assertThat(GameCategory.ALL).contains(GameCategory.BOARD, GameCategory.CARD);
         assertThat(GameCategory.ALL.get(GameCategory.ALL.size() - 1)).isEqualTo(GameCategory.OTHER);
         assertThat(GameCategory.ALL).allSatisfy(c -> assertThat(c).isEqualTo(c.toUpperCase()));
     }

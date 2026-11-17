@@ -3598,3 +3598,14 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('user_presence', 'AWAY',    '离开'),
 ('user_presence', 'OFFLINE', '离线');
 
+
+-- ------------------------------------------------------------
+-- 2026-11-18(V12.79):纸牌/棋类小游戏分类
+--   game_category 新增 CARD(纸牌)与 BOARD(棋类):
+--   接龙/蜘蛛/自由/斗地主/掼蛋/保皇/够级归纸牌,象棋/黑白棋归棋类,
+--   替代原先混在 休闲/策略 里的口径。纯字典种子,无表结构变更。
+--   幂等:INSERT IGNORE。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('game_category', 'BOARD', '棋类'),
+('game_category', 'CARD',  '纸牌');

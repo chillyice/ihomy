@@ -115,7 +115,10 @@
       </div>
     </div>
 
-    <div class="sol-tip">{{ hintNote || $t('games.freecell.tip') }}</div>
+    <details class="sol-help">
+      <summary>{{ $t('games.cards.guide') }}</summary>
+      <p>{{ $t('games.freecell.tip') }}</p>
+    </details>
 
     <Transition name="game-overlay">
       <div v-if="isWon || isLost" class="sol-overlay game-overlay">
@@ -143,6 +146,7 @@
 // 本组件负责点选与拖动移动、双击自动收纳、撤销快照、计时与最少步数纪录;牌面统一由 PlayingCard 渲染。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import PlayingCard from '@/components/games/PlayingCard.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
@@ -188,7 +192,6 @@ const rewardMsg = ref('')
 const selected = ref(null)
 const history = ref([])
 const hint = ref(null)
-const hintNote = ref('')
 
 const isWon = computed(() => game.value.status === STATUS.WON)
 const isLost = computed(() => game.value.status === STATUS.LOST)
@@ -329,17 +332,15 @@ const clearHint = () => {
     hintTimer = null
   }
   hint.value = null
-  hintNote.value = ''
 }
 const showHint = () => {
   if (game.value.status !== STATUS.PLAYING) return
   clearHint()
   const next = findHint(game.value)
   hint.value = next
-  if (!next) hintNote.value = t('games.cards.hintNone')
+  if (!next) ElMessage.info(t('games.cards.hintNone'))
   hintTimer = setTimeout(() => {
     hint.value = null
-    hintNote.value = ''
     hintTimer = null
   }, 3200)
 }

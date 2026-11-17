@@ -15,6 +15,8 @@ public final class GameCategory {
 
     public static final String ACTION = "ACTION";
     public static final String PUZZLE = "PUZZLE";
+    public static final String BOARD = "BOARD";
+    public static final String CARD = "CARD";
     public static final String CASUAL = "CASUAL";
     public static final String SIMULATION = "SIMULATION";
     public static final String ADVENTURE = "ADVENTURE";
@@ -25,7 +27,7 @@ public final class GameCategory {
 
     /** 展示顺序(也是前端筛选条顺序) */
     public static final List<String> ALL = List.of(
-            ACTION, PUZZLE, CASUAL, SIMULATION, ADVENTURE, RPG, STRATEGY, ARCADE, OTHER);
+            ACTION, PUZZLE, BOARD, CARD, CASUAL, SIMULATION, ADVENTURE, RPG, STRATEGY, ARCADE, OTHER);
 
     /** 与 game_info.category 列宽一致 */
     public static final int MAX_LENGTH = 20;

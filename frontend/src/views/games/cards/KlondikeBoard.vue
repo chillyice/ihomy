@@ -141,7 +141,10 @@
       </div>
     </div>
 
-    <div class="sol-tip">{{ hintNote || $t('games.solitaire.tip') }}</div>
+    <details class="sol-help">
+      <summary>{{ $t('games.cards.guide') }}</summary>
+      <p>{{ $t('games.solitaire.tip') }}</p>
+    </details>
 
     <Transition name="game-overlay">
       <div v-if="isWon || isLost" class="sol-overlay game-overlay">
@@ -174,6 +177,7 @@
 // 拖拽落点由 useCardDrag 通过 [data-drop] 容器识别,牌面图案统一交给 PlayingCard 渲染。
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import PlayingCard from '@/components/games/PlayingCard.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
@@ -222,7 +226,6 @@ const selected = ref(null)
 const history = ref([])
 const drawCount = ref(1)
 const hint = ref(null)
-const hintNote = ref('')
 
 const isWon = computed(() => game.value.status === STATUS.WON)
 const isLost = computed(() => game.value.status === STATUS.LOST)
@@ -359,17 +362,15 @@ const clearHint = () => {
     hintTimer = null
   }
   hint.value = null
-  hintNote.value = ''
 }
 const showHint = () => {
   if (game.value.status !== STATUS.PLAYING) return
   clearHint()
   const next = findHint(game.value)
   hint.value = next
-  if (!next) hintNote.value = t('games.cards.hintNone')
+  if (!next) ElMessage.info(t('games.cards.hintNone'))
   hintTimer = setTimeout(() => {
     hint.value = null
-    hintNote.value = ''
     hintTimer = null
   }, 3200)
 }

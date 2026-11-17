@@ -2,8 +2,8 @@
 // 只登记元数据,不引 npm 依赖、不进首屏 bundle;新增一款 = 放目录 + 这里加一行 + i18n 两条文案。
 // 出处与协议见 frontend/public/mini-games/THIRD-PARTY.md。
 export const EMBEDDED_GAMES = [
-  { slug: 'xiangqi', titleKey: 'games.embedded.xiangqi.title', descKey: 'games.embedded.xiangqi.desc', category: 'STRATEGY' },
-  { slug: 'reversi', titleKey: 'games.embedded.reversi.title', descKey: 'games.embedded.reversi.desc', category: 'STRATEGY' },
+  { slug: 'xiangqi', titleKey: 'games.embedded.xiangqi.title', descKey: 'games.embedded.xiangqi.desc', category: 'BOARD' },
+  { slug: 'reversi', titleKey: 'games.embedded.reversi.title', descKey: 'games.embedded.reversi.desc', category: 'BOARD' },
   { slug: 'match3', titleKey: 'games.embedded.match3.title', descKey: 'games.embedded.match3.desc', category: 'PUZZLE' },
   { slug: 'bubble', titleKey: 'games.embedded.bubble.title', descKey: 'games.embedded.bubble.desc', category: 'ARCADE' },
   {

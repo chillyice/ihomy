@@ -2815,6 +2815,8 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('game_category', 'ACTION',     '动作'),
 ('game_category', 'PUZZLE',     '益智'),
+('game_category', 'BOARD',      '棋类'),
+('game_category', 'CARD',       '纸牌'),
 ('game_category', 'CASUAL',     '休闲'),
 ('game_category', 'SIMULATION', '模拟养成'),
 ('game_category', 'ADVENTURE',  '冒险'),

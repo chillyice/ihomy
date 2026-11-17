@@ -1,6 +1,18 @@
 // 小游戏分类:与后端 common/GameCategory、sys_dict_item.game_category 同值同序。
 // 展示文案走 i18n dict.game_category.<value>;未识别/空值统一落 OTHER。
-export const GAME_CATEGORIES = ['ACTION', 'PUZZLE', 'CASUAL', 'SIMULATION', 'ADVENTURE', 'RPG', 'STRATEGY', 'ARCADE', 'OTHER']
+export const GAME_CATEGORIES = [
+  'ACTION',
+  'PUZZLE',
+  'BOARD',
+  'CARD',
+  'CASUAL',
+  'SIMULATION',
+  'ADVENTURE',
+  'RPG',
+  'STRATEGY',
+  'ARCADE',
+  'OTHER',
+]
 
 export const OTHER_CATEGORY = 'OTHER'
 

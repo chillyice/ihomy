@@ -1426,7 +1426,7 @@ export default {
     },
     cards: {
       title: '纸牌',
-      desc: '纸牌接龙、蜘蛛纸牌与自由纸牌，先选玩法再开局',
+      guide: '玩法说明',
       lobby: '玩法大厅',
       pick: '选择一种玩法，进入牌桌',
       recent: '最近在玩',
@@ -6081,6 +6081,8 @@ export default {
     game_category: {
       ACTION: '动作',
       PUZZLE: '益智',
+      BOARD: '棋类',
+      CARD: '纸牌',
       CASUAL: '休闲',
       SIMULATION: '模拟养成',
       ADVENTURE: '冒险',

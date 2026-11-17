@@ -1434,7 +1434,7 @@ export default {
     },
     cards: {
       title: 'Cards',
-      desc: 'Klondike, Spider and FreeCell — pick a game, then deal',
+      guide: 'How to play',
       lobby: 'Game lobby',
       pick: 'Pick a game and take a seat',
       recent: 'Recent',
@@ -6150,6 +6150,8 @@ export default {
     game_category: {
       ACTION: 'Action',
       PUZZLE: 'Puzzle',
+      BOARD: 'Board',
+      CARD: 'Cards',
       CASUAL: 'Casual',
       SIMULATION: 'Simulation',
       ADVENTURE: 'Adventure',

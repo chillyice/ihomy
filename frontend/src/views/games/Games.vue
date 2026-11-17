@@ -264,6 +264,8 @@ import {
   Postcard,
   Trophy,
   Coin,
+  Connection,
+  Wallet,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -297,7 +299,26 @@ const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:ma
 
 const games = ref([])
 const loading = ref(false)
-const activeCategory = ref('')
+// 从小游戏返回时恢复上次所在的分类:进分类时记住,回本页直接落在对应分类列表
+const CAT_REMEMBER_KEY = 'ihomy:games:cat:v1'
+const rememberedCat = (() => {
+  try {
+    const v = sessionStorage.getItem(CAT_REMEMBER_KEY)
+    return GAME_CATEGORIES.includes(v) ? v : ''
+  } catch {
+    // Storage may be disabled.
+  }
+  return ''
+})()
+const activeCategory = ref(rememberedCat)
+watch(activeCategory, (v) => {
+  try {
+    if (v) sessionStorage.setItem(CAT_REMEMBER_KEY, v)
+    else sessionStorage.removeItem(CAT_REMEMBER_KEY)
+  } catch {
+    // Storage may be disabled.
+  }
+})
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
 
@@ -362,12 +383,28 @@ const builtinGames = [
     category: 'PUZZLE',
   },
   {
-    key: 'cards',
-    titleKey: 'games.cards.title',
-    descKey: 'games.cards.desc',
+    key: 'klondike',
+    titleKey: 'games.solitaire.title',
+    descKey: 'games.solitaire.desc',
     icon: Tickets,
-    path: '/games/cards',
-    category: 'CASUAL',
+    path: '/games/cards/klondike',
+    category: 'CARD',
+  },
+  {
+    key: 'spider',
+    titleKey: 'games.spider.title',
+    descKey: 'games.spider.desc',
+    icon: Connection,
+    path: '/games/cards/spider',
+    category: 'CARD',
+  },
+  {
+    key: 'freecell',
+    titleKey: 'games.freecell.title',
+    descKey: 'games.freecell.desc',
+    icon: Wallet,
+    path: '/games/cards/freecell',
+    category: 'CARD',
   },
   {
     key: 'tetris',
@@ -407,7 +444,7 @@ const builtinGames = [
     descKey: 'games.doudizhu.desc',
     icon: Postcard,
     path: '/games/doudizhu',
-    category: 'CASUAL',
+    category: 'CARD',
   },
   {
     key: 'mahjong3d',
@@ -423,7 +460,7 @@ const builtinGames = [
     descKey: 'games.guandan.desc',
     icon: Trophy,
     path: '/games/guandan',
-    category: 'STRATEGY',
+    category: 'CARD',
   },
   {
     key: 'baohuang',
@@ -431,7 +468,7 @@ const builtinGames = [
     descKey: 'games.baohuang.desc',
     icon: Medal,
     path: '/games/baohuang',
-    category: 'STRATEGY',
+    category: 'CARD',
   },
   {
     key: 'gouji',
@@ -439,7 +476,7 @@ const builtinGames = [
     descKey: 'games.gouji.desc',
     icon: Coin,
     path: '/games/gouji',
-    category: 'STRATEGY',
+    category: 'CARD',
   },
   ...embeddedEntries,
 ]

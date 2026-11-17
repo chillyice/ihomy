@@ -266,7 +266,6 @@
 
   <aside class="side side-r">
     <div class="bar">
-      <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
       <label class="stat" style="gap:6px">
         <span data-i18n="difficulty"></span>
         <select id="difficulty">
@@ -324,7 +323,6 @@ var T = LiteI18N.create({
   shots:      { en: 'Shots', zh: '发射' },
   progress:   { en: 'Drop in', zh: '下压' },
   best:       { en: 'Best', zh: '最佳' },
-  level:      { en: 'Level', zh: '难度' },
   difficulty: { en: 'Difficulty', zh: '难度' },
   diff_easy:  { en: 'Easy', zh: '简单' },
   diff_normal:{ en: 'Normal', zh: '普通' },
@@ -387,7 +385,6 @@ var scoreEl = document.getElementById('score');
 var shotsEl = document.getElementById('shots');
 var progressEl = document.getElementById('progress');
 var bestEl = document.getElementById('best');
-var levelLabelEl = document.getElementById('levelLabel');
 var diffEl = document.getElementById('difficulty');
 var btnNew = document.getElementById('btnNew');
 var startOverlay = document.getElementById('startOverlay');
@@ -740,7 +737,13 @@ function render() {
   // flying bubble
   if (flying) drawBubble(flying.x, flying.y, flying.color, 1);
 
-  // aim guide (only while playing and not mid-flight)
+  // cannon base (under the loaded bubble, so the current colour stays visible)
+  ctx.fillStyle = '#2c3358';
+  ctx.beginPath();
+  ctx.arc(SHOOTER_X, SHOOTER_Y, R + 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // aim guide + the bubble loaded in the cannon (only while playing and not mid-flight)
   if (state === 'playing' && !flying) {
     ctx.strokeStyle = 'rgba(255,255,255,0.28)';
     ctx.setLineDash([4, 6]);
@@ -751,12 +754,6 @@ function render() {
     ctx.setLineDash([]);
     drawBubble(SHOOTER_X, SHOOTER_Y, curColor, 1);
   }
-
-  // cannon base
-  ctx.fillStyle = '#2c3358';
-  ctx.beginPath();
-  ctx.arc(SHOOTER_X, SHOOTER_Y, R + 6, 0, Math.PI * 2);
-  ctx.fill();
 
   // next-bubble preview, bottom-right corner
   var nx = FIELD_W - 30, ny = FIELD_H - 24;
@@ -794,7 +791,6 @@ function updateHud() {
   if (shotsEl) shotsEl.textContent = String(shots);
   if (progressEl) progressEl.textContent = String(config.pushEvery - (shots % config.pushEvery));
   if (bestEl) bestEl.textContent = String(best);
-  if (levelLabelEl) levelLabelEl.textContent = T.t('diff_' + diffKey);
   if (btnNew) btnNew.disabled = (state === 'ready');
   if (diffEl) diffEl.disabled = (state === 'playing');
 }

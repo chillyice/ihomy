@@ -113,7 +113,7 @@ const gameCardEl = ref(null)
 const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({
   page: pageEl,
   stage: gameCardEl,
-  fit: false,
+  scale: false,
 })
 const goBack = () => router.push('/games')
 
