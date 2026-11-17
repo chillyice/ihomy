@@ -22,6 +22,11 @@
   --color-danger: #c45656;
   --color-danger-rgb: 196, 86, 86;
   --color-warning: #9c6f1a;
+  /* 成员在线状态点(头像右下角):在线绿/忙碌红/离开黄/离线灰,四档互斥,深色由 html.dark 提亮 */
+  --presence-online: #3f8f4f;
+  --presence-busy: #cf4b3f;
+  --presence-away: #d09a2a;
+  --presence-offline: #9a9088;
   /* 表面色(游戏卡/浮层卡等"抬起的面"):浅色纯白,深色随卡片色 */
   --color-surface: #fff;
   --color-border: rgba(58, 46, 34, 0.12);
@@ -164,6 +169,11 @@ html.dark {
   --color-danger: #f78989;
   --color-danger-rgb: 247, 137, 137;
   --color-warning: #e8c07a;
+  /* 深色底上状态点提亮一档,保证在深卡片色上有足够辨识度 */
+  --presence-online: #5fca77;
+  --presence-busy: #ff7b6e;
+  --presence-away: #f0c05a;
+  --presence-offline: #8d8a86;
   --color-border: rgba(232, 220, 200, 0.1);
   /* 表面色随卡片色(游戏卡/浮层卡):深色绝不能再落回纯白,否则浅色字压白底 */
   --color-surface: var(--color-card);

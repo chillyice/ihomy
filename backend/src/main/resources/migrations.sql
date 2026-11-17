@@ -3574,3 +3574,27 @@ CREATE TABLE IF NOT EXISTS `sys_backup_job` (
   KEY `idx_scope_family` (`scope`, `family_id`, `created_at`),
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份与迁移任务记录';
+
+-- ------------------------------------------------------------
+-- 2026-11-17(V12.77):家庭成员在线状态偏好
+--   sys_user.presence_status 只存本人手动状态(ONLINE/BUSY/AWAY);
+--   OFFLINE 不落库,由 WS 连接态判定(成员列表/聊天左列头像右下角状态点)。
+--   幂等:information_schema 条件加列 / INSERT IGNORE 字典种子。
+-- ------------------------------------------------------------
+SET @add_user_presence := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_user` ADD COLUMN `presence_status` VARCHAR(20) NOT NULL DEFAULT ''ONLINE'' COMMENT ''在线状态偏好: ONLINE在线/BUSY忙碌/AWAY离开（离线由 WS 连接态判定）'' AFTER `status`',
+    'SELECT ''skip: sys_user.presence_status already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'presence_status'
+);
+PREPARE add_user_presence_stmt FROM @add_user_presence;
+EXECUTE add_user_presence_stmt;
+DEALLOCATE PREPARE add_user_presence_stmt;
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('user_presence', 'ONLINE',  '在线'),
+('user_presence', 'BUSY',    '忙碌'),
+('user_presence', 'AWAY',    '离开'),
+('user_presence', 'OFFLINE', '离线');
+

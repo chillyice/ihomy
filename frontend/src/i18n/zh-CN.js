@@ -2651,6 +2651,9 @@ export default {
     languageEn: 'English',
     theme: '主题',
     saveProfile: '保存资料',
+    myStatus: '我的状态',
+    myStatusSaved: '状态已更新',
+    myStatusFailed: '状态更新失败',
     saveFamily: '保存家庭设置',
     profileSaved: '资料已保存',
     labelRemoved: '已取消身份标签',
@@ -6020,6 +6023,12 @@ export default {
     climate: { cool: '制冷', heat: '制热', heat_cool: '冷暖', dry: '除湿', fan_only: '送风', auto: '自动', off: '关闭', idle: '待机' },
   },
   dict: {
+    user_presence: {
+      ONLINE: '在线',
+      BUSY: '忙碌',
+      AWAY: '离开',
+      OFFLINE: '离线',
+    },
     recipe_cuisine: {
       CHUAN: '川菜',
       YUE: '粤菜',

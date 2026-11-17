@@ -64,6 +64,8 @@ export const useChatStore = defineStore('chat', {
     unreadAnchor: null,
     /** 待发送的富内容卡片(分享注入/站内选择/游戏邀请的预填草稿,{msgType,content,payload} 已是可发送形态) */
     shareCard: null,
+    /** 成员在线状态实时覆盖:userId(字符串)→ ONLINE/BUSY/AWAY/OFFLINE(成员列表/聊天左列头像点用) */
+    presenceMap: {},
   }),
   getters: {
     /** 聊天界面是否在前台(/chat 页或浮窗展开) */
@@ -170,6 +172,8 @@ export const useChatStore = defineStore('chat', {
         if (socket === s) this.socketStatus = SOCKET_STATUS.CLOSED
       })
       s.on('message', (data) => this.onIncoming(data))
+      // 成员上下线/手动切换忙碌离开:同家庭房间广播,成员列表与聊天左列的头像点实时更新
+      s.on('presence', (data) => this.applyPresence(data))
       s.on('call-signal', (data) => useCallStore().onSignal(data))
       s.on('game-signal', (data) => {
         for (const fn of gameSignalListeners) fn(data)
@@ -215,6 +219,12 @@ export const useChatStore = defineStore('chat', {
           }, 1000)
         },
       )
+    },
+
+    /** WS 在线状态下行:{userId,status}:写入实时覆盖表(成员列表/聊天左列头像点据此渲染) */
+    applyPresence(data) {
+      if (!data || data.userId == null || !data.status) return
+      this.presenceMap[String(data.userId)] = data.status
     },
 
     /** WS 到达一条消息:进缓存、驱动 lastIncoming、按界面状态推进已读/未读;私聊按 dm 标记分桶 */
@@ -458,6 +468,7 @@ export const useChatStore = defineStore('chat', {
       this.chatPageActive = false
       this.floatOpen = false
       this.hydrated = false
+      this.presenceMap = {}
       gameSignalListeners = []
     },
   },

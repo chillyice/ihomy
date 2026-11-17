@@ -471,6 +471,8 @@ public class AuthService {
         u.put("avatar", user.getAvatar());
         u.put("role", roleCode);
         u.put("familyId", familyId);
+        // 在线状态偏好(红/黄/绿):前端个人设置切换后靠它跨设备恢复
+        u.put("presenceStatus", user.getPresenceStatus());
         // 首登强制改密标记:前端登录后据此弹强制改密框(改密成功后消失)
         u.put("mustChangePassword", mustChange);
         // 权限码列表:当前家庭角色权限 + 系统级 OPS 权限(若有 OPS 绑定)

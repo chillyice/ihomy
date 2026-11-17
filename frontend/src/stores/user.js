@@ -111,6 +111,12 @@ export const useUserStore = defineStore('user', {
       this.userInfo = { ...this.userInfo, bookLevel: level }
       localStorage.setItem('userInfo', JSON.stringify(this.userInfo))
     },
+    // 同步本人在线状态偏好(个人设置切换后立即生效,刷新/换设备由登录响应恢复)
+    setPresence(status) {
+      if (!this.userInfo || !status) return
+      this.userInfo = { ...this.userInfo, presenceStatus: status }
+      localStorage.setItem('userInfo', JSON.stringify(this.userInfo))
+    },
     setToken(token, refreshToken) {
       this.token = token
       // 首登强制改密时后端不签发刷新令牌(refreshToken 为 null),归一为空串避免存成 "null"

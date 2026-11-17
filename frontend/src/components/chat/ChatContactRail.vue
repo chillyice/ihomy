@@ -17,8 +17,10 @@
         :class="{ active: isActivePeer(m.id) }"
         @click="openDm(m.id, memberName(m))"
       >
-        <img v-if="m.avatar" class="rail-avatar" :src="m.avatar" :alt="memberName(m)" />
-        <span v-else class="rail-avatar rail-avatar-text">{{ memberName(m).charAt(0) }}</span>
+        <UserPresenceDot :status="statusOf(m)" :size="8">
+          <img v-if="m.avatar" class="rail-avatar" :src="m.avatar" :alt="memberName(m)" />
+          <span v-else class="rail-avatar rail-avatar-text">{{ memberName(m).charAt(0) }}</span>
+        </UserPresenceDot>
         <span class="rail-name">{{ memberName(m) }}</span>
         <span v-if="peerUnread(m.id)" class="rail-badge">{{ peerUnread(m.id) > 99 ? '99+' : peerUnread(m.id) }}</span>
       </button>
@@ -36,8 +38,10 @@
             :title="f.alias || f.familyName"
             @click="openDm(m.id, m.name)"
           >
-            <img v-if="m.avatar" class="rail-avatar" :src="m.avatar" :alt="m.name" />
-            <span v-else class="rail-avatar rail-avatar-text">{{ (m.name || '?').charAt(0) }}</span>
+            <UserPresenceDot :status="statusOf(m)" :size="8">
+              <img v-if="m.avatar" class="rail-avatar" :src="m.avatar" :alt="m.name" />
+              <span v-else class="rail-avatar rail-avatar-text">{{ (m.name || '?').charAt(0) }}</span>
+            </UserPresenceDot>
             <span class="rail-name">{{ m.name }}</span>
             <span class="rail-family-tag">{{ f.alias || f.familyName }}</span>
             <span v-if="peerUnread(m.id)" class="rail-badge">{{ peerUnread(m.id) > 99 ? '99+' : peerUnread(m.id) }}</span>
@@ -60,6 +64,8 @@ import { HomeFilled } from '@element-plus/icons-vue'
 import { circleApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { resolvePresence } from '@/utils/presence'
+import UserPresenceDot from '@/components/UserPresenceDot.vue'
 
 // narrow:对象列被拖到只剩头像宽时,名字/角标收起来(未读改成头像上的小红点)
 defineProps({ narrow: { type: Boolean, default: false } })
@@ -80,6 +86,8 @@ const familyLoaded = (familyId) => familyMembersMap.value[familyId] != null
 const familyLoading = (familyId) => familyMembersMap.value[familyId] === 'loading'
 const isActivePeer = (id) => chatStore.activePeer != null && Number(chatStore.activePeer) === Number(id)
 const peerUnread = (id) => chatStore.dmUnread[String(id)] || 0
+// 头像状态点:本家与圈内成员都取「列表快照 + WS 实时覆盖」
+const statusOf = (m) => resolvePresence(m, chatStore.presenceMap)
 
 const openDm = async (id, name) => {
   await chatStore.openDm(id, name)

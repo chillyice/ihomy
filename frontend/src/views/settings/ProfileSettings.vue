@@ -25,6 +25,11 @@
           <el-radio :value="2">{{ $t('settings.female') }}</el-radio>
         </el-radio-group>
       </el-form-item>
+      <el-form-item :label="$t('settings.myStatus')">
+        <el-radio-group :model-value="presenceStatus" @change="onPresenceChange">
+          <el-radio v-for="s in PRESENCE_CHOICES" :key="s" :value="s">{{ $t('dict.user_presence.' + s) }}</el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item :label="$t('settings.label')">
         <div class="label-row">
           <el-select v-model="labelForm.label" filterable clearable style="width: 180px" :placeholder="$t('settings.labelPlaceholder')">
@@ -75,9 +80,10 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { profileApi, fileApi } from '@/api'
+import { profileApi, fileApi, memberApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { PRESENCE_CHOICES } from '@/utils/presence'
 import AvatarCropper from '@/components/AvatarCropper.vue'
 import { applyLocale } from '@/i18n'
 
@@ -90,6 +96,21 @@ const presets = [t('settings.presetDad'), t('settings.presetMom')]
 const showLabelDialog = ref(false)
 const newLabelName = ref('')
 const profileSaving = ref(false)
+// 本人在线状态偏好:切换立即落库并广播给同家庭在线成员(离线由 WS 连接态决定,不在选项里)
+const presenceStatus = ref(userStore.userInfo?.presenceStatus || 'ONLINE')
+
+const onPresenceChange = async (v) => {
+  const prev = presenceStatus.value
+  presenceStatus.value = v
+  try {
+    await memberApi.setPresence(v)
+    userStore.setPresence(v)
+    ElMessage.success(t('settings.myStatusSaved'))
+  } catch {
+    presenceStatus.value = prev
+    ElMessage.error(t('settings.myStatusFailed'))
+  }
+}
 
 const onChangeLang = (v) => applyLocale(v)
 
@@ -172,7 +193,10 @@ const onAvatarCropped = async (file) => {
 // 页面挂载时并行拉取个人资料与身份标签(两者相互独立,各自 catch 互不影响)
 onMounted(async () => {
   const [p, l] = await Promise.all([profileApi.get().catch(() => null), profileApi.label().catch(() => null)])
-  if (p) Object.assign(profile, { nickname: p.nickname || '', avatar: p.avatar || '', birthday: p.birthday || null, gender: p.gender ?? 0 })
+  if (p) {
+    Object.assign(profile, { nickname: p.nickname || '', avatar: p.avatar || '', birthday: p.birthday || null, gender: p.gender ?? 0 })
+    presenceStatus.value = p.presenceStatus || 'ONLINE'
+  }
   // 身份标签独立接口拉取(未设置时 data 为 null)
   if (l) Object.assign(labelForm, { label: l.label || '', color: l.color || '#C9807A' })
 })

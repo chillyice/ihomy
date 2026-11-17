@@ -74,6 +74,7 @@ const RUNTIME_VARS = {
   '--cy-warm-a': 'Chillyice 暖光强度',
   '--chat-font-size': '聊天字号偏好(ChatMessages 按本机设置内联注入)',
   '--chat-color': '自己气泡的文字颜色(ChatMessages 按本机设置内联注入)',
+  '--presence-size': 'UserPresenceDot 圆点直径(调用方按头像大小传 size)',
 }
 
 const isAllowedVar = (name) =>

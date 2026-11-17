@@ -1,6 +1,9 @@
 package com.ihomy.websocket;
 
 import tools.jackson.databind.ObjectMapper;
+import com.ihomy.common.DictConst;
+import com.ihomy.entity.SysUser;
+import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 聊天室 WebSocket 处理器(协议 v2):
  * - 上行统一 {"type","data"}:ping(心跳,回 pong)/ message(聊天消息);未知 type 回 error 不断连。
  * - 下行 envelope:{"type":"message|pong|error","data":{…}};聊天消息视图与 REST 历史同构(含 senderName/msgType/payload)。
- * - 按 familyId 分房间广播;另有 userId→sessions 索引供定向投递(通话/对战信令,P3/P4 启用),
- *   目标不在线不排队补发,由上层走离线落库逻辑。
+ * - 按 familyId 分房间广播;定向投递索引(userId→sessions)在 {@link PresenceRegistry},
+ *   与成员在线状态共用同一真相(连过 WS 即在线),目标不在线不排队补发,由上层走离线落库逻辑。
  * 低并发家庭场景内存房间表足够,不引入 Redis 广播。
  */
 @Slf4j
@@ -30,13 +33,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ChatService chatService;
     private final com.ihomy.service.GameMatchService matchService;
     private final com.ihomy.service.GameRoomService roomService;
+    private final SysUserMapper sysUserMapper;
+    private final PresenceRegistry presenceRegistry;
     private final ObjectMapper objectMapper;
 
     /** 房间表:familyId -> 在线会话集合(会话自带 userId/familyId 属性) */
     private final Map<Long, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
-
-    /** 定向投递索引:userId -> 在线会话集合(同人多标签各一条) */
-    private final Map<Long, Set<WebSocketSession>> userSessions = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -45,12 +47,17 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             closeSilently(session);
             return;
         }
-        rooms.computeIfAbsent(familyId, k -> ConcurrentHashMap.newKeySet()).add(session);
         Long userId = userIdOf(session);
+        // 同人多标签:只有从「不在线」变「在线」才广播上线,避免重复推同一条状态
+        boolean wasOffline = userId != null && !isOnline(userId);
+        rooms.computeIfAbsent(familyId, k -> ConcurrentHashMap.newKeySet()).add(session);
         if (userId != null) {
-            userSessions.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet()).add(session);
+            presenceRegistry.add(userId, session);
         }
         log.info("聊天连接建立 family={} sessions={} user={}", familyId, rooms.get(familyId).size(), userId);
+        if (wasOffline) {
+            broadcastPresence(familyId, userId, presenceOfUser(userId));
+        }
     }
 
     @Override
@@ -238,6 +245,42 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         broadcast(familyId, envelope("message", view));
     }
 
+    /**
+     * 用户是否在线(转发 PresenceRegistry):成员列表/亲友圈成员判状态点用。
+     */
+    public boolean isOnline(Long userId) {
+        return presenceRegistry.isOnline(userId);
+    }
+
+    /**
+     * 在线状态广播(家庭房间,头像右下角状态点用):
+     * 建连/断连与本人手动切换忙碌/离开都走这里,status 取 ONLINE/BUSY/AWAY/OFFLINE。
+     */
+    public void broadcastPresence(Long familyId, Long userId, String status) {
+        if (familyId == null || userId == null) {
+            return;
+        }
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("userId", userId);
+        data.put("status", status == null ? DictConst.PRESENCE_ONLINE : status);
+        broadcast(familyId, envelope("presence", data));
+    }
+
+    /** 上线广播用的本人状态偏好:离线态不落库,这里取手动状态(查不到按在线) */
+    private String presenceOfUser(Long userId) {
+        try {
+            SysUser user = sysUserMapper.selectById(userId);
+            String status = user == null ? null : user.getPresenceStatus();
+            if (DictConst.PRESENCE_BUSY.equals(status) || DictConst.PRESENCE_AWAY.equals(status)) {
+                return status;
+            }
+        } catch (Exception e) {
+            // 状态查询失败不能挡住建连,退化为在线
+            log.warn("查询成员在线状态失败 user={}", userId, e);
+        }
+        return DictConst.PRESENCE_ONLINE;
+    }
+
     /** 单会话投递:IO 失败只记日志不中断循环(广播/定向共用,死会话由容器异步关闭回调摘除) */
     private void sendQuietly(WebSocketSession s, TextMessage msg) {
         try {
@@ -252,7 +295,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
      * 返回 0 表示目标不在线 —— 上层据此走离线逻辑(如落 CALL MISSED 消息),不排队补发。
      */
     public int sendToUser(Long userId, String type, Map<String, Object> data) {
-        Set<WebSocketSession> sessions = userSessions.get(userId);
+        Set<WebSocketSession> sessions = presenceRegistry.sessionsOf(userId);
         if (sessions == null || sessions.isEmpty()) {
             return 0;
         }
@@ -280,7 +323,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             if (userId == null || userId.equals(excludeUserId)) {
                 continue;
             }
-            Set<WebSocketSession> sessions = userSessions.get(userId);
+            Set<WebSocketSession> sessions = presenceRegistry.sessionsOf(userId);
             if (sessions == null) {
                 continue;
             }
@@ -296,11 +339,17 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        removeFrom(rooms.get(familyOf(session)), session);
-        removeFrom(userSessions.get(userIdOf(session)), session);
+        Long familyId = familyOf(session);
+        Long userId = userIdOf(session);
+        removeFrom(rooms.get(familyId), session);
+        presenceRegistry.remove(userId, session);
+        // 同人多标签:最后一条会话关闭才算离线,否则另一个标签仍能看到在线
+        if (familyId != null && userId != null && !isOnline(userId)) {
+            broadcastPresence(familyId, userId, DictConst.PRESENCE_OFFLINE);
+        }
     }
 
-    /** 从房间/定向索引摘除会话;集合允许留空不删键 —— 删键会与 computeIfAbsent 竞争,可能把并发中的新会话整组孤儿化(空集合内存可忽略) */
+    /** 从房间表摘除会话;集合允许留空不删键 —— 删键会与 computeIfAbsent 竞争,可能把并发中的新会话整组孤儿化(空集合内存可忽略) */
     private void removeFrom(Set<WebSocketSession> set, WebSocketSession session) {
         if (set != null) {
             set.remove(session);

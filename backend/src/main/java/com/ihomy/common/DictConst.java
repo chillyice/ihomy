@@ -30,6 +30,13 @@ public final class DictConst {
     public static final String USER_DISABLED = "DISABLED";
     private static final String USER_FALLBACK = USER_ACTIVE;
 
+    /** 成员在线状态偏好 user_presence(离线 OFFLINE 不落库,由 WS 连接态判定) */
+    public static final String PRESENCE_ONLINE = "ONLINE";
+    public static final String PRESENCE_BUSY = "BUSY";
+    public static final String PRESENCE_AWAY = "AWAY";
+    public static final String PRESENCE_OFFLINE = "OFFLINE";
+    private static final String PRESENCE_FALLBACK = PRESENCE_ONLINE;
+
     /** 角色状态 role_status */
     public static final String ROLE_ENABLED = "ENABLED";
     private static final String ROLE_FALLBACK = ROLE_ENABLED;

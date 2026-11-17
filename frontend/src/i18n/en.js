@@ -2672,6 +2672,9 @@ export default {
     languageEn: 'English',
     theme: 'Theme',
     saveProfile: 'Save profile',
+    myStatus: 'My status',
+    myStatusSaved: 'Status updated',
+    myStatusFailed: 'Failed to update status',
     saveFamily: 'Save family settings',
     profileSaved: 'Profile saved',
     labelRemoved: 'Identity label removed',
@@ -6081,6 +6084,12 @@ export default {
     },
   },
   dict: {
+    user_presence: {
+      ONLINE: 'Online',
+      BUSY: 'Busy',
+      AWAY: 'Away',
+      OFFLINE: 'Offline',
+    },
     recipe_cuisine: {
       CHUAN: 'Sichuan',
       YUE: 'Cantonese',

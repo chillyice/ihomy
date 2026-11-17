@@ -19,6 +19,7 @@ import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.FamilyShareDefaultMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
+import com.ihomy.websocket.PresenceRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,7 @@ public class CircleService {
     private final SysUserMapper userMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PublicController publicController;
+    private final PresenceRegistry presenceRegistry;
 
     /** 建圈:发起家庭自动入圈,自己是圈管理员 */
     @Transactional
@@ -372,6 +374,9 @@ public class CircleService {
             v.put("id", u.getId());
             v.put("name", u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername());
             v.put("avatar", u.getAvatar());
+            // 聊天左列头像状态点:在线取 WS 连接态,红/黄取本人手动偏好(跨家庭只保证首拉准确)
+            v.put("online", presenceRegistry.isOnline(u.getId()));
+            v.put("presenceStatus", u.getPresenceStatus());
             out.add(v);
         }
         return out;

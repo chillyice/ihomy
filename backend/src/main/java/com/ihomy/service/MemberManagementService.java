@@ -13,6 +13,7 @@ import com.ihomy.mapper.InvitationCodeMapper;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
+import com.ihomy.websocket.ChatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,32 @@ public class MemberManagementService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
     private final InvitationCodeMapper invitationCodeMapper;
+    private final ChatWebSocketHandler wsHandler;
+
+    /** 家庭成员列表:SQL 返回角色/标签/状态偏好,在线与否取 WS 连接态(成员数个位,循环可接受) */
+    public List<Map<String, Object>> listMembers(Long familyId) {
+        List<Map<String, Object>> rows = sysUserMapper.selectMembersByFamily(familyId);
+        for (Map<String, Object> row : rows) {
+            Object id = row.get("id");
+            row.put("online", id instanceof Number n && wsHandler.isOnline(n.longValue()));
+        }
+        return rows;
+    }
+
+    /** 本人切换在线状态偏好(ONLINE/BUSY/AWAY):落库并广播给同家庭在线成员;离线态只由连接态决定 */
+    public void setPresence(Long userId, Long familyId, String status) {
+        if (!DictConst.PRESENCE_ONLINE.equals(status) && !DictConst.PRESENCE_BUSY.equals(status)
+                && !DictConst.PRESENCE_AWAY.equals(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST);
+        }
+        SysUser patch = new SysUser();
+        patch.setId(userId);
+        patch.setPresenceStatus(status);
+        sysUserMapper.updateById(patch);
+        if (familyId != null) {
+            wsHandler.broadcastPresence(familyId, userId, status);
+        }
+    }
 
     /** 修改成员角色:目标须属于操作者家庭,先删旧绑定再插新角色 */
     @Transactional

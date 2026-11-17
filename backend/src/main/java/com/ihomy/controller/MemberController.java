@@ -7,7 +7,6 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.RoleDTO;
 import com.ihomy.entity.InvitationCode;
-import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AuthService;
@@ -29,17 +28,29 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MemberController {
 
-    private final SysUserMapper sysUserMapper;
     private final SecurityHelper securityHelper;
     private final MemberManagementService memberService;
     private final AuthService authService;
 
-    @Operation(summary = "家庭成员列表（含角色）")
+    @Operation(summary = "家庭成员列表（含角色与在线状态）")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list() {
         LoginUser user = securityHelper.current();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        return Result.success(sysUserMapper.selectMembersByFamily(user.getFamilyId()));
+        return Result.success(memberService.listMembers(user.getFamilyId()));
+    }
+
+    @Operation(summary = "切换我的在线状态")
+    @OperationLog(module = "USER", operationType = "UPDATE", description = "切换在线状态", saveArgs = false)
+    @PutMapping("/presence")
+    public Result<Map<String, Object>> setPresence(@RequestBody Map<String, String> body) {
+        LoginUser user = securityHelper.current();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        String status = body == null ? null : body.get("status");
+        memberService.setPresence(user.getUserId(), user.getFamilyId(), status);
+        // SysUser 有 5 分钟缓存:改完立即失效,避免 /profile 的 updateById 拿旧状态写回
+        securityHelper.invalidateUser(user.getUserId());
+        return Result.success(Map.of("status", status));
     }
 
     @Operation(summary = "修改成员角色")

@@ -27,6 +27,8 @@ public class SysUser {
     /** 用户设置的默认家庭(多家庭时优先访问,空=主家庭 familyId) */
     private Long defaultFamilyId;
     private String status;
+    /** 在线状态偏好: ONLINE在线/BUSY忙碌/AWAY离开(离线由 WS 连接态判定,不落库) */
+    private String presenceStatus;
     private Integer isFake;
     /** 首登强制改密:1=需改密(种子账号防默认密码滥用),改密前访问令牌仅可调改密/登出 */
     private Integer mustChangePassword;

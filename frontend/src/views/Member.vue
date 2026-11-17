@@ -51,7 +51,9 @@
 
         <div v-loading="loading" class="member-list">
           <div v-for="m in members" :key="m.id" class="member-row card">
-            <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
+            <UserPresenceDot :status="statusOf(m)" :size="10">
+              <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
+            </UserPresenceDot>
             <div class="member-info">
               <div class="member-name">
                 {{ m.nickname || m.username }}
@@ -126,6 +128,9 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { memberApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
+import { resolvePresence } from '@/utils/presence'
+import UserPresenceDot from '@/components/UserPresenceDot.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -135,6 +140,7 @@ import { formatDateTime as formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 // 家谱已并入本页:?tab=tree 直接打开图谱,旧 /tree 路由也跳到这里
@@ -167,6 +173,9 @@ const searchResult = ref([])
 
 // 角色码转中文展示
 const roleName = (r) => ({ OWNER: t('member.owner'), MEMBER: t('member.member'), CHILD: t('member.child') })[r] || r
+
+// 头像状态点:列表首拉的 online/presenceStatus 为主,WS 实时覆盖优先(见 utils/presence)
+const statusOf = (m) => resolvePresence(m, chatStore.presenceMap)
 
 // 拉取成员列表;OWNER 额外加载邀请码与入家申请(三者并行,失败显示重试)
 const load = async () => {

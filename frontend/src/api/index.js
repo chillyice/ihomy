@@ -98,6 +98,8 @@ export const memberApi = {
   remove: (userId) => request.delete(`/member/${userId}`),
   createInvite: (roleCode) => request.post('/member/invite', { roleCode }),
   inviteList: () => request.get('/member/invite'),
+  // 本人切换在线状态(ONLINE/BUSY/AWAY),离线由 WS 连接态决定
+  setPresence: (status) => request.put('/member/presence', { status }),
 }
 
 // 家庭纪念日(阳历/农历)
