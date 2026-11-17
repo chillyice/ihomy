@@ -411,39 +411,6 @@ body.card-dragging .sol-cardface {
   font-size: clamp(10px, calc(var(--sol-card-w, 80px) * 0.2), 24px);
   line-height: 1;
 }
-/* 玩法说明:默认折叠(与数独的 .sd-help 同款),点开才展开完整规则;
-   三个牌桌共用,提示无解走 toast,不再常驻占一行 */
-.sol-help {
-  flex: 0 0 auto;
-  width: 100%;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
-}
-.sol-help summary {
-  width: fit-content;
-  margin: 0 auto;
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.sol-help summary::-webkit-details-marker {
-  display: none;
-}
-.sol-help summary::before {
-  content: '▸';
-  transition: transform 0.15s ease;
-}
-.sol-help[open] summary::before {
-  transform: rotate(90deg);
-}
-.sol-help p {
-  margin: 4px 0 0;
-}
-
 /* 蜘蛛纸牌顶部:已完成组数 + 牌堆 */
 .sp-top {
   position: sticky;

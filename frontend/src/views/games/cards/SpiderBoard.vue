@@ -95,11 +95,6 @@
       </div>
     </div>
 
-    <details class="sol-help">
-      <summary>{{ $t('games.cards.guide') }}</summary>
-      <p>{{ $t('games.spider.tip') }}</p>
-    </details>
-
     <Transition name="game-overlay">
       <div v-if="isWon || isLost" class="sol-overlay game-overlay">
         <div class="sol-overlay-card game-overlay-card">

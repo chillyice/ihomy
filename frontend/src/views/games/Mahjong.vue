@@ -17,7 +17,11 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="game-surface mahjong-card" @contextmenu.prevent @dblclick.prevent>
-      <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
+      <GameHeader :title="$t('games.mahjong.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #rules>
+          <p>{{ $t('games.mahjong.coverHint') }}</p>
+        </template>
+      </GameHeader>
       <GameRoomBar
         v-if="play.active"
         :room="play.room"
@@ -33,11 +37,8 @@
         @auto="onAutoToggle"
       />
 
-      <!-- 封面(仅单机;房间局由房主选规则后开牌) -->
+      <!-- 封面(仅单机;房间局由房主选规则后开牌):开局规则选择 + 开始按钮,游戏名与玩法说明在统一卡头 -->
       <div v-if="phase === 'idle' && !play.active" class="cover">
-        <div class="cover-title">{{ $t('games.mahjong.title') }}</div>
-        <div class="cover-desc">{{ $t('games.mahjong.desc') }}</div>
-
         <!-- 开局规则选择:按规则名单选(每条规则自带胡牌口径) -->
         <div class="rules-panel">
           <div class="rules-title">{{ $t('games.mahjong.rulesTitle') }}</div>
@@ -61,7 +62,6 @@
 
         <button class="start-btn" type="button" @click="startGame">{{ $t('games.mahjong.start') }}</button>
         <div v-if="rounds > 0" class="cover-stats">{{ $t('games.mahjong.roundStats', { win: playerWins, lose: aiWins }) }}</div>
-        <div class="cover-hint">{{ $t('games.mahjong.coverHint') }}</div>
       </div>
 
       <!-- 牌桌 -->
@@ -369,6 +369,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
@@ -1596,18 +1597,6 @@ onBeforeUnmount(() => {
 .cover > * {
   flex-shrink: 0;
 }
-.cover-title {
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-.cover-desc {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  text-align: center;
-  max-width: 480px;
-  line-height: 1.6;
-}
 .start-btn {
   margin-top: 8px;
   padding: 10px 42px;
@@ -1619,8 +1608,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   cursor: pointer;
 }
-.cover-stats,
-.cover-hint {
+.cover-stats {
   font-size: 13px;
   color: var(--color-text-secondary);
 }

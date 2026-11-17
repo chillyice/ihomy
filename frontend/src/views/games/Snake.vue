@@ -5,30 +5,35 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="sn-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <div class="sn-head">
-        <div class="sn-title">{{ $t('games.snake.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
-        <div class="sn-stats">
-          <div class="sn-stat">
-            <span class="sn-stat-label">{{ $t('games.snake.score') }}</span>
-            <b class="sn-stat-value">{{ game.score }}</b>
-          </div>
-          <div class="sn-stat">
-            <span class="sn-stat-label">{{ $t('games.snake.best') }}</span>
-            <b class="sn-stat-value">{{ best }}</b>
-          </div>
-          <div class="sn-stat">
-            <span class="sn-stat-label">{{ $t('games.snake.length') }}</span>
-            <b class="sn-stat-value">{{ game.snake.length }}</b>
-          </div>
-        </div>
-      </div>
-
-      <div class="sn-actions">
-        <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
-          {{ paused ? $t('games.snake.resume') : $t('games.snake.pause') }}
-        </el-button>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
-      </div>
+      <GameHeader
+        :title="$t('games.snake.title') + (play.active ? ' · ' + $t('games.room.together') : '')"
+        :fullscreen="isFullscreen"
+        @exit-fullscreen="toggleFullscreen"
+      >
+        <template #stats>
+          <span class="gh-chip"
+            ><span>{{ $t('games.snake.score') }}</span
+            ><b>{{ game.score }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.snake.best') }}</span
+            ><b>{{ best }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.snake.length') }}</span
+            ><b>{{ game.snake.length }}</b></span
+          >
+        </template>
+        <template #actions>
+          <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
+            {{ paused ? $t('games.snake.resume') : $t('games.snake.pause') }}
+          </el-button>
+          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
+        </template>
+        <template #rules>
+          <p>{{ $t('games.snake.tip') }}</p>
+        </template>
+      </GameHeader>
 
       <GameRoomBar
         :room="play.room"
@@ -52,8 +57,6 @@
         <button type="button" class="sn-key sn-down" :aria-label="$t('games.snake.down')" @click="turnTo('down')">▼</button>
         <button type="button" class="sn-key sn-right" :aria-label="$t('games.snake.right')" @click="turnTo('right')">▶</button>
       </div>
-
-      <div class="sn-tip">{{ $t('games.snake.tip') }}</div>
 
       <Transition name="game-overlay">
         <div v-if="paused || game.status !== 'PLAYING'" class="sn-overlay game-overlay">
@@ -86,6 +89,7 @@ import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -360,49 +364,6 @@ onBeforeUnmount(() => {
   padding-top: 24px;
 }
 
-.sn-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 520px);
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.sn-title {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-.sn-stats {
-  display: flex;
-  gap: 8px;
-}
-.sn-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 60px;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
-}
-.sn-stat-label {
-  font-size: 10px;
-  color: var(--color-text-secondary, #8a8a8a);
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-.sn-stat-value {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.sn-actions {
-  display: flex;
-  gap: 8px;
-  width: min(100%, 520px);
-  justify-content: flex-end;
-}
-
 .sn-board {
   display: grid;
   grid-template-columns: repeat(var(--sn-cols, 20), minmax(0, 1fr));
@@ -478,14 +439,6 @@ onBeforeUnmount(() => {
   grid-row: 2;
 }
 
-.sn-tip {
-  max-width: 520px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
-}
-
 .sn-overlay {
   position: absolute;
   inset: 0;
@@ -524,9 +477,6 @@ onBeforeUnmount(() => {
   color: #e0933a;
 }
 
-html.dark .sn-stat {
-  background: rgba(255, 255, 255, 0.08);
-}
 html.dark .sn-key {
   background: rgba(255, 255, 255, 0.08);
   color: #e6e6e6;
@@ -538,13 +488,6 @@ html.dark .sn-overlay {
 @media (max-width: 560px) {
   .sn-card {
     padding: 14px 10px;
-  }
-  .sn-title {
-    font-size: 21px;
-  }
-  .sn-stat {
-    min-width: 52px;
-    padding: 4px 7px;
   }
 }
 </style>

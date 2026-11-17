@@ -1009,6 +1009,7 @@ export default {
   },
   games: {
     title: 'Games',
+    rulesLabel: 'Rules',
     embedded: {
       xiangqi: { title: 'Chinese Chess', desc: 'Cross the river and outplay the computer, three difficulty levels' },
       reversi: { title: 'Reversi', desc: 'Sandwich discs to flip them; whoever holds more at the end wins' },
@@ -1388,7 +1389,6 @@ export default {
       win: 'Solved!',
       winMeta: 'Time {time} · Hints {hints}',
       playAgain: 'Play again',
-      controlsHelp: 'Controls',
       tip: 'Select a cell and enter a number with the keyboard or number pad. Select a number to highlight its placements and related cells. In Quick fill, choose a number first, then tap cells to enter or replace it. Press and hold a cell with one note to enter that number.',
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
@@ -1434,7 +1434,6 @@ export default {
     },
     cards: {
       title: 'Cards',
-      guide: 'How to play',
       lobby: 'Game lobby',
       pick: 'Pick a game and take a seat',
       recent: 'Recent',

@@ -8,6 +8,17 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="fight-card">
+      <GameHeader :title="$t('games.gouji.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #rules>
+          <ul>
+            <li>{{ $t('games.gouji.rules1') }}</li>
+            <li>{{ $t('games.gouji.rules2') }}</li>
+            <li>{{ $t('games.gouji.rules3') }}</li>
+            <li>{{ $t('games.gouji.rules4') }}</li>
+            <li>{{ $t('games.gouji.rules5') }}</li>
+          </ul>
+        </template>
+      </GameHeader>
       <FightTable
         :seats="seatViews"
         :hand="myHand"
@@ -44,18 +55,10 @@
           <Transition name="game-overlay">
             <div v-if="phase === 'idle' || phase === 'ended'" class="fight-overlay">
               <div class="fight-overlay-card game-overlay-card">
-                <div class="fight-overlay-title">
-                  {{ phase === 'idle' ? $t('games.gouji.title') : result === 'win' ? $t('games.fight.win') : $t('games.fight.lose') }}
+                <div v-if="phase === 'ended'" class="fight-overlay-title">
+                  {{ result === 'win' ? $t('games.fight.win') : $t('games.fight.lose') }}
                 </div>
-                <div v-if="phase === 'idle'" class="fight-overlay-desc">{{ $t('games.gouji.desc') }}</div>
-                <ul v-if="phase === 'idle'" class="fight-rules">
-                  <li>{{ $t('games.gouji.rules1') }}</li>
-                  <li>{{ $t('games.gouji.rules2') }}</li>
-                  <li>{{ $t('games.gouji.rules3') }}</li>
-                  <li>{{ $t('games.gouji.rules4') }}</li>
-                  <li>{{ $t('games.gouji.rules5') }}</li>
-                </ul>
-                <div v-else class="fight-overlay-meta">{{ resultMeta }}</div>
+                <div v-if="phase === 'ended'" class="fight-overlay-meta">{{ resultMeta }}</div>
                 <div v-if="rewardMsg" class="fight-overlay-reward">{{ rewardMsg }}</div>
                 <div class="fight-overlay-actions">
                   <el-button type="primary" size="small" round @click="startGame">
@@ -83,6 +86,7 @@ import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import FightTable from '@/components/games/FightTable.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { gameApi } from '@/api'
 import { gjAiChoose, gjCanBeat, gjCombo, gjDeal, gjLegal, gjOpposite, gjPlays, gjRankText, gjScores, gjValue } from '@/utils/games/gouji'
@@ -188,7 +192,7 @@ const infoChips = computed(() => [
 ])
 
 const statusText = computed(() => {
-  if (phase.value === 'idle') return t('games.gouji.desc')
+  if (phase.value === 'idle') return ''
   if (phase.value === 'ended') return ''
   if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.gouji.yourLead')
   return t('games.fight.thinking', { name: seatName(turn.value) })

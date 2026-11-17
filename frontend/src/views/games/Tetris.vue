@@ -5,34 +5,39 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="tt-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <div class="tt-head">
-        <div class="tt-title">{{ $t('games.tetris.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
-        <div class="tt-stats">
-          <div class="tt-stat">
-            <span class="tt-stat-label">{{ $t('games.tetris.score') }}</span>
-            <b class="tt-stat-value">{{ game.score }}</b>
-          </div>
-          <div class="tt-stat">
-            <span class="tt-stat-label">{{ $t('games.tetris.best') }}</span>
-            <b class="tt-stat-value">{{ best }}</b>
-          </div>
-          <div class="tt-stat">
-            <span class="tt-stat-label">{{ $t('games.tetris.lines') }}</span>
-            <b class="tt-stat-value">{{ game.lines }}</b>
-          </div>
-          <div class="tt-stat">
-            <span class="tt-stat-label">{{ $t('games.tetris.level') }}</span>
-            <b class="tt-stat-value">{{ game.level }}</b>
-          </div>
-        </div>
-      </div>
-
-      <div class="tt-actions">
-        <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
-          {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
-        </el-button>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
-      </div>
+      <GameHeader
+        :title="$t('games.tetris.title') + (play.active ? ' · ' + $t('games.room.together') : '')"
+        :fullscreen="isFullscreen"
+        @exit-fullscreen="toggleFullscreen"
+      >
+        <template #stats>
+          <span class="gh-chip"
+            ><span>{{ $t('games.tetris.score') }}</span
+            ><b>{{ game.score }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.tetris.best') }}</span
+            ><b>{{ best }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.tetris.lines') }}</span
+            ><b>{{ game.lines }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.tetris.level') }}</span
+            ><b>{{ game.level }}</b></span
+          >
+        </template>
+        <template #actions>
+          <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
+            {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
+          </el-button>
+          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
+        </template>
+        <template #rules>
+          <p>{{ $t('games.tetris.tip') }}</p>
+        </template>
+      </GameHeader>
 
       <GameRoomBar
         :room="play.room"
@@ -91,8 +96,6 @@
         <el-button class="tt-pad-btn" @click="act((s, r) => holdPiece(s, r))">{{ $t('games.tetris.hold') }}</el-button>
       </div>
 
-      <div class="tt-tip">{{ $t('games.tetris.tip') }}</div>
-
       <Transition name="game-overlay">
         <div v-if="paused || game.status === 'OVER'" class="tt-overlay game-overlay">
           <div class="tt-overlay-card game-overlay-card">
@@ -125,6 +128,7 @@ import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@ele
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { seededRng } from '@/utils/games/seededRng'
@@ -426,50 +430,6 @@ onBeforeUnmount(() => {
   padding-top: 24px;
 }
 
-.tt-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 560px);
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.tt-title {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-.tt-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.tt-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 58px;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
-}
-.tt-stat-label {
-  font-size: 10px;
-  color: var(--color-text-secondary, #8a8a8a);
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-.tt-stat-value {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.tt-actions {
-  display: flex;
-  gap: 8px;
-  width: min(100%, 560px);
-  justify-content: flex-end;
-}
-
 .tt-stage {
   display: flex;
   align-items: flex-start;
@@ -551,14 +511,6 @@ onBeforeUnmount(() => {
   min-width: 78px;
 }
 
-.tt-tip {
-  max-width: 560px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
-}
-
 .tt-overlay {
   position: absolute;
   inset: 0;
@@ -619,7 +571,6 @@ onBeforeUnmount(() => {
   background: #d95656;
 }
 
-html.dark .tt-stat,
 html.dark .tt-box {
   background: rgba(255, 255, 255, 0.08);
 }
@@ -630,13 +581,6 @@ html.dark .tt-overlay {
 @media (max-width: 560px) {
   .tt-card {
     padding: 14px 10px;
-  }
-  .tt-title {
-    font-size: 21px;
-  }
-  .tt-stat {
-    min-width: 50px;
-    padding: 4px 7px;
   }
   .tt-board {
     width: min(68vw, 250px);

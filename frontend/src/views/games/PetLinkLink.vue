@@ -14,13 +14,14 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="game-card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始/继续 + 版权) -->
+      <GameHeader :title="$t('games.petlink.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #rules>
+          <p>{{ $t('games.petlink.coverHint') }}</p>
+        </template>
+      </GameHeader>
+
+      <!-- 封面(复刻原版标题屏):开始/继续 + 版权;游戏名与玩法说明在统一卡头 -->
       <div v-if="screen === 'cover'" class="cover">
-        <h1 class="cover-title">
-          <span class="ct-pet">宠</span><span class="ct-pet">物</span><span class="ct-lian">连</span><span class="ct-lian">连</span
-          ><span class="ct-kan">看</span>
-          <span class="ct-ihomy">-ihomy版</span>
-        </h1>
         <button class="start-btn" type="button" @click="continueGame">
           {{ savedState ? $t('games.petlink.resume') : $t('games.petlink.start') }}
         </button>
@@ -28,7 +29,6 @@
           {{ $t('games.petlink.newGame') }}
         </button>
         <div class="cover-credits">{{ $t('games.petlink.credits') }}</div>
-        <div class="cover-hint">{{ $t('games.petlink.coverHint') }}</div>
       </div>
 
       <!-- 游戏 -->
@@ -189,6 +189,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
@@ -1125,7 +1126,8 @@ function onKeydown(e) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* 卡头顶部通栏,其余内容向下排;封面自己居中,游戏态按内容自然高 */
+  justify-content: flex-start;
   padding: 20px;
   color: #fff;
 }
@@ -1136,43 +1138,21 @@ function onKeydown(e) {
   border-radius: 0;
 }
 
+/* 统一卡头通栏置顶(容器垂直居中,卡头不能跟着居中) */
+.game-card > .game-header {
+  align-self: stretch;
+  margin: -20px -20px 0;
+}
+
 /* 封面 */
 .cover {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   text-align: center;
-}
-.cover-title {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-family: 'Yuanti SC', 'YouYuan', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  /* 手机竖屏(390 宽)58px 会撑出卡片右侧被裁,按视口宽缩到装得下 */
-  font-size: clamp(34px, 12.5vw, 58px);
-  font-weight: 800;
-  letter-spacing: 4px;
-  margin: 0;
-  text-shadow:
-    0 3px 0 rgba(0, 0, 0, 0.35),
-    0 0 30px rgba(255, 255, 255, 0.12);
-}
-/* 原版标题配色:宠物=蓝、连连=粉红、看=蓝、-ihomy版=青绿 */
-.ct-pet {
-  color: #00ccff;
-}
-.ct-lian {
-  color: #ff0066;
-}
-.ct-kan {
-  color: #00ccff;
-}
-.ct-ihomy {
-  font-size: 28px;
-  color: #66ffcc;
-  margin-left: 8px;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 .start-btn {
   font-size: 20px;
@@ -1225,12 +1205,6 @@ function onKeydown(e) {
   color: #8899aa;
   letter-spacing: 1px;
   margin-top: 6px;
-}
-.cover-hint {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  max-width: 420px;
-  line-height: 1.6;
 }
 
 /* 顶部信息栏(原版 HUD) */

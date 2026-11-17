@@ -5,19 +5,43 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <div class="bf-head">
-        <div class="bf-title">2048{{ matchId ? ' · ' + $t('games.match.tag') : play.active ? ' · ' + $t('games.room.together') : '' }}</div>
-        <div class="bf-scores">
-          <div class="bf-score-box">
-            <span class="bf-score-label">{{ $t('games.g2048.score') }}</span>
-            <b class="bf-score-value">{{ score }}</b>
-          </div>
-          <div class="bf-score-box">
-            <span class="bf-score-label">{{ $t('games.g2048.best') }}</span>
-            <b class="bf-score-value">{{ best }}</b>
-          </div>
-        </div>
-      </div>
+      <GameHeader
+        :title="'2048' + (matchId ? ' · ' + $t('games.match.tag') : play.active ? ' · ' + $t('games.room.together') : '')"
+        :fullscreen="isFullscreen"
+        @exit-fullscreen="toggleFullscreen"
+      >
+        <template #settings>
+          <el-select
+            v-if="!matchId && !play.active"
+            v-model="size"
+            size="small"
+            class="bf-size-select"
+            :teleported="!isFullscreen"
+            @change="switchSize"
+          >
+            <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
+          </el-select>
+        </template>
+        <template #stats>
+          <span class="gh-chip"
+            ><span>{{ $t('games.g2048.score') }}</span
+            ><b>{{ score }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.g2048.best') }}</span
+            ><b>{{ best }}</b></span
+          >
+        </template>
+        <template #actions>
+          <el-button v-if="!matchId" size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
+          <el-button v-if="!matchId && !play.active" size="small" round :disabled="!history.length" @click="undo">{{
+            $t('games.g2048.undo')
+          }}</el-button>
+        </template>
+        <template #rules>
+          <p>{{ $t('games.g2048.tip') }}</p>
+        </template>
+      </GameHeader>
 
       <GameRoomBar
         :room="play.room"
@@ -30,23 +54,6 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
-
-      <div class="bf-actions">
-        <el-select
-          v-if="!matchId && !play.active"
-          v-model="size"
-          size="small"
-          class="bf-size-select"
-          :teleported="!isFullscreen"
-          @change="switchSize"
-        >
-          <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
-        </el-select>
-        <el-button v-if="!matchId" size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
-        <el-button v-if="!matchId && !play.active" size="small" round :disabled="!history.length" @click="undo">{{
-          $t('games.g2048.undo')
-        }}</el-button>
-      </div>
 
       <!-- 对战横幅:同种子赛,对手信息与结算结果 -->
       <div v-if="matchId" class="match-banner">
@@ -72,8 +79,6 @@
           </div>
         </div>
       </div>
-
-      <div class="bf-tip">{{ $t('games.g2048.tip') }}</div>
 
       <Transition name="game-overlay">
         <div v-if="won || gameOver" class="bf-overlay game-overlay">
@@ -108,6 +113,7 @@ import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -496,50 +502,8 @@ onBeforeUnmount(() => {
   padding-top: 28px;
 }
 
-.bf-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 480px);
-  gap: 12px;
-}
-.bf-title {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-.bf-scores {
-  display: flex;
-  gap: 8px;
-}
-.bf-score-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 72px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
-}
-.bf-score-label {
-  font-size: 10px;
-  color: var(--color-text-secondary, #8a8a8a);
-  letter-spacing: 1px;
-}
-.bf-score-value {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-
-.bf-actions {
-  display: flex;
-  gap: 8px;
-  width: min(100%, 480px);
-  justify-content: flex-end;
-}
 .bf-size-select {
   width: 88px;
-  margin-right: auto;
 }
 
 .bf-board {
@@ -679,14 +643,6 @@ onBeforeUnmount(() => {
   color: #f9f6f2;
 }
 
-.bf-tip {
-  max-width: 480px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
-}
-
 .bf-overlay {
   position: absolute;
   inset: 0;
@@ -729,9 +685,6 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-html.dark .bf-score-box {
-  background: rgba(255, 255, 255, 0.08);
-}
 html.dark .bf-overlay {
   background: rgba(20, 20, 20, 0.72);
 }
@@ -739,13 +692,6 @@ html.dark .bf-overlay {
 @media (max-width: 560px) {
   .bf-card {
     padding: 14px 10px;
-  }
-  .bf-title {
-    font-size: 22px;
-  }
-  .bf-score-box {
-    min-width: 62px;
-    padding: 4px 8px;
   }
 }
 </style>

@@ -13,7 +13,7 @@ button,select{font:inherit}button,select,summary{touch-action:manipulation}
 button{cursor:pointer}button:disabled{cursor:default}button:focus-visible,select:focus-visible{outline:3px solid #eeffc2;outline-offset:4px}
 .shell{max-width:1210px;margin:auto;padding:0 clamp(14px,4vw,48px) 28px}
 .top{min-height:81px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--edge)}
-.brand{display:flex;align-items:center;gap:11px}.brand-icon{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:var(--signal);color:var(--ink);font-size:23px}
+.brand{display:flex;align-items:center;gap:11px}
 h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-family:var(--mono);font-style:normal;font-weight:700}
 .kicker,.label,.tag{font:700 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .top-actions{display:flex;gap:8px}.quiet{border:1px solid var(--edge);background:transparent;color:var(--text);padding:7px 13px;border-radius:7px}.quiet:hover{background:#30433a}
@@ -42,14 +42,15 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border-radius:13px;padding:22px;width:min(450px,calc(100vw - 28px))}dialog::backdrop{background:#0a1510bd}dialog h2{margin:2px 0 8px}dialog p,dialog ol{color:#d4dfd4}dialog ol{padding-left:22px}dialog li{margin:7px 0}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.dialog-actions .roll{padding:8px 17px;min-height:39px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fields label{display:grid;gap:4px}.fields select{background:#182922;color:var(--text);border:1px solid #718777;border-radius:6px;padding:8px;min-width:0}
 @media(max-width:780px){.table{grid-template-columns:1fr}.console{grid-template-columns:1fr 1fr}.console .history{grid-column:1/-1}.top{min-height:64px}.intro{margin:12px 0 8px}.key{margin-bottom:2px}}
 .choices{display:flex;gap:6px;margin-top:9px}.choices[hidden]{display:none}.choice{flex:1;border:1px solid #839688;border-radius:6px;background:#273e33;color:var(--text);padding:6px;font:700 12px var(--body)}.choice:hover{background:#405b4b}.choice:disabled{opacity:.6}
-@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.console{grid-template-columns:1fr}.console .history{grid-column:auto}.top-actions{gap:5px}.quiet{padding:6px 9px}.brand-icon{width:31px;height:31px;font-size:18px}h1{font-size:20px}.brand{gap:7px}.kicker{font-size:9px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
+@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.console{grid-template-columns:1fr}.console .history{grid-column:auto}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+body.in-immersive .shell{padding-top:54px}
 </style>
 </head>
 <body>
 <main class="shell">
 <header class="top">
-<div class="brand"><span class="brand-icon" aria-hidden="true">⌁</span><div><div class="kicker">Runway / Flight game</div><h1>航线 <em>52</em></h1></div></div>
+<div class="brand"><h1>航线 <em>52</em></h1></div>
 <nav class="top-actions" aria-label="对局选项"><button type="button" class="quiet" id="help">规则</button><button type="button" class="quiet" id="new">新对局</button></nav>
 </header>
 <div class="intro"><h2>飞行棋桌面</h2><p class="tag" id="table-label"></p></div>
@@ -77,6 +78,8 @@ dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border
 <div class="dialog-actions"><button class="quiet" type="button" id="cancel">取消</button><button class="roll" type="submit">开始对局</button></div></form></dialog>
 <script>
 'use strict';
+// 站内沉浸态(移动布局玩游戏)时,外壳的浮动返回键压在本页页头上,整页下移让出空域(同源,直接查父文档)
+try{if(window.parent&&window.parent!==window&&window.parent.document.documentElement.classList.contains('game-mobile-immersive'))document.body.classList.add('in-immersive')}catch(e){}
 const $ = id => document.getElementById(id);
 const TEAMS = [
  {name:'珊瑚',code:'CRL',paint:'#f58772',ink:'#9d3627',x:38,y:38},

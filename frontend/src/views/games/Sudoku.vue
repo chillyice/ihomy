@@ -17,19 +17,24 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
-      <div class="sd-head">
-        <div class="sd-title">{{ $t('games.sudoku.title') }}</div>
-        <div class="sd-head-right">
+      <GameHeader :title="$t('games.sudoku.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #settings>
           <el-select v-model="variant" size="small" class="sd-variant" :teleported="!isFullscreen" @change="changeVariant">
             <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
           </el-select>
           <el-select v-model="difficulty" size="small" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
-          <span class="sd-timer">{{ timeText }}</span>
-          <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
-        </div>
-      </div>
+        </template>
+        <template #stats>
+          <span class="gh-chip"
+            ><b>{{ timeText }}</b></span
+          >
+        </template>
+        <template #rules>
+          <p>{{ $t('games.sudoku.tip') }}</p>
+        </template>
+      </GameHeader>
 
       <div class="sd-layout">
         <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
@@ -181,10 +186,6 @@
             <button type="button" class="sd-tool" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
             <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
           </div>
-          <details class="sd-help">
-            <summary>{{ $t('games.sudoku.controlsHelp') }}</summary>
-            <p>{{ $t('games.sudoku.tip') }}</p>
-          </details>
           <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
             {{ $t('games.sudoku.variantTip.' + variant) }}
           </div>
@@ -218,6 +219,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
@@ -1213,37 +1215,11 @@ onBeforeUnmount(() => {
   background: var(--color-bg);
 }
 
-.sd-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.sd-title {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-.sd-head-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
 .sd-variant {
   width: 140px;
 }
 .sd-difficulty {
   width: 104px;
-}
-.sd-timer {
-  font-variant-numeric: tabular-nums;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-secondary, #8a8a8a);
 }
 
 .sd-stats {
@@ -1827,18 +1803,10 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #8a8a8a);
 }
 
-.sd-help,
 .sd-hint {
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
   line-height: 1.6;
-}
-.sd-help summary {
-  width: fit-content;
-  cursor: pointer;
-}
-.sd-help p {
-  margin: 4px 0 0;
 }
 
 .sd-overlay {
@@ -1908,9 +1876,6 @@ html.dark .sd-stat.warn b {
 }
 
 @container sudoku (max-width: 549px) {
-  .sd-title {
-    font-size: 17px;
-  }
   .sd-stats {
     gap: 12px;
   }

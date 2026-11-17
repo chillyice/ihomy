@@ -16,7 +16,11 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="game-surface mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
-      <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
+      <GameHeader :title="$t('games.mahjong3d.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #rules>
+          <p>{{ $t('games.mahjong.coverHint') }}</p>
+        </template>
+      </GameHeader>
 
       <!-- 3D 舞台 -->
       <div ref="stageEl" class="m3-stage" />
@@ -82,10 +86,8 @@
         </el-button>
       </div>
 
-      <!-- 封面:规则选择(与平面麻将同一套预设) -->
+      <!-- 封面:规则选择(与平面麻将同一套预设);游戏名与玩法说明在统一卡头 -->
       <div v-if="phase === 'idle'" class="m3-cover">
-        <div class="m3-cover-title">{{ $t('games.mahjong3d.title') }}</div>
-        <div class="m3-cover-desc">{{ $t('games.mahjong3d.desc') }}</div>
         <div class="rules-panel">
           <div class="rules-title">{{ $t('games.mahjong.rulesTitle') }}</div>
           <div class="rules-list" role="radiogroup" :aria-label="$t('games.mahjong.rulesTitle')">
@@ -146,6 +148,7 @@ import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
 import { createMahjong3dTable } from '@/utils/games/mahjong3dTable'
@@ -704,6 +707,11 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
 }
+/* 统一卡头要浮在封面浮层之上(idle 也要能点开规则) */
+.mahjong3d-card > .game-header {
+  position: relative;
+  z-index: calc(var(--z-overlay) + 1);
+}
 .m3-stage {
   position: relative;
   flex: 1;
@@ -848,16 +856,6 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   z-index: var(--z-overlay);
   overflow-y: auto;
-}
-.m3-cover-title {
-  font-size: 26px;
-  font-weight: 800;
-}
-.m3-cover-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  text-align: center;
-  max-width: 480px;
 }
 .m3-start {
   border: none;

@@ -1003,6 +1003,7 @@ export default {
   },
   games: {
     title: '小游戏',
+    rulesLabel: '规则',
     embedded: {
       xiangqi: { title: '中国象棋', desc: '楚河汉界，与电脑对弈，三档难度可调' },
       reversi: { title: '黑白棋', desc: '夹住对方的棋子就能翻面，最后棋子多的一方获胜' },
@@ -1380,7 +1381,6 @@ export default {
       win: '完成！',
       winMeta: '用时 {time} · 提示 {hints} 次',
       playAgain: '再玩一局',
-      controlsHelp: '操作说明',
       tip: '选中格子后可用键盘或数字盘填数。点数字可高亮它的落点和影响范围。开启快填后，先选数字，再点格子写入或覆盖。格内只有一个候选数字时，长按可填入。',
       cellFilled: '第 {row} 行第 {col} 列，数字 {value}',
       cellEmpty: '第 {row} 行第 {col} 列，空格',
@@ -1426,7 +1426,6 @@ export default {
     },
     cards: {
       title: '纸牌',
-      guide: '玩法说明',
       lobby: '玩法大厅',
       pick: '选择一种玩法，进入牌桌',
       recent: '最近在玩',

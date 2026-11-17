@@ -11,6 +11,12 @@
     </PageToolbar>
 
     <div ref="stageEl" class="cards-stage">
+      <GameHeader :title="$t(modes[currentGame])" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #rules>
+          <p>{{ $t(modeRules[currentGame]) }}</p>
+        </template>
+      </GameHeader>
+
       <div class="cards-modes">
         <nav v-if="!route.query.room" class="cards-nav" :aria-label="$t('games.cards.title')">
           <RouterLink
@@ -24,7 +30,6 @@
             {{ $t(title) }}
           </RouterLink>
         </nav>
-        <span v-else>{{ $t(modes[currentGame]) }}</span>
         <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
       </div>
 
@@ -40,6 +45,7 @@ import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } fro
 import { useRoute, useRouter } from 'vue-router'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { useGameView } from '@/composables/useGameView'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import KlondikeBoard from './cards/KlondikeBoard.vue'
@@ -52,6 +58,13 @@ const modes = {
   klondike: 'games.solitaire.title',
   spider: 'games.spider.title',
   freecell: 'games.freecell.title',
+}
+
+/** 各玩法的玩法说明(统一卡头的规则面板内容) */
+const modeRules = {
+  klondike: 'games.solitaire.tip',
+  spider: 'games.spider.tip',
+  freecell: 'games.freecell.tip',
 }
 
 function savedMode() {

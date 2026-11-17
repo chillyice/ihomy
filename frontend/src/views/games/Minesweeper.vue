@@ -16,33 +16,36 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
-      <div class="ms-head">
-        <div class="ms-title">{{ $t('games.minesweeper.title') }}</div>
-        <div class="ms-stats">
-          <div class="ms-stat">
-            <span class="ms-stat-label">{{ $t('games.minesweeper.flags') }}</span>
-            <b class="ms-stat-value">{{ remainingMines(board) }}</b>
-          </div>
-          <div class="ms-stat">
-            <span class="ms-stat-label">{{ $t('games.minesweeper.time') }}</span>
-            <b class="ms-stat-value">{{ formatClock(elapsed) }}</b>
-          </div>
-          <div class="ms-stat">
-            <span class="ms-stat-label">{{ $t('games.minesweeper.best') }}</span>
-            <b class="ms-stat-value">{{ bestText }}</b>
-          </div>
-        </div>
-      </div>
-
-      <div class="ms-actions">
-        <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="onLevelChange">
-          <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
-        </el-select>
-        <el-button size="small" round :type="flagMode ? 'primary' : 'default'" @click="flagMode = !flagMode">
-          {{ flagMode ? $t('games.minesweeper.flagMode') : $t('games.minesweeper.revealMode') }}
-        </el-button>
-        <el-button size="small" round @click="onNewGameClick">{{ $t('games.minesweeper.newGame') }}</el-button>
-      </div>
+      <GameHeader :title="$t('games.minesweeper.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
+        <template #settings>
+          <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="onLevelChange">
+            <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
+          </el-select>
+        </template>
+        <template #stats>
+          <span class="gh-chip"
+            ><span>{{ $t('games.minesweeper.flags') }}</span
+            ><b>{{ remainingMines(board) }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.minesweeper.time') }}</span
+            ><b>{{ formatClock(elapsed) }}</b></span
+          >
+          <span class="gh-chip"
+            ><span>{{ $t('games.minesweeper.best') }}</span
+            ><b>{{ bestText }}</b></span
+          >
+        </template>
+        <template #actions>
+          <el-button size="small" round :type="flagMode ? 'primary' : 'default'" @click="flagMode = !flagMode">
+            {{ flagMode ? $t('games.minesweeper.flagMode') : $t('games.minesweeper.revealMode') }}
+          </el-button>
+          <el-button size="small" round @click="onNewGameClick">{{ $t('games.minesweeper.newGame') }}</el-button>
+        </template>
+        <template #rules>
+          <p>{{ $t('games.minesweeper.tip') }}</p>
+        </template>
+      </GameHeader>
 
       <div class="ms-board-wrap">
         <div class="ms-board" :class="board.level.toLowerCase()">
@@ -66,8 +69,6 @@
           </button>
         </div>
       </div>
-
-      <div class="ms-tip">{{ $t('games.minesweeper.tip') }}</div>
 
       <Transition name="game-overlay">
         <div v-if="isFinished" class="ms-overlay game-overlay">
@@ -97,6 +98,7 @@ import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -481,54 +483,8 @@ onBeforeUnmount(() => {
   padding-top: 24px;
 }
 
-.ms-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(100%, 760px);
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.ms-title {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-.ms-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ms-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 66px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
-}
-.ms-stat-label {
-  font-size: 10px;
-  color: var(--color-text-secondary, #8a8a8a);
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-.ms-stat-value {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-
-.ms-actions {
-  display: flex;
-  gap: 8px;
-  width: min(100%, 760px);
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
 .ms-level {
   width: 96px;
-  margin-right: auto;
 }
 
 .ms-board-wrap {
@@ -639,14 +595,6 @@ onBeforeUnmount(() => {
   color: #888;
 }
 
-.ms-tip {
-  max-width: 760px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-  text-align: center;
-}
-
 .ms-overlay {
   position: absolute;
   inset: 0;
@@ -685,9 +633,6 @@ onBeforeUnmount(() => {
   color: #e0933a;
 }
 
-html.dark .ms-stat {
-  background: rgba(255, 255, 255, 0.08);
-}
 html.dark .ms-cell:not(.open) {
   background: linear-gradient(160deg, #4a505a, #333942);
   color: #e6e6e6;
@@ -731,13 +676,6 @@ html.dark .ms-overlay {
 @media (max-width: 560px) {
   .ms-card {
     padding: 14px 10px;
-  }
-  .ms-title {
-    font-size: 21px;
-  }
-  .ms-stat {
-    min-width: 58px;
-    padding: 4px 8px;
   }
 }
 </style>
