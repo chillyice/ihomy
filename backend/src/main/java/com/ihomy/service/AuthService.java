@@ -17,6 +17,7 @@ import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.JwtUtils;
+import io.jsonwebtoken.Claims;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import lombok.RequiredArgsConstructor;
@@ -234,9 +235,9 @@ public class AuthService {
         }
     }
 
-    /** 签发壁纸令牌(供桌面壁纸首次接入,之后由 /auth/refresh 滑动续期) */
+    /** 签发壁纸令牌(供桌面壁纸首次接入,之后由 /auth/refresh 滑动续期);家庭随令牌携带,续期不跟随其他设备 */
     public Map<String, String> wallpaperToken(SysUser user) {
-        return Map.of("refreshToken", jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
+        return Map.of("refreshToken", jwtUtils.generateWallpaperToken(user.getId(), user.getUsername(), familyOf(user)));
     }
 
     /** 签发桌面卡片令牌(供 Android 卡片 WorkManager 使用,之后由 /auth/refresh 滑动续期);角色与家庭是签发时快照 */
@@ -269,18 +270,20 @@ public class AuthService {
             if (reused == null) throw new BizException(ResultCode.UNAUTHORIZED);
             SysUser u = sysUserMapper.selectById(Long.valueOf(claims.getSubject()));
             if (u == null) throw new BizException(ResultCode.USER_NOT_FOUND);
-            return buildTokens(u, roleOf(u), familyOf(u), reused);
+            Long fid = refreshFamily(u, familyClaim(claims));
+            return buildTokens(u, roleCodeOf(u, fid), fid, reused);
         }
         Long userId = Long.valueOf(claims.getSubject());
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
             throw new BizException(ResultCode.USER_NOT_FOUND);
         }
-        Long familyId = familyOf(user);
-        String roleCode = roleOf(user);
+        // 续期家庭优先取本设备刷新令牌自带的家庭快照:其他设备切换家庭只影响它自己的会话
+        Long familyId = refreshFamily(user, familyClaim(claims));
+        String roleCode = roleCodeOf(user, familyId);
         if (wallpaper) {
             return buildTokens(user, roleCode, familyId,
-                    jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
+                    jwtUtils.generateWallpaperToken(user.getId(), user.getUsername(), familyId));
         }
         if (widget) {
             return buildTokens(user, roleCode, familyId,
@@ -293,6 +296,30 @@ public class AuthService {
 
     private String stripBearer(String token) {
         return token != null && token.startsWith("Bearer ") ? token.substring(7) : token;
+    }
+
+    /** 刷新/介质令牌内的家庭快照(JSON 数字按 Number 兼容取整);旧令牌无此 claim 返回 null */
+    private static Long familyClaim(Claims claims) {
+        Object v = claims.get("familyId");
+        return v instanceof Number n ? n.longValue() : null;
+    }
+
+    /**
+     * 续期时的家庭口径:优先本设备刷新令牌自带的家庭快照(同一账号多端各持一份令牌,
+     * 别的设备切换家庭不影响本设备);令牌无快照(7 天内残留的旧令牌)或已不是该家庭
+     * 成员(被移出)时回落全局解析(Redis 最近家庭/默认家庭/主家庭)。
+     */
+    private Long refreshFamily(SysUser user, Long tokenFamily) {
+        if (tokenFamily != null && sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), tokenFamily) != null) {
+            return tokenFamily;
+        }
+        return familyOf(user);
+    }
+
+    /** 指定家庭取角色码(取不到回落 GUEST,与 roleOf 同口径) */
+    private String roleCodeOf(SysUser user, Long familyId) {
+        String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), familyId);
+        return roleCode == null ? "GUEST" : roleCode;
     }
 
     /** 拉黑 token:value=out(登出,一律拒绝)/ rot:时刻:替换令牌(轮换宽限内可复得同一份新令牌) */
@@ -328,13 +355,13 @@ public class AuthService {
         return roleCode == null ? "GUEST" : roleCode;
     }
 
-    /** 我的家庭列表:来自角色绑定,标记主家庭/默认家庭/当前家庭 */
-    public List<Map<String, Object>> listFamilies(Long userId) {
+    /** 我的家庭列表:来自角色绑定,标记主家庭/默认家庭/当前家庭(当前家庭=本会话令牌快照,多端各自高亮) */
+    public List<Map<String, Object>> listFamilies(Long userId, Long sessionFamilyId) {
         List<Map<String, Object>> result = new java.util.ArrayList<>();
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) throw new BizException(ResultCode.USER_NOT_FOUND);
 
-        Long current = resolveFamily(userId);
+        Long current = sessionFamilyId != null ? sessionFamilyId : resolveFamily(userId);
         java.util.Set<Long> seen = new java.util.HashSet<>();
         List<SysUserRole> roles = sysUserRoleMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUserRole>()
@@ -451,9 +478,9 @@ public class AuthService {
         return securityHelper.current();
     }
 
-    /** 组装令牌响应(普通会话):签发新的 refresh token */
+    /** 组装令牌响应(普通会话):签发新的 refresh token(家庭随令牌携带,续期按设备隔离) */
     private Map<String, Object> buildTokens(SysUser user, String roleCode, Long familyId) {
-        return buildTokens(user, roleCode, familyId, jwtUtils.generateRefreshToken(user.getId(), user.getUsername()));
+        return buildTokens(user, roleCode, familyId, jwtUtils.generateRefreshToken(user.getId(), user.getUsername(), familyId));
     }
 
     /** 组装令牌响应:access token + 指定 refresh token(壁纸令牌/轮换复用)+ 用户信息 + 分享 token + 权限码 */

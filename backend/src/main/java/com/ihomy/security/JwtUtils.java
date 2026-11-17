@@ -49,17 +49,21 @@ public class JwtUtils {
         return build(userId, username, role, familyId, accessExpire, "ACCESS", mustChangePwd);
     }
 
-    /** 签发长期刷新令牌(仅含身份,不含角色/家庭) */
-    public String generateRefreshToken(Long userId, String username) {
-        return build(userId, username, null, null, refreshExpire, "REFRESH", false);
+    /**
+     * 签发长期刷新令牌:家庭 ID 随令牌携带(签发时快照)。
+     * 同一账号在多设备各持一份刷新令牌,续期只认自己令牌里的家庭,别的设备切换家庭不影响本设备会话。
+     */
+    public String generateRefreshToken(Long userId, String username, Long familyId) {
+        return build(userId, username, null, familyId, refreshExpire, "REFRESH", false);
     }
 
     /**
      * 签发壁纸介质令牌(type=WALLPAPER):桌面壁纸(WE)无法输入账号密码,用它与普通刷新令牌区分——
      * 普通刷新令牌轮换后即拉黑(单次有效),壁纸令牌不轮换拉黑,允许浏览器会话与多个壁纸实例各持一份、各自滑动续期。
+     * 家庭 ID 随令牌携带:续期时沿用签发时的家庭,不跟随其他设备的切换。
      */
-    public String generateWallpaperToken(Long userId, String username) {
-        return build(userId, username, null, null, refreshExpire, "WALLPAPER", false);
+    public String generateWallpaperToken(Long userId, String username, Long familyId) {
+        return build(userId, username, null, familyId, refreshExpire, "WALLPAPER", false);
     }
 
     /**

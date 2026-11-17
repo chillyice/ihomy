@@ -153,7 +153,8 @@ public class AuthController {
     public Result<List<Map<String, Object>>> families() {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        return Result.success(authService.listFamilies(user.getId()));
+        // currentUser().familyId 已被覆盖为 JWT 里的会话家庭:isCurrent 按本设备会话标,多端互不干扰
+        return Result.success(authService.listFamilies(user.getId(), user.getFamilyId()));
     }
 
     @Operation(summary = "切换当前家庭")
