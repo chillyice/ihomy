@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+      .stack {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: 50% 56%;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(11, 23, 36, 0.35), rgba(11, 23, 36, 0.38) 55%, rgba(8, 16, 28, 0.57));
+      }
+      body.bare .rc {
+        display: none;
+      }
+      body.pause .rc-cloud {
+        animation-play-state: paused !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { createApp, h } from 'vue'
+      import Clouds from '/src/components/morning/RandomClouds.vue'
+      import day from '/src/assets/morning/cloud-day.webp'
+      import overcast from '/src/assets/morning/overcast-day.webp'
+      import thunder from '/src/assets/morning/thunder-day.webp'
+      import clear from '/src/assets/morning/clear-day.webp'
+
+      const q = new URLSearchParams(location.search)
+      if (q.get('bare') === '1') document.body.classList.add('bare')
+      if (q.get('pause') === '1') document.body.classList.add('pause')
+
+      // 固定种子:两次截图抽到同一批云,比较「有云/无云」才有意义
+      const seed = Number(q.get('seed') || 0)
+      if (seed) {
+        let s = seed
+        Math.random = () => {
+          s = (s * 16807) % 2147483647
+          return s / 2147483647
+        }
+      }
+
+      const scene = q.get('c') || 'cloud'
+      const night = q.get('n') === '1'
+      const windScale = Number(q.get('w') || 4)
+      const photos = { clear, cloud: day, overcast, thunder }
+      const photo = photos[scene] || day
+
+      const app = createApp({
+        render: () =>
+          h(
+            'div',
+            {
+              class: 'stack',
+              style: q.get('bg') === 'flat' ? { background: '#7c8593' } : { backgroundImage: `url(${photo})` },
+            },
+            [
+              h(Clouds, { scene, night, windScale, windDeg: 270, animated: true, debug: q.get('debug') === '1' }),
+              q.get('scrim') === '1' ? h('div', { class: 'scrim' }) : null,
+            ],
+          ),
+      })
+      // 预览页没装 i18n:调试标签只需要 key 文本
+      app.config.globalProperties.$t = (k) => k
+      app.mount('#app')
+    </script>
+  </body>
+</html>
