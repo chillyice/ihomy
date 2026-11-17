@@ -59,14 +59,19 @@ export default defineConfig(({ mode }) => {
                 // 麻将/扑克牌面图集 2.3MB:只在牌类游戏页按需加载,不进预缓存
                 // (预缓存会让每个访客首装多下 2.3MB,workbox 默认也会因 >2MiB 直接构建失败)
                 globIgnores: ['ruffle/**', 'emulatorjs/**', 'mini-games/**'],
-                // iframe 里的静态小游戏是独立的页面导航,不能被 SPA 的离线兜底顶成 /index.html(会显示成首页)
-                navigateFallbackDenylist: [/^\/mini-games\//],
+                // iframe 里的静态小游戏是独立的页面导航,不能被 SPA 的离线兜底顶成 /index.html(会显示成首页)。
+                // /api/ 与 /files/ 同理:安装包下载走 /api/public/product/download → 302 到 /files/<page>/<包名>,
+                // 一旦被兜底成 index.html,前端路由找不到这个路径就跳回首页——用户看到的是「点下载却打开了 ihomy」。
+                navigateFallbackDenylist: [/^\/mini-games\//, /^\/api\//, /^\/files\//],
                 runtimeCaching: [
                   {
                     // 缓存 GET 接口(离线浏览/弱网);排除敏感接口:保险箱、认证、运维、个人资料
                     // 这些响应含明文密码/凭证/权限,不能落 Cache Storage(登出也无法保证清除)
+                    // 安装包下载接口也排除:8MB 级的二进制不配进 api-cache(且它本来就不该被导航缓存命中)
                     urlPattern: ({ url }) =>
-                      url.pathname.startsWith('/api/') && !/^\/api\/(vault|auth|ops|profile)(\/|$)/.test(url.pathname),
+                      url.pathname.startsWith('/api/') &&
+                      !/^\/api\/(vault|auth|ops|profile)(\/|$)/.test(url.pathname) &&
+                      !url.pathname.startsWith('/api/public/product/download'),
                     handler: 'NetworkFirst',
                     options: {
                       cacheName: 'api-cache',
