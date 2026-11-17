@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ChatMessageMapper">
+
+    <!-- 各家庭房间最新消息 id:聊天室列表一次算全部未读,不逐房查询 -->
+    <select id="selectLastIds" resultType="map">
+        SELECT family_id AS familyId, MAX(id) AS lastMsgId
+        FROM family_chat_message
+        WHERE family_id IN
+        <foreach collection="familyIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY family_id
+    </select>
+
+</mapper>

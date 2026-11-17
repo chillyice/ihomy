@@ -2108,6 +2108,7 @@ export default {
   chat: {
     title: '聊天室',
     roomTitle: '家庭聊天室',
+    fromFamily: '来自 {name}',
     rail: {
       family: '家庭',
       members: '本家成员',
@@ -2903,6 +2904,13 @@ export default {
     bgmTipLink: '跳转音乐页面',
     currentFamily: '当前家庭',
     switchTo: '切换',
+    joinFamily: '加入新家庭',
+    joinFamilyHint: '有邀请码就直接加入另一个家庭;当前家庭不变,加入后可回到上方切换。',
+    joinFamilySearchHint: '没有邀请码?到「家庭成员」页搜索公开家庭并申请加入。',
+    inviteCodePh: '请输入邀请码',
+    joinAction: '加入',
+    joining: '加入中...',
+    joinSuccess: '已加入该家庭,可在上方切换到新家庭',
     createFamily: '创建新家庭',
     createFamilyHint: '你将成为新家庭的家长，创建后自动切换过去，可随时切回原家庭。',
     createFamilyDialogHint: '你将成为新家庭的家长,创建后自动切换到新家庭。',

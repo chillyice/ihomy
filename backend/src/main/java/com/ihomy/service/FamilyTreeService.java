@@ -8,8 +8,10 @@ import com.ihomy.common.UserNames;
 import com.ihomy.dto.TreeMemberDTO;
 import com.ihomy.entity.FamilyTreeMember;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.FamilyTreeMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class FamilyTreeService {
 
     private final FamilyTreeMapper treeMapper;
     private final SysUserMapper sysUserMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
 
     /** 家庭全部成员(附 father/mother/spouse 姓名与关联账号展示名,前端组树用) */
     public List<Map<String, Object>> list(Long familyId) {
@@ -240,11 +243,12 @@ public class FamilyTreeService {
         if (dto.getNote() != null) m.setNote(dto.getNote());
     }
 
-    /** 关联账号必须是本家庭成员(跨家庭按不存在处理,不泄露他家庭用户) */
+    /** 关联账号必须在本家庭有角色绑定(第二家庭成员也算;跨家庭按不存在处理,不泄露他家庭用户) */
     private void validateUser(Long familyId, Long userId) {
         if (userId == null) return;
-        SysUser u = sysUserMapper.selectById(userId);
-        if (u == null || familyId == null || !familyId.equals(u.getFamilyId())) {
+        if (familyId == null || sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, userId)
+                .eq(SysUserRole::getFamilyId, familyId)) == 0) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
     }
@@ -289,9 +293,7 @@ public class FamilyTreeService {
                 .eq(FamilyTreeMember::getFamilyId, familyId))) {
             if (m.getUserId() != null) linked.add(m.getUserId());
         }
-        List<SysUser> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getFamilyId, familyId)
-                .orderByAsc(SysUser::getId));
+        List<SysUser> users = sysUserMapper.selectUsersByFamily(familyId);
         int count = 0;
         for (SysUser u : users) {
             if (linked.contains(u.getId())) continue;

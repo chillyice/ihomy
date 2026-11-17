@@ -39,25 +39,40 @@ public class ChatController {
         return securityHelper.current();
     }
 
-    @Operation(summary = "历史消息(beforeId 翻页,缺省最新一批)")
+    /** 目标房间:缺省/本家=当前家庭;亲友圈家庭经服务层校验连通性,不连通一律 404 */
+    private long room(LoginUser user, Long requestedFamilyId) {
+        return chatService.requireRoomAccess(user.getUserId(), user.getFamilyId(), requestedFamilyId);
+    }
+
+    @Operation(summary = "我可见的聊天室(本家 + 活跃亲友圈家庭,含未读数)")
+    @GetMapping("/rooms")
+    public Result<List<Map<String, Object>>> rooms() {
+        LoginUser user = current();
+        return Result.success(chatService.rooms(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "历史消息(beforeId 翻页,缺省最新一批;familyId 指定亲友圈家庭房间)")
     @GetMapping("/history")
-    public Result<List<Map<String, Object>>> history(@RequestParam(required = false) Long beforeId,
+    public Result<List<Map<String, Object>>> history(@RequestParam(required = false) Long familyId,
+                                                     @RequestParam(required = false) Long beforeId,
                                                      @RequestParam(defaultValue = "50") int limit) {
-        return Result.success(chatService.history(current().getFamilyId(), beforeId, limit));
+        LoginUser user = current();
+        return Result.success(chatService.history(room(user, familyId), beforeId, limit));
     }
 
     @Operation(summary = "未读数与最新消息")
     @GetMapping("/unread")
-    public Result<Map<String, Object>> unread() {
+    public Result<Map<String, Object>> unread(@RequestParam(required = false) Long familyId) {
         LoginUser user = current();
-        return Result.success(chatService.unread(user.getUserId(), user.getFamilyId()));
+        return Result.success(chatService.unread(user.getUserId(), room(user, familyId)));
     }
 
     @Operation(summary = "标记已读(记录用户已读游标)")
     @PostMapping("/read")
     public Result<Void> read(@RequestBody(required = false) ChatReadDTO dto) {
         LoginUser user = current();
-        chatService.markRead(user.getUserId(), user.getFamilyId(), dto == null ? null : dto.getMsgId());
+        chatService.markRead(user.getUserId(), room(user, dto == null ? null : dto.getFamilyId()),
+                dto == null ? null : dto.getMsgId());
         return Result.success();
     }
 

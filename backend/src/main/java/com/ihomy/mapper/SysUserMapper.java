@@ -15,4 +15,10 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     SysUser selectByEmail(@Param("email") String email);
 
     List<Map<String, Object>> selectMembersByFamily(@Param("familyId") Long familyId);
+
+    /** 家庭全部成员账号(按 sys_user_role 绑定,含第二家庭成员) */
+    List<SysUser> selectUsersByFamily(@Param("familyId") Long familyId);
+
+    /** 家庭活跃成员数(与成员列表同一口径) */
+    long countActiveMembers(@Param("familyId") Long familyId);
 }

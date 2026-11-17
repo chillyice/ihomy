@@ -9,9 +9,11 @@ import com.ihomy.dto.AnniversaryDTO;
 import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.FamilyAnniversaryMember;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.AnniversaryMapper;
 import com.ihomy.mapper.FamilyAnniversaryMemberMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.service.access.ContentKind;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class AnniversaryService {
     private final AnniversaryMapper anniversaryMapper;
     private final FamilyAnniversaryMemberMapper memberMapper;
     private final SysUserMapper sysUserMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
     private final AudienceService audienceService;
 
     /**
@@ -190,14 +193,18 @@ public class AnniversaryService {
         return new ArrayList<>(dedup);
     }
 
-    /** 关联账号必须都属于本家庭,否则按不存在处理(不泄露他家庭用户) */
+    /** 关联账号必须都在本家庭有角色绑定(第二家庭成员也算),否则按不存在处理(不泄露他家庭用户) */
     private void validateMembers(Long familyId, List<Long> memberIds) {
         if (memberIds.isEmpty()) return;
         if (familyId == null) throw new BizException(ResultCode.NOT_FOUND);
-        Map<Long, SysUser> userMap = batchUsers(new HashSet<>(memberIds));
+        Set<Long> bound = new HashSet<>();
+        for (SysUserRole row : sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                .in(SysUserRole::getUserId, memberIds)
+                .eq(SysUserRole::getFamilyId, familyId))) {
+            bound.add(row.getUserId());
+        }
         for (Long uid : memberIds) {
-            SysUser u = userMap.get(uid);
-            if (u == null || !Objects.equals(familyId, u.getFamilyId())) {
+            if (!bound.contains(uid)) {
                 throw new BizException(ResultCode.NOT_FOUND);
             }
         }

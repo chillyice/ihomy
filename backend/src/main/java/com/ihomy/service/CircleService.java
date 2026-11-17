@@ -358,6 +358,46 @@ public class CircleService {
     }
 
     /**
+     * 当前家庭所在活跃圈里的全部家庭(含本家),带家庭名/封面与圈内称呼。
+     * 聊天室左列与房间列表用;顺序本家在前,其余按家庭 id 升序。
+     */
+    public List<Map<String, Object>> connectedFamilies(Long familyId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (familyId == null) return result;
+        Set<Long> ids = connectedFamilyIds(familyId);
+        // 圈内称呼:同一家庭可能出现在多个圈里,取第一个非空称呼(展示用)
+        Map<Long, String> aliases = new HashMap<>();
+        List<FamilyCircleMember> mine = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                .eq(FamilyCircleMember::getFamilyId, familyId)
+                .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE));
+        if (!mine.isEmpty()) {
+            List<Long> circleIds = mine.stream().map(FamilyCircleMember::getCircleId).distinct().toList();
+            for (FamilyCircleMember row : memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                    .in(FamilyCircleMember::getCircleId, circleIds)
+                    .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE))) {
+                if (row.getAlias() != null && !row.getAlias().isBlank() && !aliases.containsKey(row.getFamilyId())) {
+                    aliases.put(row.getFamilyId(), row.getAlias());
+                }
+            }
+        }
+        Map<Long, Family> families = familyMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(Family::getId, f -> f));
+        List<Long> ordered = new ArrayList<>(ids);
+        ordered.sort((a, b) -> a.equals(familyId) ? -1 : b.equals(familyId) ? 1 : Long.compare(a, b));
+        for (Long id : ordered) {
+            Family f = families.get(id);
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("familyId", id);
+            v.put("familyName", f == null ? null : f.getName());
+            v.put("coverImage", f == null ? null : f.getCoverImage());
+            v.put("alias", aliases.get(id));
+            v.put("self", id.equals(familyId));
+            result.add(v);
+        }
+        return result;
+    }
+
+    /**
      * 同圈家庭的成员名单(仅 id/名字/头像,不含家谱与联系方式)。
      * 目标家庭必须与发起家庭连通(同家庭或同圈),否则 NOT_FOUND。
      */
@@ -365,9 +405,7 @@ public class CircleService {
         if (targetFamilyId == null || !connectedFamilyIds(selfFamilyId).contains(targetFamilyId)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        List<SysUser> users = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getFamilyId, targetFamilyId)
-                .orderByAsc(SysUser::getId));
+        List<SysUser> users = userMapper.selectUsersByFamily(targetFamilyId);
         List<Map<String, Object>> out = new ArrayList<>();
         for (SysUser u : users) {
             Map<String, Object> v = new LinkedHashMap<>();

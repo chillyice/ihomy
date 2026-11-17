@@ -117,9 +117,17 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 sendToUser(userId, "message", echo);
                 return;
             }
-            Map<String, Object> view = chatService.sendMessage(familyId, userId, str(data.get("msgType")),
+            // 上行带 familyId 时可发到亲友圈其他家庭房间(圈内可读可发言);未带=本家
+            Long targetFamilyId = data.get("familyId") instanceof Number n ? n.longValue() : familyId;
+            try {
+                chatService.requireRoomAccess(userId, familyId, targetFamilyId);
+            } catch (com.ihomy.common.BizException e) {
+                replyError(session, "BAD_TARGET");
+                return;
+            }
+            Map<String, Object> view = chatService.sendMessage(targetFamilyId, userId, str(data.get("msgType")),
                     str(data.get("content")), payload);
-            broadcast(familyId, envelope("message", view));
+            broadcastRoom(targetFamilyId, envelope("message", view));
         } catch (IllegalArgumentException e) {
             replyError(session, e.getMessage());
         }
@@ -226,7 +234,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         sendToUser(other, "game-signal", out);
     }
 
-    /** 广播给同房间全部在线会话 */
+    /** 广播给同房间全部在线会话(本家) */
     private void broadcast(Long familyId, Map<String, Object> envelope) {
         Set<WebSocketSession> room = rooms.get(familyId);
         if (room == null) {
@@ -240,9 +248,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** REST 侧(对战邀请卡/结果卡等)复用同一 envelope 推送同房间在线成员 */
+    /** 广播到某家庭房间:本家 + 同亲友圈家庭的在线会话(圈内可读可发言) */
+    private void broadcastRoom(Long targetFamilyId, Map<String, Object> envelope) {
+        TextMessage msg = new TextMessage(toJson(envelope));
+        for (Map.Entry<Long, Set<WebSocketSession>> e : rooms.entrySet()) {
+            if (!chatService.canAccessRoom(e.getKey(), targetFamilyId)) {
+                continue;
+            }
+            for (WebSocketSession s : e.getValue()) {
+                if (s.isOpen()) {
+                    sendQuietly(s, msg);
+                }
+            }
+        }
+    }
+
+    /** REST 侧(对战邀请卡/结果卡等)复用同一 envelope 推送房间在线成员(含同圈家庭) */
     public void broadcastMessage(Long familyId, Map<String, Object> view) {
-        broadcast(familyId, envelope("message", view));
+        broadcastRoom(familyId, envelope("message", view));
     }
 
     /**

@@ -14,9 +14,24 @@
         JOIN sys_user_role ur ON ur.user_id = u.id
         JOIN sys_role r ON r.id = ur.role_id
         LEFT JOIN family_user_label l ON l.user_id = u.id AND l.family_id = #{familyId}
-        WHERE u.family_id = #{familyId} AND u.deleted = 0
+        WHERE u.deleted = 0
         AND ur.family_id = #{familyId} AND r.status = 'ENABLED'
         ORDER BY u.id
+    </select>
+
+    <!-- 家庭全部成员账号:以角色绑定为准(含通过邀请码/申请加入的第二家庭成员) -->
+    <select id="selectUsersByFamily" resultType="com.ihomy.entity.SysUser">
+        SELECT DISTINCT u.* FROM sys_user u
+        JOIN sys_user_role ur ON ur.user_id = u.id
+        WHERE ur.family_id = #{familyId} AND u.deleted = 0
+        ORDER BY u.id
+    </select>
+
+    <!-- 家庭活跃成员数:与成员列表同一口径(角色绑定 + 账号启用) -->
+    <select id="countActiveMembers" resultType="long">
+        SELECT COUNT(DISTINCT u.id) FROM sys_user u
+        JOIN sys_user_role ur ON ur.user_id = u.id
+        WHERE ur.family_id = #{familyId} AND u.deleted = 0 AND u.status = 'ACTIVE'
     </select>
 
 </mapper>

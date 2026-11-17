@@ -8,18 +8,24 @@ import com.ihomy.entity.ChatDmMessage;
 import com.ihomy.entity.ChatMessage;
 import com.ihomy.entity.ChatRead;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.ChatDmMessageMapper;
 import com.ihomy.mapper.ChatMessageMapper;
 import com.ihomy.mapper.ChatReadMapper;
+import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +40,8 @@ public class ChatService {
     private final ChatDmMessageMapper dmMapper;
     private final ChatReadMapper readMapper;
     private final SysUserMapper sysUserMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
+    private final FamilyMapper familyMapper;
     private final CircleService circleService;
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
@@ -53,9 +61,10 @@ public class ChatService {
         java.util.Collections.reverse(list);
 
         Map<Long, Sender> senders = messageSenders(list);
+        Map<Long, String> familyNames = crossFamilyNames(list, senders);
         List<Map<String, Object>> result = new ArrayList<>();
         for (ChatMessage m : list) {
-            result.add(toView(m, senders));
+            result.add(toView(m, senders, familyNames));
         }
         return result;
     }
@@ -75,7 +84,7 @@ public class ChatService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("unread", count);
         result.put("lastMsgId", lastId);
-        result.put("lastMsg", last == null ? null : toView(last, messageSenders(List.of(last))));
+        result.put("lastMsg", last == null ? null : view(last));
         return result;
     }
 
@@ -94,6 +103,75 @@ public class ChatService {
             read.setLastReadMsgId(target);
             readMapper.updateById(read);
         }
+    }
+
+    // ---------- 亲友圈家庭房间(2026-11:圈内家庭可读可发言) ----------
+
+    /**
+     * 房间准入:目标为空=本家;其他家庭必须与当前家庭在同一个活跃亲友圈里。
+     * 违规一律 NOT_FOUND(不泄露家庭是否存在),返回最终要读写的家庭 id。
+     */
+    public Long requireRoomAccess(Long userId, Long currentFamilyId, Long requestedFamilyId) {
+        if (currentFamilyId == null || userId == null || !userFamilyIds(userId).contains(currentFamilyId)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (requestedFamilyId == null || requestedFamilyId.equals(currentFamilyId)) {
+            return currentFamilyId;
+        }
+        if (!circleService.connectedFamilyIds(currentFamilyId).contains(requestedFamilyId)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        return requestedFamilyId;
+    }
+
+    /** 会话所在家庭能否读目标家庭房间(本家或同圈);WS 广播按此筛在线会话 */
+    public boolean canAccessRoom(Long familyId, Long targetFamilyId) {
+        if (familyId == null || targetFamilyId == null) return false;
+        return familyId.equals(targetFamilyId) || circleService.connectedFamilyIds(familyId).contains(targetFamilyId);
+    }
+
+    /** 用户有角色绑定的全部家庭(多家庭成员口径,替代只看主家庭) */
+    private Set<Long> userFamilyIds(Long userId) {
+        return sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getUserId, userId)).stream()
+                .map(SysUserRole::getFamilyId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
+     * 我可见的聊天室(本家 + 活跃亲友圈里其他家庭),带各自未读数与最新消息 id。
+     * 三次批量查询(家庭概要 / 各房最新 id / 本人已读游标),不做逐房循环。
+     */
+    public List<Map<String, Object>> rooms(Long userId, Long currentFamilyId) {
+        List<Map<String, Object>> families = circleService.connectedFamilies(currentFamilyId);
+        if (families.isEmpty()) return new ArrayList<>();
+        List<Long> ids = families.stream().map(m -> ((Number) m.get("familyId")).longValue()).toList();
+        Map<Long, Long> lastIds = new LinkedHashMap<>();
+        for (Map<String, Object> row : messageMapper.selectLastIds(ids)) {
+            Object fid = row.get("familyId");
+            Object lid = row.get("lastMsgId");
+            if (fid instanceof Number f && lid instanceof Number l) {
+                lastIds.put(f.longValue(), l.longValue());
+            }
+        }
+        Map<Long, Long> readIds = new LinkedHashMap<>();
+        for (ChatRead r : readMapper.selectList(new LambdaQueryWrapper<ChatRead>()
+                .eq(ChatRead::getUserId, userId)
+                .in(ChatRead::getFamilyId, ids))) {
+            readIds.put(r.getFamilyId(), r.getLastReadMsgId() == null ? 0L : r.getLastReadMsgId());
+        }
+        List<Map<String, Object>> out = new ArrayList<>(families.size());
+        for (Map<String, Object> f : families) {
+            long familyId = ((Number) f.get("familyId")).longValue();
+            long lastId = lastIds.getOrDefault(familyId, 0L);
+            long readId = readIds.getOrDefault(familyId, 0L);
+            Map<String, Object> v = new LinkedHashMap<>(f);
+            v.put("unread", Math.max(0, lastId - readId));
+            v.put("lastMsgId", lastId);
+            out.add(v);
+        }
+        return out;
     }
 
     /** payload 长度上限:发送侧与 WS 侧同一口径,超限拒绝 */
@@ -223,19 +301,24 @@ public class ChatService {
         return v == null ? null : v.toString();
     }
 
-    /** 通话信令的家庭隔离:双方必须同家庭(OPS/无家庭用户不参与通话) */
+    /** 通话/对战的家庭隔离:双方必须有共同的家庭角色绑定(OPS/无家庭用户不参与) */
     public boolean sameFamily(Long userId, Long targetUserId) {
         if (userId == null || targetUserId == null || userId.equals(targetUserId)) {
             return false;
         }
-        SysUser a = sysUserMapper.selectById(userId);
-        SysUser b = sysUserMapper.selectById(targetUserId);
-        return a != null && b != null && a.getFamilyId() != null && a.getFamilyId().equals(b.getFamilyId());
+        Set<Long> mine = userFamilyIds(userId);
+        if (mine.isEmpty()) return false;
+        Set<Long> peers = userFamilyIds(targetUserId);
+        for (Long id : mine) {
+            if (peers.contains(id)) return true;
+        }
+        return false;
     }
 
     /** 单条消息的统一视图(WS 广播与 REST 历史同构,带发送人昵称) */
     public Map<String, Object> view(ChatMessage m) {
-        return toView(m, messageSenders(List.of(m)));
+        Map<Long, Sender> senders = messageSenders(List.of(m));
+        return toView(m, senders, crossFamilyNames(List.of(m), senders));
     }
 
     /**
@@ -276,22 +359,29 @@ public class ChatService {
     // ---------- 私聊(DM) ----------
 
     /**
-     * 私聊关系校验:双方同家庭,或双方家庭在同一亲友圈里(同圈家庭之间可见成员名单、可私聊)。
+     * 私聊关系校验:双方有共同的家庭角色绑定(同家庭),或双方家庭在同一活跃亲友圈里连通。
      * 不满足抛 IllegalArgumentException("BAD_TARGET"),WS 层转 error envelope,REST 层转友好提示。
      */
     public void requireCanChat(Long userId, Long peerId) {
         if (userId == null || peerId == null || userId.equals(peerId)) {
             throw new IllegalArgumentException("BAD_TARGET");
         }
-        SysUser a = sysUserMapper.selectById(userId);
-        SysUser b = sysUserMapper.selectById(peerId);
-        if (a == null || b == null || a.getFamilyId() == null || b.getFamilyId() == null) {
+        Set<Long> mine = userFamilyIds(userId);
+        Set<Long> peers = userFamilyIds(peerId);
+        if (mine.isEmpty() || peers.isEmpty()) {
             throw new IllegalArgumentException("BAD_TARGET");
         }
-        if (!a.getFamilyId().equals(b.getFamilyId())
-                && !circleService.connectedFamilyIds(a.getFamilyId()).contains(b.getFamilyId())) {
-            throw new IllegalArgumentException("BAD_TARGET");
+        for (Long f : mine) {
+            if (peers.contains(f)) return;
         }
+        // 跨家庭:任一边的家庭与本边家庭在同一亲友圈即可(同圈可见成员名单、可私聊)
+        for (Long f : mine) {
+            Set<Long> connected = circleService.connectedFamilyIds(f);
+            for (Long p : peers) {
+                if (connected.contains(p)) return;
+            }
+        }
+        throw new IllegalArgumentException("BAD_TARGET");
     }
 
     /** 私聊关系是否成立(requireCanChat 的布尔版,批量列表过滤用) */
@@ -448,8 +538,8 @@ public class ChatService {
         return last == null ? 0 : last.getId();
     }
 
-    /** 发送人展示信息(昵称 + 头像):一次批查回填,避免 N+1 */
-    private record Sender(String name, String avatar) {}
+    /** 发送人展示信息(主家庭 + 昵称 + 头像):一次批查回填,避免 N+1 */
+    private record Sender(Long familyId, String name, String avatar) {}
 
     /** 按发送人 id 批查展示信息;昵称缺失回退用户名,再缺回退占位名 */
     private Map<Long, Sender> senders(List<Long> ids) {
@@ -460,9 +550,26 @@ public class ChatService {
         Map<Long, Sender> out = new LinkedHashMap<>();
         for (SysUser u : sysUserMapper.selectBatchIds(distinct)) {
             String name = u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername();
-            out.put(u.getId(), new Sender(name, u.getAvatar()));
+            out.put(u.getId(), new Sender(u.getFamilyId(), name, u.getAvatar()));
         }
         return out;
+    }
+
+    /** 跨家庭发言的发送人所属家庭名:只有发送人主家庭≠房间家庭时才下发,前端好标「来自某家」 */
+    private Map<Long, String> crossFamilyNames(List<ChatMessage> messages, Map<Long, Sender> senders) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (ChatMessage m : messages) {
+            Sender s = senders.get(m.getSenderId());
+            if (s != null && s.familyId() != null && !s.familyId().equals(m.getFamilyId())) {
+                ids.add(s.familyId());
+            }
+        }
+        if (ids.isEmpty()) return Map.of();
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (com.ihomy.entity.Family f : familyMapper.selectBatchIds(ids)) {
+            names.put(f.getId(), f.getName());
+        }
+        return names;
     }
 
     /** 消息列表里出现过的发送人 */
@@ -476,12 +583,21 @@ public class ChatService {
     }
 
     private Map<String, Object> toView(ChatMessage m, Map<Long, Sender> senders) {
+        return toView(m, senders, Map.of());
+    }
+
+    private Map<String, Object> toView(ChatMessage m, Map<Long, Sender> senders, Map<Long, String> familyNames) {
         Sender sender = senders.get(m.getSenderId());
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("id", m.getId());
+        v.put("familyId", m.getFamilyId());
         v.put("senderId", m.getSenderId());
         v.put("senderName", sender == null || sender.name() == null ? "未知成员" : sender.name());
         v.put("senderAvatar", sender == null ? null : sender.avatar());
+        if (sender != null && sender.familyId() != null && !sender.familyId().equals(m.getFamilyId())) {
+            String familyName = familyNames.get(sender.familyId());
+            if (familyName != null) v.put("senderFamilyName", familyName);
+        }
         v.put("content", m.getContent());
         v.put("msgType", m.getMsgType());
         v.put("payload", m.getPayload());

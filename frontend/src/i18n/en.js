@@ -2119,6 +2119,7 @@ export default {
   chat: {
     title: 'Chat',
     roomTitle: 'Family chat room',
+    fromFamily: 'from {name}',
     floatToggle: 'Chat bubble',
     floatRemoved: 'Chat bubble hidden — turn it back on in Chat',
     rail: {
@@ -2754,6 +2755,14 @@ export default {
     bgmTipLink: 'go to the music page',
     currentFamily: 'Current home',
     switchTo: 'Switch',
+    joinFamily: 'Join a new family',
+    joinFamilyHint:
+      'Have an invite code? Join another family right away. Your current family stays the same, and you can switch above afterwards.',
+    joinFamilySearchHint: 'No invite code? Search for a public family on the Members page and apply.',
+    inviteCodePh: 'Enter the invite code',
+    joinAction: 'Join',
+    joining: 'Joining...',
+    joinSuccess: 'Joined — switch to the new family above',
     createFamily: 'Create a home',
     createFamilyHint: 'You will own the new home and are switched to it right away; you can switch back any time.',
     createFamilyDialogHint: 'You will be the owner of the new home and switched to it right away.',

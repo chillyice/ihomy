@@ -6,7 +6,6 @@ import com.ihomy.common.AnniversaryDate;
 import com.ihomy.common.DictConst;
 import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.FamilyAnniversaryMember;
-import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AnniversaryMapper;
 import com.ihomy.mapper.FamilyAnniversaryMemberMapper;
 import com.ihomy.mapper.SysUserMapper;
@@ -103,12 +102,10 @@ public class HomeStatsService {
         return a.getMonth() == date.getMonthValue() && a.getDay() == date.getDayOfMonth();
     }
 
-    /** 有效(未禁用)成员数 */
+    /** 有效(未禁用)成员数:按角色绑定计数,含第二家庭成员 */
     private long countMembers(Long familyId) {
         if (familyId == null) return 0;
-        LambdaQueryWrapper<SysUser> qw = new LambdaQueryWrapper<>();
-        qw.eq(SysUser::getFamilyId, familyId).eq(SysUser::getStatus, DictConst.USER_ACTIVE);
-        return sysUserMapper.selectCount(qw);
+        return sysUserMapper.countActiveMembers(familyId);
     }
 
     /** 本家庭未来最近的纪念日(最多 limit 条):首页统计与今日页签共用这一份口径 */

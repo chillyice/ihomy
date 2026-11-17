@@ -109,7 +109,7 @@ class FamilyTreeServiceTest {
         FamilyTreeMember linked = member(10L, "已在家谱", null);
         linked.setUserId(100L);
         when(treeMapper.selectList(any())).thenReturn(List.of(linked));
-        when(sysUserMapper.selectList(any())).thenReturn(List.of(
+        when(sysUserMapper.selectUsersByFamily(FAMILY)).thenReturn(List.of(
                 user(100L, "已在"), user(101L, "待导入"), user(102L, "未选")));
 
         int count = service.importMembers(FAMILY, List.of(101L));
@@ -125,7 +125,7 @@ class FamilyTreeServiceTest {
     @Test
     void importMembersWithoutSelectionBringsEveryUnlinkedAccount() {
         when(treeMapper.selectList(any())).thenReturn(List.of());
-        when(sysUserMapper.selectList(any())).thenReturn(List.of(user(1L, "甲"), user(2L, "乙")));
+        when(sysUserMapper.selectUsersByFamily(FAMILY)).thenReturn(List.of(user(1L, "甲"), user(2L, "乙")));
 
         assertThat(service.importMembers(FAMILY, null)).isEqualTo(2);
         verify(treeMapper, times(2)).insert(any(FamilyTreeMember.class));

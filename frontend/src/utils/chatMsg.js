@@ -53,6 +53,16 @@ export function isSiteInternal(url) {
   return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')
 }
 
+/**
+ * 消息归属的房间家庭 id:私聊返回 null;家庭消息取 familyId,老数据缺省时退回当前家庭。
+ * 前端按这个值把消息分到本家房 / 亲友圈其他家庭房。
+ */
+export function messageRoomId(m, fallbackFamilyId) {
+  if (!m || (m.dm && m.dm.userId != null)) return null
+  const id = m.familyId ?? fallbackFamilyId
+  return id == null || id === '' ? null : Number(id)
+}
+
 /** 文本截断(选择器标题快照等展示用) */
 export function clipText(v, max) {
   if (typeof v !== 'string') return ''

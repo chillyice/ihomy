@@ -7,6 +7,7 @@ import {
   buildLinkPayload,
   isSiteInternal,
   mergeMessages,
+  messageRoomId,
   parsePayload,
   serializePayload,
 } from './chatMsg'
@@ -93,6 +94,19 @@ describe('isSiteInternal / serializePayload', () => {
     circular.self = circular
     expect(serializePayload(circular)).toBeNull()
     expect(serializePayload(null)).toBeNull()
+  })
+})
+
+describe('messageRoomId', () => {
+  it('家庭消息取 familyId;老数据缺省时退回当前家庭', () => {
+    expect(messageRoomId({ familyId: 7 }, 2)).toBe(7)
+    expect(messageRoomId({ familyId: '7' }, 2)).toBe(7)
+    expect(messageRoomId({}, 2)).toBe(2)
+  })
+  it('私聊与空值返回 null(不进任何家庭房)', () => {
+    expect(messageRoomId({ dm: { userId: 9 }, familyId: 7 }, 2)).toBeNull()
+    expect(messageRoomId(null, 2)).toBeNull()
+    expect(messageRoomId({}, null)).toBeNull()
   })
 })
 

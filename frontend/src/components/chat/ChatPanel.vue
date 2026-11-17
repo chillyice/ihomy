@@ -25,7 +25,12 @@
             <el-icon :size="16"><Expand v-if="!railOpen" /><Fold v-else /></el-icon>
           </button>
           <span class="head-title">{{ conversationTitle }}</span>
-          <button v-if="chatStore.activePeer != null" type="button" class="head-back" @click="chatStore.closeDm()">
+          <button
+            v-if="chatStore.activePeer != null || chatStore.activeRoomId != null"
+            type="button"
+            class="head-back"
+            @click="chatStore.closeDm()"
+          >
             {{ $t('chat.rail.backFamily') }}
           </button>
         </div>
@@ -143,10 +148,13 @@ onBeforeUnmount(() => {
   railObserver = null
 })
 
-// 会话标题:家庭聊天室 / 私聊对方名(打开会话时由对象列传入 store)
+// 会话标题:本家聊天室 / 亲友圈家庭房间名 / 私聊对方名(打开会话时由对象列传入 store)
 const conversationTitle = computed(() => {
-  if (chatStore.activePeer == null) return t('chat.roomTitle')
-  return chatStore.activePeerName || t('chat.dm.fallbackTitle', { id: chatStore.activePeer })
+  if (chatStore.activePeer != null) {
+    return chatStore.activePeerName || t('chat.dm.fallbackTitle', { id: chatStore.activePeer })
+  }
+  if (chatStore.activeRoomId != null) return chatStore.activeRoomName || t('chat.roomTitle')
+  return t('chat.roomTitle')
 })
 </script>
 

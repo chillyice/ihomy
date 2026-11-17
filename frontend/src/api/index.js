@@ -27,6 +27,8 @@ export const dailyApi = {
 export const authApi = {
   captcha: () => request.get('/auth/captcha'),
   families: () => request.get('/auth/families'),
+  // 已登录用户用邀请码加入另一个家庭(只多一条角色绑定,不切当前家庭)
+  join: (inviteCode) => request.post('/auth/join', { inviteCode }),
   wallpaperToken: () => request.post('/auth/wallpaper-token'),
   forgotPassword: (data) => request.post('/auth/forgot-password', data),
   resetPassword: (data) => request.post('/auth/reset-password', data),
@@ -615,11 +617,12 @@ export const treeApi = {
   unlink: (params) => request.delete('/tree/relation', { params }),
 }
 
-// 聊天室(历史/未读/已读游标;实时走 WebSocket;unfurl 为站外链接预览)
+// 聊天室(历史/未读/已读游标;实时走 WebSocket;familyId 指定亲友圈家庭房间,缺省本家)
 export const chatApi = {
+  rooms: () => request.get('/chat/rooms'),
   history: (params) => request.get('/chat/history', { params }),
-  unread: () => request.get('/chat/unread'),
-  read: (msgId) => request.post('/chat/read', { msgId }),
+  unread: (familyId) => request.get('/chat/unread', { params: { familyId } }),
+  read: (msgId, familyId) => request.post('/chat/read', { msgId, familyId }),
   unfurl: (url) => request.post('/chat/unfurl', { url }),
   iceServers: () => request.get('/chat/ice-servers'),
   // 私聊(DM):历史翻页、按人未读分组、把某人发来的全部置已读

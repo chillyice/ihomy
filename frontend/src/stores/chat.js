@@ -43,7 +43,19 @@ export const useChatStore = defineStore('chat', {
     dmUnread: {},
     /** 私聊历史是否已拉过:peerId(字符串)→ bool */
     dmLoaded: {},
-    /** 当前会话:null=家庭聊天室,数字=私聊对方 userId */
+    /** 亲友圈家庭房间:familyId(字符串)→ 消息数组 */
+    roomMessages: {},
+    /** 亲友圈家庭房间未读:familyId(字符串)→ 条数(不含本家) */
+    roomUnread: {},
+    /** 亲友圈家庭房间历史是否已拉过:familyId(字符串)→ bool */
+    roomLoaded: {},
+    /** 我可见的聊天室概要:familyId(字符串)→ {familyId,familyName,alias,coverImage,self} */
+    roomsMeta: {},
+    /** 当前正在看的亲友圈家庭房间 id(null=本家) */
+    activeRoomId: null,
+    /** 当前家庭房间展示名(打开房间时传入,标题用) */
+    activeRoomName: '',
+    /** 当前会话:null=家庭房间(本家或 activeRoomId),数字=私聊对方 userId */
     activePeer: null,
     /** 当前私聊对方的展示名(打开会话时传入,标题用) */
     activePeerName: '',
@@ -70,12 +82,25 @@ export const useChatStore = defineStore('chat', {
   getters: {
     /** 聊天界面是否在前台(/chat 页或浮窗展开) */
     viewing: (s) => s.chatPageActive || s.floatOpen,
-    /** 总未读 = 家庭流 + 全部私聊(浮球/侧栏角标) */
-    totalUnread: (s) => s.unread + Object.values(s.dmUnread).reduce((a, b) => a + (Number(b) || 0), 0),
-    /** 当前会话的消息列表(家庭流或私聊分桶) */
-    activeMessages: (s) => (s.activePeer == null ? s.messages : s.dmMessages[String(s.activePeer)] || []),
-    /** 当前会话是否已加载过历史(私聊按会话记,家庭流看 hydrated) */
-    activeLoaded: (s) => (s.activePeer == null ? s.hydrated : !!s.dmLoaded[String(s.activePeer)]),
+    /** 当前会话键:null=本家 / p:<userId>=私聊 / f:<familyId>=亲友圈家庭房间 */
+    activeKey: (s) => (s.activePeer != null ? `p:${s.activePeer}` : s.activeRoomId != null ? `f:${s.activeRoomId}` : null),
+    /** 总未读 = 本家 + 全部私聊 + 亲友圈家庭房间(浮球/侧栏角标) */
+    totalUnread: (s) =>
+      s.unread +
+      Object.values(s.dmUnread).reduce((a, b) => a + (Number(b) || 0), 0) +
+      Object.values(s.roomUnread).reduce((a, b) => a + (Number(b) || 0), 0),
+    /** 当前会话的消息列表(本家流 / 私聊分桶 / 亲友圈家庭房间分桶) */
+    activeMessages: (s) => {
+      if (s.activePeer != null) return s.dmMessages[String(s.activePeer)] || []
+      if (s.activeRoomId != null) return s.roomMessages[String(s.activeRoomId)] || []
+      return s.messages
+    },
+    /** 当前会话是否已加载过历史(私聊/房间按会话记,本家看 hydrated) */
+    activeLoaded: (s) => {
+      if (s.activePeer != null) return !!s.dmLoaded[String(s.activePeer)]
+      if (s.activeRoomId != null) return !!s.roomLoaded[String(s.activeRoomId)]
+      return s.hydrated
+    },
   },
   actions: {
     /** 建连入口:已连接/连接中是幂等空转;登出态直接忽略 */
@@ -239,6 +264,13 @@ export const useChatStore = defineStore('chat', {
         this.onDmIncoming(data, mine)
         return
       }
+      // 亲友圈家庭房间:下行带 familyId(本家消息也带,与本家 id 相等时走原家庭流)
+      const ownFamilyId = Number(userStore.userInfo?.familyId) || null
+      const roomId = data.familyId == null ? ownFamilyId : Number(data.familyId)
+      if (roomId != null && ownFamilyId != null && roomId !== ownFamilyId) {
+        this.onRoomIncoming(data, roomId, mine)
+        return
+      }
       // 重连补拉与实时推送可能撞车:同一 id 只留一份
       if (this.messages.some((m) => m.id === data.id)) return
       this.messages.push(data)
@@ -251,6 +283,25 @@ export const useChatStore = defineStore('chat', {
         chatApi.read(data.id).catch(() => {})
       } else {
         this.unread += 1
+      }
+    },
+
+    /** 亲友圈家庭房间消息进对应分桶;在看的房间立即置已读,否则累计该房未读 */
+    onRoomIncoming(data, familyId, mine) {
+      const key = String(familyId)
+      const bucket = this.roomMessages[key] || (this.roomMessages[key] = [])
+      if (bucket.some((m) => m.id === data.id)) return
+      bucket.push(data)
+      if (bucket.length > KEEP_MESSAGES) {
+        bucket.splice(0, bucket.length - KEEP_MESSAGES)
+      }
+      this.lastIncoming = data
+      const openHere = this.viewing && this.activePeer == null && String(this.activeRoomId) === key
+      if (mine || openHere) {
+        chatApi.read(data.id, familyId).catch(() => {})
+        if (openHere) this.roomUnread[key] = 0
+      } else {
+        this.roomUnread[key] = (Number(this.roomUnread[key]) || 0) + 1
       }
     },
 
@@ -280,7 +331,8 @@ export const useChatStore = defineStore('chat', {
     setUnreadAnchor(key, count) {
       const n = Math.max(0, Number(count) || 0)
       const target = key == null ? null : String(key)
-      const list = target == null ? this.messages : this.dmMessages[target] || []
+      const list =
+        target == null ? this.messages : target.startsWith('f:') ? this.roomMessages[target.slice(2)] || [] : this.dmMessages[target] || []
       const myId = useUserStore().userInfo?.id
       const incoming = list.filter((m) => m.senderId !== myId)
       if (!n || !incoming.length) {
@@ -306,6 +358,8 @@ export const useChatStore = defineStore('chat', {
       if (peerId == null) return
       this.activePeer = Number(peerId)
       this.activePeerName = name || this.activePeerName || ''
+      this.activeRoomId = null
+      this.activeRoomName = ''
       const unreadBefore = Number(this.dmUnread[String(peerId)]) || 0
       await this.loadDmHistory(this.activePeer)
       if (this.viewing) {
@@ -315,10 +369,33 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    /** 回到家庭聊天室 */
+    /**
+     * 打开亲友圈家庭房间:切房间、拉历史(拉过就跳过)、把该房未读置已读。
+     * name 为展示名(圈内称呼/家庭名,可省)。
+     */
+    async openRoom(familyId, name = '') {
+      if (familyId == null) return
+      const id = Number(familyId)
+      this.activePeer = null
+      this.activePeerName = ''
+      this.activeRoomId = id
+      const meta = this.roomsMeta[String(id)]
+      this.activeRoomName = name || meta?.alias || meta?.familyName || ''
+      const unreadBefore = Number(this.roomUnread[String(id)]) || 0
+      await this.loadRoomHistory(id)
+      if (this.viewing) {
+        chatApi.read(null, id).catch(() => {})
+        this.roomUnread[String(id)] = 0
+        if (unreadBefore > 0) this.setUnreadAnchor(`f:${id}`, unreadBefore)
+      }
+    },
+
+    /** 回到本家聊天室 */
     closeDm() {
       this.activePeer = null
       this.activePeerName = ''
+      this.activeRoomId = null
+      this.activeRoomName = ''
       this.unreadAnchor = null
     },
 
@@ -349,23 +426,59 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    /** 发送文本消息(≤2000 字);连接不可用时返回 false 由调用方提示。activePeer 非空走私聊 */
+    /** 拉某个亲友圈家庭房间的历史(与本地缓存按 id 合并,幂等) */
+    async loadRoomHistory(familyId, { force = false } = {}) {
+      const key = String(familyId)
+      if (this.roomLoaded[key] && !force) return
+      try {
+        const msgs = await chatApi.history({ familyId: Number(familyId) })
+        this.roomMessages[key] = mergeMessages(this.roomMessages[key], msgs, KEEP_MESSAGES)
+        this.roomLoaded[key] = true
+      } catch {
+        // 拉失败不装死:保留已有缓存,下次打开重试
+      }
+    },
+
+    /** 亲友圈家庭房间未读基线 + 房间概要(登录后/重连后拉一次;正在看的房间不被旧数据覆盖) */
+    async loadRoomUnread() {
+      try {
+        const list = await chatApi.rooms()
+        const nextUnread = {}
+        const nextMeta = {}
+        for (const row of list || []) {
+          if (!row || row.self) continue
+          const key = String(row.familyId)
+          nextMeta[key] = row
+          // 正开着的房间已读位点刚推进,别被基线拉回的旧未读盖掉
+          if (this.viewing && String(this.activeRoomId) === key) continue
+          nextUnread[key] = Number(row.unread) || 0
+        }
+        this.roomUnread = nextUnread
+        this.roomsMeta = nextMeta
+      } catch {
+        // 基线拉不到就用现有值
+      }
+    },
+
+    /** 发送文本消息(≤2000 字);连接不可用时返回 false 由调用方提示。私聊/亲友圈房间按当前会话分流 */
     sendText(text) {
       const t = (text || '').trim()
       if (!t || t.length > 2000 || !socket) return false
       const data = { content: t }
       if (this.activePeer != null) data.dm = { userId: this.activePeer }
+      else if (this.activeRoomId != null) data.familyId = this.activeRoomId
       return socket.send({ type: 'message', data })
     },
 
     /**
      * 发送富内容消息({msgType, content, payload});payload 传结构化对象,这里统一序列化。
-     * activePeer 非空时发到该私聊会话。返回 false 表示未发出(连接断开或负载非法)。
+     * 私聊/亲友圈房间按当前会话分流。返回 false 表示未发出(连接断开或负载非法)。
      */
     sendContent({ msgType, content, payload }) {
       if (!socket) return false
       const data = { content: content == null ? '' : String(content), msgType: msgType || 'TEXT' }
       if (this.activePeer != null) data.dm = { userId: this.activePeer }
+      else if (this.activeRoomId != null) data.familyId = this.activeRoomId
       if (payload) {
         const s = serializePayload(payload)
         if (!s) return false
@@ -418,17 +531,19 @@ export const useChatStore = defineStore('chat', {
           }
         }
         this.hydrated = true
-        // 私聊未读基线(不阻塞本次加载,失败只影响角标精度)
+        // 私聊/亲友圈房间未读基线(不阻塞本次加载,失败只影响角标精度)
         this.loadDmUnread()
+        this.loadRoomUnread()
       })().finally(() => {
         historyPromise = null
       })
       return historyPromise
     },
 
-    /** 断线重连后补拉:正在看就顺手推进已读,否则只回正角标 */
+    /** 断线重连后补拉:正在看就顺手推进已读,否则只回正角标;正在看的亲友圈房间单独补拉 */
     resync() {
-      return this.loadHistory({ force: true, markRead: this.viewing })
+      if (this.activeRoomId != null) this.loadRoomHistory(this.activeRoomId, { force: true })
+      return this.loadHistory({ force: true, markRead: this.viewing && this.activeRoomId == null })
     },
 
     /** 通话/对战等协议信令上行(结构化 {type,data},由调用方组好) */
@@ -460,6 +575,12 @@ export const useChatStore = defineStore('chat', {
       this.dmMessages = {}
       this.dmUnread = {}
       this.dmLoaded = {}
+      this.roomMessages = {}
+      this.roomUnread = {}
+      this.roomLoaded = {}
+      this.roomsMeta = {}
+      this.activeRoomId = null
+      this.activeRoomName = ''
       this.activePeer = null
       this.activePeerName = ''
       this.unread = 0

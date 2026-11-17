@@ -1,7 +1,12 @@
 <template>
   <!-- 聊天对象列:家庭聊天室 + 本家成员 + 亲友圈(圈内家庭→成员);点成员开私聊 -->
   <aside class="chat-rail" :class="{ narrow }">
-    <button type="button" class="rail-item rail-family" :class="{ active: chatStore.activePeer == null }" @click="chatStore.closeDm()">
+    <button
+      type="button"
+      class="rail-item rail-family"
+      :class="{ active: chatStore.activePeer == null && chatStore.activeRoomId == null }"
+      @click="chatStore.closeDm()"
+    >
       <el-icon :size="16"><HomeFilled /></el-icon>
       <span class="rail-name">{{ $t('chat.rail.family') }}</span>
       <span v-if="chatStore.unread" class="rail-badge">{{ chatStore.unread > 99 ? '99+' : chatStore.unread }}</span>
@@ -29,6 +34,20 @@
       <template v-for="c in circles" :key="c.id">
         <div class="rail-group-label">{{ c.name }}</div>
         <template v-for="f in circleFamilies(c)" :key="f.familyId">
+          <!-- 亲友圈家庭聊天室入口:圈内家庭可读可发言,未读单独计数 -->
+          <button
+            type="button"
+            class="rail-item rail-room"
+            :class="{ active: isActiveRoom(f.familyId) }"
+            :title="f.alias || f.familyName"
+            @click="openRoom(f)"
+          >
+            <el-icon class="rail-room-icon" :size="16"><HomeFilled /></el-icon>
+            <span class="rail-name">{{ f.alias || f.familyName }}</span>
+            <span v-if="roomUnread(f.familyId)" class="rail-badge">
+              {{ roomUnread(f.familyId) > 99 ? '99+' : roomUnread(f.familyId) }}
+            </span>
+          </button>
           <button
             v-for="m in familyMembers(f.familyId)"
             :key="'c' + f.familyId + '-' + m.id"
@@ -85,12 +104,19 @@ const familyMembers = (familyId) => familyMembersMap.value[familyId] || []
 const familyLoaded = (familyId) => familyMembersMap.value[familyId] != null
 const familyLoading = (familyId) => familyMembersMap.value[familyId] === 'loading'
 const isActivePeer = (id) => chatStore.activePeer != null && Number(chatStore.activePeer) === Number(id)
+const isActiveRoom = (id) => chatStore.activePeer == null && chatStore.activeRoomId != null && Number(chatStore.activeRoomId) === Number(id)
 const peerUnread = (id) => chatStore.dmUnread[String(id)] || 0
+const roomUnread = (id) => chatStore.roomUnread[String(id)] || 0
 // 头像状态点:本家与圈内成员都取「列表快照 + WS 实时覆盖」
 const statusOf = (m) => resolvePresence(m, chatStore.presenceMap)
 
 const openDm = async (id, name) => {
   await chatStore.openDm(id, name)
+}
+
+/** 进亲友圈家庭聊天室(读历史 + 置已读);不动当前家庭的 WS 房间绑定 */
+const openRoom = async (f) => {
+  await chatStore.openRoom(f.familyId, f.alias || f.familyName || '')
 }
 
 // 圈内家庭成员:渲染前按需补拉(一次一个家庭,拉过就不再拉)

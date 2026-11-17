@@ -11,7 +11,11 @@
             {{ m.senderName?.charAt(0) }}
           </el-avatar>
           <div class="msg-body">
-            <div class="msg-meta">{{ m.senderName }} · {{ fmtTime(m.createdAt) }}</div>
+            <div class="msg-meta">
+              {{ m.senderName }}
+              <span v-if="m.senderFamilyName"> · {{ $t('chat.fromFamily', { name: m.senderFamilyName }) }}</span>
+              · {{ fmtTime(m.createdAt) }}
+            </div>
             <div class="msg-bubble" :class="{ 'is-card': isCard(m) }">
               <span v-if="!isCard(m)">{{ m.content }}</span>
               <MsgCardHost v-else :msg="m" />
@@ -34,7 +38,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import { useChatTextStyle } from '@/composables/useChatTextStyle'
-import { MSG_TYPE } from '@/utils/chatMsg'
+import { MSG_TYPE, messageRoomId } from '@/utils/chatMsg'
 import MsgCardHost from '@/components/chat/cards/MsgCardHost.vue'
 
 const userStore = useUserStore()
@@ -63,12 +67,12 @@ const isCard = (m) => m.msgType && m.msgType !== MSG_TYPE.TEXT
 
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(5, 16) : '')
 
-const peerKey = computed(() => (chatStore.activePeer == null ? null : String(chatStore.activePeer)))
+const activeKey = computed(() => chatStore.activeKey)
 
-/** 进会话时服务端报的未读锚点(家庭流 / 当前私聊) */
+/** 进会话时服务端报的未读锚点(本家 / 当前房间 / 当前私聊按 activeKey 对应) */
 const anchor = computed(() => {
   const a = chatStore.unreadAnchor
-  if (!a || a.key !== peerKey.value) return null
+  if (!a || a.key !== activeKey.value) return null
   return a
 })
 
@@ -76,11 +80,15 @@ const anchor = computed(() => {
 const jumpTarget = computed(() => liveNew.value || anchor.value)
 const jumpCount = computed(() => jumpTarget.value?.count || 0)
 
-/** 是否是当前会话的消息(store 的 lastIncoming 家庭/私聊共用一份) */
+/** 是否是当前会话的消息(store 的 lastIncoming 本家/房间/私聊共用一份) */
 const belongsHere = (m) => {
   if (!m) return false
-  if (m.dm && m.dm.userId != null) return peerKey.value != null && String(m.dm.userId) === peerKey.value
-  return peerKey.value == null
+  if (m.dm && m.dm.userId != null) return activeKey.value != null && String(m.dm.userId) === String(chatStore.activePeer)
+  // 家庭消息:按消息所属家庭与当前房间(缺省=本家)比对
+  const room = messageRoomId(m, userStore.userInfo?.familyId)
+  if (room == null) return chatStore.activeRoomId == null
+  const active = chatStore.activeRoomId == null ? Number(userStore.userInfo?.familyId) : Number(chatStore.activeRoomId)
+  return active != null && room === active
 }
 
 /** 是否贴着底部(必须在插入新消息之前判断:插入后高度已变) */
@@ -167,8 +175,8 @@ onMounted(() => {
   })
 })
 
-// 切换会话(家庭⇄私聊)重置滚动与浮标;进来先看最新
-watch(peerKey, () => {
+// 切换会话(家庭房 ⇄ 圈内其他家庭房 ⇄ 私聊)重置滚动与浮标;进来先看最新
+watch(activeKey, () => {
   stickBottom = true
   liveNew.value = null
   nextTick(() => scrollBottom())

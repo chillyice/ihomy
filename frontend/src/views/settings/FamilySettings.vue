@@ -224,6 +224,24 @@
     <el-empty v-else :description="$t('common.empty')" :image-size="40" />
   </div>
 
+  <!-- 加入另一个家庭:有邀请码直接加入(当前家庭不变);没有邀请码引导去成员页搜索申请 -->
+  <div class="card settings-card">
+    <div class="section-label">{{ $t('settings.joinFamily') }}</div>
+    <button class="create-family-btn" @click="openJoinFamily">{{ $t('settings.joinFamily') }}</button>
+    <p class="share-tip">{{ $t('settings.joinFamilyHint') }}</p>
+    <p class="share-tip">{{ $t('settings.joinFamilySearchHint') }}</p>
+  </div>
+
+  <el-dialog v-model="showJoinFamily" :title="$t('settings.joinFamily')" width="380px" append-to-body @keyup.esc="showJoinFamily = false">
+    <el-input v-model="joinInviteCode" :placeholder="$t('settings.inviteCodePh')" maxlength="64" @keyup.enter="confirmJoinFamily" />
+    <template #footer>
+      <el-button @click="showJoinFamily = false">{{ $t('common.cancel') }}</el-button>
+      <el-button type="primary" :disabled="!joinInviteCode.trim() || joiningFamily" :loading="joiningFamily" @click="confirmJoinFamily">
+        {{ joiningFamily ? $t('settings.joining') : $t('settings.joinAction') }}
+      </el-button>
+    </template>
+  </el-dialog>
+
   <!-- 创建新家庭:放在家庭设置最下方 -->
   <div class="card settings-card">
     <div class="section-label">{{ $t('settings.createFamily') }}</div>
@@ -665,6 +683,30 @@ const switchFamily = async (familyId) => {
     location.reload()
   } catch (e) {
     ElMessage.error(e.message || t('common.failed'))
+  }
+}
+
+// 邀请码加入另一个家庭:成功后只多一条成员身份,刷新列表供用户自己切换
+const showJoinFamily = ref(false)
+const joinInviteCode = ref('')
+const joiningFamily = ref(false)
+const openJoinFamily = () => {
+  joinInviteCode.value = ''
+  showJoinFamily.value = true
+}
+const confirmJoinFamily = async () => {
+  const code = joinInviteCode.value.trim()
+  if (!code || joiningFamily.value) return
+  joiningFamily.value = true
+  try {
+    await authApi.join(code)
+    showJoinFamily.value = false
+    ElMessage.success(t('settings.joinSuccess'))
+    await loadFamilies()
+  } catch (e) {
+    ElMessage.error(e.message || t('common.failed'))
+  } finally {
+    joiningFamily.value = false
   }
 }
 

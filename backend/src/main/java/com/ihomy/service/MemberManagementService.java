@@ -36,6 +36,7 @@ public class MemberManagementService {
     private final SysRoleMapper sysRoleMapper;
     private final InvitationCodeMapper invitationCodeMapper;
     private final ChatWebSocketHandler wsHandler;
+    private final com.ihomy.security.SecurityHelper securityHelper;
 
     /** 家庭成员列表:SQL 返回角色/标签/状态偏好,在线与否取 WS 连接态(成员数个位,循环可接受) */
     public List<Map<String, Object>> listMembers(Long familyId) {
@@ -62,13 +63,12 @@ public class MemberManagementService {
         }
     }
 
-    /** 修改成员角色:目标须属于操作者家庭,先删旧绑定再插新角色 */
+    /** 修改成员角色:目标须在本家庭有角色绑定,先删旧绑定再插新角色 */
     @Transactional
     public void setRole(Long operatorFamilyId, Long targetUserId, String roleCode) {
         SysRole role = findRole(roleCode);
         if (targetUserId == null || operatorFamilyId == null) throw new BizException(ResultCode.BAD_REQUEST);
-        SysUser target = sysUserMapper.selectById(targetUserId);
-        if (target == null || !operatorFamilyId.equals(target.getFamilyId())) {
+        if (!isMember(operatorFamilyId, targetUserId)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         LambdaQueryWrapper<SysUserRole> qw = new LambdaQueryWrapper<>();
@@ -81,24 +81,48 @@ public class MemberManagementService {
         sysUserRoleMapper.insert(ur);
     }
 
-    /** 移出成员:禁止移出自己;删角色绑定并清空其指向该家庭的主/默认家庭(授权残留) */
+    /** 移出成员:禁止移出自己;删角色绑定后,主/默认家庭仍指向本家时改指他仍加入的家庭(没有才清空) */
     @Transactional
     public void removeMember(Long operatorUserId, Long operatorFamilyId, Long targetUserId) {
         if (operatorUserId.equals(targetUserId)) throw new BizException(ResultCode.BAD_REQUEST);
-        SysUser target = sysUserMapper.selectById(targetUserId);
-        // 走到这里必有 operatorFamilyId == target.familyId,故清空主家庭无条件成立
-        if (target == null || !operatorFamilyId.equals(target.getFamilyId())) {
+        if (operatorFamilyId == null || targetUserId == null || !isMember(operatorFamilyId, targetUserId)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+        SysUser target = sysUserMapper.selectById(targetUserId);
+        if (target == null) throw new BizException(ResultCode.NOT_FOUND);
         LambdaQueryWrapper<SysUserRole> qw = new LambdaQueryWrapper<>();
         qw.eq(SysUserRole::getUserId, targetUserId).eq(SysUserRole::getFamilyId, operatorFamilyId);
         sysUserRoleMapper.delete(qw);
-        // null 值必须用 wrapper 显式 SET:updateById 会跳过 null 字段,清空不生效
-        sysUserMapper.update(null, new LambdaUpdateWrapper<SysUser>()
-                .eq(SysUser::getId, targetUserId)
-                .set(SysUser::getFamilyId, null)
-                // 默认家庭仍是别的家庭时保留(他还属于那个家庭),同为被移出家庭才清
-                .set(operatorFamilyId.equals(target.getDefaultFamilyId()), SysUser::getDefaultFamilyId, null));
+        // 可能还在别的家庭:主家庭优先落到剩下的绑定,一个都没有才置空
+        Long next = firstRemainingFamily(targetUserId);
+        if (operatorFamilyId.equals(target.getFamilyId())) {
+            // null 值必须用 wrapper 显式 SET:updateById 会跳过 null 字段,清空不生效
+            sysUserMapper.update(null, new LambdaUpdateWrapper<SysUser>()
+                    .eq(SysUser::getId, targetUserId)
+                    .set(SysUser::getFamilyId, next));
+            securityHelper.invalidateUser(targetUserId);
+        }
+        if (operatorFamilyId.equals(target.getDefaultFamilyId())) {
+            sysUserMapper.update(null, new LambdaUpdateWrapper<SysUser>()
+                    .eq(SysUser::getId, targetUserId)
+                    .set(SysUser::getDefaultFamilyId, next));
+        }
+    }
+
+    /** 目标用户是否在指定家庭有角色绑定(与成员列表同一口径) */
+    private boolean isMember(Long familyId, Long userId) {
+        return sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, userId)
+                .eq(SysUserRole::getFamilyId, familyId)) > 0;
+    }
+
+    /** 用户剩余角色绑定里的第一个家庭(任意一个即可,用于主家庭回退),没有返回 null */
+    private Long firstRemainingFamily(Long userId) {
+        SysUserRole row = sysUserRoleMapper.selectOne(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, userId)
+                .orderByAsc(SysUserRole::getFamilyId)
+                .last("LIMIT 1"));
+        return row == null ? null : row.getFamilyId();
     }
 
     /** 生成邀请码:12 位随机码,预设角色(默认 MEMBER),7 天有效、最多使用 10 次 */
