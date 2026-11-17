@@ -70,7 +70,7 @@ dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border
 </div>
 </main>
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
-<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航线箭头上，沿虚线飞跃 12 格；落在其他本色航点上可跳 4 格。起飞格和归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库。带星的四个起飞格不会撞机。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航线箭头上，沿虚线飞跃 12 格；落在其他本色航点上可跳 4 格。起飞格和归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本色飞跃航线斜穿下一个颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。带星的四个起飞格不会撞机。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
 <div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
@@ -101,6 +101,19 @@ function coords(color,progress,piece) {
  if(isPublic(progress)) return point(publicIndex(color,progress));
  return point(publicIndex(color,51),209-29*(progress-N));
 }
+/**
+ * 本色飞跃航线(6→18)斜穿下一个颜色的归航跑道:盘面画成一条略微内凹的曲线,
+ * 中点正好压在对方跑道「从内向外第 4 格」的格心上,飞跃时扫到停在那一格的飞机会把它撞回机库。
+ */
+const LEAP_CROSS = GOAL-3, LEAP_SAMPLES = 12, LEAP_STEP_MS = 24;
+const leapCurve = c => {
+ const a=point(c*13+6), b=point(c*13+18), t=coords((c+1)%4,LEAP_CROSS,0);
+ return [a,[2*t[0]-(a[0]+b[0])/2,2*t[1]-(a[1]+b[1])/2],b];
+};
+const curvePoint = ([a,k,b],t) => {
+ const u=1-t;
+ return [u*u*a[0]+2*u*t*k[0]+t*t*b[0],u*u*a[1]+2*u*t*k[1]+t*t*b[1]];
+};
 const last = state => state.order[state.turn];
 const arrivals = (state,c) => state.planes[c].filter(p=>p===GOAL).length;
 function fresh(size,mode) {
@@ -109,15 +122,24 @@ function fresh(size,mode) {
   phase:'roll',face:0,winner:null,round:0,log:['塔台就绪，珊瑚机队先掷。']};
 }
 /**
- * 逐格帧:普通前进按格推进;同色跳格 / 跨场飞跃的最后一段是一次飞过去;折返先到圆心再往回走。
+ * 逐格帧:普通前进按格推进;同色跳格是一次跳过去;跨场飞跃沿曲线取样飞过去;
+ * 折返先到圆心再往回走。
  */
-function walkFrames(from,land,to,kind){
+function walkFrames(c,from,land,to,kind){
  if(from===HANGAR)return [{p:to}];
  if(kind==='折返'){
   const back=[];
   for(let p=from+1;p<=GOAL;p+=1)back.push({p});
   for(let p=GOAL-1;p>=to;p-=1)back.push({p});
   return back;
+ }
+ if(kind==='跨场飞跃'){
+  const curve=leapCurve(c), path=[];
+  for(let i=1;i<=LEAP_SAMPLES;i+=1){
+   const [x,y]=curvePoint(curve,i/LEAP_SAMPLES);
+   path.push({x,y,leap:true,stepMs:LEAP_STEP_MS});
+  }
+  return path;
  }
  const path=[];
  for(let p=from+1;p<=land;p+=1)path.push({p});
@@ -142,7 +164,9 @@ function movesFor(g,face=g.face) {
     g.planes[rival].forEach((p,i)=>{if(isPublic(p)&&publicIndex(rival,p)===spot) captures.push([rival,i]);});
    }
   }
-  return [{piece,to,kind,captures,frames:walkFrames(from,land,to,kind)}];
+  // 飞跃航线扫过下一个颜色的归航跑道:停在被扫过那一格上的飞机同样撞回机库
+  if(kind==='跨场飞跃')g.planes[(c+1)%4].forEach((p,i)=>{if(p===LEAP_CROSS)captures.push([(c+1)%4,i]);});
+  return [{piece,to,kind,captures,frames:walkFrames(c,from,land,to,kind)}];
  });
 }
 function note(g, line) {g.log.unshift(line);g.log=g.log.slice(0,4);}
@@ -200,8 +224,8 @@ function svgBoard(){
  art+=text(350,350,'✈',28,middle+' fill="#e9f1b9"');
  art+=text(350,372,'归航',12,middle+' fill="#f0edda" letter-spacing="3"');
  for(let c=0;c<4;c++){
-  const t=TEAMS[c], a=point(c*13+6), b=point(c*13+18);
-  art+=line(a,b,'fill="none" stroke="'+t.ink+'" stroke-width="2" stroke-dasharray="6 5" opacity=".5"');
+  const t=TEAMS[c], [a,k,b]=leapCurve(c);
+  art+='<path d="M'+a.join(',')+'Q'+k.join(',')+' '+b.join(',')+'" fill="none" stroke="'+t.ink+'" stroke-width="2" stroke-dasharray="6 5" opacity=".5"/>';
  }
  for(let c=0;c<4;c++){
   const t=TEAMS[c], [x,y]=[t.x,t.y];
@@ -299,8 +323,8 @@ const STEP_MS=80, LEAP_MS=280;
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 /**
- * 逐格滑行:按 movesFor 给出的逐格帧一格一格挪过去,跳跃段(同色跳格/跨场飞跃)单独滑一次,
- * 折返段先走圆心再往回走。节拍只负责「每格等多久」,位移本身由 .piece 的 left/top 过渡插值。
+ * 逐格滑行:按 movesFor 给出的逐格帧一格一格挪过去,同色跳格单独滑一次、跨场飞跃沿曲线取样飞过去,
+ * 折返段先走圆心再往回走。节拍只负责「每格/每段等多久」,位移本身由 .piece 的 left/top 过渡插值。
  */
 async function glide(c,piece,from,move,stale){
  const el=tokenMap.get(c+':'+piece);
@@ -308,11 +332,13 @@ async function glide(c,piece,from,move,stale){
  el.classList.add('moving');el.classList.remove('parked');el.style.zIndex=4;
  for(const frame of move.frames){
   if(stale())break;
-  const [x,y]=coords(c,frame.p,piece);
+  const [x,y]=frame.x==null?coords(c,frame.p,piece):[frame.x,frame.y];
   el.style.setProperty('--x',x/7+'%');el.style.setProperty('--y',y/7+'%');
   el.classList.toggle('leaping',!!frame.leap);
-  await sleep(frame.leap?LEAP_MS:STEP_MS);
+  el.style.transitionDuration=frame.stepMs?frame.stepMs+'ms':'';
+  await sleep(frame.stepMs||(frame.leap?LEAP_MS:STEP_MS));
  }
+ el.style.transitionDuration='';
  el.classList.remove('moving','leaping');
 }
 async function act(i,focus=false){
