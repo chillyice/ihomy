@@ -22,11 +22,11 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 .chart-frame{background:#40534a;padding:6px;box-shadow:0 16px 38px #09130e66;border-radius:14px}
 .chart{position:relative;aspect-ratio:1;background:var(--chart);border-radius:9px;overflow:hidden;isolation:isolate}
 .chart>svg{width:100%;height:100%;display:block}
-.piece{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;width:4.2%;aspect-ratio:1;min-width:0;padding:0;border-radius:50%;border:1px solid #1c2824;color:#15262a;background:var(--team);box-shadow:0 2px 2px #18292360;display:grid;place-items:center;font:800 clamp(8px,1.12vw,14px) var(--mono);transition:left .08s linear,top .08s linear,box-shadow .15s}
+.piece{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;width:3.6%;aspect-ratio:1;min-width:0;padding:0;border-radius:50%;border:1px solid #1c2824;color:#15262a;background:var(--team);box-shadow:0 2px 2px #18292360;display:grid;place-items:center;font:800 clamp(8px,1vw,13px) var(--mono);transition:left .11s cubic-bezier(.38,0,.62,1),top .11s cubic-bezier(.38,0,.62,1),box-shadow .15s}
 .piece.moving{z-index:4}.piece.leaping{transition-duration:.28s,.28s,.15s}
 /* 同格棋子完全重叠叠成一摞:最上面那架挂数量角标,否则四架叠起来看着只剩一架 */
 .piece[data-stack]::after{content:attr(data-stack);position:absolute;right:-24%;top:-24%;min-width:66%;aspect-ratio:1;padding:0 1px;border-radius:99px;background:#172522;color:#f4f4e7;border:1px solid #f4f4e7;display:grid;place-items:center;font:800 clamp(6px,.8vw,10px)/1 var(--mono);pointer-events:none;box-shadow:0 1px 2px #0a1510aa}
-.piece[hidden]{display:none}.piece.parked{width:5.1%}.piece:not(:disabled){z-index:3;outline:2px solid #192b24;outline-offset:2px;box-shadow:0 0 0 5px #fff,0 2px 5px 6px #25382d44}
+.piece[hidden]{display:none}.piece.parked{width:4.4%}.piece:not(:disabled){z-index:3;outline:2px solid #192b24;outline-offset:1px;box-shadow:0 0 0 3px #fff,0 2px 5px 5px #25382d3a}
 .piece:not(:disabled):hover{filter:brightness(1.13);scale:1.15}
 .piece:focus-visible{outline:3px solid #192b24;box-shadow:0 0 0 7px white}
 .key{display:flex;flex-wrap:wrap;gap:7px 19px;color:var(--muted);font-size:12px;margin:11px 0 0}.key b{color:var(--signal);font-size:14px;margin-right:3px}
@@ -105,7 +105,7 @@ function coords(color,progress,piece) {
  * 本色飞跃航线(6→18)斜穿下一个颜色的归航跑道:盘面画成一条略微内凹的曲线,
  * 中点正好压在对方跑道「从内向外第 4 格」的格心上,飞跃时扫到停在那一格的飞机会把它撞回机库。
  */
-const LEAP_CROSS = GOAL-3, LEAP_SAMPLES = 12, LEAP_STEP_MS = 24;
+const LEAP_CROSS = GOAL-3, LEAP_SAMPLES = 12, LEAP_STEP_MS = 30;
 const leapCurve = c => {
  const a=point(c*13+6), b=point(c*13+18), t=coords((c+1)%4,LEAP_CROSS,0);
  return [a,[2*t[0]-(a[0]+b[0])/2,2*t[1]-(a[1]+b[1])/2],b];
@@ -319,7 +319,7 @@ function throwDie(){
   else if(!$('roll').disabled)$('roll').focus({preventScroll:true});
  },270);
 }
-const STEP_MS=80, LEAP_MS=280;
+const STEP_MS=130, LEAP_MS=280;
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 /**
@@ -336,9 +336,10 @@ async function glide(c,piece,from,move,stale){
   el.style.setProperty('--x',x/7+'%');el.style.setProperty('--y',y/7+'%');
   el.classList.toggle('leaping',!!frame.leap);
   el.style.transitionDuration=frame.stepMs?frame.stepMs+'ms':'';
+  el.style.transitionTimingFunction=frame.stepMs?'linear':'';
   await sleep(frame.stepMs||(frame.leap?LEAP_MS:STEP_MS));
  }
- el.style.transitionDuration='';
+ el.style.transitionDuration='';el.style.transitionTimingFunction='';
  el.classList.remove('moving','leaping');
 }
 async function act(i,focus=false){
