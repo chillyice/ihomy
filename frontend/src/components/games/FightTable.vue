@@ -68,7 +68,9 @@
           :class="{ sel: selectedIds.has(card.id), wild: isWild?.(card) }"
           :aria-pressed="selectedIds.has(card.id)"
           :aria-label="cardLabel(card)"
-          @click="$emit('select', card)"
+          :data-id="card.id"
+          @click="onCardClick(card)"
+          @pointerdown="onCardDown(card, $event)"
         >
           <PlayingCard :card="card" />
           <span v-if="isWild?.(card)" class="ft-wild">{{ $t('games.fight.wild') }}</span>
@@ -105,7 +107,65 @@ const props = defineProps({
   sortValue: { type: Function, default: null },
 })
 
-defineEmits(['select'])
+const emit = defineEmits(['select', 'extend-select', 'auto-select'])
+
+// ---------- 手牌拖选(仅鼠标;触摸仍走点选,拖动手势留给手牌横向滚动) ----------
+// 左键按住扫过多张 = 扩选(逐张并入选择);右键按住扫过多张 = 标记自动出牌,
+// 松开右键整体交给页面,轮到自己时自动打出、打不出保留选中退回手动。
+// 按下时不接管指针(要靠 pointer 落点找新牌),真拖起来才挂 window 监听,松手即摘。
+const DRAG_THRESHOLD = 6
+let dragState = null
+let justDragged = false
+
+const cardIdAt = (x, y) => document.elementFromPoint(x, y)?.closest('.ft-card')?.dataset.id ?? null
+
+function onCardClick(card) {
+  if (justDragged) {
+    justDragged = false
+    return
+  }
+  emit('select', card)
+}
+
+function onCardDown(card, e) {
+  if (e.pointerType !== 'mouse' || (e.button !== 0 && e.button !== 2)) return
+  dragState = { button: e.button, active: false, startX: e.clientX, startY: e.clientY, ids: new Set([card.id]) }
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', onDragUp)
+  window.addEventListener('pointercancel', onDragUp)
+}
+
+function onDragMove(e) {
+  if (!dragState) return
+  if (!dragState.active) {
+    if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < DRAG_THRESHOLD) return
+    dragState.active = true
+    if (dragState.button === 0) emit('extend-select', [...dragState.ids])
+  }
+  const id = cardIdAt(e.clientX, e.clientY)
+  if (!id || dragState.ids.has(id)) return
+  dragState.ids.add(id)
+  if (dragState.button === 0) emit('extend-select', [id])
+}
+
+function onDragUp() {
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragUp)
+  window.removeEventListener('pointercancel', onDragUp)
+  if (!dragState) return
+  const state = dragState
+  dragState = null
+  if (!state.active) return
+  if (state.button === 0) {
+    // 拖选落点的那张牌会再收到合成 click,吞掉避免把刚选中的牌又反选回去
+    justDragged = true
+    setTimeout(() => {
+      justDragged = false
+    }, 0)
+  } else {
+    emit('auto-select', [...state.ids])
+  }
+}
 
 // 相对座位坐标(百分比):0 号永远是自己(下),按逆时针依次环绕。
 const POSITIONS = {
@@ -466,11 +526,11 @@ const cardLabel = (card) => {
   margin-left: 0;
 }
 .ft-card.sel {
-  z-index: 2;
   outline: 2px solid #ffd166;
   outline-offset: -2px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.34);
-  transform: translateY(-16px);
+  box-shadow:
+    0 0 0 1px rgba(255, 209, 102, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.28);
 }
 .ft-card.wild {
   box-shadow:

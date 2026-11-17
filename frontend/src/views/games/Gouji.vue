@@ -32,6 +32,8 @@
         :my-note="myNote"
         :sort-value="gjValue"
         @select="toggleCard"
+        @extend-select="extendSelect"
+        @auto-select="markAuto"
       >
         <template #actions>
           <template v-if="phase === 'playing'">
@@ -80,7 +82,7 @@
 <script setup>
 // 顶牌顺序:玩家固定 0 号座,每局从 0 号先出;够级限制按「场上还有几家有牌」判断,
 // 人少了(四人乱缠)就放开对头限制,与规则内核同口径。
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -228,6 +230,7 @@ function startGame() {
   last.value = null
   passCount.value = 0
   selected.value = []
+  pendingAuto.value = []
   finishOrder.value = []
   result.value = ''
   rewardMsg.value = ''
@@ -264,6 +267,7 @@ function commitPlay(seat, combo) {
   passCount.value = 0
   passStreak.value = passStreak.value.map((n, i) => (i === seat ? 0 : n))
   selected.value = []
+  pendingAuto.value = []
   if (!hands.value[seat].length) {
     finishOrder.value = [...finishOrder.value, seat]
     if (finishOrder.value.length >= SEATS - 1) {
@@ -320,9 +324,35 @@ async function grantReward() {
 }
 
 function toggleCard(card) {
-  if (!myTurn.value) return
   selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
 }
+
+// ---------- 扩选与自动出牌 ----------
+// 左键拖选:拖过的牌并入选择(随时可选,不限于自己回合);右键拖选:标记的牌
+// 在轮到自己时自动打出(能大过桌面就出),打不出则保留选中退回手动。
+const pendingAuto = ref([])
+function extendSelect(ids) {
+  selected.value = [...new Set([...selected.value, ...ids])]
+}
+function markAuto(ids) {
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = ids.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  tryAutoPlay()
+}
+function tryAutoPlay() {
+  if (!pendingAuto.value.length || !myTurn.value) return
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = pendingAuto.value.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  if (canPlay.value) {
+    playSelected()
+    pendingAuto.value = []
+  }
+}
+watch(myTurn, (turn) => {
+  if (turn) tryAutoPlay()
+})
 
 function playSelected() {
   if (!canPlay.value) return
@@ -336,6 +366,7 @@ function hint() {
     activeCount: activeCount.value,
   })
   selected.value = plays.length ? plays[0].cards.map((card) => card.id) : []
+  pendingAuto.value = []
 }
 
 onBeforeUnmount(() => {

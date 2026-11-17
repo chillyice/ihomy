@@ -31,6 +31,8 @@
         :my-note="myNote"
         :sort-value="dzValue"
         @select="toggleCard"
+        @extend-select="extendSelect"
+        @auto-select="markAuto"
       >
         <template #actions>
           <template v-if="phase === 'bid' && bidTurn === 0">
@@ -93,7 +95,7 @@
 <script setup>
 // 回合驱动:玩家固定 0 号座,两位电脑由 setTimeout 依次行动;每次重开/离开把 session +1,
 // 旧定时器醒来发现令牌变了就自行退出,避免切页后还在改状态。
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -250,6 +252,7 @@ function startGame() {
   last.value = null
   passCount.value = 0
   selected.value = []
+  pendingAuto.value = []
   multiplier.value = 1
   finishOrder.value = []
   result.value = ''
@@ -349,6 +352,7 @@ function commitPlay(seat, combo) {
   playCounts.value = playCounts.value.map((n, i) => (i === seat ? n + 1 : n))
   if (combo.type === DDZ_COMBO.BOMB || combo.type === DDZ_COMBO.ROCKET) multiplier.value *= 2
   selected.value = []
+  pendingAuto.value = []
   if (!hands.value[seat].length) {
     finishOrder.value = [...finishOrder.value, seat]
     const farmersDone = [0, 1, 2].filter((s) => s !== landlord.value && finishOrder.value.includes(s)).length
@@ -412,9 +416,35 @@ async function grantReward() {
 }
 
 function toggleCard(card) {
-  if (!myTurn.value) return
   selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
 }
+
+// ---------- 扩选与自动出牌 ----------
+// 左键拖选:拖过的牌并入选择(随时可选,不限于自己回合);右键拖选:标记的牌
+// 在轮到自己时自动打出(能大过桌面就出),打不出则保留选中退回手动。
+const pendingAuto = ref([])
+function extendSelect(ids) {
+  selected.value = [...new Set([...selected.value, ...ids])]
+}
+function markAuto(ids) {
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = ids.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  tryAutoPlay()
+}
+function tryAutoPlay() {
+  if (!pendingAuto.value.length || !myTurn.value) return
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = pendingAuto.value.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  if (canPlay.value) {
+    playSelected()
+    pendingAuto.value = []
+  }
+}
+watch(myTurn, (turn) => {
+  if (turn) tryAutoPlay()
+})
 
 function playSelected() {
   if (!canPlay.value) return
@@ -425,6 +455,7 @@ function hint() {
   if (!myTurn.value) return
   const plays = dzPlays(myHand.value, lastCombo.value)
   selected.value = plays.length ? plays[0].cards.map((card) => card.id) : []
+  pendingAuto.value = []
 }
 
 onBeforeUnmount(() => {

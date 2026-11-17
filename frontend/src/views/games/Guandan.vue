@@ -32,6 +32,8 @@
         :my-note="myNote"
         :sort-value="sortValue"
         @select="toggleCard"
+        @extend-select="extendSelect"
+        @auto-select="markAuto"
       >
         <template #actions>
           <template v-if="phase === 'playing'">
@@ -78,7 +80,7 @@
 <script setup>
 // 回合驱动与斗地主同构:玩家固定 0 号座,电脑按座位顺序行动,pass 累计到「只剩一家没表态」时清桌。
 // 一局打完先结算升级(打几 → 下一局级牌),下一局发牌前自动进贡还贡。
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -269,6 +271,7 @@ function dealRound(withTribute) {
   last.value = null
   passCount.value = 0
   selected.value = []
+  pendingAuto.value = []
   finishOrder.value = []
   result.value = ''
   matchWin.value = false
@@ -307,6 +310,7 @@ function commitPlay(seat, combo) {
   passCount.value = 0
   passStreak.value = passStreak.value.map((n, i) => (i === seat ? 0 : n))
   selected.value = []
+  pendingAuto.value = []
   if (!hands.value[seat].length) {
     finishOrder.value = [...finishOrder.value, seat]
     if (finishOrder.value.length >= SEATS - 1) {
@@ -373,9 +377,35 @@ async function grantReward() {
 }
 
 function toggleCard(card) {
-  if (!myTurn.value) return
   selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
 }
+
+// ---------- 扩选与自动出牌 ----------
+// 左键拖选:拖过的牌并入选择(随时可选,不限于自己回合);右键拖选:标记的牌
+// 在轮到自己时自动打出(能大过桌面就出),打不出则保留选中退回手动。
+const pendingAuto = ref([])
+function extendSelect(ids) {
+  selected.value = [...new Set([...selected.value, ...ids])]
+}
+function markAuto(ids) {
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = ids.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  tryAutoPlay()
+}
+function tryAutoPlay() {
+  if (!pendingAuto.value.length || !myTurn.value) return
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  pendingAuto.value = pendingAuto.value.filter((id) => handIds.has(id))
+  selected.value = [...pendingAuto.value]
+  if (canPlay.value) {
+    playSelected()
+    pendingAuto.value = []
+  }
+}
+watch(myTurn, (turn) => {
+  if (turn) tryAutoPlay()
+})
 
 function playSelected() {
   if (!canPlay.value) return
@@ -388,6 +418,7 @@ function hint() {
   const plays = lastCombo.value ? combos.filter((combo) => gdBeats(combo, lastCombo.value)) : combos
   if (!plays.length) {
     selected.value = []
+    pendingAuto.value = []
     return
   }
   const sorted = [...plays].sort((a, b) => Number(a.bomb) - Number(b.bomb) || a.rank - b.rank || b.len - a.len)
