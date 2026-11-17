@@ -108,13 +108,18 @@
                 :key="p.key"
                 class="ludo-piece"
                 :class="{ movable: p.movable, leaping: p.key === movingKey, parked: p.step === 0 }"
-                :transform="`translate(${p.x} ${p.y})`"
+                :style="{ transform: `translate(${p.x}px, ${p.y}px)` }"
               >
                 <circle class="piece-halo" r="0.47" />
                 <circle class="piece-shadow" cy="0.065" r="0.315" />
                 <circle class="piece-body" r="0.315" :style="{ fill: colorSolid(p.color) }" />
                 <ellipse class="piece-glint" cx="-0.075" cy="-0.115" rx="0.13" ry="0.085" transform="rotate(-28)" />
                 <path class="piece-glyph" :d="PLANE_PATH" transform="scale(0.0255) translate(-8 -8)" />
+                <!-- 同格棋子完全重叠叠成一摞:最上面那架挂数量角标,不然多架叠起来看着只剩一架 -->
+                <g v-if="p.stackTop" class="piece-stack-badge">
+                  <circle class="piece-stack-bg" cx="0.25" cy="-0.24" r="0.17" />
+                  <text class="piece-stack-text" x="0.25" y="-0.16">{{ p.stackSize }}</text>
+                </g>
               </g>
             </svg>
 
@@ -511,31 +516,30 @@ const pieceViews = computed(() => {
         x: point[0],
         y: point[1],
         movable: !!legalByPiece.value[piece],
+        stackSize: 1,
+        stackTop: false,
       })
     }
   }
-  // 同格叠放:同一落点的棋子做小幅环形错位,免得完全重叠
-  const groups = new Map()
-  for (const item of list) {
-    const key = `${item.x.toFixed(2)}:${item.y.toFixed(2)}`
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(item)
-  }
-  for (const group of groups.values()) {
-    if (group.length < 2) continue
-    group.forEach((item, i) => {
-      const angle = (Math.PI * 2 * i) / group.length - Math.PI / 2
-      item.x += Math.cos(angle) * 0.17
-      item.y += Math.sin(angle) * 0.17
-    })
-  }
+  // 同格叠放:同格棋子完全重叠(叠成一摞),不再环形错开;数量由最上面那架的角标给出
+  const cellOf = (item) => `${item.x.toFixed(2)}:${item.y.toFixed(2)}`
+  const sizes = new Map()
+  for (const item of list) sizes.set(cellOf(item), (sizes.get(cellOf(item)) || 0) + 1)
+  for (const item of list) item.stackSize = sizes.get(cellOf(item)) || 1
   // 正在飞的画在最上,其次可点的
   const rank = (item) => (item.key === movingKey.value ? 2 : item.movable ? 1 : 0)
-  return list.sort((a, b) => rank(a) - rank(b))
+  list.sort((a, b) => rank(a) - rank(b))
+  const tops = new Map()
+  for (const item of list) tops.set(cellOf(item), item)
+  for (const item of list) item.stackTop = item.stackSize > 1 && tops.get(cellOf(item)) === item
+  return list
 })
 
 // ---------- 走子 / 动画 ----------
-/** 逐格播放 lastMove.frames:普通一步 150ms,飞跃/起飞 470ms */
+/** 逐格播放 lastMove.frames:CSS 过渡负责「挪过去」的插值,这两档只是每格的节拍(要快,但看得清一格一格走) */
+const STEP_MS = 100
+const LEAP_MS = 360
+
 async function animateMove(next) {
   const move = next?.lastMove
   if (!move || !move.frames?.length) return
@@ -547,7 +551,7 @@ async function animateMove(next) {
     if (token !== animToken) return
     const leap = !!frame.at
     animSteps.value = { ...animSteps.value, [key]: frame.step }
-    await sleep(leap ? 470 : 150)
+    await sleep(leap ? LEAP_MS : STEP_MS)
   }
   if (token !== animToken) return
   animSteps.value = {}
@@ -1078,13 +1082,14 @@ html.dark .ludo-card {
 }
 
 /* ---------- 棋子 ---------- */
+/* 位移用 CSS transform(不是 SVG transform 属性,属性变化不会触发过渡),逐格过渡才有「一格一格挪」的观感 */
 .ludo-piece {
-  transition: transform 0.14s ease-out;
+  transition: transform 0.1s linear;
   pointer-events: none;
 }
 
 .ludo-piece.leaping {
-  transition-duration: 0.46s;
+  transition-duration: 0.34s;
   transition-timing-function: cubic-bezier(0.3, 0.9, 0.4, 1);
 }
 
@@ -1110,6 +1115,20 @@ html.dark .ludo-card {
   stroke: rgba(var(--color-brand-rgb), 0.9);
   stroke-width: 0.05;
   opacity: 0;
+}
+
+/* 叠起来的同格棋子:右上角数量角标(只挂一摞里最上面那架) */
+.piece-stack-bg {
+  fill: rgba(32, 26, 20, 0.62);
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 0.028;
+}
+
+.piece-stack-text {
+  fill: #fff;
+  font-size: 0.24;
+  font-weight: 700;
+  text-anchor: middle;
 }
 
 .ludo-piece.parked .piece-body {

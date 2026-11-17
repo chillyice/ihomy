@@ -22,7 +22,10 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 .chart-frame{background:#40534a;padding:6px;box-shadow:0 16px 38px #09130e66;border-radius:14px}
 .chart{position:relative;aspect-ratio:1;background:var(--chart);border-radius:9px;overflow:hidden;isolation:isolate}
 .chart>svg{width:100%;height:100%;display:block}
-.piece{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;width:4.2%;aspect-ratio:1;min-width:0;padding:0;border-radius:50%;border:1px solid #1c2824;color:#15262a;background:var(--team);box-shadow:0 2px 2px #18292360;display:grid;place-items:center;font:800 clamp(8px,1.12vw,14px) var(--mono);transition:left .26s ease,top .26s ease,box-shadow .15s}
+.piece{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;width:4.2%;aspect-ratio:1;min-width:0;padding:0;border-radius:50%;border:1px solid #1c2824;color:#15262a;background:var(--team);box-shadow:0 2px 2px #18292360;display:grid;place-items:center;font:800 clamp(8px,1.12vw,14px) var(--mono);transition:left .08s linear,top .08s linear,box-shadow .15s}
+.piece.moving{z-index:4}.piece.leaping{transition-duration:.28s,.28s,.15s}
+/* 同格棋子完全重叠叠成一摞:最上面那架挂数量角标,否则四架叠起来看着只剩一架 */
+.piece[data-stack]::after{content:attr(data-stack);position:absolute;right:-24%;top:-24%;min-width:66%;aspect-ratio:1;padding:0 1px;border-radius:99px;background:#172522;color:#f4f4e7;border:1px solid #f4f4e7;display:grid;place-items:center;font:800 clamp(6px,.8vw,10px)/1 var(--mono);pointer-events:none;box-shadow:0 1px 2px #0a1510aa}
 .piece[hidden]{display:none}.piece.parked{width:5.1%}.piece:not(:disabled){z-index:3;outline:2px solid #192b24;outline-offset:2px;box-shadow:0 0 0 5px #fff,0 2px 5px 6px #25382d44}
 .piece:not(:disabled):hover{filter:brightness(1.13);scale:1.15}
 .piece:focus-visible{outline:3px solid #192b24;box-shadow:0 0 0 7px white}
@@ -204,7 +207,7 @@ function svgBoard(){
  }
  chart.innerHTML=art;
 }
-let game=load(), timer=0, spinning=false, blocked=false;
+let game=load(), timer=0, spinning=false, blocked=false, moving=false;
 const tokenMap=new Map();
 function rebuild(){
  $('tokens').replaceChildren();tokenMap.clear();
@@ -227,16 +230,16 @@ function sync(){
  $('turn-badge').textContent=won?'对局结束':'第 '+(game.round+(pick||spinning?0:1)||1)+' 掷';
  $('turn-name').textContent=TEAMS[won?done:c].name+'机队'+(won?'获胜':'');
  $('turn-name').style.color=TEAMS[won?done:c].paint;
- $('instruction').textContent=won?'四架飞机全部归航。':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。');
+ $('instruction').textContent=won?'四架飞机全部归航。':moving?'飞机滑行中…':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。');
  $('roll').textContent=won?'再开一局':cpu?'电脑回合':pick?'请选择飞机':'掷骰子';
- $('roll').disabled=blocked||!won&&(cpu||pick||spinning);
+ $('roll').disabled=blocked||moving||!won&&(cpu||pick||spinning);
  const face=$('die');face.classList.toggle('rolling',spinning);face.innerHTML=die(game.face);face.setAttribute('aria-label',spinning?'掷骰中':game.face?game.face+' 点':'尚未掷骰');
  $('routes').innerHTML=game.order.map(k=>{
   const t=TEAMS[k], n=arrivals(game,k);
   return '<li class="route'+(!won&&k===c?' active':'')+'" style="--team:'+t.paint+'"'+(!won&&k===c?' aria-current="true"':'')+'><i class="chip" aria-hidden="true"></i><div><strong>'+t.name+'</strong><small>'+(game.mode==='cpu'?(k===0?'你':'电脑'):'玩家 '+(game.order.indexOf(k)+1))+'</small></div><div class="marks" aria-label="归航 '+n+' 架">'+Array.from({length:4},(_,i)=>'<i aria-hidden="true" class="'+(i<n?'filled':'')+'"></i>').join('')+'<span aria-hidden="true">'+n+'/4</span></div></li>';
  }).join('');
  $('log').replaceChildren(...game.log.slice(0,3).map(line=>{const li=document.createElement('li');li.textContent=line;return li;}));
- const legal=new Set(!won&&pick&&!cpu&&!blocked?movesFor(game).map(m=>m.piece):[]), stacks=new Map();
+ const legal=new Set(!won&&pick&&!cpu&&!blocked&&!moving?movesFor(game).map(m=>m.piece):[]), stacks=new Map();
  const choices=$('choices');choices.hidden=!legal.size;
  choices.replaceChildren(...[...legal].map(i=>{const b=document.createElement('button');b.className='choice';b.type='button';b.textContent=(i+1)+' 号飞机';b.onclick=()=>act(i,true);return b;}));
  for(const k of game.order)game.planes[k].forEach((p,i)=>{
@@ -249,21 +252,22 @@ function sync(){
   stacks.get(key).push({el,x,y});
  });
  for(const group of stacks.values()){
-  group.sort((a,b)=>Number(a.el.disabled)-Number(b.el.disabled));
-  group.forEach(({el,x,y},i)=>{
-   const n=group.length, spread=n===1?0:n<5?16:22, angle=i*Math.PI*2/n-Math.PI/2;
-   el.style.setProperty('--x',(x+spread*Math.cos(angle))/7+'%');el.style.setProperty('--y',(y+spread*Math.sin(angle))/7+'%');
+  // 同格棋子完全重叠(不再沿小环排开),数量由最上面那架角标给出
+  const top=(group.filter(g=>!g.el.disabled).pop()||group[group.length-1]).el;
+  group.forEach(({el,x,y})=>{
+   el.style.setProperty('--x',x/7+'%');el.style.setProperty('--y',y/7+'%');
    el.style.zIndex=el.disabled?1:3;
+   if(el===top&&group.length>1)el.dataset.stack=group.length;else delete el.dataset.stack;
   });
  }
 }
 function schedule(){
  clearTimeout(timer);
- if(blocked||spinning||!isCpu()||game.phase==='won')return;
+ if(blocked||moving||spinning||!isCpu()||game.phase==='won')return;
  timer=setTimeout(()=>game.phase==='roll'?throwDie():act(choose(game)),game.phase==='roll'?680:490);
 }
 function throwDie(){
- if(blocked||spinning||game.phase!=='roll')return;
+ if(blocked||moving||spinning||game.phase!=='roll')return;
  spinning=true;sync();clearTimeout(timer);
  timer=setTimeout(()=>{
   spinning=false;cast(game,Math.floor(Math.random()*6)+1);
@@ -272,8 +276,43 @@ function throwDie(){
   else if(!$('roll').disabled)$('roll').focus({preventScroll:true});
  },270);
 }
-function act(i,focus=false){
- if(!play(game,i))return;
+const STEP_MS=80, LEAP_MS=280;
+const sleep=ms=>new Promise(done=>setTimeout(done,ms));
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+/**
+ * 逐格滑行:按点数一格一格挪过去,跳跃段(同色跳格/跨场飞跃)单独滑一次。
+ * 节拍只负责「每格等多久」,位移本身由 .piece 的 left/top 过渡插值。
+ */
+async function glide(c,piece,from,move,stale){
+ const el=tokenMap.get(c+':'+piece);
+ if(!el||from===GOAL||reduced.matches)return;
+ const raw=move.kind==='同色跳格'?move.to-4:move.kind==='跨场飞跃'?move.to-12:move.to;
+ const path=[];
+ if(from===HANGAR)path.push({p:move.to});
+ else{for(let p=from+1;p<=raw;p+=1)path.push({p});if(move.to!==raw)path.push({p:move.to,leap:true});}
+ el.classList.add('moving');el.classList.remove('parked');el.style.zIndex=4;
+ for(const frame of path){
+  if(stale())break;
+  const [x,y]=coords(c,frame.p,piece);
+  el.style.setProperty('--x',x/7+'%');el.style.setProperty('--y',y/7+'%');
+  el.classList.toggle('leaping',!!frame.leap);
+  await sleep(frame.leap?LEAP_MS:STEP_MS);
+ }
+ el.classList.remove('moving','leaping');
+}
+async function act(i,focus=false){
+ if(blocked||moving||spinning||game.phase!=='move')return;
+ const snapshot=game, c=last(game), move=movesFor(game).find(m=>m.piece===i);
+ if(!move)return;
+ clearTimeout(timer);
+ moving=true;sync();
+ try{
+  await glide(c,i,game.planes[c][i],move,()=>game!==snapshot||blocked);
+ }finally{
+  moving=false;
+ }
+ if(game!==snapshot){sync();return;}
+ if(!play(game,i)){sync();return;}
  save();sync();schedule();
  if(focus&&!$('roll').disabled)$('roll').focus({preventScroll:true});
 }
