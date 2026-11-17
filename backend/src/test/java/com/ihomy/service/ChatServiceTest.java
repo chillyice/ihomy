@@ -55,13 +55,38 @@ class ChatServiceTest {
     private ChatService service;
 
     private void boundTo(Long userId, Long... familyIds) {
-        List<SysUserRole> rows = java.util.Arrays.stream(familyIds).map(f -> {
-            SysUserRole r = new SysUserRole();
-            r.setUserId(userId);
-            r.setFamilyId(f);
-            return r;
-        }).toList();
+        List<SysUserRole> rows = java.util.Arrays.stream(familyIds).map(f -> roleRow(userId, f)).toList();
         when(sysUserRoleMapper.selectList(any())).thenReturn(rows);
+    }
+
+    private SysUserRole roleRow(Long userId, Long familyId) {
+        SysUserRole r = new SysUserRole();
+        r.setUserId(userId);
+        r.setFamilyId(familyId);
+        return r;
+    }
+
+    /**
+     * 通话准入(WS call-signal 前置):按「共享任一家庭绑定」判定,不看主家庭。
+     * 场景:我在养生协会(第二家庭),小明主家庭就是养生协会——V12.74 之前按 sys_user.family_id 比对会拒,
+     * 表现为主叫一直等到超时,被叫完全不响铃。
+     */
+    @Test
+    void callAllowedWhenUsersShareAnyFamilyBinding() {
+        when(sysUserRoleMapper.selectList(any()))
+                .thenReturn(List.of(roleRow(USER, 2L), roleRow(USER, 41L)))
+                .thenReturn(List.of(roleRow(9L, 41L)));
+
+        assertThat(service.sameFamily(USER, 9L)).isTrue();
+    }
+
+    @Test
+    void callRejectedWhenUsersShareNoFamily() {
+        when(sysUserRoleMapper.selectList(any()))
+                .thenReturn(List.of(roleRow(USER, 2L)))
+                .thenReturn(List.of(roleRow(9L, 41L)));
+
+        assertThat(service.sameFamily(USER, 9L)).isFalse();
     }
 
     @Test
