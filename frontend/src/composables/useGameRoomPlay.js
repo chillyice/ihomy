@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
-import { ROOM_STATUS, isCoop, roomGame } from '@/utils/gameRoom'
+import { ROOM_STATUS, isCoop, isRoomGoneError, roomGame } from '@/utils/gameRoom'
 
 /**
  * @param {Object} [options]
@@ -26,6 +26,8 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
   const active = computed(() => roomId.value > 0)
   const room = ref(null)
   const loading = ref(false)
+  // 房间确定不存在(404:已解散/被清掉):轮询必须停,否则每 4s 一次 404 + 一条报错弹窗
+  const gone = ref(false)
   const reported = ref(false)
   const finishResult = ref(null)
   const now = ref(Date.now())
@@ -61,7 +63,12 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
 
   function startPolling() {
     stopPolling()
+    if (gone.value) return
     pollTimer = setInterval(() => {
+      if (gone.value) {
+        stopPolling()
+        return
+      }
       if (!playing.value) load({ silent: true })
     }, 4000)
   }
@@ -83,9 +90,16 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
     if (!silent) loading.value = true
     try {
       const data = await roomApi.get(roomId.value)
+      gone.value = false
       applyRoom(data)
       return data
-    } catch {
+    } catch (e) {
+      if (isRoomGoneError(e)) {
+        // 房间没了:报错弹窗由请求拦截器弹一次即可,这里只负责彻底停下轮询
+        gone.value = true
+        stopPolling()
+        return null
+      }
       if (!silent) ElMessage.warning(t('games.room.loadFailed'))
       return null
     } finally {
@@ -201,6 +215,7 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
     rivalName,
     reported,
     finishResult,
+    gone,
     now,
     load,
     send,

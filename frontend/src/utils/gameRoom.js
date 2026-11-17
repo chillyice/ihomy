@@ -225,3 +225,9 @@ export const roomPathForGame = (code) => roomGame(code)?.path || '/games'
 /** 阅读型比分:纸牌按「用步数/用时换分」统一成高分为好(与 PK 高分制一致) */
 export const cardRoomScore = (moves, seconds) =>
   Math.max(1, 20000 - Math.max(0, Math.round(moves || 0)) * 20 - Math.max(0, Math.round(seconds || 0)))
+
+/**
+ * 房间接口报错是否等于「房间已经没了」:只有 404(已解散/被清掉)才该停掉轮询,
+ * 断网、超时、5xx 都是一时的,继续按 4s 重试。
+ */
+export const isRoomGoneError = (err) => Number(err?.code) === 404

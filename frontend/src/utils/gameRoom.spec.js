@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSwitchRole, canTakePlayerSeat, roomHasAi, roomPlayerCount, seatLayout } from './gameRoom'
+import { canSwitchRole, canTakePlayerSeat, isRoomGoneError, roomHasAi, roomPlayerCount, seatLayout } from './gameRoom'
 
 const member = (userId, role) => ({ userId, role, name: `u${userId}`, ready: false, score: null, finishedAt: null })
 
@@ -114,5 +114,20 @@ describe('seatLayout', () => {
   it('空房间/缺字段不抛错', () => {
     expect(seatLayout(null).emptyPlayerSeats).toBeGreaterThan(0)
     expect(seatLayout({ members: [] }).players).toHaveLength(0)
+  })
+})
+
+describe('isRoomGoneError', () => {
+  it('业务码 404 才算房间没了', () => {
+    expect(isRoomGoneError({ code: 404, message: '资源不存在' })).toBe(true)
+    expect(isRoomGoneError({ code: '404' })).toBe(true)
+  })
+
+  it('断网/超时/5xx 都不算,轮询继续重试', () => {
+    expect(isRoomGoneError({ code: 'ECONNABORTED' })).toBe(false)
+    expect(isRoomGoneError({ code: 500 })).toBe(false)
+    expect(isRoomGoneError(new Error('boom'))).toBe(false)
+    expect(isRoomGoneError(null)).toBe(false)
+    expect(isRoomGoneError(undefined)).toBe(false)
   })
 })
