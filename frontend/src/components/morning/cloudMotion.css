@@ -14,7 +14,7 @@
   left: 0;
   opacity: var(--track-opacity);
   transform: translate3d(var(--track-rest-x), var(--track-rest-y), 0) translate(-50%, -50%) var(--track-shape);
-  animation: morning-cloud-track linear infinite;
+  animation: morning-cloud-track linear both;
 }
 
 @keyframes morning-cloud-track {

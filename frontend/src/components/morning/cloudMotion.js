@@ -18,6 +18,7 @@ const COMPASS = [
 ]
 const mix = (a, b, t) => a + (b - a) * t
 const snap = (n) => (Math.abs(n) < 1e-8 ? 0 : n)
+const rand = (min, max) => mix(min, max, Math.random())
 
 export function morningWindVector(degrees, direction) {
   const numeric = Number.parseFloat(degrees)
@@ -30,22 +31,36 @@ export function morningWindVector(degrees, direction) {
   return { x: snap(-Math.sin(radians)), y: snap(Math.cos(radians)) }
 }
 
-export function cloudMotionStyle(wind, level, anchor, phase, speed) {
+export function sampleCloudFlight(heightBand, speedBias = 1, initialIndex = null) {
+  // 开屏留几朵已经在路上，其余分批入场；后续每朵独立等下一次风。
+  const inFlight = initialIndex === 0 || (initialIndex > 1 && Math.random() < 0.68)
+  return {
+    x: rand(3, 97),
+    y: rand(...heightBand),
+    nearY: rand(-16, -5),
+    speed: speedBias * rand(0.85, 1.22),
+    phase: inFlight ? rand(initialIndex === 0 ? 0.35 : 0.21, 0.77) : 0,
+    delay: inFlight ? 0 : rand(1.5, initialIndex === null ? 22 : 14),
+  }
+}
+
+export function cloudMotionStyle(wind, level, rest, flight) {
   const sideways = Math.abs(wind.x)
   const depth = Math.abs(wind.y)
   const low = wind.y >= 0
   // 每朵云有独立航道，远处聚向中间，但不挤在一个消失点上。
-  const farX = mix(50, anchor.x, 0.78)
-  const farY = mix(24, 42, Math.min(1, Math.max(0, (anchor.y - 4) / 58)))
-  const fromX = mix(mix(anchor.x, low ? anchor.x : farX, depth), wind.x > 0 ? -14 : 114, sideways)
-  const toX = mix(mix(anchor.x, low ? farX : anchor.x, depth), wind.x > 0 ? 114 : -14, sideways)
-  const fromY = mix(anchor.y, low ? -10 : farY, depth)
-  const toY = mix(anchor.y, low ? farY : -10, depth)
+  const { x, y, nearY, phase, speed, delay } = flight
+  const farX = mix(50, x, 0.78)
+  const farY = mix(24, 42, Math.min(1, Math.max(0, (y - 4) / 58)))
+  const fromX = mix(mix(x, low ? x : farX, depth), wind.x > 0 ? -14 : 114, sideways)
+  const toX = mix(mix(x, low ? farX : x, depth), wind.x > 0 ? 114 : -14, sideways)
+  const fromY = mix(y, low ? nearY : farY, depth)
+  const toY = mix(y, low ? farY : nearY, depth)
   const duration = Math.max(24, 210 * 0.8 ** level) * speed
 
   return {
-    '--track-rest-x': anchor.x + 'vw',
-    '--track-rest-y': anchor.y + 'vh',
+    '--track-rest-x': rest.x + 'vw',
+    '--track-rest-y': rest.y + 'vh',
     '--track-from-x': fromX + 'vw',
     '--track-from-y': fromY + 'vh',
     '--track-to-x': toX + 'vw',
@@ -53,6 +68,6 @@ export function cloudMotionStyle(wind, level, anchor, phase, speed) {
     '--track-from-scale': mix(1, low ? 1.3 : 0.48, depth),
     '--track-to-scale': mix(1, low ? 0.48 : 1.3, depth),
     animationDuration: duration + 's',
-    animationDelay: -phase * duration + 's',
+    animationDelay: delay - phase * duration + 's',
   }
 }

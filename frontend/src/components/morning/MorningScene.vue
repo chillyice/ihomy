@@ -36,6 +36,7 @@
         :style="style"
         alt=""
         decoding="async"
+        @animationend="recycleCloud($event, i)"
       />
     </div>
 
@@ -61,7 +62,8 @@ import cloudPuff from '@/assets/morning/cloud-puff.webp'
 import cloudVeil from '@/assets/morning/cloud-veil.webp'
 import lightning from '@/assets/morning/lightning.webp'
 import { pickMorningBackdrop } from './backdrops'
-import { cloudMotionStyle, morningWindVector } from './cloudMotion'
+import { morningWindVector, sampleCloudFlight } from './cloudMotion'
+import { useCloudFlights } from './useCloudFlights'
 import RandomClouds from './RandomClouds.vue'
 import './cloudMotion.css'
 
@@ -138,56 +140,51 @@ const drift = computed(() => morningWindVector(props.windDeg, props.windDir))
 // 每种天气规定云的密度和高度,具体大小、位置与形状每次重新抽取。
 const SKY_LAYERS = {
   clear: [
-    [cloudVeil, 68, 17, 42, 0.32, 0.19],
-    [cloudVeil, 27, 31, 32, 0.24, 0.65],
+    [cloudVeil, 68, 17, 42, 0.32],
+    [cloudVeil, 27, 31, 32, 0.24],
   ],
   cloud: [
-    [cloudPuff, 23, 16, 62, 0.84, 0.34],
-    [cloudPuff, 83, 32, 55, 0.74, 0.56],
-    [cloudVeil, 53, 13, 82, 0.52, 0.79],
+    [cloudPuff, 23, 16, 62, 0.84],
+    [cloudPuff, 83, 32, 55, 0.74],
+    [cloudVeil, 53, 13, 82, 0.52],
   ],
   overcast: [
-    [cloudVeil, 20, 5, 106, 0.74, 0.3],
-    [cloudVeil, 80, 22, 115, 0.62, 0.55],
-    [cloudVeil, 45, 39, 93, 0.5, 0.69],
+    [cloudVeil, 20, 5, 106, 0.74],
+    [cloudVeil, 80, 22, 115, 0.62],
+    [cloudVeil, 45, 39, 93, 0.5],
   ],
   rain: [
-    [cloudVeil, 24, 11, 104, 0.64, 0.32],
-    [cloudVeil, 72, 31, 92, 0.6, 0.58],
+    [cloudVeil, 24, 11, 104, 0.64],
+    [cloudVeil, 72, 31, 92, 0.6],
   ],
   snow: [
-    [cloudVeil, 43, 10, 114, 0.6, 0.42],
-    [cloudVeil, 66, 32, 83, 0.48, 0.68],
+    [cloudVeil, 43, 10, 114, 0.6],
+    [cloudVeil, 66, 32, 83, 0.48],
   ],
   fog: [
-    [cloudVeil, 29, 64, 120, 0.48, 0.34],
-    [cloudVeil, 72, 76, 132, 0.43, 0.57],
+    [cloudVeil, 29, 64, 120, 0.48],
+    [cloudVeil, 72, 76, 132, 0.43],
   ],
   thunder: [
-    [cloudVeil, 30, 8, 101, 0.66, 0.31],
-    [cloudVeil, 74, 26, 110, 0.62, 0.63],
+    [cloudVeil, 30, 8, 101, 0.66],
+    [cloudVeil, 74, 26, 110, 0.62],
   ],
 }
-const clouds = shallowRef([])
+const { clouds, movingClouds, recycleCloud } = useCloudFlights(drift, wind)
 const strikes = shallowRef([])
-const movingClouds = computed(() => {
-  const vector = drift.value
-  const level = wind.value
-  return clouds.value.map(({ image, anchor, phase, speed, style }) => ({
-    image,
-    style: { ...style, ...cloudMotionStyle(vector, level, anchor, phase, speed) },
-  }))
-})
 
 function createClouds() {
   const horizontalShift = rand(-14, 14)
-  return SKY_LAYERS[scene.value].map(([image, left, top, width, opacity, phase], index) => {
+  return SKY_LAYERS[scene.value].map(([image, left, top, width, opacity], index) => {
     const size = width * rand(0.76, 1.24)
+    const heightBand = [Math.max(2, top - 16), top + 16]
+    const speedBias = 1 + index * 0.18
     return {
       image,
-      anchor: { x: Math.max(2, Math.min(98, left + horizontalShift + rand(-16, 16))), y: Math.max(1, top + rand(-8, 8)) },
-      phase: phase + rand(-0.08, 0.08),
-      speed: (1 + index * 0.18) * rand(0.85, 1.15),
+      heightBand,
+      speedBias,
+      rest: { x: Math.max(2, Math.min(98, left + horizontalShift + rand(-16, 16))), y: Math.max(1, top + rand(-8, 8)) },
+      flight: sampleCloudFlight(heightBand, speedBias, index),
       style: {
         width: `clamp(${size * 3.6}px, ${size}vw, ${size * 15}px)`,
         '--track-opacity': opacity * rand(0.8, 1.08),
@@ -211,7 +208,7 @@ function createStrikes() {
   }))
 }
 
-// 同一场景固定素材和航道；实况风刷新时只更新运动参数。
+// 同一场景固定素材；实况风刷新时只更新运动参数。
 watch(
   sceneKey,
   () => {

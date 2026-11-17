@@ -1,14 +1,21 @@
 <!-- 随机云叠在天气照片上。密度纹理只在场景切换时生成，风只负责平移云层。 -->
 <template>
   <div ref="layer" class="rc" :class="{ 'morning-cloud-still': !animated }" aria-hidden="true">
-    <canvas v-for="c in movingClouds" :key="c.seed" class="rc-cloud morning-cloud-motion" :style="c.style"></canvas>
+    <canvas
+      v-for="(c, i) in movingClouds"
+      :key="c.seed"
+      class="rc-cloud morning-cloud-motion"
+      :style="c.style"
+      @animationend="recycleCloud($event, i)"
+    ></canvas>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { paintCloud } from './cloudTexture'
-import { cloudMotionStyle, morningWindVector } from './cloudMotion'
+import { morningWindVector, sampleCloudFlight } from './cloudMotion'
+import { useCloudFlights } from './useCloudFlights'
 import './cloudMotion.css'
 
 const props = defineProps({
@@ -139,17 +146,8 @@ function makeKindBag(count) {
 }
 
 const layer = ref(null)
-const clouds = shallowRef([])
+const { clouds, movingClouds, recycleCloud } = useCloudFlights(drift, wind)
 const compact = typeof window !== 'undefined' && window.innerWidth < 640
-
-const movingClouds = computed(() => {
-  const vector = drift.value
-  const level = wind.value
-  return clouds.value.map((cloud) => ({
-    ...cloud,
-    style: { ...cloud.style, ...cloudMotionStyle(vector, level, cloud.anchor, cloud.phase, cloud.speed) },
-  }))
-})
 
 watch(
   [() => props.scene, () => props.night],
@@ -171,18 +169,18 @@ watch(
       const wPct = rand(...shape.w)
       const wPx = rand(...shape.px) * depth
       const ratio = rand(...shape.ratio)
-      const phase = (i + rand(0.28, 0.72)) / count
       const width = compact ? 224 : 320
       const height = Math.max(56, Math.round(width * ratio))
       const low = kind === 'fogbank' || props.scene === 'fog'
+      const heightBand = low ? [34, 61] : shape.tall ? [16, 28] : [8, overcast ? 44 : 34]
       return {
         kind,
         seed: Math.floor(rand(0, 4294967296)),
         width,
         height,
-        phase,
-        speed: rand(0.87, 1.16),
-        anchor: { x: phase * 104 - 2, y: low ? rand(34, 61) : shape.tall ? rand(16, 28) : rand(8, overcast ? 44 : 34) },
+        heightBand,
+        rest: { x: ((i + rand(0.18, 0.82)) / count) * 104 - 2, y: rand(...heightBand) },
+        flight: sampleCloudFlight(heightBand, 1, i),
         style: {
           // 低矮的横屏上仍把云限制在风景线以上。
           width: `min(${px(wPx)}, ${wPct.toFixed(1)}%, ${((shape.tall ? 52 : 38) / ratio).toFixed(1)}vh)`,
