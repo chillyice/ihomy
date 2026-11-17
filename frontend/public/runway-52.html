@@ -87,17 +87,19 @@ const TEAMS = [
  {name:'金鹏',code:'GLD',paint:'#f3c455',ink:'#8a5d12',x:522,y:522},
  {name:'翡翠',code:'JDE',paint:'#71c8a4',ink:'#23684d',x:38,y:522},
 ];
-const N = 52, GOAL = 57, HANGAR = -1;
+const N = 52, GOAL = 57, HANGAR = -1, CIRCUIT_LAST = 50, R0 = 51;
 const STORE = 'runway52.table.v1';
 const mod = (i,n=N) => (i%n+n)%n;
 const point = (i,r=244) => {
  const a = (-135+mod(i)*360/N)*Math.PI/180;
  return [350+r*Math.cos(a),350+r*Math.sin(a)];
 };
-const publicIndex = (color,progress) => mod(13*color+progress);
-const isPublic = p => p>=0&&p<N;
-/* 起飞位:不在主环上,压在自家机场靠跑道一侧的外沿(环外 272 半径、自家门口与进环第一格之间) */
-const takeoffSpot = color => point(color*13+0.5,272);
+/* 进环格序(格名 A1B1C1D1 四色循环×13 组):进度 1..50 依次落在 13C+3 .. 13C——
+   起飞走一步到上一家色的 D1,自家角格 A1(红/本色)是归航跑道口;进度 51 起转入归航跑道 */
+const publicIndex = (color,progress) => mod(13*color+2+progress);
+const isPublic = p => p>=1&&p<=CIRCUIT_LAST;
+/* 起飞位:不在主环上,压在自家机场靠跑道一侧的外沿(环外 272 半径、进环第一格 D1 旁) */
+const takeoffSpot = color => point(color*13+2.5,272);
 const stand = (color,p) => {
  const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
 };
@@ -105,16 +107,17 @@ function coords(color,progress,piece) {
  if(progress===HANGAR) return stand(color,piece);
  if(progress===0) return takeoffSpot(color);
  if(isPublic(progress)) return point(publicIndex(color,progress));
- return point(publicIndex(color,51),209-29*(progress-N));
+ return point(13*color, 209-(209-64)*(progress-R0)/(GOAL-R0));
 }
 /**
- * 本家航线格在本家起飞位前方、下一家与对角家归航跑道口之间(=下一家起飞位后数 4 格,进度 17),
- * 飞跃 12 格落在对角家起飞位后数 3 格(进度 29);曲线中点恰好压在对角家跑道
- * 「从内向外第 4 格」的格心上,飞跃时扫到停在那一格的飞机会把它撞回机库。
+ * 本家航线格(D2 等)在自家角格(归航跑道口)前方、下一家与对角家归航跑道口之间
+ * (=下一家进环第一格再往前 4 格,进度 18),飞跃 12 格落在对角家进环第一格后 3 格
+ * (C2 等,进度 30);曲线中点恰好压在对角家跑道「从内向外第 4 格」的格心上,
+ * 飞跃时扫到停在那一格的飞机会把它撞回机库。
  */
 const LEAP_CROSS = GOAL-3, LEAP_SAMPLES = 12, LEAP_STEP_MS = 30;
 const leapCurve = c => {
- const a=point(c*13+17), b=point(c*13+29), t=coords((c+2)%4,LEAP_CROSS,0);
+ const a=point(c*13+20), b=point(c*13+32), t=coords((c+2)%4,LEAP_CROSS,0);
  return [a,[2*t[0]-(a[0]+b[0])/2,2*t[1]-(a[1]+b[1])/2],b];
 };
 const curvePoint = ([a,k,b],t) => {
@@ -159,11 +162,11 @@ function movesFor(g,face=g.face) {
   if (from===GOAL || (from===HANGAR&&face!==6)) return [];
   let to=from===HANGAR?0:from+face, kind=from===HANGAR?'起飞':'前进', captures=[];
   // 归航跑道:点数大于到圆心的距离时照样能动——先走到圆心,剩下的点数再从圆心往回折返
-  if(from>=N&&to>GOAL){to=GOAL*2-to;kind='折返';}
+  if(from>=R0&&to>GOAL){to=GOAL*2-to;kind='折返';}
   if(to>GOAL) return [];
   const land=to;
-  if(from>=0&&to===17){to+=12;kind='跨场飞跃';}
-  else if(from>=0&&to<N&&to%4===0&&to+4<N){to+=4;kind='同色跳格';}
+  if(from>=0&&to===18){to+=12;kind='跨场飞跃';}
+  else if(from>=0&&to<=CIRCUIT_LAST&&to%4===2&&to+4<=CIRCUIT_LAST){to+=4;kind='同色跳格';}
   if(to===GOAL) kind='归航';
   // 捕获:起飞位(进度 0)是本家私有位,既不会被撞,起飞也不撞人
   if(isPublic(to)&&to!==0){
@@ -246,22 +249,18 @@ function svgBoard(){
   const [tx,ty]=takeoffSpot(c);
   art+=circle(tx,ty,13,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.5"');
   art+=text(tx,ty+5,'★',15,middle+' fill="#162923" font-weight="900"');
-  art+=line(point(c*13+51),coords(c,GOAL,0),'stroke="'+t.ink+'" stroke-width="4" opacity=".53"');
-  for(let p=N;p<=GOAL;p++){
+  art+=line(point(c*13),coords(c,GOAL,0),'stroke="'+t.ink+'" stroke-width="4" opacity=".53"');
+  for(let p=R0;p<=GOAL;p++){
    const [px,py]=coords(c,p,0);
    art+=circle(px,py,p===GOAL?13:11,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.2"');
    if(p===GOAL) art+=circle(px,py,6,'fill="none" stroke="'+t.ink+'" stroke-width="1.6"');
   }
  }
  for(let i=0;i<N;i++){
-  const [x,y]=point(i), jet=mod(i-17,13)===0, t=TEAMS[i%4];
-  art+=circle(x,y,9.6,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1"');
-  // 航线格:底色保持四色节奏(它同时是下一家的本色格),本家颜色画成小徽标,看到的颜色=实际触发飞跃的本家
-  if(jet){
-   const owner=TEAMS[Math.floor(mod(i-17,52)/13)];
-   art+=circle(x,y,7,'fill="'+owner.paint+'" stroke="'+owner.ink+'" stroke-width="1.2"');
-   art+=text(x,y+3.2,'⇢',9,middle+' fill="#162923" font-weight="900"');
-  }
+  const [x,y]=point(i), jet=mod(i-20,13)===0, t=TEAMS[i%4];
+  art+=circle(x,y,jet?12:9.6,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="'+(jet?1.5:1)+'"');
+  // 航线格落在本家本色格上(D2 等),底色即本家色,看到的颜色=实际触发飞跃的本家
+  if(jet) art+=text(x,y+5.4,'⇢',17,middle+' fill="#162923" font-weight="900"');
  }
  chart.innerHTML=art;
 }
@@ -303,7 +302,7 @@ function sync(){
  for(const k of game.order)game.planes[k].forEach((p,i)=>{
   const el=tokenMap.get(k+':'+i);
   el.hidden=p===GOAL;el.disabled=k!==c||!legal.has(i);el.classList.toggle('parked',p===HANGAR);
-  el.setAttribute('aria-label',TEAMS[k].name+' '+(i+1)+' 号飞机，'+(p===HANGAR?'在机库':p===0?'在起飞位':p>=N?'在归航跑道':'在公共航线'));
+  el.setAttribute('aria-label',TEAMS[k].name+' '+(i+1)+' 号飞机，'+(p===HANGAR?'在机库':p===0?'在起飞位':p>=R0?'在归航跑道':'在公共航线'));
   if(p===GOAL)return;
   const [x,y]=coords(k,p,i), key=x.toFixed(3)+':'+y.toFixed(3);
   if(!stacks.has(key))stacks.set(key,[]);
