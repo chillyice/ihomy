@@ -70,7 +70,7 @@ dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border
 </div>
 </main>
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
-<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航线箭头上，沿虚线飞跃 12 格；落在其他本色航点上可跳 4 格。起飞格和归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库。带星的四个起飞格不会撞机。</li><li>绕完公共航线后转入本色跑道。到终点需要刚好的点数；没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航线箭头上，沿虚线飞跃 12 格；落在其他本色航点上可跳 4 格。起飞格和归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库。带星的四个起飞格不会撞机。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
 <div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
@@ -108,12 +108,31 @@ function fresh(size,mode) {
  return {order,mode,turn:0,planes:Array.from({length:4},()=>Array(4).fill(HANGAR)),
   phase:'roll',face:0,winner:null,round:0,log:['塔台就绪，珊瑚机队先掷。']};
 }
+/**
+ * 逐格帧:普通前进按格推进;同色跳格 / 跨场飞跃的最后一段是一次飞过去;折返先到圆心再往回走。
+ */
+function walkFrames(from,land,to,kind){
+ if(from===HANGAR)return [{p:to}];
+ if(kind==='折返'){
+  const back=[];
+  for(let p=from+1;p<=GOAL;p+=1)back.push({p});
+  for(let p=GOAL-1;p>=to;p-=1)back.push({p});
+  return back;
+ }
+ const path=[];
+ for(let p=from+1;p<=land;p+=1)path.push({p});
+ if(to!==land)path.push({p:to,leap:true});
+ return path;
+}
 function movesFor(g,face=g.face) {
  const c=last(g);
  return g.planes[c].flatMap((from,piece)=>{
   if (from===GOAL || (from===HANGAR&&face!==6)) return [];
   let to=from===HANGAR?0:from+face, kind=from===HANGAR?'起飞':'前进', captures=[];
+  // 归航跑道:点数大于到圆心的距离时照样能动——先走到圆心,剩下的点数再从圆心往回折返
+  if(from>=N&&to>GOAL){to=GOAL*2-to;kind='折返';}
   if(to>GOAL) return [];
+  const land=to;
   if(from>=0&&to===6){to+=12;kind='跨场飞跃';}
   else if(from>=0&&to<N&&to%4===0&&to+4<N&&publicIndex(c,to)%13!==0){to+=4;kind='同色跳格';}
   if(to===GOAL) kind='归航';
@@ -123,7 +142,7 @@ function movesFor(g,face=g.face) {
     g.planes[rival].forEach((p,i)=>{if(isPublic(p)&&publicIndex(rival,p)===spot) captures.push([rival,i]);});
    }
   }
-  return [{piece,to,kind,captures}];
+  return [{piece,to,kind,captures,frames:walkFrames(from,land,to,kind)}];
  });
 }
 function note(g, line) {g.log.unshift(line);g.log=g.log.slice(0,4);}
@@ -280,18 +299,14 @@ const STEP_MS=80, LEAP_MS=280;
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 /**
- * 逐格滑行:按点数一格一格挪过去,跳跃段(同色跳格/跨场飞跃)单独滑一次。
- * 节拍只负责「每格等多久」,位移本身由 .piece 的 left/top 过渡插值。
+ * 逐格滑行:按 movesFor 给出的逐格帧一格一格挪过去,跳跃段(同色跳格/跨场飞跃)单独滑一次,
+ * 折返段先走圆心再往回走。节拍只负责「每格等多久」,位移本身由 .piece 的 left/top 过渡插值。
  */
 async function glide(c,piece,from,move,stale){
  const el=tokenMap.get(c+':'+piece);
  if(!el||from===GOAL||reduced.matches)return;
- const raw=move.kind==='同色跳格'?move.to-4:move.kind==='跨场飞跃'?move.to-12:move.to;
- const path=[];
- if(from===HANGAR)path.push({p:move.to});
- else{for(let p=from+1;p<=raw;p+=1)path.push({p});if(move.to!==raw)path.push({p:move.to,leap:true});}
  el.classList.add('moving');el.classList.remove('parked');el.style.zIndex=4;
- for(const frame of path){
+ for(const frame of move.frames){
   if(stale())break;
   const [x,y]=coords(c,frame.p,piece);
   el.style.setProperty('--x',x/7+'%');el.style.setProperty('--y',y/7+'%');
