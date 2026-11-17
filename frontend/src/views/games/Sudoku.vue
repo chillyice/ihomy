@@ -1969,4 +1969,24 @@ html.dark .sd-stat.warn b {
     border-radius: 8px;
   }
 }
+
+/* 手机沉浸态:页头/底栏/游戏工具栏已收起,棋盘把省下来的高度吃掉 */
+:global(html.game-mobile-immersive) .sd-layout {
+  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 340px - var(--room-bar-h, 0px)), 560px));
+}
+@container sudoku (min-width: 550px) {
+  :global(html.game-mobile-immersive) .sd-layout {
+    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 100px - var(--room-bar-h, 0px)), 560px)) minmax(0, 232px);
+  }
+}
+
+/* 横屏矮窗:右侧面板(统计/数字盘/工具/帮助)展开后可能比棋盘还高,
+   让面板自己滚动,否则页面 overflow:hidden 会把下半截直接裁掉 */
+@media (max-height: 520px) {
+  .sd-panel {
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+    padding-bottom: 4px;
+  }
+}
 </style>

@@ -3,9 +3,9 @@
 <template>
   <div class="page desktop-game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <el-button size="small" round @click="router.push(props.backTo)">
+      <el-button class="gt-back" size="small" round @click="router.push(props.backTo)">
         <el-icon><ArrowLeft /></el-icon>
-        {{ $t('games.back') }}
+        <span class="gt-label">{{ $t('games.back') }}</span>
       </el-button>
       <span class="dg-title">{{ game?.name || $t('games.title') }}</span>
       <div class="game-top-actions">

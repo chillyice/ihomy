@@ -4,9 +4,9 @@
 <template>
   <div ref="pageEl" class="page web-game-page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <el-button size="small" round @click="router.push('/games')">
+      <el-button class="gt-back" size="small" round @click="router.push('/games')">
         <el-icon><ArrowLeft /></el-icon>
-        {{ $t('games.back') }}
+        <span class="gt-label">{{ $t('games.back') }}</span>
       </el-button>
       <span class="wg-title">{{ game?.name || $t('games.title') }}</span>
       <div class="game-top-actions">
@@ -29,6 +29,7 @@
           <span class="wg-btn-label">{{ $t('games.web.vault') }}</span>
         </el-button>
         <el-button
+          class="gt-pagefull"
           size="small"
           round
           :title="pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen')"
@@ -37,7 +38,14 @@
           <el-icon><Fold v-if="pageFull" /><Expand v-else /></el-icon>
           <span class="wg-btn-label">{{ pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen') }}</span>
         </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
+        <el-button
+          class="gt-fullscreen"
+          size="small"
+          round
+          :title="isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen')"
+          :aria-label="isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen')"
+          @click="toggleFullscreen"
+        >
           <el-icon><FullScreen /></el-icon>
           <span class="wg-btn-label">{{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}</span>
         </el-button>

@@ -4,13 +4,21 @@
     <!-- 顶栏:返回 + 全屏(工具按钮统一进顶栏,与物品定位一致) -->
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
       <div class="game-top-actions">
-        <el-button v-if="backTo" size="small" round @click="router.push(backTo)">
+        <el-button v-if="backTo" class="gt-back" size="small" round @click="router.push(backTo)">
           <el-icon><ArrowLeft /></el-icon>
-          {{ $t('tools.flash.back') }}
+          <span class="gt-label">{{ $t('tools.flash.back') }}</span>
         </el-button>
-        <el-button v-if="fileName || src" size="small" round @click="toggleFullscreen">
+        <el-button
+          v-if="fileName || src"
+          class="gt-fullscreen"
+          size="small"
+          round
+          :title="isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen')"
+          :aria-label="isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen')"
+          @click="toggleFullscreen"
+        >
           <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen') }}
+          <span class="gt-label">{{ isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen') }}</span>
         </el-button>
       </div>
     </PageToolbar>

@@ -419,6 +419,129 @@ html.game-wide .page.game-page {
   user-select: text;
   -webkit-touch-callout: default;
 }
+
+/* ===== 手机游戏沉浸态(MobileLayout 在游戏路由挂 html.game-mobile-immersive)=====
+ * 页头/底栏/页脚全部收起,游戏页吃满整个可视化视口;返回键只留左上角一个浮动按钮,
+ * 游戏自己的工具栏改成右上角悬浮图标,不再单独占一行。 */
+html.game-mobile-immersive,
+html.game-mobile-immersive body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.game-mobile-immersive #app {
+  padding-bottom: 0;
+  height: 100%;
+}
+html.game-mobile-immersive .mobile-header,
+html.game-mobile-immersive .mobile-tabbar,
+html.game-mobile-immersive .back-to-top,
+html.game-mobile-immersive .site-footer,
+html.game-mobile-immersive .app-sidebar {
+  display: none !important;
+}
+html.game-mobile-immersive .mobile-layout {
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+html.game-mobile-immersive .mobile-sub-content {
+  height: 100dvh;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+}
+/* 保留安全区(横屏刘海/小白条),其余内边距清零;height 用 100% 与父级 100dvh 对齐 */
+html.game-mobile-immersive .mobile-sub-content .page {
+  width: 100%;
+  max-width: none;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
+  overflow: hidden;
+}
+html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
+  overflow: hidden;
+}
+html.game-mobile-immersive .game-page-readable > .game-surface,
+html.game-mobile-immersive .game-page-readable > .cards-stage {
+  margin-inline: 0;
+}
+/* 靠 useGameView 等比缩小的小游戏(2048/俄罗斯方块/扫雷/贪吃蛇/宠物连连看):
+   卡片吃掉整块剩余高度,内容不足时铺满背景;**只伸不缩**(flex-shrink:0),内容高于视口时
+   保持自然高度交给 useGameView 做 transform 缩放(缩了也能铺满)。
+   自管高度的页面(.game-page-readable:麻将/飞行棋/数独/牌桌)不在此列——它们自己按可用高
+   分配内部区域,被撑到自然高度反而会被页面 overflow:hidden 裁掉底部。 */
+html.game-mobile-immersive .mobile-sub-content .page.game-page:not(.game-page-readable) > .game-surface,
+html.game-mobile-immersive .mobile-sub-content .page.game-page:not(.game-page-readable) > .cards-stage {
+  flex: 1 0 auto;
+}
+/* 自管高度页:卡片跟随页面收缩,内部区域各自滚动/等比缩放,整局都留在视口内 */
+html.game-mobile-immersive .mobile-sub-content .page.game-page-readable > .game-surface,
+html.game-mobile-immersive .mobile-sub-content .page.game-page-readable > .cards-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* 游戏页顶栏:不再占布局高度,只把额外动作(重载/开外部/存档等)浮到右上角 */
+html.game-mobile-immersive .game-topbar {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 8px);
+  left: auto;
+  width: auto;
+  max-width: calc(100vw - 104px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  z-index: var(--z-float);
+  pointer-events: none;
+}
+html.game-mobile-immersive .game-topbar > * {
+  pointer-events: auto;
+}
+html.game-mobile-immersive .game-topbar .game-top-actions {
+  margin-left: 0;
+  gap: 6px;
+}
+/* 返回由左上角浮动按钮统一提供;宽屏/全屏/页面全屏在手机上无意义(已整屏),不再重复占位 */
+html.game-mobile-immersive .game-topbar .gt-back,
+html.game-mobile-immersive .game-topbar .gt-wide,
+html.game-mobile-immersive .game-topbar .gt-fullscreen,
+html.game-mobile-immersive .game-topbar .gt-pagefull,
+html.game-mobile-immersive .game-topbar .gt-label,
+html.game-mobile-immersive .game-topbar .wg-btn-label,
+html.game-mobile-immersive .game-topbar .dg-btn-label,
+html.game-mobile-immersive .game-topbar .wg-title,
+html.game-mobile-immersive .game-topbar .dg-title {
+  display: none !important;
+}
+/* 纯说明性标签(如「模拟器」)不占角落;手柄已连接的提示保留 */
+html.game-mobile-immersive .game-topbar .el-tag:not(.gamepad-tag) {
+  display: none !important;
+}
+html.game-mobile-immersive .game-topbar .el-button {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(var(--color-card-rgb), 0.92);
+  border-color: rgba(var(--color-card-rgb), 0.55);
+  box-shadow: var(--shadow);
+}
+html.game-mobile-immersive .game-topbar .el-tag {
+  background: rgba(var(--color-card-rgb), 0.92);
+}
+/* 全屏时各个游戏卡里会再插一行「退出全屏」动作;手机沉浸态已经整屏,这行纯占地方 */
+html.game-mobile-immersive .game-surface .game-top-actions,
+html.game-mobile-immersive .cards-modes .game-top-actions {
+  display: none !important;
+}
 html.theme-warm .gc-pin .game-topbar {
   display: flex;
   align-items: center;

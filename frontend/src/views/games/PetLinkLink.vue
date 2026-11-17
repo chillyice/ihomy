@@ -1149,7 +1149,8 @@ function onKeydown(e) {
   align-items: baseline;
   gap: 4px;
   font-family: 'Yuanti SC', 'YouYuan', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 58px;
+  /* 手机竖屏(390 宽)58px 会撑出卡片右侧被裁,按视口宽缩到装得下 */
+  font-size: clamp(34px, 12.5vw, 58px);
   font-weight: 800;
   letter-spacing: 4px;
   margin: 0;

@@ -4,17 +4,42 @@
     <el-tag v-if="gamepad" size="small" type="success" effect="plain" class="gamepad-tag">
       {{ $t('games.gamepadReady') }}
     </el-tag>
-    <el-button v-if="showBack" size="small" round @click="$emit('back')">
+    <el-button
+      v-if="showBack"
+      class="gt-back"
+      size="small"
+      round
+      :title="backLabel || $t('games.back')"
+      :aria-label="backLabel || $t('games.back')"
+      @click="$emit('back')"
+    >
       <el-icon><ArrowLeft /></el-icon>
-      {{ backLabel || $t('games.back') }}
+      <span class="gt-label">{{ backLabel || $t('games.back') }}</span>
     </el-button>
-    <el-button v-if="showFullscreen" size="small" round @click="$emit('fullscreen')">
+    <el-button
+      v-if="showFullscreen"
+      class="gt-fullscreen"
+      size="small"
+      round
+      :title="isFullscreen ? exitLabel || $t('games.exitFullscreen') : fullscreenLabel || $t('games.fullscreen')"
+      :aria-label="isFullscreen ? exitLabel || $t('games.exitFullscreen') : fullscreenLabel || $t('games.fullscreen')"
+      @click="$emit('fullscreen')"
+    >
       <el-icon><FullScreen /></el-icon>
-      {{ isFullscreen ? exitLabel || $t('games.exitFullscreen') : fullscreenLabel || $t('games.fullscreen') }}
+      <span class="gt-label">{{ isFullscreen ? exitLabel || $t('games.exitFullscreen') : fullscreenLabel || $t('games.fullscreen') }}</span>
     </el-button>
-    <el-button v-if="showWide" size="small" round :type="wide ? 'primary' : 'default'" @click="$emit('wide')">
+    <el-button
+      v-if="showWide"
+      class="gt-wide"
+      size="small"
+      round
+      :type="wide ? 'primary' : 'default'"
+      :title="wide ? exitWideLabel || $t('games.exitWide') : wideLabel || $t('games.wide')"
+      :aria-label="wide ? exitWideLabel || $t('games.exitWide') : wideLabel || $t('games.wide')"
+      @click="$emit('wide')"
+    >
       <el-icon><Monitor /></el-icon>
-      {{ wide ? exitWideLabel || $t('games.exitWide') : wideLabel || $t('games.wide') }}
+      <span class="gt-label">{{ wide ? exitWideLabel || $t('games.exitWide') : wideLabel || $t('games.wide') }}</span>
     </el-button>
   </div>
 </template>

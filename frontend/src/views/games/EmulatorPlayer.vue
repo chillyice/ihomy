@@ -4,17 +4,33 @@
   <div class="page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
       <div class="game-top-actions">
-        <el-button v-if="backTo" size="small" round @click="router.push(backTo)">
+        <el-button v-if="backTo" class="gt-back" size="small" round @click="router.push(backTo)">
           <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
+          <span class="gt-label">{{ $t('games.back') }}</span>
         </el-button>
-        <el-button v-if="fileName || src" size="small" round @click="toggleFullscreen">
+        <el-button
+          v-if="fileName || src"
+          class="gt-fullscreen"
+          size="small"
+          round
+          :title="isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen')"
+          :aria-label="isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen')"
+          @click="toggleFullscreen"
+        >
           <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen') }}
+          <span class="gt-label">{{ isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen') }}</span>
         </el-button>
-        <el-button v-if="fileName || src" size="small" round :loading="loading" @click="reloadGame">
+        <el-button
+          v-if="fileName || src"
+          size="small"
+          round
+          :loading="loading"
+          :title="$t('gba.reload')"
+          :aria-label="$t('gba.reload')"
+          @click="reloadGame"
+        >
           <el-icon><RefreshRight /></el-icon>
-          {{ $t('gba.reload') }}
+          <span class="gt-label">{{ $t('gba.reload') }}</span>
         </el-button>
         <el-tag v-if="fileName || src" size="small" type="info" effect="plain">
           {{ $t('games.gamepadEmulator') }}

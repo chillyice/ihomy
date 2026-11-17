@@ -31,6 +31,8 @@ export function useGameView({ page, stage, fit = true, scale = true, fullBleed =
 
   const stageEl = () => stage?.value || null
   const pageEl = () => page?.value || null
+  // 手机沉浸态(MobileLayout 挂的根类):页头/底栏已收起,页面直接吃满可视高度
+  const inMobileGameShell = () => typeof document !== 'undefined' && document.documentElement.classList.contains('game-mobile-immersive')
 
   const clearStageTransform = () => {
     const el = stageEl()
@@ -64,7 +66,10 @@ export function useGameView({ page, stage, fit = true, scale = true, fullBleed =
       bottom = Math.min(scrollerRect.bottom, viewportH)
       scrollerPadBottom = parseFloat(getComputedStyle(scroller).paddingBottom) || 0
     }
-    const height = Math.max(220, Math.min(Math.floor(bottom - scrollerPadBottom - rect.top - 6), viewportH - 8))
+    // 手机沉浸态没有页头/底栏,直接占满可视化视口,不再留 6/8px 的窗口呼吸位
+    const height = inMobileGameShell()
+      ? Math.max(220, Math.floor(viewportH))
+      : Math.max(220, Math.min(Math.floor(bottom - scrollerPadBottom - rect.top - 6), viewportH - 8))
     pageNode.style.height = `${height}px`
     const cs = getComputedStyle(pageNode)
     const padTop = parseFloat(cs.paddingTop) || 0
@@ -112,8 +117,15 @@ export function useGameView({ page, stage, fit = true, scale = true, fullBleed =
     // 缩放过的元素进全屏,内部坐标会跟着缩放,先还原再请求
     clearStageTransform()
     try {
-      if (document.fullscreenElement) await document.exitFullscreen?.()
-      else await stageEl()?.requestFullscreen?.()
+      if (document.fullscreenElement) {
+        await document.exitFullscreen?.()
+        return
+      }
+      // 手机沉浸态已经占满站内视口,全屏只用于藏掉浏览器地址栏/系统状态栏:
+      // 目标是 documentElement(整个文档),而不是游戏卡——否则卡片外的浮动返回键不会被绘制
+      const target = inMobileGameShell() ? document.documentElement : stageEl()
+      if (!target?.requestFullscreen) return
+      await target.requestFullscreen({ navigationUI: 'hide' })
     } catch (e) {
       // 浏览器拒绝(如 iOS)时保持窗口态
     }
@@ -125,7 +137,8 @@ export function useGameView({ page, stage, fit = true, scale = true, fullBleed =
 
   const onFullscreenChange = () => {
     const target = stageEl()
-    isFullscreen.value = !!target && document.fullscreenElement === target
+    // 手机沉浸态走的是整文档全屏,只要还在全屏就算全屏;桌面仍认「游戏卡本身被全屏」
+    isFullscreen.value = inMobileGameShell() ? !!document.fullscreenElement : !!target && document.fullscreenElement === target
     nextTick(scheduleFit)
   }
 

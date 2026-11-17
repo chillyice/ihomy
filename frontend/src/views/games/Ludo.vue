@@ -252,6 +252,7 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
+import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
@@ -881,7 +882,9 @@ watch(
 
 async function goBack() {
   if (!play.active || !play.room?.id) {
-    router.push('/games')
+    // 手机沉浸态的浮动返回键也走这里:优先回到进入游戏前的页面
+    if (window.history.state && window.history.state.back != null) router.back()
+    else router.push('/games')
     return
   }
   const roomId = play.room.id
@@ -895,6 +898,9 @@ async function goBack() {
   }
   router.push(play.isHost ? `/games/room/${roomId}` : '/games')
 }
+
+// 手机沉浸态:左上角浮动返回键优先走本页退出逻辑,房间局才会先退房/结束房间
+useGameExit(goBack)
 
 onBeforeUnmount(() => {
   animToken += 1
@@ -1532,6 +1538,18 @@ html.dark .ludo-card {
 @media (max-height: 500px) {
   .ludo-dice-box {
     order: -1;
+  }
+}
+
+/* 手机沉浸态:页头/底栏/游戏工具栏都不在布局里了,棋盘按真实可用高度放大 */
+:global(html.game-mobile-immersive) .ludo-card {
+  --ludo-board-max: min(620px, calc(100dvh - 56px - var(--room-bar-h, 0px)));
+}
+
+@media (max-width: 860px) and (orientation: portrait) {
+  :global(html.game-mobile-immersive) .ludo-card {
+    /* 竖屏堆叠:只扣卡片内边距 + 侧栏(状态/骰子/玩家/规则)实测高度 */
+    --ludo-board-max: min(620px, calc(100dvh - 380px - var(--room-bar-h, 0px)));
   }
 }
 </style>

@@ -10,6 +10,39 @@ export function isMobileHomePath(path) {
   return MOBILE_HOME_PATHS.includes(path)
 }
 
+// 手机端进入游戏后要收起站内外壳(页头/底栏/页脚),把整块屏幕让给游戏。
+// 只认「正在玩」的路由:游戏大厅 / 一起玩房间 / 对战详情 / 桌面游戏信息页仍保留正常外壳导航。
+const MOBILE_GAME_PREFIXES = [
+  '/games/petlink',
+  '/games/sudoku',
+  '/games/2048',
+  '/games/minesweeper',
+  '/games/cards',
+  '/games/tetris',
+  '/games/snake',
+  '/games/mahjong',
+  '/games/mahjong3d',
+  '/games/ludo',
+  '/games/doudizhu',
+  '/games/guandan',
+  '/games/baohuang',
+  '/games/gouji',
+  '/games/play',
+  '/games/web',
+  '/games/embed',
+  // 工具箱里的两个播放器本质也是游戏(模拟器 / Flash)
+  '/tools/gba',
+  '/tools/flash',
+]
+
+export function isMobileGamePath(path) {
+  if (!path) return false
+  // /games/mahjong 不能连带吃掉 /games/mahjong3d 之外的兄弟路由;前缀逐条比较即可,
+  // 这里只额外排除信息页与大厅(它们前缀不同,本来就不会命中,写出来方便后来者看懂边界)。
+  if (path === '/games' || path === '/games/room' || path.startsWith('/games/room/') || path === '/games/match') return false
+  return MOBILE_GAME_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`))
+}
+
 // 精确路径 → 页头标题 i18n 键
 const PAGE_TITLE_KEYS = {
   '/blog': 'blog.title',

@@ -11,7 +11,7 @@
 // 必须由我们自己刷成页面底色,否则和主题撞色。
 import { SystemBars, SystemBarsStyle } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
-import { isAndroidApp } from '@/utils/platform'
+import { isAndroidApp, isNativeApp } from '@/utils/platform'
 
 // 页面根底色不透明度低于此值视为「没铺底」,继续往上找
 const ALPHA_FLOOR = 0.5
@@ -92,6 +92,31 @@ async function apply() {
     // 状态栏是锦上添花,失败不影响使用;清掉缓存让下次事件再试一遍
     appliedKey = ''
     console.warn('[native] 状态栏样式设置失败', e)
+  }
+}
+
+let gameBarHidden = false
+
+/**
+ * 游戏沉浸态:隐藏系统状态栏,把整块屏幕让给游戏;离开游戏时恢复并重刷主题样式。
+ * Web 端没有系统状态栏可隐,由 MobileGameChrome 的浏览器全屏按钮接管。
+ */
+export async function setStatusBarHidden(hidden) {
+  if (!isNativeApp()) return
+  const next = !!hidden
+  if (gameBarHidden === next) return
+  try {
+    if (next) await StatusBar.hide()
+    else await StatusBar.show()
+    gameBarHidden = next
+    if (!next) {
+      // 恢复显示后底色/图标样式要按当前主题重刷一遍,否则可能停在游戏时的样式
+      appliedKey = ''
+      schedule()
+    }
+  } catch (e) {
+    gameBarHidden = !next
+    console.warn('[native] 状态栏显隐切换失败', e)
   }
 }
 

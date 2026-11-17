@@ -149,7 +149,16 @@ const seatViews = computed(() => {
   return props.seats.map((s, seat) => {
     const rel = (seat - props.mySeat + n) % n
     const [x, y] = table[rel] || table[0]
-    return { ...s, seat, rel, x: `${x}%`, y: `${y}%` }
+    // 座位宽高的一半在 CSS 里(--ft-seat-half / --ft-seat-half-h):
+    // 边缘座位按 translate(-50%) 定位会有一半探出牌桌被 overflow:hidden 裁掉(手机竖屏最明显),
+    // 用 clamp 把圆心拉回桌内,坐标仍然是原来的百分比
+    return {
+      ...s,
+      seat,
+      rel,
+      x: `clamp(var(--ft-seat-half, 50px), ${x}%, calc(100% - var(--ft-seat-half, 50px)))`,
+      y: `clamp(var(--ft-seat-half-h, 24px), ${y}%, calc(100% - var(--ft-seat-half-h, 24px)))`,
+    }
   })
 })
 
@@ -168,6 +177,9 @@ const cardLabel = (card) => {
   min-height: 0;
   flex-direction: column;
   gap: 8px;
+  /* 座位定位的一半宽高(见 seatViews 的 clamp):max-width 132 / 头像 30 的座位大致一半 */
+  --ft-seat-half: 66px;
+  --ft-seat-half-h: 27px;
 }
 .ft-root:fullscreen {
   padding: clamp(8px, 2vw, 18px);
@@ -500,6 +512,10 @@ const cardLabel = (card) => {
 }
 
 @media (max-width: 720px) {
+  .ft-root {
+    --ft-seat-half: 50px;
+    --ft-seat-half-h: 24px;
+  }
   .ft-table {
     min-height: 260px;
   }
@@ -519,6 +535,36 @@ const cardLabel = (card) => {
   }
   .ft-mini {
     width: 24px;
+  }
+}
+
+/* 手机横屏/矮窗(高 ≤ 520px):牌桌优先让位,手牌与操作区必须完整可见(裁了就没法出牌)。
+   桌面矮窗同样适用——只是把牌桌压缩,不影响玩法。 */
+@media (max-height: 520px) {
+  .ft-root {
+    gap: 5px;
+  }
+  .ft-table {
+    flex: 1 1 140px;
+    min-height: 140px;
+  }
+  .ft-my-head {
+    min-height: 0;
+    font-size: 11px;
+  }
+  .ft-hand {
+    min-height: calc(var(--fc-card-w, 40px) * 1.15 + 10px);
+    padding: 10px 6px 0;
+  }
+  .ft-actions {
+    min-height: 28px;
+    gap: 6px;
+  }
+  .ft-center {
+    font-size: 12px;
+  }
+  .ft-seat {
+    padding: 2px 5px;
   }
 }
 </style>

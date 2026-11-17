@@ -20,12 +20,13 @@
 
     <!-- 子页面:顶部返回栏 + router-view(页面切换带方向感的淡入) -->
     <template v-else>
-      <MobileHeader :title="pageTitle">
+      <!-- 游戏沉浸态:页头与底栏全部收起,整屏交给游戏;返回键由左上角浮动按钮提供 -->
+      <MobileHeader v-if="!isGameRoute" :title="pageTitle">
         <template #right>
           <slot name="header-right" />
         </template>
       </MobileHeader>
-      <div class="mobile-sub-content">
+      <div class="mobile-sub-content" :class="{ 'is-game-stage': isGameRoute }">
         <router-view v-slot="{ Component, route: childRoute }">
           <Transition :name="childRoute.meta.transition || 'mobile-page'" mode="out-in">
             <component :is="Component" :key="childRoute.path" />
@@ -34,9 +35,11 @@
       </div>
     </template>
 
-    <!-- 底部导航:五格可自定义,站内页面常驻(沉浸页与登录页除外) -->
+    <!-- 底部导航:五格可自定义,站内页面常驻(沉浸页/游戏/登录页除外) -->
     <MobileTabBar v-if="showTabBar" :items="tabs" :active-code="activeCode" :capturing="capturing" @pick="onTabPick" @edit="openEditor" />
     <MobileTabEditor v-model="editorOpen" />
+
+    <MobileGameChrome v-if="isGameRoute" @back="exitGame" />
 
     <BackToTop />
     <InstallPrompt />
@@ -45,20 +48,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, provide, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import MobileTabBar from '@/components/MobileTabBar.vue'
 import MobileTabEditor from '@/components/MobileTabEditor.vue'
 import MobileHeader from '@/components/MobileHeader.vue'
+import MobileGameChrome from '@/components/games/MobileGameChrome.vue'
 import MobileHomeFeed from '@/components/MobileHomeFeed.vue'
 import MobileMoreGrid from '@/components/MobileMoreGrid.vue'
 import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
-import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
+import { isMobileGamePath, isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
+import { isNativeApp } from '@/utils/platform'
+import { useDevice } from '@/composables/useDevice'
+import { GAME_EXIT_KEY, createGameExitRegistry } from '@/composables/useGameExit'
 import { isMobileTabActive } from '@/utils/mobileTabs'
 import { quickCapture, resetQuickAlbumCache } from '@/utils/quickCapture'
 import { resetPrefCache } from '@/utils/userPref'
@@ -71,6 +78,8 @@ const router = useRouter()
 const { t } = useI18n()
 const floatsStore = useFloatsStore()
 const userStore = useUserStore()
+// 只有真手机(判据在 useDevice)才自动进浏览器全屏:窄窗桌面端不抢窗口
+const { isPhone } = useDevice()
 const activeTab = ref('home')
 
 const { tabs, editorOpen, openEditor, ensureSynced } = useMobileTabs()
@@ -175,9 +184,85 @@ const onTouchEnd = (e) => {
 // 首页判据与页头标题键都在 utils/mobileNav.js(纯函数,带单测);路由把 '/' 重定向到 '/home',两者都要认
 const isHomeRoute = computed(() => isMobileHomePath(route.path))
 
+// 游戏沉浸态:进游戏就收起页头/底栏,整屏让给游戏;判据是纯函数(utils/mobileNav.js)
+const isGameRoute = computed(() => isMobileGamePath(route.path))
+
 // 沉浸页(阅读器/游戏等)与登录类页面不挂底栏:这些页面需要整屏或本就无站内导航
 const HIDE_TABBAR_PATHS = ['/login', '/reset-password']
-const showTabBar = computed(() => !route.meta.immersive && !HIDE_TABBAR_PATHS.includes(route.path))
+const showTabBar = computed(() => !route.meta.immersive && !isGameRoute.value && !HIDE_TABBAR_PATHS.includes(route.path))
+
+// 房间局(飞行棋等)退出前要退房/结束房间:页面注册自己的退出逻辑,浮动返回键优先走它
+const gameExit = createGameExitRegistry()
+provide(GAME_EXIT_KEY, gameExit.provideValue)
+
+/** 原生壳:游戏期间隐藏系统状态栏(Web 端由浏览器全屏接管) */
+async function applyNativeStatusBar(hidden) {
+  if (!isNativeApp()) return
+  try {
+    const m = await import('@/native/statusBar')
+    await m.setStatusBarHidden(hidden)
+  } catch (e) {
+    console.warn('[game] 状态栏切换失败', e)
+  }
+}
+
+const canUseBrowserFullscreen = () => !isNativeApp() && typeof document?.documentElement?.requestFullscreen === 'function'
+
+/**
+ * 手机浏览器进游戏:直接吃掉地址栏与系统状态栏,整块屏幕交给游戏。
+ * 浏览器只认用户手势,从游戏卡点进来时成功;直达深链/浏览器返回时会被拒绝,静默保持窗口态,
+ * 左上角的浮动全屏按钮仍可手动补一次。
+ */
+async function enterGameFullscreen() {
+  if (!isPhone.value || document.fullscreenElement || !canUseBrowserFullscreen()) return
+  try {
+    await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+  } catch {
+    // iOS Safari 不支持 / 没有用户手势:保持窗口态,不影响继续玩
+  }
+}
+
+/** 离开游戏:不管走浮动返回还是系统返回手势,都要把全屏收掉,否则整站会留在全屏里 */
+function exitGameFullscreen() {
+  if (!document.fullscreenElement) return
+  document.exitFullscreen?.().catch(() => {})
+}
+
+/** 进出游戏时同步 html 根类:main.css 据此收起外壳、让页面占满视口 */
+function applyGameMode(on) {
+  document.documentElement.classList.toggle('game-mobile-immersive', on)
+  applyNativeStatusBar(on)
+  if (on) {
+    window.scrollTo(0, 0)
+    enterGameFullscreen()
+  } else {
+    exitGameFullscreen()
+  }
+}
+
+/** 左上角浮动返回:优先页面注册的退出逻辑,否则回到访问前的页面(直达深链回游戏列表) */
+async function exitGame() {
+  if (document.fullscreenElement) {
+    try {
+      await document.exitFullscreen?.()
+    } catch {
+      // 退出全屏失败不阻塞返回
+    }
+  }
+  if (gameExit.hasHandler()) {
+    gameExit.run()
+    return
+  }
+  if (window.history.state && window.history.state.back != null) router.back()
+  else router.push('/games')
+}
+
+watch(isGameRoute, applyGameMode, { immediate: true })
+
+onBeforeUnmount(() => {
+  applyGameMode(false)
+  gameExit.reset()
+})
 
 // 当前高亮:首页看三 Tab,子页面按路由前缀匹配(详情页也点亮所属入口)
 const activeCode = computed(() => {
@@ -268,6 +353,13 @@ onMounted(ensureSynced)
 .mobile-sub-content {
   padding-top: calc(48px + env(safe-area-inset-top, 0px));
   min-height: 100vh;
+}
+/* 游戏沉浸态:撤掉页头占位,整屏交给游戏(安全区由游戏页自身内边距处理) */
+.mobile-sub-content.is-game-stage {
+  padding: 0;
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
 }
 /* 子页面也常驻底栏:留出与首页同一份高度,避免最后一行被加号挡住 */
 .has-tabbar .mobile-sub-content {

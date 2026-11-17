@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isMobileHomePath, mobileHeaderTitleKey } from './mobileNav'
+import { isMobileGamePath, isMobileHomePath, mobileHeaderTitleKey } from './mobileNav'
 
 // 回归:经典首页由 '/' 迁到 '/home' 后,移动三 Tab 判据一度仍只认 '/',导致移动端渲染桌面首页且无底部 TabBar
 describe('isMobileHomePath', () => {
@@ -11,6 +11,42 @@ describe('isMobileHomePath', () => {
   it('子页面不算首页(否则子页面会被塞进 TabBar 外壳)', () => {
     for (const p of ['/blog', '/help', '/tools', '/home/extra', '/diary/book/2']) {
       expect(isMobileHomePath(p)).toBe(false)
+    }
+  })
+})
+
+describe('isMobileGamePath', () => {
+  it('正在玩的路由进入沉浸态(收起页头/底栏)', () => {
+    for (const p of [
+      '/games/petlink',
+      '/games/sudoku',
+      '/games/2048',
+      '/games/minesweeper',
+      '/games/cards',
+      '/games/cards/klondike',
+      '/games/tetris',
+      '/games/snake',
+      '/games/snake/match/9',
+      '/games/mahjong',
+      '/games/mahjong3d',
+      '/games/ludo',
+      '/games/doudizhu',
+      '/games/guandan',
+      '/games/baohuang',
+      '/games/gouji',
+      '/games/play/12',
+      '/games/web/12',
+      '/games/embed/2048',
+      '/tools/gba',
+      '/tools/flash',
+    ]) {
+      expect(isMobileGamePath(p), p).toBe(true)
+    }
+  })
+
+  it('大厅/房间/对战详情/桌面游戏信息页保留正常外壳', () => {
+    for (const p of ['/games', '/games/room/3', '/games/match/3', '/games/match', '/tools', '/tools/color', '/home', '']) {
+      expect(isMobileGamePath(p), p).toBe(false)
     }
   })
 })
