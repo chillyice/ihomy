@@ -157,12 +157,23 @@ public class HealthIngestService {
                 .mapToInt(list -> HealthSleepAggregator.aggregate(list).size()).sum();
         checkDailyCap(userId, rows.size() + sessionCount);
 
+        // 同一成员的重算串行化:两路上报同时到达时「整窗删 + 重插」会互相踩(计划 §4.4)
+        String lockKey = "ihomy:health:lock:" + userId;
+        String lockVal = String.valueOf(System.nanoTime());
+        if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, lockVal, java.time.Duration.ofSeconds(60)))) {
+            throw new BizException(ResultCode.TOO_MANY_REQUESTS, "上一次上报还在处理,请稍后重试");
+        }
         int duplicated = 0;
-        if (!rows.isEmpty()) sampleMapper.upsertBatch(rows);
+        try {
+            if (!rows.isEmpty()) sampleMapper.upsertBatch(rows);
 
-        for (Map.Entry<String, List<HealthSleepAggregator.Interval>> e : byApp.entrySet()) {
-            duplicated += rebuildSleep(userId, familyId, provider, offset,
-                    e.getKey(), appSource.get(e.getKey()), e.getValue(), futureLimit);
+            for (Map.Entry<String, List<HealthSleepAggregator.Interval>> e : byApp.entrySet()) {
+                duplicated += rebuildSleep(userId, familyId, provider, offset,
+                        e.getKey(), appSource.get(e.getKey()), e.getValue(), futureLimit);
+            }
+        } finally {
+            // 只释放自己拿到的锁,避免把别人的重算解锁
+            if (lockVal.equals(redis.opsForValue().get(lockKey))) redis.delete(lockKey);
         }
 
         if (tokenId != null) tokenService.markIngest(tokenId);
