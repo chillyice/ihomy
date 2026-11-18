@@ -2,6 +2,7 @@ package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.BizException;
+import com.ihomy.common.HealthIngestJson;
 import com.ihomy.common.Ips;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -55,13 +56,17 @@ public class HealthDataController {
     private final HealthQueryService queryService;
     private final HealthPrivacyService privacyService;
     private final SecurityHelper securityHelper;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     // ==================== 上报 ====================
 
     @Operation(summary = "统一上报健康数据(令牌或本人登录态;单次 ≤2000 条)")
     @PostMapping("/ingest")
-    public Result<Map<String, Object>> ingest(@RequestBody HealthIngestDTO dto, HttpServletRequest request) {
+    public Result<Map<String, Object>> ingest(@RequestBody(required = false) String raw, HttpServletRequest request) {
         LoginUser user = requireLogin();
+        // 请求体按原文接收:快捷指令/安卓插件都可能用 text/plain 或干脆不带 Content-Type,
+        // 也兼容把整段 JSON 贴成 {"": "<json>"} 的写法
+        HealthIngestDTO dto = HealthIngestJson.parse(objectMapper, raw);
         Long tokenId = (Long) request.getAttribute(HealthTokenFilter.TOKEN_ID_ATTR);
         String tokenPrefix = (String) request.getAttribute(HealthTokenFilter.TOKEN_PREFIX_ATTR);
         return Result.success(ingestService.ingest(dto, user.getUserId(), user.getFamilyId(),

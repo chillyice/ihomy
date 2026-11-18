@@ -64,7 +64,7 @@ public class HealthIngestService {
 
         String provider = dto.getProvider() == null ? "" : dto.getProvider().trim().toUpperCase(Locale.ROOT);
         if (!HealthMetric.PROVIDERS.contains(provider)) {
-            throw new BizException(ResultCode.BAD_REQUEST, "不支持的上报来源");
+            throw new BizException(ResultCode.BAD_REQUEST, "没认出这批数据的来源,请照帮助页里的请求体原样发送");
         }
         ZoneOffset offset = HealthTime.parseOffset(dto.getTimezone());
         if (offset == null) {

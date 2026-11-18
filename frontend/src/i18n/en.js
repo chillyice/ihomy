@@ -3131,7 +3131,8 @@ export default {
       tplStep1: 'Create a Shortcut and add "Find Health Samples" for each item you want to sync (sleep, steps, heart rate…).',
       tplStep2:
         'Add "Get Contents of URL": use the upload address above, method POST, and an Authorization header with Bearer plus your token.',
-      tplStep3: 'Set the request body to JSON and follow the template below: sleep as stage intervals, other metrics per day or per hour.',
+      tplStep3:
+        'Pick File for the request body and choose the template text (or pick JSON and paste the whole thing); follow the template: sleep as stage intervals, other metrics per day or per hour.',
       tplStep4: 'Automate it daily; once "Last ingest" on this page shows a non-zero accepted count, it works.',
       tplBodyLabel: 'Request body example (replace dates and values with Shortcut variables)',
       tplBodyNote:
@@ -6635,7 +6636,7 @@ export default {
         'Add a Text action and paste the body below, changing the dates and numbers to your own first.',
         'Add a Get Contents of URL action: the upload address as the URL, POST as the method.',
         'Add one header named Authorization whose value is Bearer, one space, then your hk_ key.',
-        'Set the request body to JSON with that text as the content; run it once by hand and success in the reply means it works.',
+        'Pick File for the request body and choose that text (if there is no File option, pick JSON and paste the whole thing); run it once by hand and success in the reply means it works.',
       ],
       bodyLabel: 'Fill the request body like this',
       copy: 'Copy',
