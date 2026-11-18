@@ -477,6 +477,25 @@ html.theme-warm .gc-pin .fp-topbar {
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
+/* 可点击芯片(如 2048 的分数/最高分):点一下生成分享图 */
+.gh-chip.is-shareable {
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.12s ease;
+}
+.gh-chip.is-shareable:hover {
+  border-color: rgba(var(--color-brand-rgb), 0.55);
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
+.gh-chip.is-shareable:active {
+  transform: scale(0.97);
+}
+.gh-chip.is-shareable:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
 .gh-rules-panel {
   padding: 8px 16px 12px;
   border-top: 1px dashed var(--color-border);
@@ -536,6 +555,337 @@ html.game-wide .page.game-page {
   -webkit-touch-callout: default;
 }
 
+/* ===== 统一游戏外壳(GameShell.vue,插槽内容跨作用域,样式必须全局;规范见 UI §43)=====
+ * 三段式:头部行(返回 | 标题 | …… | 全屏 宽屏 规则)→ 控件行(设置 | 数据芯片 | 按钮)
+ * → 游戏区。页面本体透明,直接透出内容页底板,不再套圆角外框;
+ * 风格色只走 --gs-accent(主色)与 --gs-bg(整页底色,必须同时给 dark 档)。
+ * 游戏区实测宽高由外壳写成 --gs-w / --gs-h,棋盘尺寸按它们推导,不再写 calc(100dvh - Npx)。 */
+.page.game-shell {
+  --gs-pad: 12px;
+  --gs-gap: 8px;
+  --gs-head-h: 44px;
+  --gs-control-h: 32px;
+  --gs-radius: 10px;
+  --gs-accent: var(--color-brand);
+  --gs-bg: transparent;
+  max-width: none;
+  padding: var(--gs-pad);
+  background: var(--gs-bg);
+}
+/* 暖居主题把内容页的上/左右内边距清零(留白交给 gc-main 一层),游戏外壳必须保留自己四周的一圈,
+   否则头部与棋盘会贴到容器边缘;这里显式压过 `html.theme-warm .page`,任何主题档 --gs-pad 都生效 */
+html.theme-warm .page.game-shell {
+  padding: var(--gs-pad);
+}
+/* 信息栏 = 头 + 规则面板 + 控件行 + 房间条。竖屏时它就是页面顶部的一摞(段间距由各段自己的 padding 给),
+   横屏时整块挪到左列,游戏区独占右侧(见下面的横屏档) */
+.gs-rail {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 风格色:游戏在自己的 scoped 样式里覆盖 --gs-accent 一处即可让主色按钮/选中态跟着变;
+   EP 的浅色档按 --gs-accent 混出来(不支持 color-mix 的老浏览器保留 EP 默认档) */
+.page.game-shell {
+  --el-color-primary: var(--gs-accent);
+  --el-color-primary-light-3: color-mix(in srgb, var(--gs-accent) 70%, var(--color-card));
+  --el-color-primary-light-5: color-mix(in srgb, var(--gs-accent) 50%, var(--color-card));
+  --el-color-primary-light-7: color-mix(in srgb, var(--gs-accent) 30%, var(--color-card));
+  --el-color-primary-light-8: color-mix(in srgb, var(--gs-accent) 20%, var(--color-card));
+  --el-color-primary-light-9: color-mix(in srgb, var(--gs-accent) 10%, var(--color-card));
+  --el-color-primary-dark-2: color-mix(in srgb, var(--gs-accent) 80%, #000);
+}
+.page.game-shell:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  justify-content: flex-start;
+  padding: var(--gs-pad);
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* --- 头部行 --- */
+.gs-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--gs-gap);
+  min-height: var(--gs-head-h);
+  padding-bottom: 6px;
+  min-width: 0;
+}
+.gs-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.gs-end {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.gs-head .el-button {
+  height: var(--gs-control-h);
+  padding: 0 12px;
+  border-radius: var(--gs-radius);
+  font-size: 13px;
+}
+.gs-head .gs-icon-btn {
+  width: var(--gs-control-h);
+  padding: 0;
+}
+.gs-head .gs-icon-btn.rounded {
+  border-radius: 999px;
+}
+
+/* --- 控件行:选择框与按钮同高同圆角,设置靠左、芯片与按钮靠右 --- */
+.gs-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gs-gap);
+  padding-bottom: var(--gs-gap);
+  min-width: 0;
+}
+.gs-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gs-gap);
+  min-width: 0;
+}
+.gs-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.gs-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--gs-gap);
+  min-width: 0;
+}
+.gs-controls .el-button {
+  height: var(--gs-control-h);
+  padding: 0 12px;
+  border-radius: var(--gs-radius);
+  font-size: 13px;
+}
+/* 头部/控件行的按钮统一成外壳规格:通用 `.el-button` 的 34px(0,3,0)与移动端触控下限
+   44px(0,4,0)都会把一排控件顶成两行,这里用 0,5,0 稳超两者,不依赖书写顺序 */
+.page.game-shell :is(.gs-head, .gs-controls) .el-button:not(.is-link) {
+  height: var(--gs-control-h);
+  min-height: var(--gs-control-h);
+  padding: 0 12px;
+  border-radius: var(--gs-radius) !important;
+  font-size: 13px;
+}
+/* 数据芯片与选择框/按钮同高,避免一行三种高度 */
+.page.game-shell .gs-stats .gh-chip {
+  align-items: center;
+  height: var(--gs-control-h);
+  padding-block: 0;
+}
+.gs-controls .el-select {
+  width: auto;
+}
+.gs-controls .el-select__wrapper {
+  min-height: var(--gs-control-h);
+  height: var(--gs-control-h);
+  font-size: 13px;
+}
+.gs-controls .el-radio-group .el-radio-button__inner {
+  height: var(--gs-control-h);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* --- 规则面板(默认收起,替代各页常驻的说明条) --- */
+.gs-rules-panel {
+  flex: 0 0 auto;
+  padding: 2px 2px 10px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.gs-rules-panel p {
+  margin: 2px 0;
+}
+.gs-rules-panel ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.gs-rules-panel li {
+  margin: 3px 0;
+}
+
+/* --- 附加区(房间条/对战横幅)与游戏区 --- */
+.gs-extras,
+.gs-footer {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+/* 游戏区是尺寸容器:棋盘/画板按 100cqw / 100cqh 直接取「游戏区实际盒」,
+   视口一变当帧就正确,不依赖 JS 测量时机(这是 --gs-h 曾经滞后一档的根因)。
+   --gs-w / --gs-h 仍然由外壳写入,只给需要像素值的 JS 消费者(three.js / canvas)用。 */
+.gs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+}
+.gs-body.is-center {
+  align-items: center;
+  justify-content: center;
+}
+.gs-body.is-stretch {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.gs-body.is-start {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* --- 紧凑档:手机竖/窄窗(返回与规则只留图标)--- */
+@media (max-width: 768px) {
+  .page.game-shell {
+    --gs-pad: 10px;
+    --gs-head-h: 40px;
+    --gs-control-h: 30px;
+  }
+  .gs-title {
+    font-size: 15px;
+  }
+  .gs-back-label,
+  .gs-rules-label {
+    display: none;
+  }
+  .gs-head .el-button,
+  .gs-controls .el-button {
+    padding: 0 10px;
+  }
+  .page.game-shell :is(.gs-head, .gs-controls) .el-button:not(.is-link) {
+    padding: 0 10px;
+  }
+  .gs-head .gs-icon-btn {
+    padding: 0;
+  }
+}
+
+/* --- 矮档:手机横屏/矮窗口(优先让出高度给棋盘)--- */
+@media (max-height: 520px) {
+  .page.game-shell {
+    --gs-pad: 8px;
+    --gs-head-h: 36px;
+    --gs-control-h: 28px;
+    --gs-gap: 6px;
+  }
+  .gs-head {
+    padding-bottom: 4px;
+  }
+  .gs-controls {
+    padding-bottom: 4px;
+  }
+  .gs-title {
+    font-size: 14px;
+  }
+  .gs-head .el-button,
+  .gs-controls .el-button {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .page.game-shell :is(.gs-head, .gs-controls) .el-button:not(.is-link) {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .gs-head .gs-icon-btn {
+    padding: 0;
+  }
+}
+
+/* 外壳自己提供返回键:移动端浮动返回/全屏浮层在本路由退场 */
+html.game-shell .mobile-game-chrome {
+  display: none !important;
+}
+
+/* --- 横屏矮屏(手机横屏):信息栏挪到左列,游戏区独占右侧 ---
+ * 竖排时头部与控件各占一行,横屏一行只剩一两百像素给棋盘,左右大片宽度空着。
+ * 改成两栏后:左列 = 返回/标题/图标 + 规则 + 选择框 + 数据芯片 + 按钮(竖排靠左),
+ * 右列 = 游戏区按高度铺满。门槛与上面的矮屏档一致(横屏 + max-height:520px),
+ * 平板横屏(高 820)、电脑横屏(高 900)仍是上下一行式布局。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .page.game-shell {
+    --gs-rail-w: min(38%, 240px);
+    display: grid;
+    grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rail body'
+      'rail footer';
+    column-gap: var(--gs-gap);
+    align-items: stretch;
+  }
+  .gs-rail {
+    grid-area: rail;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .gs-body {
+    grid-area: body;
+  }
+  .gs-footer {
+    grid-area: footer;
+  }
+  /* 头一行放不下「全屏 宽屏 规则」时,图标落到第二行而不是把标题挤没 */
+  .gs-head {
+    flex-wrap: wrap;
+    align-content: flex-start;
+  }
+  .gs-head .gs-title {
+    flex: 1 1 auto;
+  }
+  /* 控件竖排:选择框一行、数据芯片一行、按钮一行,统一靠左 */
+  .gs-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .gs-controls .gs-settings,
+  .gs-controls .gs-end {
+    width: 100%;
+  }
+  .gs-controls .gs-end {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  .gs-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* ===== 手机游戏沉浸态(MobileLayout 在游戏路由挂 html.game-mobile-immersive)=====
  * 页头/底栏/页脚全部收起,游戏页吃满整个可视化视口;返回键只留左上角一个浮动按钮,
  * 游戏自己的工具栏改成右上角悬浮图标,不再单独占一行。 */
@@ -576,6 +926,13 @@ html.game-mobile-immersive .mobile-sub-content .page {
   padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
     env(safe-area-inset-left, 0px) !important;
   overflow: hidden;
+}
+/* 统一外壳页自己带内边距:上面那条把内边距压成只剩安全区,棋盘/按钮会贴到屏幕边缘,
+   这里把外壳的 --gs-pad 叠在安全区之外(安全区本身仍保留,横屏刘海不被盖住) */
+html.game-mobile-immersive .mobile-sub-content .page.game-shell {
+  padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--gs-pad))
+    calc(env(safe-area-inset-right, 0px) + var(--gs-pad)) calc(env(safe-area-inset-bottom, 0px) + var(--gs-pad))
+    calc(env(safe-area-inset-left, 0px) + var(--gs-pad)) !important;
 }
 html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
   overflow: hidden;

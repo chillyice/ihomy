@@ -1014,6 +1014,19 @@ export default {
   games: {
     title: 'Games',
     rulesLabel: 'Rules',
+    share: {
+      dialogTitle: 'Share your score',
+      hint: 'Send this card to the family, or keep it as a keepsake',
+      save: 'Save image',
+      copy: 'Copy image',
+      share: 'Share',
+      saved: 'Image saved',
+      copied: 'Image copied — paste it anywhere',
+      copyUnsupported: 'This browser cannot copy images — use "Save image" instead',
+      failed: 'The image could not be created, please try again',
+      footer: 'from ihomy family games',
+      chipHint: 'Tap to create a share card',
+    },
     embedded: {
       xiangqi: { title: 'Chinese Chess', desc: 'Cross the river and outplay the computer, three difficulty levels' },
       reversi: { title: 'Reversi', desc: 'Sandwich discs to flip them; whoever holds more at the end wins' },

@@ -990,6 +990,21 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 5. **列表留白**:暖居主题物品列表 `html.theme-warm .fp-list` padding 24px,≤768px 收到 16px;其余页面沿用 `.page` 标尺,不在页面容器里再叠一层 padding。
 6. **批量操作文案**:跨类型选中时按钮文案区分实际动作(如映射相册显示「解除映射」),确认框给出数量;一次操作完成即退出选择态,不做持久记忆。
 
+## 43. 小游戏统一外壳(GameShell)
+
+2026-11-18 起,全部自研小游戏页与本地化的开源小游戏统一用 `components/games/GameShell.vue` 承载,**一页只填插槽**;外壳样式唯一来源是 `main.css` 的「统一游戏外壳」段(插槽内容跨作用域,scoped 管不到)。守门 `views/games/gameShellAdoption.spec.js`。
+
+1. **结构**:`.page.game-shell` 竖排 = `.gs-head`(一行头部)+ `.gs-rules-panel`(规则折叠)+ `.gs-controls`(一行控件)+ `.gs-extras`(房间条/对战横幅)+ `.gs-body.game-surface`(吃满剩余高度)+ `.gs-footer`。插槽:default=游戏区内容,`head`(标题行右侧附加)/`settings`/`stats`/`actions`/`rules`/`extras`/`footer`;`emits: back`;expose `pageEl/bodyEl/isFullscreen/isWide/toggleFullscreen/toggleWide/refit`。
+2. **头部一行**:`[← 返回] 标题 …… [全屏][宽屏][规则]` —— **返回不再独占一行,也不再用浮动圆钮**(外壳挂载时给 `<html>` 加 `game-shell`,`html.game-shell .mobile-game-chrome{display:none}`)。标题 17px/700 单行省略(带对局状态时由页面拼成「2048 · 一起玩」);`≤768px` 返回与规则只留图标(`.gs-back-label`/`.gs-rules-label` 隐藏),标题 15px。全屏/宽屏/规则三键在手机上也保留:它们宽 30px,不占额外行。
+3. **控件行**:`高 32px / 圆角 10px / 字号 13px / 间距 8px`,矮屏(`max-height:520px`)降 28px、间距 6px。左 `settings`(选择框 `width:auto`,`:teleported="!isFullscreen"`),右侧 `stats` 数据芯片 + `actions` 按钮常右对齐(`.gs-end{margin-left:auto}`),换行后仍靠右。**选择框与按钮同高同圆角同字号**,别在页面里再改尺寸。`actions` 内顺序:次操作(撤销/重开)在左,**主操作(开新局/开始)最右**。
+4. **底板**:页面本体 `background: transparent`,直接透出内容页底板(html 底色 + SunLightLayer),**不再套一层圆角卡片**。风格化只允许两件:`--gs-accent`(主色,自动映射 `--el-color-primary*` 系列,Element Plus 控件跟着变)与 `--gs-bg`(叠一层 rgba 渐变,**必须同时写 `html.dark` 档**)。禁止改 `--color-bg`、禁止整页写死配色(守门 `themeTokens.spec.js`)。
+5. **游戏区尺寸**:`.gs-body{flex:1;min-height:0;overflow:hidden;container-type:size}` —— 它是**尺寸容器**,棋盘/牌桌直接按 `100cqw`/`100cqh` 推导(`width: min(100%, 100cqh, 760px)` + `aspect-ratio`),视口一变当帧就对,**不依赖 JS 测量时机**。外壳仍用 `ResizeObserver` 把实测尺寸写成 `--gs-w/--gs-h`,但那只给必须拿像素值的 JS 消费者(three.js / canvas)用。**禁写 `calc(100dvh - Npx)` 这类按外壳猜的魔法数**,**禁整块 `transform: scale()`**(文字发虚、手势错位;`useGameView` 传 `scale: false`)。放不下先缩格子,不缩整块。`bodyAlign`:center(棋盘居中)/stretch(画板吃满)/start(顶部对齐)。
+6. **六视口**:手机竖 390×844、手机横 844×390、平板竖 820×1180、平板横 1180×820、电脑横 1440×900、电脑竖 900×1440 都要可用。全屏目标 = 整页(头部与控件在全屏里仍可点)。**四周留白一律走 `--gs-pad`(默认 12px,`≤768px` 10px,`max-height:520px` 8px),棋盘与头部都不许贴容器边缘**;沉浸态 = 安全区 + `--gs-pad`(`var(--safe-area-inset-top, env(safe-area-inset-top))` 口径同 §40)。注意暖居主题有 `html.theme-warm .page{padding-top/left/right:0}`,外壳已用 `html.theme-warm .page.game-shell` 显式压回,页面别再自己写 padding。
+6b. **手机横屏 = 左信息栏 + 右游戏区**(`@media (orientation:landscape) and (max-height:520px)`):头/规则/控件/房间条打包在 `.gs-rail` 里整块挪到左侧(`min(38%,240px)`),`<header>` 与控件行改竖排(选择框一行、芯片一行、按钮一行,统一靠左),`.gs-body` 用 grid 占右列吃满高度。**页面不要为此写任何额外样式**,棋盘照旧按 `100cqh` 推导就会自然变大(767×390 实测 290→358)。平板横屏(820 高)与电脑横屏(900 高)不进入该档,仍是上下一行式。
+7. **公共能力入壳,页面不再各写一份**:返回/标题/规则折叠/全屏/宽屏/手柄标签(`useGamepad`→`gamepadConnected`)/一屏适配(`useGameView` with `fit`)/触摸守卫(`.game-surface`)/`--room-bar-h` 口径。页面可传 `fit:false` 与 `readable` 自行管高度(牌桌类),但头部与控件行仍走外壳。
+8. **迁移与本地化**:自研页逐局迁到 GameShell;`/games/embed/*` 的单文件开源游戏(象棋/黑白棋/消消乐/泡泡龙)本地化为 `views/games/embedded/<Name>Game.vue` —— 原 `h1`→`title`、`.toolbar`→`settings`+`actions`、`.tip`→`rules`、原 `<style>` 加 scoped 且 `body{}` 规则迁到组件根类、`document`/`window` 监听收进 `onMounted/onBeforeUnmount`、canvas 尺寸改读 `--gs-h`,**玩法逻辑逐字保留**;wasm 弹球与 trex 继续 iframe(`WebGame.vue`)。文件头保留 `Based on litegame-hub (MIT © 2026 DongGuoTao), localized as a Vue component`。
+9. **战绩分享图**:数据芯片(`.gh-chip`)可点击时加 `is-shareable` + `v-a11y-click`,点开 `components/games/GameScoreShare.vue` —— 版式与绘制在 `utils/games/scoreCard.js`(纯布局函数 + Canvas 2D,1080×1350 竖版:标题/日期/正方形棋盘/数据块/页脚),**颜色一律从主题变量读出后传入**(Canvas 读不到样式表),所以暖居/深色下生成的图和界面同一套配色;出口三件:保存图片 / 复制图片 / 系统分享(壳内走 Capacitor `shareBlob`)。**页面级弹窗放 `#overlay` 插槽**(即 `.gs-rail` 内),不要放进游戏区 —— `.gs-body` 是尺寸容器会把 `fixed` 定位困住;全屏时传 `:append-to-body="false"`(挂在 body 上的弹窗在全屏元素里看不见,这是 §27 的唯一例外)。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

@@ -1008,6 +1008,19 @@ export default {
   games: {
     title: '小游戏',
     rulesLabel: '规则',
+    share: {
+      dialogTitle: '分享战绩',
+      hint: '这张图可以直接发给家人，也可以存下来留念',
+      save: '保存图片',
+      copy: '复制图片',
+      share: '分享',
+      saved: '图片已保存',
+      copied: '图片已复制，可以直接粘贴',
+      copyUnsupported: '当前浏览器不支持复制图片，可以改用「保存图片」',
+      failed: '图片没生成出来，请再试一次',
+      footer: '来自 ihomy 家庭小游戏',
+      chipHint: '点击生成分享图',
+    },
     embedded: {
       xiangqi: { title: '中国象棋', desc: '楚河汉界，与电脑对弈，三档难度可调' },
       reversi: { title: '黑白棋', desc: '夹住对方的棋子就能翻面，最后棋子多的一方获胜' },

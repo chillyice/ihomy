@@ -1,48 +1,29 @@
 <template>
-  <div ref="pageEl" class="page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
-
-    <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader
-        :title="'2048' + (matchId ? ' · ' + $t('games.match.tag') : play.active ? ' · ' + $t('games.room.together') : '')"
-        :fullscreen="isFullscreen"
-        @exit-fullscreen="toggleFullscreen"
+  <GameShell ref="shellEl" class="bf-shell" :title="title" body-align="center" @back="goBack">
+    <template #settings>
+      <el-select v-if="!matchId && !play.active" v-model="size" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
+        <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
+      </el-select>
+    </template>
+    <template #stats>
+      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        ><span>{{ $t('games.g2048.score') }}</span
+        ><b>{{ score }}</b></span
       >
-        <template #settings>
-          <el-select
-            v-if="!matchId && !play.active"
-            v-model="size"
-            size="small"
-            class="bf-size-select"
-            :teleported="!isFullscreen"
-            @change="switchSize"
-          >
-            <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
-          </el-select>
-        </template>
-        <template #stats>
-          <span class="gh-chip"
-            ><span>{{ $t('games.g2048.score') }}</span
-            ><b>{{ score }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.g2048.best') }}</span
-            ><b>{{ best }}</b></span
-          >
-        </template>
-        <template #actions>
-          <el-button v-if="!matchId" size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
-          <el-button v-if="!matchId && !play.active" size="small" round :disabled="!history.length" @click="undo">{{
-            $t('games.g2048.undo')
-          }}</el-button>
-        </template>
-        <template #rules>
-          <p>{{ $t('games.g2048.tip') }}</p>
-        </template>
-      </GameHeader>
+      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        ><span>{{ $t('games.g2048.best') }}</span
+        ><b>{{ best }}</b></span
+      >
+    </template>
+    <template #actions>
+      <el-button v-if="!matchId && !play.active" :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
+      <el-button v-if="!matchId" @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
+    </template>
+    <template #rules>
+      <p>{{ $t('games.g2048.tip') }}</p>
+    </template>
 
+    <template #extras>
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -61,7 +42,22 @@
         <span class="match-state">{{ matchStateText }}</span>
         <span v-if="matchResultText" class="match-result">{{ matchResultText }}</span>
       </div>
+    </template>
 
+    <template #overlay>
+      <GameScoreShare
+        v-model="shareOpen"
+        :title="title"
+        :stats="shareStats"
+        :tiles="tiles"
+        :grid-size="size"
+        :tile-color="tileColor"
+        :append-to-body="!isFullscreen"
+        file-base="ihomy-2048"
+      />
+    </template>
+
+    <div class="bf-stage" @contextmenu.prevent @dblclick.prevent>
       <div class="bf-board" :class="'bf-size-' + size" @touchstart="onTouchStart" @touchend="onTouchEnd">
         <div class="bf-playfield" :style="playfieldStyle">
           <div v-for="i in size * size" :key="i" class="bf-slot"></div>
@@ -90,15 +86,15 @@
             <div class="bf-overlay-meta">{{ $t('games.g2048.meta', { score }) }}</div>
             <div v-if="won && rewardMsg" class="bf-overlay-reward">{{ rewardMsg }}</div>
             <div class="bf-overlay-actions">
-              <el-button v-if="won" type="primary" size="small" round @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
-              <el-button v-if="won" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
-              <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+              <el-button v-if="won" type="primary" @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
+              <el-button v-if="won" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+              <el-button v-else type="primary" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
             </div>
           </div>
         </div>
       </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -111,11 +107,9 @@ import { useI18n } from 'vue-i18n'
 import { gameApi, matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import { useGameView } from '@/composables/useGameView'
+import GameScoreShare from '@/components/games/GameScoreShare.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
 import { seededRng } from '@/utils/games/seededRng'
@@ -182,9 +176,10 @@ const reportMatchScore = async () => {
 
 const MAX_HISTORY = 20
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+// 外壳自己管全屏/宽屏/一屏适配;页面只读它的状态(全屏时下拉要留在全屏元素内)
+const shellEl = ref(null)
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
+const title = computed(() => '2048' + (matchId.value ? ' · ' + t('games.match.tag') : play.active ? ' · ' + t('games.room.together') : ''))
 
 const size = ref(4)
 const tiles = ref([])
@@ -216,6 +211,31 @@ const playfieldStyle = computed(() => ({
   gridTemplateColumns: `repeat(${size.value}, 1fr)`,
   gridTemplateRows: `repeat(${size.value}, 1fr)`,
 }))
+
+// ---------- 战绩分享图(点分数/最高分触发) ----------
+const shareOpen = ref(false)
+const shareStats = computed(() => [
+  { label: t('games.g2048.score'), value: score.value },
+  { label: t('games.g2048.best'), value: best.value },
+])
+// Canvas 读不到样式表:分享图沿用棋盘的方块色板(与 .bf-tile-* 同一份色值)
+const TILE_PALETTE = {
+  2: ['#eee4da', '#776e65'],
+  4: ['#ede0c8', '#776e65'],
+  8: ['#f2b179', '#f9f6f2'],
+  16: ['#f59563', '#f9f6f2'],
+  32: ['#f67c5f', '#f9f6f2'],
+  64: ['#f65e3b', '#f9f6f2'],
+  128: ['#edcf72', '#f9f6f2'],
+  256: ['#edcc61', '#f9f6f2'],
+  512: ['#edc850', '#f9f6f2'],
+  1024: ['#edc53f', '#f9f6f2'],
+  2048: ['#edc22e', '#f9f6f2'],
+}
+const tileColor = (value) => {
+  const pair = TILE_PALETTE[value]
+  return pair ? { bg: pair[0], fg: pair[1] } : { bg: '#3c3a32', fg: '#f9f6f2' }
+}
 
 const tileStyle = (tile) => {
   const n = size.value
@@ -481,25 +501,18 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--color-brand-text);
 }
-.bf-card {
+/* 棋盘舞台:边长取「游戏区宽 / 游戏区高 / 上限」三者的最小值,再各让 8px,
+   棋盘不顶到游戏区边缘(宽高两个方向同时让,横竖屏都不会突然贴边);
+   外壳的 .gs-body 是尺寸容器,所以横竖屏/平板/电脑同一口径,不整体缩放也不留大片空白 */
+.bf-stage {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 16px 16px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-primary, #2b2b2b);
+  flex: 0 0 auto;
+  width: min(calc(100% - 16px), calc(100cqh - 16px), 760px);
+  aspect-ratio: 1;
   --bf-gap: clamp(6px, 2vw, 10px);
 }
-.bf-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding-top: 28px;
+.bf-shell:fullscreen .bf-stage {
+  width: min(calc(100% - 16px), calc(100cqh - 16px), 900px);
 }
 
 .bf-size-select {
@@ -507,8 +520,8 @@ onBeforeUnmount(() => {
 }
 
 .bf-board {
-  width: min(100%, 480px);
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   padding: var(--bf-gap);
   border-radius: 10px;
   background: var(--color-card-2);
@@ -516,9 +529,6 @@ onBeforeUnmount(() => {
   touch-action: none;
   user-select: none;
   contain: layout style;
-}
-.bf-card:fullscreen .bf-board {
-  width: min(74vh, 86vw);
 }
 .bf-playfield {
   position: relative;
@@ -649,7 +659,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(250, 248, 239, 0.72);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -687,11 +697,5 @@ onBeforeUnmount(() => {
 
 html.dark .bf-overlay {
   background: rgba(20, 20, 20, 0.72);
-}
-
-@media (max-width: 560px) {
-  .bf-card {
-    padding: 14px 10px;
-  }
 }
 </style>

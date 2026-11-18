@@ -221,3 +221,62 @@ export async function shareFiles(urls, title = '') {
   ElMessage.info(t('common.shareUnsupported'))
   return false
 }
+
+/** blob → base64(壳内 Filesystem.writeFile 只收 base64) */
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      resolve(result.slice(result.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+/**
+ * 分享内存里的图片(截图 / canvas 生成的分享图,没有可下载的 URL):
+ * 壳内写 Cache 后拉起系统面板,Web 交给 navigator.share;都不支持就退回保存到本地。
+ */
+export async function shareBlob(blob, filename = 'ihomy-share.png', title = '') {
+  if (!blob) return false
+  const name = filename || 'ihomy-share.png'
+  if (isNativeApp()) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      const { Share } = await import('@capacitor/share')
+      const data = await blobToBase64(blob)
+      await Filesystem.mkdir({ path: SHARE_DIR, directory: Directory.Cache, recursive: true }).catch(() => {})
+      const path = `${SHARE_DIR}/${Date.now()}-${name}`
+      const res = await Filesystem.writeFile({ path, data, directory: Directory.Cache })
+      await Share.share({ title, files: [res.uri], dialogTitle: t('common.share') })
+      return true
+    } catch (e) {
+      console.warn('[share] 图片分享失败', e)
+      ElMessage.error(t('common.shareFailed'))
+      return false
+    }
+  }
+  const file = new File([blob], name, { type: blob.type || 'image/png' })
+  if (typeof navigator !== 'undefined' && navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+    try {
+      await navigator.share({ files: [file], title })
+      return true
+    } catch (e) {
+      if (e?.name === 'AbortError') return false
+    }
+  }
+  // 不支持文件分享:退回下载(与「保存图片」同口径)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 4000)
+  ElMessage.info(t('common.shareUnsupported'))
+  return false
+}
