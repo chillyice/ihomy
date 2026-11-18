@@ -12,6 +12,9 @@ import top.ihomy.app.camera.CameraPlugin;
 import top.ihomy.app.diagnostics.CrashStore;
 import top.ihomy.app.diagnostics.DiagnosticsPlugin;
 import top.ihomy.app.haptics.HapticsPlugin;
+import top.ihomy.app.health.HealthDataPlugin;
+import top.ihomy.app.health.HealthPrefs;
+import top.ihomy.app.health.HealthSyncWorker;
 import top.ihomy.app.live.AppVisibility;
 import top.ihomy.app.photo.PhotoBackupPlugin;
 import top.ihomy.app.pip.PipPlugin;
@@ -58,11 +61,17 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PipPlugin.class);
         // 窗口底色:状态栏/手势条露出的底色跟页面走(targetSdk 36 上 setStatusBarColor 已失效)
         registerPlugin(WindowBarsPlugin.class);
+        // 健康数据:Health Connect 授权 + 读睡眠/活动/体征 → 上报本站(设置页里按组授权)
+        registerPlugin(HealthDataPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);
         // 闲时自动更新:周期任务在这里兜一次(插件 load 也会调,幂等);开关关着就撤排期
         AutoUpdateWorker.ensureScheduled(getApplicationContext());
+        // 健康数据每日同步:开关打开过才排期(WorkManager KEEP 幂等,重复调用不重排)
+        if (HealthPrefs.autoSync(getApplicationContext())) {
+            HealthSyncWorker.schedulePeriodic(getApplicationContext());
+        }
         // 壳内页面 origin 固定为 https://localhost,而接口与文件都在 https://ihomy.top:
         // 家庭私有照片/电子书/视频靠 ihomy_at cookie(后端对壳来源下发 SameSite=None)鉴权,
         // 不显式允许三方 cookie 时这些子资源会一律 403。

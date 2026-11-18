@@ -67,6 +67,43 @@
       </div>
     </div>
 
+    <div v-if="nativeSupported" class="card settings-card health-android">
+      <div class="section-label">{{ $t('settings.health.androidTitle') }}</div>
+      <div class="share-tip">{{ $t('settings.health.androidHint') }}</div>
+
+      <template v-if="native.available">
+        <div class="android-row">
+          <span class="result-label">{{ $t('settings.health.androidGroups') }}</span>
+          <div class="group-chips">
+            <el-tag v-for="g in groups" :key="g" size="small" :type="isGranted(g) ? 'success' : 'info'">
+              {{ groupText(g) }}
+            </el-tag>
+          </div>
+          <el-button size="small" :loading="authorizing" @click="authorize">{{ $t('settings.health.androidAuthorize') }}</el-button>
+        </div>
+
+        <div class="privacy-row">
+          <div class="privacy-text">
+            <div class="row-title">{{ $t('settings.health.androidAuto') }}</div>
+            <div class="share-tip">{{ $t('settings.health.androidAutoHint') }}</div>
+          </div>
+          <el-switch v-model="autoSync" :loading="savingAuto" @change="onAutoSyncChange" />
+        </div>
+
+        <div class="health-actions">
+          <el-button type="primary" :loading="syncing" @click="syncNow">{{ $t('settings.health.androidSyncNow') }}</el-button>
+          <span class="result-time">{{ lastSyncText }}</span>
+        </div>
+
+        <div v-if="syncResult" class="result-row">
+          <el-tag size="small" type="success">{{ $t('settings.health.accepted') }} {{ syncResult.accepted || 0 }}</el-tag>
+          <el-tag size="small" type="info">{{ $t('settings.health.duplicated') }} {{ syncResult.duplicated || 0 }}</el-tag>
+          <el-tag size="small" type="warning">{{ $t('settings.health.rejected') }} {{ syncResult.rejected || 0 }}</el-tag>
+        </div>
+      </template>
+      <div v-else class="share-tip android-missing">{{ $t('settings.health.androidUnavailable') }}</div>
+    </div>
+
     <div class="card settings-card health-privacy">
       <div class="section-label">{{ $t('settings.health.privacyTitle') }}</div>
 
@@ -122,6 +159,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { formatDateTime } from '@/utils/datetime'
+import { isAndroidApp } from '@/utils/platform'
 
 const { t } = useI18n()
 
@@ -147,6 +185,102 @@ const plainToken = ref('')
 const reproductive = ref(false)
 const clearSource = ref('SHORTCUT')
 const viewLogs = ref([])
+
+// 手机直连(仅 Android 壳):原生桥按需加载,Web 端不注册插件、不进首屏包
+let bridgeModule = null
+const nativeSupported = ref(false)
+const native = ref({ available: false, granted: [], last: null })
+const groups = ref([])
+const authorizing = ref(false)
+const syncing = ref(false)
+const savingAuto = ref(false)
+const autoSync = ref(false)
+const syncResult = ref(null)
+
+const loadBridge = async () => {
+  if (!bridgeModule) bridgeModule = await import('@/native/health')
+  return bridgeModule
+}
+
+const isGranted = (g) => (native.value.granted || []).includes(g)
+
+const groupText = (g) => {
+  const key = {
+    SLEEP: 'androidGroupSleep',
+    ACTIVITY: 'androidGroupActivity',
+    VITALS: 'androidGroupVitals',
+    BODY: 'androidGroupBody',
+  }[g]
+  return key ? t(`settings.health.${key}`) : g
+}
+
+const lastSyncText = computed(() => {
+  const last = native.value.last
+  if (!last || !last.at) return t('settings.health.androidNeverSync')
+  const when = formatDateTime(last.at)
+  return last.ok
+    ? `${t('settings.health.androidLastSync')} ${when}`
+    : `${t('settings.health.androidLastSync')} ${when} · ${last.message || ''}`
+})
+
+const loadNative = async () => {
+  nativeSupported.value = isAndroidApp()
+  if (!nativeSupported.value) return
+  const m = await loadBridge()
+  groups.value = m.HEALTH_GROUPS
+  try {
+    native.value = await m.healthNativeStatus()
+  } catch (e) {
+    native.value = { available: false, granted: [], last: null }
+  }
+  autoSync.value = !!(native.value.last && native.value.last.auto)
+}
+
+const authorize = async () => {
+  authorizing.value = true
+  try {
+    const m = await loadBridge()
+    await m.requestHealthPermissions(groups.value)
+    ElMessage.success(t('settings.health.androidAuthorized'))
+    await loadNative()
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.saveFailed'))
+  } finally {
+    authorizing.value = false
+  }
+}
+
+/** 首次会回填 90 天,之后只补上次成功点之后的窗口(原生侧决定,这里只给上限) */
+const syncNow = async () => {
+  syncing.value = true
+  try {
+    const m = await loadBridge()
+    syncResult.value = await m.syncHealthNow({ days: 90 })
+    ElMessage.success(t('settings.health.androidSyncDone', { accepted: syncResult.value.accepted || 0 }))
+    await loadNative()
+  } catch (e) {
+    ElMessage.error(t('settings.health.androidSyncFailed', { message: e?.message || '' }))
+  } finally {
+    syncing.value = false
+  }
+}
+
+const onAutoSyncChange = async (on) => {
+  savingAuto.value = true
+  try {
+    const m = await loadBridge()
+    await m.setHealthAutoSync(on)
+    ElMessage.success(t(on ? 'settings.health.androidAutoOn' : 'settings.health.androidAutoOff'))
+    // 开启时会新生成一把长期令牌,刷新列表让它立刻可见
+    if (on) await load()
+    await loadNative()
+  } catch (e) {
+    autoSync.value = !on
+    ElMessage.error(e?.message || t('common.saveFailed'))
+  } finally {
+    savingAuto.value = false
+  }
+}
 
 // 上传地址按当前站点域名拼,内嵌壳与局域网访问都对得上
 const endpoint = computed(() => `${window.location.origin}/api/health/ingest`)
@@ -297,12 +431,31 @@ const loadViewLog = async () => {
 onMounted(() => {
   load()
   loadConsent()
+  loadNative()
 })
 </script>
 
 <style scoped>
 .health-privacy {
   margin-top: 16px;
+}
+.health-android {
+  margin-top: 16px;
+}
+.android-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.android-missing {
+  margin-top: 10px;
 }
 .health-endpoint {
   display: flex;

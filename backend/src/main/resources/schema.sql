@@ -849,6 +849,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('library','书架',     'icon-library','/library','content',  'left',  20, 1),
 ('games',  '小游戏', 'icon-games',   '/games',  'content',  'left',  21, 1);
 -- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
+-- health(V12.89):生活组排在保险箱(14)之后、聊天室(16)之前;首页卡与移动端导航同源。
 -- 家庭组(V10.85):物品定位/家庭公告/智能家居 从生活组拆出,侧栏固定排在生活之后;
 -- 组内相对序 member(3) < item(4) < announcement(15) < iot(16)。工具箱(V12.23)归回生活组殿后(17)。
 -- 照片瀑布已并入相册,不再单列为模块。
@@ -866,6 +867,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('points',    '积分商城', 'icon-points',    '/points', 'life', 'left', 12, 1),
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 0),
 ('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
+('health',    '健康',     'icon-health',    '/health', 'life', 'left', 15, 1),
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
@@ -2194,6 +2196,8 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('SpringDoc OpenAPI', 'MAVEN', 'org.springdoc:springdoc-openapi-starter-webmvc-ui', '3.2.0', 'Apache-2.0', 'https://github.com/springdoc/springdoc-openapi', '接口文档', 'FULL'),
 ('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.48', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成(Boot 4.1.2 BOM 托管)', 'FULL'),
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
+-- Android 壳专用(不进后端 jar):Google Maven 分发,升级巡检按 androidx 发布说明人工核对
+('Health Connect Client', 'MAVEN', 'androidx.health.connect:connect-client', '1.1.0', 'Apache-2.0', 'https://developer.android.com/jetpack/androidx/releases/health-connect', 'Android 手环健康数据读取', 'FULL'),
 ('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),

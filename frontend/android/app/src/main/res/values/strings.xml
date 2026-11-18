@@ -23,6 +23,11 @@
     <string name="widget_book_month">%1$d月</string>
     <string name="widget_toggle_done">标记完成</string>
 
+    <!-- 健康数据(Health Connect 授权弹窗里的「为什么需要」说明页) -->
+    <string name="health_rationale_title">为什么要读取健康数据</string>
+    <string name="health_rationale_body">ihomy 只读取你授权的那几组健康数据(睡眠、活动、体征、身体成分),用来看自己的趋势,并在你允许时给家人看。数据只传到你家的 ihomy 服务器,不提供给任何第三方。你可以随时在「健康连接」里撤销授权,或在 ihomy 设置里清除已上传的数据。</string>
+    <string name="health_rationale_ok">知道了</string>
+
     <!-- 长按图标快捷方式(默认中文;英文覆盖见 values-en) -->
     <string name="shortcut_schedule">今日日程</string>
     <string name="shortcut_schedule_long">查看今天的提醒与计划</string>

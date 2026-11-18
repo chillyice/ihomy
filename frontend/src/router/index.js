@@ -40,6 +40,8 @@ const routes = [
   { path: '/iot', name: 'Iot', component: () => import('@/views/iot/Iot.vue'), meta: { requiresAuth: true } },
   // 家庭保险箱(密码管理器):家庭共享的账号密码保管箱,须登录
   { path: '/vault', name: 'Vault', component: () => import('@/views/vault/Vault.vue'), meta: { requiresAuth: true } },
+  // 健康数据(手机上报的睡眠/体征/活动):本人恒可看,他人要 health:view,故须登录
+  { path: '/health', name: 'Health', component: () => import('@/views/health/Health.vue'), meta: { requiresAuth: true } },
   // 家谱已并入「家庭成员」页,旧书签/导航统一跳到图谱标签
   { path: '/tree', redirect: { path: '/member', query: { tab: 'tree' } } },
   { path: '/weather', name: 'Weather', component: () => import('@/views/weather/Weather.vue'), meta: { public: true } },

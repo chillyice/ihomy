@@ -253,6 +253,7 @@ const WIDGET_MAP = {
   wish: 'wish',
   book: 'finance',
   album: 'album',
+  health: 'health',
 }
 const widgetType = (code) => WIDGET_MAP[code] || null
 

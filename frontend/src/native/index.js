@@ -26,6 +26,8 @@ export function bootNative() {
       import('./haptics'),
       // 相册自动备份:回前台/启动时按开关补传手机新照片
       import('./photoBackup').then((m) => m.installPhotoBackup()),
+      // 健康数据:登出时撤掉自动同步与长期令牌(Android 才有,其它端直接返回)
+      import('./health').then((m) => m.installHealthBridge()),
       // 更新检查放最后:等前面的能力就绪,且不阻塞其它初始化
       import('./appUpdate').then((m) => m.checkAppUpdate()),
     ]).then((results) => {

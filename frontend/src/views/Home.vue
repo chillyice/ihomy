@@ -324,6 +324,35 @@
             <router-link to="/book?tab=ledger" class="card-more">{{ $t('home.dashboard.assetDetail') }}</router-link>
           </template>
 
+          <!-- 健康(V12.89):本人最近 7 天睡眠与今日活动;空态引导去设置里配同步 -->
+          <template v-else-if="w.id === 'health'">
+            <div class="card-head">{{ $t('home.dashboard.health') }}</div>
+            <div v-if="healthSummary && healthSummary.hasData" class="health-body">
+              <div class="health-top">
+                <div class="health-sleep">
+                  <span class="health-sleep-val">{{ sleepText($t, healthSleepRow?.sleepMin) }}</span>
+                  <span class="health-sleep-label">{{ $t('health.metrics.sleep') }}</span>
+                </div>
+                <svg class="health-spark" viewBox="0 0 140 32" preserveAspectRatio="none" aria-hidden="true">
+                  <rect v-for="b in healthBars" :key="b.key" :x="b.x" :y="b.y" width="12" :height="b.h" rx="2" />
+                </svg>
+              </div>
+              <div class="health-row">
+                <span>{{ $t('health.metrics.steps') }}</span>
+                <span class="health-row-val">{{ formatMetric('STEPS', healthToday?.steps) }}</span>
+              </div>
+              <div class="health-row">
+                <span>{{ $t('health.metrics.restingHr') }}</span>
+                <span class="health-row-val">{{ formatMetric('RESTING_HR', healthToday?.restingHr) }}</span>
+              </div>
+            </div>
+            <div v-else class="widget-empty">
+              {{ $t('home.dashboard.healthEmpty') }}
+              <div class="widget-empty-hint">{{ $t('home.dashboard.healthHint') }}</div>
+            </div>
+            <router-link to="/health" class="card-more">{{ $t('home.dashboard.healthDetail') }}</router-link>
+          </template>
+
           <!-- 本月收支 + 理财持仓(本金不计收支,单独一行,点了直达理财页签) -->
           <template v-else-if="w.id === 'finance'">
             <div class="card-head">{{ $t('home.dashboard.finance') }}</div>
@@ -436,7 +465,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi, healthApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
 import { usePullRefresh } from '@/composables/usePullRefresh'
@@ -455,6 +484,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatYuan } from '@/utils/money'
+import { sleepText, formatMetric } from '@/utils/healthMetrics'
 import { summarizePortfolio } from '@/utils/finance'
 import { resolveAssetCard } from '@/utils/assetCard'
 import { formatRelativeTime } from '@/utils/datetime'
@@ -628,6 +658,35 @@ const loadWishes = async () => {
   // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不限定登录态
   try {
     wishes.value = await wishApi.list()
+  } catch (e) {}
+}
+// 健康卡:只取本人最近 7 天摘要(后端 /health/summary 只回本人,他人数据走 /health 页);游客不发请求
+const healthSummary = ref(null)
+const healthToday = computed(() => {
+  const items = healthSummary.value?.items
+  return Array.isArray(items) && items.length ? items[items.length - 1] : null
+})
+// 睡眠按「入睡日」落库(昨晚那一觉记在昨天那行),卡上要取最近一条有睡眠的记录,
+// 否则每天上午打开首页睡眠都是「—」,而步数/心率是当天的
+const healthSleepRow = computed(() => {
+  const items = healthSummary.value?.items
+  if (!Array.isArray(items)) return null
+  for (let i = items.length - 1; i >= 0; i--) if (items[i].sleepMin != null) return items[i]
+  return null
+})
+// 7 天睡眠微条形图:viewBox 140×32,7 根 12 宽、间距 20;缺数据留 2px 底座示意「那天没记录」
+const healthBars = computed(() => {
+  const items = healthSummary.value?.items || []
+  const max = Math.max(1, ...items.map((d) => d.sleepMin || 0))
+  return items.map((d, i) => {
+    const h = d.sleepMin ? Math.max(3, Math.round((d.sleepMin / max) * 28)) : 2
+    return { key: `${d.date}-${i}`, x: i * 20 + 2, y: 30 - h, h }
+  })
+})
+const loadHealth = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    healthSummary.value = await healthApi.summary(7)
   } catch (e) {}
 }
 const searchItems = async () => {
@@ -831,6 +890,8 @@ const DEFAULT_LAYOUT = [
   { id: 'finance', col: 8, row: 5, w: 2, h: 2 },
   // 资产卡:只进默认布局(新用户/恢复默认),已有用户的 localStorage 布局不强插
   { id: 'asset', col: 10, row: 5, w: 2, h: 2 },
+  // 健康卡(V12.89):排在资产之后;只进默认布局,已有用户可从侧栏拖入
+  { id: 'health', col: 10, row: 7, w: 2, h: 2 },
 ].map((g) => ({ id: g.id, x: g.col / COLS, y: g.row / ROWS, w: g.w / COLS, h: g.h / ROWS }))
 
 // 布局键加版本号:v3 起组件改为自由布局(x/y/w/h 画布比例),旧 v1/v2 栅格布局语义不兼容,直接丢弃
@@ -850,6 +911,7 @@ const WIDGET_DEFAULT_SIZE = {
   wish: { w: 2, h: 2 },
   finance: { w: 2, h: 2 },
   asset: { w: 2, h: 2 },
+  health: { w: 2, h: 2 },
   task: { w: 3, h: 3 },
   daily: { w: 2, h: 3 },
 }
@@ -945,6 +1007,8 @@ const visibleWidgets = computed(() =>
     if (['today', 'task', 'search'].includes(w.id)) return userStore.isLoggedIn
     // 收支/资产卡跟账本可见性同口径:被家长设为「不可见」的成员连卡都不渲染
     if (['finance', 'asset'].includes(w.id)) return userStore.isLoggedIn && userStore.canReadBook
+    // 健康卡只给本人看:游客不渲染(计划 §8.3)
+    if (w.id === 'health') return userStore.isLoggedIn
     if (w.id === 'anni') return anniversaries.value.length > 0
     // 愿望单对游客开放(后端返回演示家庭的公开愿望);无数据时不展示,避免留一张空卡
     if (w.id === 'wish') return wishes.value.length > 0
@@ -966,6 +1030,16 @@ watch(
   [hasAsset, () => userStore.isLoggedIn, () => userStore.canReadBook],
   ([on, loggedIn, readable]) => {
     if (on && loggedIn && readable) loadAssets()
+  },
+  { immediate: true },
+)
+
+// 健康卡同上:拖入/默认布局/登录完成触发拉一次摘要
+const hasHealth = computed(() => widgets.value.some((w) => w.id === 'health'))
+watch(
+  [hasHealth, () => userStore.isLoggedIn],
+  ([on, loggedIn]) => {
+    if (on && loggedIn) loadHealth()
   },
   { immediate: true },
 )
@@ -1346,6 +1420,7 @@ const WIDGET_LABEL_KEYS = {
   wish: 'home.dashboard.wishlist',
   finance: 'home.dashboard.finance',
   asset: 'home.dashboard.asset',
+  health: 'home.dashboard.health',
   album: 'home.dashboard.album',
   daily: 'daily.image',
 }
@@ -1401,7 +1476,16 @@ usePullRefresh({
   target: root,
   disabled: () => editMode.value,
   onRefresh: () =>
-    Promise.all([loadAll(), loadPoints(), loadReminders(), loadBookSummary(), loadWishes(), loadTodayRecipes(), loadItemHouses()]),
+    Promise.all([
+      loadAll(),
+      loadPoints(),
+      loadReminders(),
+      loadBookSummary(),
+      loadWishes(),
+      loadTodayRecipes(),
+      loadItemHouses(),
+      loadHealth(),
+    ]),
 })
 
 onMounted(async () => {
@@ -2313,6 +2397,61 @@ html.dark .recipe-name {
   font-size: 10px;
   line-height: 1.5;
   color: var(--color-text-secondary);
+}
+/* 健康卡:睡眠大字 + 7 天微条形图 + 步数/静息心率两行 */
+.health-body {
+  padding: 4px 18px 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+.health-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+.health-sleep {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.health-sleep-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.health-sleep-label {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+.health-spark {
+  flex: 0 0 78px;
+  height: 34px;
+  overflow: visible;
+}
+.health-spark rect {
+  fill: var(--health-bar, var(--color-primary));
+  opacity: 0.55;
+}
+.health-spark rect:last-child {
+  opacity: 0.95;
+}
+.health-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #999);
+  font-variant-numeric: tabular-nums;
+}
+.health-row-val {
+  color: var(--color-text);
+  font-weight: 600;
 }
 .fin-item {
   display: flex;

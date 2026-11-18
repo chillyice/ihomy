@@ -6,6 +6,8 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Android 13 及以下健康连接是独立 APK:不声明包可见性会误判「本机不可用」 -->
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
     <!-- allowBackup=false:令牌密文在 EncryptedSharedPreferences,其密钥不参与备份,
@@ -98,6 +100,17 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
 
+        </activity>
+
+        <!-- 健康连接授权弹窗里的「为什么需要」说明页(系统要求:声明 ACTION_SHOW_PERMISSIONS_RATIONALE) -->
+        <activity
+            android:name=".health.HealthPermissionRationaleActivity"
+            android:exported="true"
+            android:label="@string/health_rationale_title"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
 
         <!-- 桌面卡片 ×4:今日概览 / 今日提醒 / 纪念日倒计时 / 记账本月(RemoteViews 直写,数据见 widget/ 目录) -->
@@ -262,4 +275,26 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+
+    <!-- 健康数据(Health Connect):只读,按四组在设置页里按需申请;记录类型 ↔ 权限码由 connect-client 版本生成,
+         升级库时以 HealthPermission.getReadPermission(XXX::class) 为准。 -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_FLIGHTS_CLIMBED" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_BODY_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" />
+    <!-- 每日后台同步(WorkManager)读健康数据;Android 15+ 需要这条,旧系统忽略 -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 </manifest>

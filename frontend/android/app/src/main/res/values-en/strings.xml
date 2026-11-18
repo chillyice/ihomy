@@ -18,6 +18,11 @@
     <string name="widget_book_month">%1$d</string>
     <string name="widget_toggle_done">Mark done</string>
 
+    <!-- Health Connect rationale (English) -->
+    <string name="health_rationale_title">Why ihomy reads health data</string>
+    <string name="health_rationale_body">ihomy reads only the health groups you approve (sleep, activity, vitals, body measurements) to show your own trends and, if you allow it, to family members. Data goes only to your family\'s ihomy server, never to third parties. You can revoke access in Health Connect or delete uploaded data in ihomy settings at any time.</string>
+    <string name="health_rationale_ok">Got it</string>
+
     <!-- Launcher shortcuts (English) -->
     <string name="shortcut_schedule">Schedule</string>
     <string name="shortcut_schedule_long">Today\'s reminders and plans</string>

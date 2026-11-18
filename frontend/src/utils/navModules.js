@@ -32,6 +32,7 @@ import {
   QuestionFilled,
   Promotion,
   Delete,
+  FirstAidKit,
 } from '@element-plus/icons-vue'
 
 // code → 路由路径(后端 sys_home_module.code 为字符串标识)
@@ -62,6 +63,7 @@ export const NAV_PATHS = {
   plant: '/plant',
   games: '/games',
   vault: '/vault',
+  health: '/health',
   iot: '/iot',
   help: '/help',
   announcement: '/announcement',
@@ -96,6 +98,7 @@ export const ICON_MAP = {
   plant: Sunny,
   games: Aim,
   vault: Lock,
+  health: FirstAidKit,
   iot: MagicStick,
   help: QuestionFilled,
   announcement: Promotion,
@@ -131,7 +134,8 @@ export function buildNavItems(modules, { hasOps = false, child = false } = {}) {
   // 帮助:与设置/运维同为不入 sys_home_module 的虚拟入口(标题同样写死,nav 现状即如此)
   list.push({ code: 'help', title: '帮助', path: '/help', category: 'system', sortOrder: 92 })
   // 天气:同样不入 sys_home_module。此前桌面靠侧栏迷你天气/首页天气卡片进入,移动端无任何入口,
-  // 手机上等于「有页面但到不了」。sortOrder 15 落在 vault(14) 与 chat(16) 之间,不破「工具箱殿后」。
+  // 手机上等于「有页面但到不了」。sortOrder 15 落在 vault(14) 与 chat(16) 之间,不破「工具箱殿后」;
+  // health(V12.89)模块行同为 15 且先入列表,实际顺序为 保险箱 → 健康 → 天气 → 聊天室。
   list.push({ code: 'weather', title: '天气', path: '/weather', category: 'life', sortOrder: 15 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
   const sorted = list.sort((a, b) => a.sortOrder - b.sortOrder)

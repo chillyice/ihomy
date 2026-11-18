@@ -3752,3 +3752,20 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('health_metric', 'WAIST',           '腰围'),
 ('health_metric', 'VO2MAX',          '最大摄氧量'),
 ('health_metric', 'MENSTRUAL_FLOW',  '月经流量');
+
+-- ------------------------------------------------------------
+-- V12.89 健康数据接入 P1/P2(2026-11-18)
+--   ① 首页/导航:生活组新增「健康」(sort 15 = 保险箱之后、聊天室之前);改完需重启后端(内存缓存,踩坑 §2.1)
+--   ② 开源组件台账:Android 壳的 Health Connect 客户端(只进 APK,不进后端 jar)
+--   幂等:SELECT ... WHERE NOT EXISTS 按 (code, family_id) 判重;台账按 package_ref 判重。
+-- ------------------------------------------------------------
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'health', '健康', 'icon-health', '/health', 'life', 'left', 15, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'health' AND `family_id` IS NULL);
+
+-- 已有开发库可能把健康卡排到别处:统一回 15,保证与 schema.sql 一致
+UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'health' AND `family_id` IS NULL AND `sort_order` <> 15;
+
+INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`)
+SELECT 'Health Connect Client', 'MAVEN', 'androidx.health.connect:connect-client', '1.1.0', 'Apache-2.0', 'https://developer.android.com/jetpack/androidx/releases/health-connect', 'Android 手环健康数据读取', 'FULL'
+WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'androidx.health.connect:connect-client');

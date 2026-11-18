@@ -84,6 +84,18 @@
   --blob-3: 236, 192, 172;
   --blob-4: 168, 201, 222;
   --blob-5: 192, 216, 168;
+  /* 健康数据页(/health):趋势柱与心率带用低饱和青绿,睡眠分期四色互不抢占;
+     深色块里覆写成亮调(浅色值压在夜色底上会糊) */
+  --health-bar: #4a7a6a;
+  --health-band: #4a7a6a;
+  --health-chip-bg: rgba(74, 122, 106, 0.1);
+  --health-track: rgba(58, 46, 34, 0.08);
+  --health-stage-deep: #2f4f6f;
+  --health-stage-light: #6f9bb8;
+  --health-stage-rem: #8a7fb0;
+  --health-stage-awake: #d08a6a;
+  --health-stage-inbed: #a8a294;
+  --health-stage-unknown: #b5ab9c;
 }
 
 /* Element Plus 主色/文字色 → 主题 token(消除默认蓝 #409EFF 与 #a8abb2 灰;光尘/暖居通用,晨暮均覆盖) */
@@ -197,6 +209,17 @@ html.dark {
   --blob-3: 200, 160, 140;
   --blob-4: 120, 160, 200;
   --blob-5: 160, 180, 120;
+  /* 健康数据页:深色底上用亮一档的青绿与分期色,浅色值在夜色上对比不足 */
+  --health-bar: #8fc7b4;
+  --health-band: #8fc7b4;
+  --health-chip-bg: rgba(143, 199, 180, 0.16);
+  --health-track: rgba(232, 220, 200, 0.1);
+  --health-stage-deep: #4f86b8;
+  --health-stage-light: #8fbcda;
+  --health-stage-rem: #a99dd0;
+  --health-stage-awake: #e2a184;
+  --health-stage-inbed: #8c8779;
+  --health-stage-unknown: #7d7668;
   color-scheme: dark;
 }
 

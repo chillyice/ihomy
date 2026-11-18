@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+// Health Connect 读取(health/HealthConnectReader.kt):库是 Kotlin suspend API,只给这一个文件开 Kotlin
+apply plugin: 'kotlin-android'
 
 // 版本号唯一事实来源:仓库根 VERSION(与前端 __APP_VERSION__、运维页一致)。
 // V<主>.<次> → versionName 原样,V<主>.<次> → versionCode = 主*1000 + 次。
@@ -73,6 +75,11 @@ dependencies {
     implementation project(':capacitor-android')
     // 桌面卡片数据同步(30 分钟周期)与 App 内改动触发的一次性刷新
     implementation "androidx.work:work-runtime:$androidxWorkVersion"
+    // 健康数据:读 Health Connect(只读权限,按组申请)+ Kotlin 协程做阻塞桥接
+    implementation "androidx.health.connect:connect-client:$androidxHealthConnectVersion"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinxCoroutinesVersion"
+    // connect-client 的 guava 只在运行期传递进来,而 WorkManager 的 ListenableFuture 在编译期要可见
+    implementation "com.google.guava:guava:31.1-android"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

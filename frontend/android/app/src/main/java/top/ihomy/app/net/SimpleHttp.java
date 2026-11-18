@@ -31,6 +31,39 @@ public final class SimpleHttp {
         request(url, token, "POST");
     }
 
+    /**
+     * JSON POST 并返回响应体:健康数据上报要带请求体、也要读回 code/条数。
+     * 非 2xx 抛异常,但 4xx 的响应体仍带业务 message,调用方拿不到——统一按「HTTP n」上抛由页面提示。
+     */
+    public static String postJson(String url, String token, String body) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        try {
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("Accept", "application/json");
+            byte[] payload = (body == null ? "{}" : body).getBytes(StandardCharsets.UTF_8);
+            conn.setFixedLengthStreamingMode(payload.length);
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                os.write(payload);
+            }
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
+            InputStream in = conn.getInputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            in.close();
+            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
     private static String request(String url, String token, String method) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         try {
