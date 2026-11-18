@@ -3769,3 +3769,13 @@ UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'health' AND `fami
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`)
 SELECT 'Health Connect Client', 'MAVEN', 'androidx.health.connect:connect-client', '1.1.0', 'Apache-2.0', 'https://developer.android.com/jetpack/androidx/releases/health-connect', 'Android 手环健康数据读取', 'FULL'
 WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'androidx.health.connect:connect-client');
+
+-- ------------------------------------------------------------
+-- V12.91 健康数据接入 P3(2026-11-18)
+--   family_health_sample 新增 (period, start_time) 复合索引:每天 04:20 的保留清理按
+--   「period = POINT 且 start_time < 水位」删行,原有索引都以 family_id/user_id 起头,吃不上。
+--   information_schema 守卫幂等,重跑无害。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_health_sample' AND index_name = 'idx_period_start');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_health_sample` ADD INDEX `idx_period_start` (`period`, `start_time`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -11,6 +11,10 @@
         <span v-else class="tb-note">{{ $t('health.selfOnly') }}</span>
       </div>
       <div class="tb-right">
+        <el-button :loading="exporting" @click="exportCsv">
+          <el-icon><Download /></el-icon>
+          <span class="btn-text">{{ $t('health.exportCsv') }}</span>
+        </el-button>
         <el-button :loading="loading" @click="reloadAll">
           <el-icon><Refresh /></el-icon>
           <span class="btn-text">{{ $t('health.refresh') }}</span>
@@ -223,9 +227,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Download } from '@element-plus/icons-vue'
 import { healthApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { saveBlobResponse } from '@/utils/download'
 import HealthTrendChart from './HealthTrendChart.vue'
 import { stackBar, timelineSegments } from './healthChart'
 import {
@@ -250,9 +255,12 @@ const TABS = ['overview', 'sleep', 'vitals', 'activity', 'body']
 const DENSE_POINT = ['HEART_RATE', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC']
 const RANGE_DAYS = 14
 const SLEEP_DAYS = 14
+// 导出范围默认近 90 天(与服务端默认一致);更长的区间不在界面上选,直接用接口参数
+const EXPORT_DAYS = 90
 
 const tab = ref(TABS.includes(String(route.query.tab || '')) ? String(route.query.tab) : 'overview')
 const loading = ref(false)
+const exporting = ref(false)
 const members = ref([])
 const targetUserId = ref(userStore.userInfo?.id ?? null)
 const overviewDay = ref(null)
@@ -481,6 +489,23 @@ async function doClear() {
     ElMessage.error(e?.message || t('common.failed'))
   } finally {
     clearing.value = false
+  }
+}
+
+/** 导出当前成员近 90 天的长表 CSV:成功直接落盘;失败时服务端仍回 JSON,由 saveBlobResponse 抛出可读文案 */
+async function exportCsv() {
+  if (!userStore.isLoggedIn || !viewingId.value) return
+  const from = shiftDay(-(EXPORT_DAYS - 1))
+  const to = shiftDay(0)
+  exporting.value = true
+  try {
+    const blob = await healthApi.exportCsv({ userId: viewingId.value, from, to })
+    await saveBlobResponse(blob, `health-${from}_${to}.csv`)
+    ElMessage.success(t('health.exportDone', { from, to }))
+  } catch (e) {
+    ElMessage.error(e?.message || t('common.failed'))
+  } finally {
+    exporting.value = false
   }
 }
 

@@ -789,4 +789,6 @@ export const healthApi = {
   stages: (id) => request.get(`/health/sleep/${id}/stages`),
   metric: (params) => request.get('/health/metric', { params }),
   summary: (days) => request.get('/health/summary', { params: days ? { days } : {} }),
+  // 导出:长表 CSV(睡眠/分期/样本),直接回文件流;失败时后端仍回 JSON,由 saveBlobResponse 识别
+  exportCsv: (params) => request.get('/health/export', { params, responseType: 'blob', timeout: 0 }),
 }

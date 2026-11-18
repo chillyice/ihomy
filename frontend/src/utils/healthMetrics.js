@@ -34,10 +34,12 @@ export const HEALTH_METRICS = {
   VO2MAX: { group: 'VITAL', period: 'DAY', unit: 'ml/kg/min', digits: 1, nameKey: 'health.metrics.vo2max' },
 }
 
-/** 各 tab 要展示的指标(顺序即卡片顺序);睡眠单独一页,不在此列 */
+/** 各 tab 要展示的指标(顺序即卡片顺序);睡眠单独一页,不在此列。
+ *  体征页除心率/血氧外还列血糖、收缩压/舒张压、呼吸频率与最大摄氧量(手表有就自动出现,没有就是空态);
+ *  活动页补正念与爬楼。新增指标仍按目录加一行,这里只决定挂在哪个 tab。 */
 export const TAB_METRICS = {
-  ACTIVITY: ['STEPS', 'DISTANCE', 'ACTIVE_ENERGY', 'EXERCISE_MIN'],
-  VITAL: ['HEART_RATE', 'RESTING_HR', 'HRV', 'SPO2', 'BODY_TEMP'],
+  ACTIVITY: ['STEPS', 'DISTANCE', 'ACTIVE_ENERGY', 'EXERCISE_MIN', 'MINDFUL_MIN', 'FLIGHTS'],
+  VITAL: ['HEART_RATE', 'RESTING_HR', 'HRV', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC', 'RESP_RATE', 'VO2MAX'],
   BODY: ['WEIGHT', 'BODY_FAT', 'WAIST'],
 }
 

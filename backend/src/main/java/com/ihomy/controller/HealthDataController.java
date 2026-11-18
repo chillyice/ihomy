@@ -21,6 +21,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -178,6 +181,21 @@ public class HealthDataController {
     public Result<Map<String, Object>> summary(@RequestParam(required = false) Integer days) {
         LoginUser user = requireLogin();
         return Result.success(queryService.summary(user.getUserId(), days == null ? 7 : days));
+    }
+
+    /** 直接回文件流(不走 Result 包装):前端用 blob 存盘,失败时才回 JSON 由前端识别 */
+    @Operation(summary = "导出健康数据 CSV(长表:睡眠/分期/样本;默认近 90 天,≤366 天)")
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        HealthQueryService.CsvFile file = queryService.exportCsv(viewer(), userId, from, to);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.filename() + "\"")
+                .contentLength(file.content().length)
+                .body(file.content());
     }
 
     // ==================== 内部 ====================

@@ -67,6 +67,27 @@
       </div>
     </div>
 
+    <div class="card settings-card health-shortcut">
+      <div class="section-label">{{ $t('settings.health.tplTitle') }}</div>
+      <div class="share-tip">{{ $t('settings.health.tplHint') }}</div>
+
+      <ol class="tpl-steps">
+        <li>{{ $t('settings.health.tplStep1') }}</li>
+        <li>{{ $t('settings.health.tplStep2') }}</li>
+        <li>{{ $t('settings.health.tplStep3') }}</li>
+        <li>{{ $t('settings.health.tplStep4') }}</li>
+      </ol>
+
+      <div class="tpl-body">
+        <div class="tpl-body-head">
+          <span class="tpl-body-label">{{ $t('settings.health.tplBodyLabel') }}</span>
+          <el-button size="small" type="primary" plain @click="copyText(TPL_BODY)">{{ $t('settings.health.copy') }}</el-button>
+        </div>
+        <pre class="tpl-code">{{ TPL_BODY }}</pre>
+        <div class="share-tip">{{ $t('settings.health.tplBodyNote') }}</div>
+      </div>
+    </div>
+
     <div v-if="nativeSupported" class="card settings-card health-android">
       <div class="section-label">{{ $t('settings.health.androidTitle') }}</div>
       <div class="share-tip">{{ $t('settings.health.androidHint') }}</div>
@@ -168,6 +189,25 @@ const SOURCES = [
   { value: 'HEALTH_CONNECT', labelKey: 'settings.health.sourceHealthConnect' },
   { value: 'IOS_NATIVE', labelKey: 'settings.health.sourceNative' },
 ]
+
+// iOS 快捷指令请求体模板:睡眠传分期区间(服务端聚合成会话),其余指标按天或按小时聚合传;
+// 用真实示例值(不是占位符),用户点复制后改日期/数值就能跑通,也避免模板里出现会被误替换的符号
+const TPL_BODY = `{
+  "provider": "SHORTCUT",
+  "timezone": "+08:00",
+  "samples": [
+    { "metric": "STEPS", "period": "DAY", "date": "2026-11-18", "value": 8240, "source": "APPLE" },
+    { "metric": "RESTING_HR", "period": "DAY", "date": "2026-11-18", "value": 56, "source": "APPLE" },
+    { "metric": "HEART_RATE", "period": "POINT", "start": "2026-11-18T09:00:00",
+      "end": "2026-11-18T10:00:00", "avg": 72, "min": 60, "max": 96, "count": 58, "source": "APPLE" }
+  ],
+  "sleep": [
+    { "stage": "DEEP",  "start": "2026-11-17T23:20:00", "end": "2026-11-18T00:50:00", "source": "APPLE" },
+    { "stage": "LIGHT", "start": "2026-11-18T00:50:00", "end": "2026-11-18T03:10:00", "source": "APPLE" },
+    { "stage": "REM",   "start": "2026-11-18T03:10:00", "end": "2026-11-18T04:20:00", "source": "APPLE" },
+    { "stage": "AWAKE", "start": "2026-11-18T04:20:00", "end": "2026-11-18T04:35:00", "source": "APPLE" }
+  ]
+}`
 
 const loading = ref(false)
 const creating = ref(false)
@@ -291,7 +331,12 @@ const rejectedDetail = computed(() => {
 })
 
 const scopeText = (row) => {
-  const key = { OVERVIEW: 'viewlogScopeOverview', SLEEP: 'viewlogScopeSleep', METRIC: 'viewlogScopeMetric' }[row.scope]
+  const key = {
+    OVERVIEW: 'viewlogScopeOverview',
+    SLEEP: 'viewlogScopeSleep',
+    METRIC: 'viewlogScopeMetric',
+    EXPORT: 'viewlogScopeExport',
+  }[row.scope]
   const base = key ? t(`settings.health.${key}`) : row.scope
   return row.metric ? `${base} · ${row.metric}` : base
 }
@@ -331,8 +376,7 @@ const createToken = async () => {
 }
 
 /** 复制统一入口:内嵌壳/局域网 http 下 navigator.clipboard 不可用,退回 execCommand */
-const copyPlain = async () => {
-  const text = plainToken.value
+const copyText = async (text) => {
   if (!text) return
   let ok = false
   try {
@@ -360,6 +404,8 @@ const copyPlain = async () => {
   if (ok) ElMessage.success(t('settings.health.copied'))
   else ElMessage.warning(t('settings.health.copyFailed'))
 }
+
+const copyPlain = () => copyText(plainToken.value)
 
 const revoke = async (row) => {
   await ElMessageBox.confirm(t('settings.health.revokeConfirm', { name: row.name }), t('common.tip'), { type: 'warning' })
@@ -438,6 +484,41 @@ onMounted(() => {
 <style scoped>
 .health-privacy {
   margin-top: 16px;
+}
+.health-shortcut {
+  margin-top: 16px;
+}
+.tpl-steps {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--color-text-primary);
+}
+.tpl-body {
+  margin-top: 12px;
+}
+.tpl-body-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tpl-body-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.tpl-code {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-2);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
 }
 .health-android {
   margin-top: 16px;

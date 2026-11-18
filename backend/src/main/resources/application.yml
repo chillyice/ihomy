@@ -108,6 +108,11 @@ app:
   log-retention-days: 7
   # 天气调用日志(report_weather)保留天数:每天 04:10 清理,响应正文体积大,过期即删
   weather-log-retention-days: 7
+  # 健康数据保留:每天 04:20 清理。POINT 行(单点/小时聚合)保留 N 天,
+  # 日聚合与睡眠会话/分期永久保留;查看审计是轻量表,只留 90 天。置 0 = 关闭该类清理。
+  health:
+    point-retention-days: 180
+    view-log-retention-days: 90
   # WebRTC 通话 ICE 服务器(1:1 语音视频,聊天室 P3):
   # 分号分隔多条,单条格式 url[|username|credential];STUN 基线开箱即用,
   # TURN(自建 coturn)生产经 external.yml 覆盖——凭证不入 git,见 external.yml.template

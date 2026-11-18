@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.HealthCsv;
 import com.ihomy.common.HealthMetric;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.FamilyHealthSample;
@@ -38,6 +39,8 @@ public class HealthQueryService {
 
     private static final int MAX_SLEEP_RANGE_DAYS = 62;
     private static final int MAX_METRIC_RANGE_DAYS = 366;
+    /** 单次导出样本行上限:超过就让用户缩小范围,不做静默截断 */
+    private static final int MAX_EXPORT_SAMPLES = 50_000;
 
     private final SysUserMapper userMapper;
     private final FamilyHealthSampleMapper sampleMapper;
@@ -283,6 +286,90 @@ public class HealthQueryService {
         item.put("startTime", r.getStartTime());
         item.put("source", r.getSource());
         return item;
+    }
+
+    // ==================== 导出 CSV ====================
+
+    /** 导出结果:文件名(纯 ASCII,客户端直接落盘)与文件内容(UTF-8 BOM + CRLF) */
+    public record CsvFile(String filename, byte[] content) {
+    }
+
+    /**
+     * 导出某成员一段时间的健康数据长表:先睡眠会话、再睡眠分期、最后其余样本(每类内按时间升序)。
+     * 可见性与读侧完全一致(本人恒可读自己 / OWNER 恒可读全家 / 其他成员需 health:view),
+     * 敏感指标对他人照旧剔除;跨人导出写一条 scope=EXPORT 的查看审计。
+     */
+    public CsvFile exportCsv(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to) {
+        SysUser target = requireTarget(viewer, targetUserId);
+        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate begin = from == null ? end.minusDays(89) : from;
+        if (begin.isAfter(end)) {
+            LocalDate t = begin;
+            begin = end;
+            end = t;
+        }
+        if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
+            throw new BizException(ResultCode.BAD_REQUEST, "单次最多导出 366 天数据");
+        }
+        boolean self = Objects.equals(viewer.id(), target.getId());
+
+        List<FamilyHealthSleep> sleeps = sleepMapper.selectList(new LambdaQueryWrapper<FamilyHealthSleep>()
+                .eq(FamilyHealthSleep::getUserId, target.getId())
+                .between(FamilyHealthSleep::getSleepDate, begin, end)
+                .orderByAsc(FamilyHealthSleep::getStartTime));
+        Map<Long, FamilyHealthSleep> sleepById = new HashMap<>();
+        sleeps.forEach(s -> sleepById.put(s.getId(), s));
+        List<FamilyHealthSleepStage> stages = sleeps.isEmpty() ? List.of()
+                : stageMapper.selectList(new LambdaQueryWrapper<FamilyHealthSleepStage>()
+                .in(FamilyHealthSleepStage::getSleepId, sleepById.keySet())
+                .orderByAsc(FamilyHealthSleepStage::getStartTime));
+        List<FamilyHealthSample> samples = sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
+                .eq(FamilyHealthSample::getUserId, target.getId())
+                .ge(FamilyHealthSample::getStartTime, begin.atStartOfDay())
+                .lt(FamilyHealthSample::getStartTime, end.plusDays(1).atStartOfDay())
+                .orderByAsc(FamilyHealthSample::getStartTime)
+                .last("LIMIT " + (MAX_EXPORT_SAMPLES + 1)));
+        if (samples.size() > MAX_EXPORT_SAMPLES) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这段时间的数据太多,请缩小日期范围再导出");
+        }
+
+        List<String> rows = new ArrayList<>(sleeps.size() + stages.size() + samples.size());
+        for (FamilyHealthSleep s : sleeps) {
+            rows.add(HealthCsv.line("SLEEP", HealthMetric.SLEEP, HealthMetric.PERIOD_SESSION,
+                    HealthCsv.num(s.getTotalMin()), "", "", "", "min",
+                    HealthCsv.num(s.getDeepMin()), HealthCsv.num(s.getLightMin()),
+                    HealthCsv.num(s.getRemMin()), HealthCsv.num(s.getAwakeMin()),
+                    s.getStageLevel(), HealthCsv.date(s.getSleepDate()),
+                    HealthCsv.time(s.getStartTime()), HealthCsv.time(s.getEndTime()),
+                    s.getSource(), s.getProvider()));
+        }
+        for (FamilyHealthSleepStage st : stages) {
+            FamilyHealthSleep parent = sleepById.get(st.getSleepId());
+            // 分期行没有来源字段,取所属会话的,导出后才能分清是哪个设备/通道
+            rows.add(HealthCsv.line("STAGE", st.getStage(), "STAGE",
+                    HealthCsv.num(st.getDurationMin()), "", "", "", "min",
+                    "", "", "", "", "",
+                    HealthCsv.date(parent == null ? null : parent.getSleepDate()),
+                    HealthCsv.time(st.getStartTime()), HealthCsv.time(st.getEndTime()),
+                    parent == null ? "" : parent.getSource(),
+                    parent == null ? "" : parent.getProvider()));
+        }
+        for (FamilyHealthSample r : samples) {
+            if (HealthMetric.isSensitive(r.getMetric()) && !self) {
+                continue;
+            }
+            rows.add(HealthCsv.line("SAMPLE", r.getMetric(), r.getPeriod(),
+                    HealthCsv.num(r.getValueNum()), HealthCsv.num(r.getValueMin()), HealthCsv.num(r.getValueMax()),
+                    HealthCsv.num(r.getSampleCount()), r.getUnit(),
+                    "", "", "", "", "", "",
+                    HealthCsv.time(r.getStartTime()), HealthCsv.time(r.getEndTime()),
+                    r.getSource(), r.getProvider()));
+        }
+
+        privacyService.logView(viewer.id(), viewer.ip(), target.getId(), viewer.familyId(),
+                "EXPORT", null, begin, end);
+
+        return new CsvFile("health-" + begin + "_" + end + ".csv", HealthCsv.toBytes(rows));
     }
 
     // ==================== 可见性 ====================

@@ -3186,7 +3186,8 @@ CREATE TABLE `family_health_sample` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_metric_start` (`user_id`, `metric`, `start_time`, `source_app`),
   KEY `idx_family_metric_time` (`family_id`, `metric`, `start_time`),
-  KEY `idx_user_metric_time` (`user_id`, `metric`, `start_time`)
+  KEY `idx_user_metric_time` (`user_id`, `metric`, `start_time`),
+  KEY `idx_period_start` (`period`, `start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员健康样本(日聚合/小时聚合)';
 
 DROP TABLE IF EXISTS `family_health_view_log`;
