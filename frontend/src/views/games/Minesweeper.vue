@@ -557,6 +557,10 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
+/* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
+.ms-meta-actions .el-button + .el-button {
+  margin-left: 0;
+}
 /* 手机横屏:数据与按钮竖排成棋盘左侧一列(和外壳 rail 同向),棋盘独占右侧;
    此时纵向预算不再扣数据条,横向预算扣掉这一列的宽度 */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -567,7 +571,8 @@ onBeforeUnmount(() => {
     display: grid;
     grid-template-columns: var(--ms-meta-w) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
-    align-items: center;
+    /* 数据列与棋盘同一口径靠上,和 2048/数独横屏左列一致 */
+    align-items: start;
     column-gap: 10px;
     row-gap: 0;
     /* 装得下时整块按实际宽度收缩(数据列紧贴棋盘,由外壳居中);
@@ -578,7 +583,7 @@ onBeforeUnmount(() => {
   .ms-meta {
     flex-direction: column;
     align-items: stretch;
-    justify-content: center;
+    justify-content: start;
     gap: 8px;
     height: auto;
   }

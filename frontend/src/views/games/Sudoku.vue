@@ -2331,19 +2331,18 @@ html.dark .sd-cell.conflict {
   }
 }
 
-/* 横屏(游戏区宽 > 高):棋盘按高度铺满左列,数字盘/工具收成右侧一列。
+/* 横屏(游戏区宽 > 高):用时条在棋盘左上一条,棋盘按高度铺满左列,数字盘/工具收成右侧一列。
    必须放在最后:上面 .sd-numpad/.sd-tools/.sd-num/.sd-tool 的基础声明会按书写顺序覆盖同权重的容器规则 */
 @container (min-aspect-ratio: 6/5) {
   .sd-layout {
-    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感。
-       用时条占左列顶上一条,棋盘吃左列剩下的高度 */
+    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感 */
     grid-template-columns: minmax(0, 1fr) clamp(148px, 30%, 232px);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       'meta panel'
       'board panel';
     gap: clamp(12px, 3cqi, 30px);
-    /* 横屏这条在棋盘左上:按钮独占一行落到用时上面,所以高度按两行算 */
+    /* 这条在棋盘左上:按钮独占一行落到用时上面,所以高度按两行算 */
     --sd-meta-h: calc(var(--gs-control-h) * 2 + 16px);
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
   }
@@ -2376,6 +2375,48 @@ html.dark .sd-cell.conflict {
   .sd-tool {
     padding: 6px 8px;
     font-size: 12px;
+  }
+}
+
+/* 手机横屏(游戏区高 ≤ 520):用时/撤销/新游戏收成棋盘左侧一列,靠上排,
+   自上而下 新游戏 → 撤销 → 时间(用户指定口径);棋盘吃满中间一列的高度 */
+@container (min-aspect-ratio: 6/5) and (max-height: 520px) {
+  .sd-layout {
+    /* 左列固定 132;右列按比例收窄(手机横屏让棋盘吃满高度),上限 200 保持平板手感 */
+    --sd-meta-w: 132px;
+    --sd-side-w: clamp(118px, 22%, 200px);
+    --sd-gap: clamp(10px, 2cqi, 24px);
+    grid-template-columns: var(--sd-meta-w) minmax(0, 1fr) var(--sd-side-w);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'meta board panel';
+    gap: var(--sd-gap);
+    /* 棋盘边长:横向扣掉左右两列,纵向不扣用时条(它已在左列,不占棋盘高度) */
+    --sd-frame-size: min(calc(100cqw - var(--sd-meta-w) - var(--sd-side-w) - 2 * var(--sd-gap) - 8px), calc(100cqh - 8px), 560px);
+  }
+  .sd-meta {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    align-self: start;
+    width: 100%;
+    height: auto;
+    gap: 6px;
+  }
+  .sd-meta > .gh-chip {
+    order: 2;
+    justify-content: space-between;
+    min-height: var(--gs-control-h);
+  }
+  .sd-meta-actions {
+    order: 1;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+  /* EP 给相邻按钮加 margin-left:12px,竖排时会顶偏一格 */
+  .sd-meta-actions .el-button + .el-button {
+    margin-left: 0;
   }
 }
 </style>

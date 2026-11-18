@@ -65,14 +65,15 @@
     </template>
 
     <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图。
-         撤销/新游戏放在这条的右端(棋盘右上角),横屏时落到分数上面 -->
+         撤销/新游戏放在这条的右端(棋盘右上角);手机横屏时整条改成棋盘左侧一列,
+         自上而下:新游戏、撤销、最高分、分数(芯片各带类名,横屏按类名重排) -->
     <div class="bf-layout">
       <div class="bf-meta">
-        <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        <span v-a11y-click class="gh-chip is-shareable bf-chip-score" :title="$t('games.share.chipHint')" @click="shareOpen = true"
           ><span>{{ $t('games.g2048.score') }}</span
           ><b>{{ score }}</b></span
         >
-        <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        <span v-a11y-click class="gh-chip is-shareable bf-chip-best" :title="$t('games.share.chipHint')" @click="shareOpen = true"
           ><span>{{ $t('games.g2048.best') }}</span
           ><b>{{ best }}</b></span
         >
@@ -577,19 +578,49 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 手机横屏:和数独同一口径 —— 按钮在分数上面,整条靠棋盘左上;
-   按钮独占一行(两个芯片仍并排,不让它们也竖起来占高度) */
+/* 手机横屏:整条挪到棋盘左侧,自上而下 新游戏 → 撤销 → 最高分 → 分数(用户指定口径)。
+   棋盘边长跟着「游戏区剩余高」走,不再被这条减掉一行高度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .bf-layout {
-    --bf-meta-h: calc(var(--gs-control-h) * 2 + 16px);
+    --bf-meta-w: 132px;
+    display: grid;
+    grid-template-columns: var(--bf-meta-w) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 0;
+    width: min(calc(100% - 16px), calc(100cqh - 8px + var(--bf-meta-w) + 10px));
   }
   .bf-meta {
+    flex-direction: column;
+    align-items: stretch;
     height: auto;
+    gap: 6px;
   }
+  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
+  .bf-meta > .gh-chip {
+    justify-content: space-between;
+    min-height: var(--gs-control-h);
+  }
+  /* 按钮也是竖排,顺序按用户要求:新游戏在上、撤销在下 */
   .bf-meta-actions {
-    order: -1;
-    flex: 0 0 100%;
+    order: 1;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
     margin-left: 0;
+  }
+  /* EP 给相邻按钮加 margin-left:12px,竖排时会顶偏一格,间距只走 gap */
+  .bf-meta-actions .el-button + .el-button {
+    margin-left: 0;
+  }
+  .bf-chip-best {
+    order: 2;
+  }
+  .bf-chip-score {
+    order: 3;
+  }
+  .bf-stage {
+    width: 100%;
   }
 }
 .bf-stage {
