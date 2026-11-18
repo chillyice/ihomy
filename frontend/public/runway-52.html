@@ -57,7 +57,7 @@ body.in-immersive .shell{padding-top:54px}
 <div class="table">
 <section aria-label="飞行棋盘">
 <div class="chart-frame"><div class="chart" id="chart"><svg viewBox="0 0 700 700" aria-hidden="true"></svg><div id="tokens"></div></div></div>
-<div class="key"><span><b>★</b>起飞格（安全，机场旁环外）</span><span><b>⇢</b>本家航线格，飞跃 12 格</span><span><b>◎</b>归航跑道</span></div>
+<div class="key"><span><b>★</b>起飞区（安全，机场旁环外）</span><span><b>◉</b>第一步（进环格）</span><span><b>⇢</b>本家航线格，飞跃 12 格</span><span><b>◎</b>归航跑道</span></div>
 </section>
 <aside class="console" aria-label="回合控制">
 <section class="card turn-card" aria-labelledby="turn-label">
@@ -71,7 +71,7 @@ body.in-immersive .shell{padding-top:54px}
 </div>
 </main>
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
-<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞格是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
 <div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
@@ -98,8 +98,8 @@ const point = (i,r=244) => {
    起飞走一步到上一家色的 D1,自家角格 A1(红/本色)是归航跑道口;进度 51 起转入归航跑道 */
 const publicIndex = (color,progress) => mod(13*color+2+progress);
 const isPublic = p => p>=1&&p<=CIRCUIT_LAST;
-/* 起飞位:不在主环上,压在自家机场靠跑道一侧的外沿(环外 272 半径、进环第一格 D1 旁) */
-const takeoffSpot = color => point(color*13+2.5,272);
+/* 起飞区:不在主环上,压在进环第一格 D1 的正外侧(环外 275 半径),与第一步只隔一圈间距 */
+const takeoffSpot = color => point(color*13+3,275);
 const stand = (color,p) => {
  const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
 };
@@ -123,6 +123,11 @@ const leapCurve = c => {
 const curvePoint = ([a,k,b],t) => {
  const u=1-t;
  return [u*u*a[0]+2*u*t*k[0]+t*t*b[0],u*u*a[1]+2*u*t*k[1]+t*t*b[1]];
+};
+/* 飞跃格箭头朝向 = 本家飞跃航线在起点处的切线(控制点 − 起点),箭头指着飞出去的方向 */
+const leapAngle = c => {
+ const [a,k]=leapCurve(c);
+ return Math.atan2(k[1]-a[1],k[0]-a[0])*180/Math.PI;
 };
 const last = state => state.order[state.turn];
 const arrivals = (state,c) => state.planes[c].filter(p=>p===GOAL).length;
@@ -217,6 +222,24 @@ function load(){
  return fresh(4,'cpu');
 }
 function save(){try{localStorage.setItem(STORE,JSON.stringify(game));}catch{}}
+/**
+ * 机场板轮廓:圆角方块,只把朝向盘心的那只角切一刀。
+ * 原来方块内角正好压在 A1(归航跑道口)格心、归航跑道粗线也从这个角长出来,整块看着像"用尖角
+ * 指着跑道";切成斜边后机场对着主环的是一段平口,和 A1 之间留出空隙。
+ */
+function platePath(x,y,s,r,inner){
+ const k={tl:0,tr:1,br:2,bl:3}[inner], cut=s*.26;
+ const P=[[x,y],[x+s,y],[x+s,y+s],[x,y+s]];
+ const f=p=>p[0].toFixed(2)+','+p[1].toFixed(2);
+ const along=(v,to,len)=>{const L=Math.hypot(to[0]-v[0],to[1]-v[1])||1;return [v[0]+(to[0]-v[0])/L*len,v[1]+(to[1]-v[1])/L*len];};
+ let d='';
+ for(let i=0;i<4;i++){
+  const v=P[i], len=i===k?cut:r;
+  const a=along(v,P[(i+3)%4],len), b=along(v,P[(i+1)%4],len);
+  d+=(i===0?'M':'L')+f(a)+(i===k?'L'+f(b):'Q'+f(v)+' '+f(b));
+ }
+ return d+'Z';
+}
 function svgBoard(){
  const chart=$('chart').querySelector('svg');
  const circle=(x,y,r,attrs='')=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" '+attrs+'/>';
@@ -240,7 +263,7 @@ function svgBoard(){
  }
  for(let c=0;c<4;c++){
   const t=TEAMS[c], [x,y]=[t.x,t.y];
-  art+='<rect x="'+x+'" y="'+y+'" width="140" height="140" rx="9" fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.5"/>';
+  art+='<path d="'+platePath(x,y,140,11,['br','bl','tl','tr'][c])+'" fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.5"/>';
   art+='<path d="M'+(x+13)+' '+(y+36)+'h114" stroke="'+t.ink+'" opacity=".6"/>';
   art+=text(x+13,y+25,t.name,16,'fill="#162923" font-weight="800"');
   art+=text(x+127,y+25,t.code,12,'text-anchor="end" fill="'+t.ink+'" '+tech);
@@ -257,10 +280,13 @@ function svgBoard(){
   }
  }
  for(let i=0;i<N;i++){
-  const [x,y]=point(i), jet=mod(i-20,13)===0, t=TEAMS[i%4];
-  art+=circle(x,y,jet?12:9.6,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="'+(jet?1.5:1)+'"');
-  // 航线格落在本家本色格上(D2 等),底色即本家色,看到的颜色=实际触发飞跃的本家
-  if(jet) art+=text(x,y+5.4,'⇢',17,middle+' fill="#162923" font-weight="900"');
+  const [x,y]=point(i), jet=mod(i-20,13)===0, first=mod(i-3,13)===0, t=TEAMS[i%4];
+  // 第一步(进环格 D1):放大一号 + 内圈靶心,和普通格一眼分开
+  art+=circle(x,y,first?13.5:jet?12:9.6,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="'+(first?2.2:jet?1.5:1)+'"');
+  if(first) art+=circle(x,y,6.2,'fill="none" stroke="'+t.ink+'" stroke-width="1.6" opacity=".75"');
+  // 航线格落在本家本色格上(D2 等),底色即本家色,看到的颜色=实际触发飞跃的本家;
+  // 箭头按本家飞跃航线的出发切线转向,指着飞出去的方向,不再一律朝右
+  if(jet) art+='<g transform="translate('+x+' '+y+') rotate('+leapAngle(i%4).toFixed(1)+')"><path d="M-5.4 0H3.4M0.2 -3.4L3.8 0L0.2 3.4" fill="none" stroke="#162923" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></g>';
  }
  chart.innerHTML=art;
 }
@@ -302,7 +328,7 @@ function sync(){
  for(const k of game.order)game.planes[k].forEach((p,i)=>{
   const el=tokenMap.get(k+':'+i);
   el.hidden=p===GOAL;el.disabled=k!==c||!legal.has(i);el.classList.toggle('parked',p===HANGAR);
-  el.setAttribute('aria-label',TEAMS[k].name+' '+(i+1)+' 号飞机，'+(p===HANGAR?'在机库':p===0?'在起飞位':p>=R0?'在归航跑道':'在公共航线'));
+  el.setAttribute('aria-label',TEAMS[k].name+' '+(i+1)+' 号飞机，'+(p===HANGAR?'在机库':p===0?'在起飞区':p>=R0?'在归航跑道':'在公共航线'));
   if(p===GOAL)return;
   const [x,y]=coords(k,p,i), key=x.toFixed(3)+':'+y.toFixed(3);
   if(!stacks.has(key))stacks.set(key,[]);
