@@ -610,6 +610,7 @@ html.theme-warm .page.game-shell {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--gs-gap);
   min-height: var(--gs-head-h);
   padding-bottom: 6px;
@@ -623,6 +624,22 @@ html.theme-warm .page.game-shell {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+/* 标题后缀(数独的模式/难度):紧跟在游戏名后面,算头部的一等成员,宽度由页面自己定 */
+.gs-title-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.gs-head .el-select {
+  width: auto;
+}
+.gs-head .el-select__wrapper {
+  min-height: var(--gs-control-h);
+  height: var(--gs-control-h);
+  font-size: 13px;
 }
 .gs-end {
   display: flex;
@@ -640,7 +657,9 @@ html.theme-warm .page.game-shell {
   border-radius: var(--gs-radius);
   font-size: 13px;
 }
-.gs-head .gs-icon-btn {
+/* 图标按钮(全屏/宽屏/撤销/新游戏):正方形、不吃左右内边距,功能靠 title + aria-label 说明。
+   选择器压过下面那条 `.el-button:not(.is-link)`(0,5,0)的 `padding: 0 12px` */
+.page.game-shell :is(.gs-head, .gs-controls) .el-button.gs-icon-btn {
   width: var(--gs-control-h);
   padding: 0;
 }
@@ -858,8 +877,10 @@ html.theme-warm .page.game-shell {
   .page.game-shell :is(.gs-head, .gs-controls) .el-button:not(.is-link) {
     padding: 0 10px;
   }
-  .gs-head .gs-icon-btn {
-    padding: 0;
+  /* 宽屏模式只是放开内容宽度上限、收起侧栏,手机上本来就吃满整宽,按钮留着没用;
+     让出这个图标位,标题后面的设置/数据才和返回、规则挤在同一行(不再折成两行) */
+  .gs-head .gs-wide {
+    display: none;
   }
 }
 

@@ -3,40 +3,32 @@
     ref="shellEl"
     class="sd-shell"
     :title="$t('games.sudoku.title')"
-    :rules-pages="[rulesPagePlay, rulesPageControls, rulesPageVariants]"
+    :rules-pages="[rulesPagePlay, rulesPageControls, rulesPageVariants, rulesPageTech]"
     body-align="stretch"
     @back="goBack"
   >
-    <template #settings>
+    <!-- 模式与难度跟在游戏名后面(不再占控件行);改了就按新设置开局 -->
+    <template #titleExtra>
       <el-select v-model="variant" class="sd-variant" :teleported="!isFullscreen" @change="changeVariant">
         <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
       </el-select>
       <el-select v-model="difficulty" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
         <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
       </el-select>
-      <el-button class="sd-teach-btn" round @click="teachOpen = true">{{ $t('games.sudoku.teach.button') }}</el-button>
-    </template>
-    <template #stats>
-      <span class="gh-chip"
-        ><span>{{ $t('games.sudoku.time') }}</span
-        ><b>{{ timeText }}</b></span
-      >
-      <span class="gh-chip"
-        ><span>{{ $t('games.sudoku.blanks') }}</span
-        ><b>{{ blanksLeft }}</b></span
-      >
-      <span class="gh-chip" :class="{ 'is-warn': conflictCount > 0 }">
-        <span>{{ $t('games.sudoku.conflicts') }}</span
-        ><b>{{ conflictCount }}</b>
-      </span>
-      <span v-if="hintsUsed" class="gh-chip"
-        ><span>{{ $t('games.sudoku.hints') }}</span
-        ><b>{{ hintsUsed }}</b></span
-      >
     </template>
     <template #actions>
-      <el-button :disabled="!history.length" @click="undo">{{ $t('games.sudoku.undo') }}</el-button>
-      <el-button @click="startNew">{{ $t('games.sudoku.newGame') }}</el-button>
+      <el-button
+        class="gs-icon-btn"
+        :disabled="!history.length"
+        :title="$t('games.sudoku.undo')"
+        :aria-label="$t('games.sudoku.undo')"
+        @click="undo"
+      >
+        <el-icon><RefreshLeft /></el-icon>
+      </el-button>
+      <el-button class="gs-icon-btn" :title="$t('games.sudoku.newGame')" :aria-label="$t('games.sudoku.newGame')" @click="startNew">
+        <el-icon><Plus /></el-icon>
+      </el-button>
     </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
@@ -50,13 +42,24 @@
       <ul v-else-if="page === 1">
         <li v-for="n in 5" :key="n">{{ $t('games.sudoku.rules.ctrl' + n) }}</li>
       </ul>
-      <template v-else>
+      <template v-else-if="page === 2">
         <p>{{ $t('games.sudoku.rules.variantsIntro') }}</p>
         <ul>
           <li v-for="key in VARIANT_TIPS" :key="key">
             <b>{{ $t('games.sudoku.variant.' + key) }}</b> · {{ $t('games.sudoku.variantTip.' + key) }}
           </li>
         </ul>
+      </template>
+      <!-- 技巧单列一页:与提示引擎同一套技巧阶梯,不用再单独开弹窗 -->
+      <template v-else>
+        <p class="sd-tech-intro">{{ $t('games.sudoku.teach.intro') }}</p>
+        <ol class="sd-tech-list">
+          <li v-for="item in TECH_LIST" :key="item" class="sd-tech-item">
+            <b>{{ $t('games.sudoku.tech.' + item + '.name') }}</b>
+            <p>{{ $t('games.sudoku.tech.' + item + '.desc') }}</p>
+          </li>
+        </ol>
+        <p class="sd-tech-foot">{{ $t('games.sudoku.teach.foot') }}</p>
       </template>
     </template>
     <template #extras>
@@ -73,21 +76,63 @@
       />
     </template>
 
-    <!-- 技巧教学:与提示引擎同一套技巧阶梯;页面级弹窗挂 #overlay,全屏时留在整页里 -->
+    <!-- 开局选择:进页面先定模式与难度(上一局没下完时也可以直接接着下)。
+         页面级弹窗挂 #overlay,全屏时留在整页里 -->
     <template #overlay>
-      <el-dialog v-model="teachOpen" class="dialog-md" :append-to-body="!isFullscreen" :title="$t('games.sudoku.teach.title')">
-        <p class="sd-teach-intro">{{ $t('games.sudoku.teach.intro') }}</p>
-        <ol class="sd-teach-list">
-          <li v-for="item in TECH_LIST" :key="item" class="sd-teach-item">
-            <b>{{ $t('games.sudoku.tech.' + item + '.name') }}</b>
-            <p>{{ $t('games.sudoku.tech.' + item + '.desc') }}</p>
-          </li>
-        </ol>
-        <p class="sd-teach-foot">{{ $t('games.sudoku.teach.foot') }}</p>
+      <el-dialog
+        v-model="chooserOpen"
+        class="dialog-sm sd-chooser"
+        :append-to-body="!isFullscreen"
+        :title="$t('games.sudoku.chooser.title')"
+        :show-close="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+      >
+        <p class="sd-chooser-tip">{{ $t('games.sudoku.chooser.tip') }}</p>
+        <div class="sd-chooser-fields">
+          <label class="sd-chooser-field">
+            <span>{{ $t('games.sudoku.chooser.variant') }}</span>
+            <el-select v-model="chooserVariant" :teleported="!isFullscreen">
+              <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
+            </el-select>
+          </label>
+          <label class="sd-chooser-field">
+            <span>{{ $t('games.sudoku.chooser.difficulty') }}</span>
+            <el-select v-model="chooserDifficulty" :teleported="!isFullscreen">
+              <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
+            </el-select>
+          </label>
+        </div>
+        <p v-if="savedGame" class="sd-chooser-saved">
+          {{
+            $t('games.sudoku.chooser.saved', {
+              variant: $t('games.sudoku.variant.' + savedGame.variant),
+              difficulty: $t('games.sudoku.difficulty.' + savedGame.difficulty),
+              time: formatTime(savedGame.elapsed || 0),
+            })
+          }}
+        </p>
+        <template #footer>
+          <div class="sd-chooser-actions">
+            <el-button @click="goBack">{{ $t('games.sudoku.chooser.back') }}</el-button>
+            <el-button v-if="savedGame" type="primary" @click="resumeSaved">{{ $t('games.sudoku.chooser.resume') }}</el-button>
+            <el-button :type="savedGame ? 'default' : 'primary'" @click="startFromChooser">{{
+              $t('games.sudoku.chooser.start')
+            }}</el-button>
+          </div>
+        </template>
       </el-dialog>
     </template>
 
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
+      <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
+           冲突直接画在格子上,提示次数只在通关结果里报 -->
+      <div class="sd-meta">
+        <span class="gh-chip"
+          ><span>{{ $t('games.sudoku.time') }}</span
+          ><b>{{ timeText }}</b></span
+        >
+      </div>
       <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
         <template v-if="variant === 'SKYSCRAPER'">
           <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
@@ -268,6 +313,7 @@ import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } fr
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { Plus, RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
@@ -331,6 +377,7 @@ const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 const rulesPagePlay = computed(() => t('games.sudoku.rules.pagePlay'))
 const rulesPageControls = computed(() => t('games.sudoku.rules.pageControls'))
 const rulesPageVariants = computed(() => t('games.sudoku.rules.pageVariants'))
+const rulesPageTech = computed(() => t('games.sudoku.rules.pageTech'))
 /** 规则第三页只列有额外规则的变体(标准玩法已在第一页讲了) */
 const VARIANT_TIPS = VARIANT_KEYS.filter((key) => key !== 'CLASSIC')
 
@@ -378,9 +425,37 @@ const rewardMsg = ref('')
 const hintFlash = ref(-1)
 // 最近一次提示:技巧推导结果(格子、数字、用了哪几招);CONFLICT/DEAD 只用于面板文案
 const hint = ref(null)
-// 快照:一键存下当前盘面,走投无路时一键回退(与技巧教学弹窗各自独立)
+// 快照:一键存下当前盘面,走投无路时一键回退(与开局选择各自独立)
 const snapAt = ref(0)
-const teachOpen = ref(false)
+
+// ---------- 开局选择:进页面先定模式与难度 ----------
+const chooserOpen = ref(false)
+const chooserVariant = ref('CLASSIC')
+const chooserDifficulty = ref('MEDIUM')
+/** 上一局没下完的进度(有就多给一个「继续上一局」) */
+const savedGame = ref(null)
+
+const openChooser = () => {
+  const saved = loadState()
+  savedGame.value = saved
+  chooserVariant.value = saved?.variant || variant.value
+  chooserDifficulty.value = saved?.difficulty || difficulty.value
+  chooserOpen.value = true
+}
+
+const startFromChooser = () => {
+  chooserOpen.value = false
+  variant.value = chooserVariant.value
+  difficulty.value = chooserDifficulty.value
+  return startNew()
+}
+
+const resumeSaved = () => {
+  if (!savedGame.value) return
+  chooserOpen.value = false
+  applySavedState(savedGame.value)
+  syncSnapMeta()
+}
 
 const snapTime = computed(() => {
   if (!snapAt.value) return ''
@@ -543,7 +618,6 @@ const conflicts = computed(() => {
   })
 })
 const conflictCount = computed(() => conflicts.value.size)
-const blanksLeft = computed(() => board.value.reduce((n, v) => n + (v ? 0 : 1), 0))
 const counts = computed(() => digitCounts(board.value))
 const remaining = computed(() => {
   const left = [0]
@@ -1375,11 +1449,8 @@ onMounted(async () => {
     return
   }
 
-  const saved = loadState()
-  if (saved) applySavedState(saved)
-  else await startNew()
-  // 刷新后本地那份快照若仍属于这道题就继续可用,否则丢掉
-  syncSnapMeta()
+  // 单机从分类进来先选模式与难度(选了才开局);上一局没下完可以接着下
+  openChooser()
 })
 
 onBeforeUnmount(() => {
@@ -1422,24 +1493,43 @@ onBeforeUnmount(() => {
   --sd-dragon: rgba(188, 116, 46, 0.62);
 }
 
+/* 头部两个下拉跟在游戏名后面:手机档收窄一档,好和返回/图标挤在同一行 */
 .sd-variant {
-  width: 140px;
+  width: 118px;
 }
 .sd-difficulty {
-  width: 104px;
+  width: 84px;
+}
+@media (max-width: 768px) {
+  .sd-variant {
+    width: 100px;
+  }
+  .sd-difficulty {
+    width: 74px;
+  }
+}
+@media (max-width: 400px) {
+  .sd-variant {
+    width: 90px;
+  }
+  .sd-difficulty {
+    width: 68px;
+  }
 }
 
-/* 棋盘 + 操作面板:竖屏=棋盘在上、数字盘在下;横屏改左右两栏(见下面的容器查询)。
-   外壳的 .gs-body 是尺寸容器,这里直接用 100cqh 扣掉「实测面板高度」,
+/* 棋盘 + 操作面板:竖屏=用时条在上、棋盘居中、数字盘在下;横屏改左右两栏(见下面的容器查询)。
+   外壳的 .gs-body 是尺寸容器,这里直接用 100cqh 扣掉「实测面板高度 + 用时条高度」,
    不再按屏高减魔法数,也不整块 transform 缩放 */
 .sd-layout {
-  --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-panel-h, 0px) - 18px), 560px);
+  --sd-meta-h: calc(var(--gs-control-h) + 10px);
+  --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-panel-h, 0px) - var(--sd-meta-h) - 18px), 560px);
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  /* 两行都按内容走、整体垂直居中:棋盘被宽度卡住时(手机竖屏/平板竖屏)棋盘与数字盘
+  /* 三行都按内容走、整体垂直居中:棋盘被宽度卡住时(手机竖屏/平板竖屏)整摞
      贴在一起居中,而不是被 1fr 行拉开一大段空白 */
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
+  grid-template-areas: 'meta' 'board' 'panel';
   justify-items: center;
   align-items: center;
   align-content: center;
@@ -1449,7 +1539,18 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
 }
+/* 用时条:宽度跟棋盘一致(--sd-frame-size),左边缘与棋盘对齐 */
+.sd-meta {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: var(--sd-frame-size);
+  height: var(--gs-control-h);
+  min-width: 0;
+}
 .sd-panel {
+  grid-area: panel;
   display: grid;
   gap: 10px;
   width: 100%;
@@ -1461,6 +1562,7 @@ onBeforeUnmount(() => {
    外框自身是尺寸容器,外圈提示数字按 cqi 跟随棋盘大小 */
 .sd-frame {
   container-type: inline-size;
+  grid-area: board;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   grid-template-rows: repeat(9, minmax(0, 1fr));
@@ -2049,36 +2151,36 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #8a8a8a);
 }
 
-/* 技巧教学 */
-.sd-teach-intro,
-.sd-teach-foot {
+/* 帮助里的技巧页(元素在游戏外壳的规则弹窗内,按本页作用域渲染) */
+.sd-tech-intro,
+.sd-tech-foot {
   margin: 0;
   font-size: 12px;
   line-height: 1.7;
   color: var(--color-text-secondary, #8a8a8a);
 }
-.sd-teach-intro {
+.sd-tech-intro {
   margin-bottom: 10px;
 }
-.sd-teach-foot {
+.sd-tech-foot {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
 }
-.sd-teach-list {
+.sd-tech-list {
   display: grid;
   gap: 10px;
   margin: 0;
   padding-left: 20px;
 }
-.sd-teach-item {
+.sd-tech-item {
   font-size: 13px;
   color: var(--color-text-primary, #2b2b2b);
 }
-.sd-teach-item b {
+.sd-tech-item b {
   font-size: 13px;
 }
-.sd-teach-item p {
+.sd-tech-item p {
   margin: 3px 0 0;
   font-size: 12px;
   line-height: 1.7;
@@ -2147,11 +2249,41 @@ html.dark .sd-shell {
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
 }
-.sd-shell .gh-chip.is-warn b {
-  color: #d64c4c;
+
+/* 开局选择弹窗:两个字段竖排,标签在上、下拉占满整行 */
+.sd-chooser-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #8a8a8a);
 }
-html.dark .sd-shell .gh-chip.is-warn b {
-  color: #ff9a9a;
+.sd-chooser-fields {
+  display: grid;
+  gap: 10px;
+}
+.sd-chooser-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-chooser-field .el-select {
+  width: 100%;
+}
+.sd-chooser-saved {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--sd-line-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-chooser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* 窄窗(手机竖):数字盘与工具键压一档,棋盘仍是通栏最大尺寸 */
@@ -2187,11 +2319,15 @@ html.dark .sd-shell .gh-chip.is-warn b {
    必须放在最后:上面 .sd-numpad/.sd-tools/.sd-num/.sd-tool 的基础声明会按书写顺序覆盖同权重的容器规则 */
 @container (min-aspect-ratio: 6/5) {
   .sd-layout {
-    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感 */
+    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感。
+       用时条占左列顶上一条,棋盘吃左列剩下的高度 */
     grid-template-columns: minmax(0, 1fr) clamp(148px, 30%, 232px);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'meta panel'
+      'board panel';
     gap: clamp(12px, 3cqi, 30px);
-    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
+    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
   }
   .sd-panel {
     max-height: 100%;

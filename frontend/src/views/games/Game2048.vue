@@ -12,19 +12,26 @@
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
       </el-select>
     </template>
-    <template #stats>
-      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
-        ><span>{{ $t('games.g2048.score') }}</span
-        ><b>{{ score }}</b></span
-      >
-      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
-        ><span>{{ $t('games.g2048.best') }}</span
-        ><b>{{ best }}</b></span
-      >
-    </template>
     <template #actions>
-      <el-button v-if="!matchId && !play.active" :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
-      <el-button v-if="!matchId" @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
+      <el-button
+        v-if="!matchId && !play.active"
+        class="gs-icon-btn bf-undo"
+        :disabled="!history.length"
+        :title="$t('games.g2048.undo')"
+        :aria-label="$t('games.g2048.undo')"
+        @click="undo"
+      >
+        <el-icon><RefreshLeft /></el-icon>
+      </el-button>
+      <el-button
+        v-if="!matchId"
+        class="gs-icon-btn bf-new"
+        :title="$t('games.g2048.newGame')"
+        :aria-label="$t('games.g2048.newGame')"
+        @click="startNew"
+      >
+        <el-icon><Plus /></el-icon>
+      </el-button>
     </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
@@ -77,42 +84,56 @@
       />
     </template>
 
-    <div class="bf-stage" @contextmenu.prevent @dblclick.prevent>
-      <div class="bf-board" :class="'bf-size-' + size" @touchstart="onTouchStart" @touchend="onTouchEnd">
-        <div class="bf-playfield" :style="playfieldStyle">
-          <div v-for="i in size * size" :key="i" class="bf-slot"></div>
-          <div
-            v-for="tile in tiles"
-            :key="tile.id"
-            class="bf-tile"
-            :class="[
-              'bf-tile-' + Math.min(tile.value, 4096),
-              { new: newIds.has(tile.id), merged: mergedIds.has(tile.id), 'len-long': tile.value >= 1000 },
-            ]"
-            :style="tileStyle(tile)"
-          >
-            {{ tile.value }}
-          </div>
-        </div>
+    <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图 -->
+    <div class="bf-layout">
+      <div class="bf-meta">
+        <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+          ><span>{{ $t('games.g2048.score') }}</span
+          ><b>{{ score }}</b></span
+        >
+        <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+          ><span>{{ $t('games.g2048.best') }}</span
+          ><b>{{ best }}</b></span
+        >
       </div>
 
-      <Transition name="game-overlay">
-        <div v-if="won || gameOver" class="bf-overlay game-overlay">
-          <div class="bf-overlay-card game-overlay-card">
-            <div class="bf-overlay-icon">{{ won ? '🏆' : '💤' }}</div>
-            <div class="bf-overlay-title">
-              {{ won ? $t('games.g2048.win') : $t('games.g2048.lose') }}
-            </div>
-            <div class="bf-overlay-meta">{{ $t('games.g2048.meta', { score }) }}</div>
-            <div v-if="won && rewardMsg" class="bf-overlay-reward">{{ rewardMsg }}</div>
-            <div class="bf-overlay-actions">
-              <el-button v-if="won" type="primary" @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
-              <el-button v-if="won" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
-              <el-button v-else type="primary" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+      <div class="bf-stage" @contextmenu.prevent @dblclick.prevent>
+        <div class="bf-board" :class="'bf-size-' + size" @touchstart="onTouchStart" @touchend="onTouchEnd">
+          <div class="bf-playfield" :style="playfieldStyle">
+            <div v-for="i in size * size" :key="i" class="bf-slot"></div>
+            <div
+              v-for="tile in tiles"
+              :key="tile.id"
+              class="bf-tile"
+              :class="[
+                'bf-tile-' + Math.min(tile.value, 4096),
+                { new: newIds.has(tile.id), merged: mergedIds.has(tile.id), 'len-long': tile.value >= 1000 },
+              ]"
+              :style="tileStyle(tile)"
+            >
+              {{ tile.value }}
             </div>
           </div>
         </div>
-      </Transition>
+
+        <Transition name="game-overlay">
+          <div v-if="won || gameOver" class="bf-overlay game-overlay">
+            <div class="bf-overlay-card game-overlay-card">
+              <div class="bf-overlay-icon">{{ won ? '🏆' : '💤' }}</div>
+              <div class="bf-overlay-title">
+                {{ won ? $t('games.g2048.win') : $t('games.g2048.lose') }}
+              </div>
+              <div class="bf-overlay-meta">{{ $t('games.g2048.meta', { score }) }}</div>
+              <div v-if="won && rewardMsg" class="bf-overlay-reward">{{ rewardMsg }}</div>
+              <div class="bf-overlay-actions">
+                <el-button v-if="won" type="primary" @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
+                <el-button v-if="won" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+                <el-button v-else type="primary" @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </div>
     </div>
   </GameShell>
 </template>
@@ -124,6 +145,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Plus, RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi, matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -521,18 +543,34 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--color-brand-text);
 }
-/* 棋盘舞台:边长取「游戏区宽 / 游戏区高 / 上限」三者的最小值,再各让 8px,
-   棋盘不顶到游戏区边缘(宽高两个方向同时让,横竖屏都不会突然贴边);
-   外壳的 .gs-body 是尺寸容器,所以横竖屏/平板/电脑同一口径,不整体缩放也不留大片空白 */
+/* 棋盘区 = 分数条 + 棋盘,共用一列宽(分数按列宽左对齐,紧贴棋盘左上角)。
+   棋盘边长取「这一列的宽 / 游戏区剩余高 / 上限」三者的最小值,各让 8px;
+   扣高度时先减去分数条与它和棋盘之间的间距,整块才装得进游戏区,横竖屏同一口径 */
+.bf-layout {
+  --bf-meta-h: calc(var(--gs-control-h) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(calc(100% - 16px), calc(100cqh - var(--bf-meta-h) - 16px), 760px);
+}
+.bf-shell:fullscreen .bf-layout {
+  width: min(calc(100% - 16px), calc(100cqh - var(--bf-meta-h) - 16px), 900px);
+}
+/* 分数/最高分:固定一条控制行高,点一下出分享图(芯片样式沿用 .gh-chip) */
+.bf-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  height: var(--gs-control-h);
+  min-width: 0;
+}
 .bf-stage {
   position: relative;
   flex: 0 0 auto;
-  width: min(calc(100% - 16px), calc(100cqh - 16px), 760px);
+  width: 100%;
   aspect-ratio: 1;
   --bf-gap: clamp(6px, 2vw, 10px);
-}
-.bf-shell:fullscreen .bf-stage {
-  width: min(calc(100% - 16px), calc(100cqh - 16px), 900px);
 }
 
 .bf-size-select {

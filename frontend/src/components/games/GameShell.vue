@@ -22,6 +22,8 @@
           <span class="gs-back-label">{{ backLabel || $t('games.back') }}</span>
         </el-button>
         <span class="gs-title">{{ title }}</span>
+        <!-- 标题后缀(数独的模式/难度等):跟在游戏名后面,手机档自动收窄 -->
+        <div v-if="$slots.titleExtra" class="gs-title-extra"><slot name="titleExtra" /></div>
         <div class="gs-end">
           <slot name="head" />
           <el-tag v-if="gamepadConnected" size="small" type="success" effect="plain" class="gamepad-tag">
@@ -67,10 +69,11 @@
       </header>
 
       <div v-if="$slots.settings || $slots.stats || $slots.actions" class="gs-controls">
-        <div class="gs-settings"><slot name="settings" /></div>
-        <div class="gs-end">
-          <div class="gs-stats"><slot name="stats" /></div>
-          <div class="gs-actions"><slot name="actions" /></div>
+        <!-- 空插槽不渲染:否则空 div 也参与 flex gap,按钮会莫名偏离右边 -->
+        <div v-if="$slots.settings" class="gs-settings"><slot name="settings" /></div>
+        <div v-if="$slots.stats || $slots.actions" class="gs-end">
+          <div v-if="$slots.stats" class="gs-stats"><slot name="stats" /></div>
+          <div v-if="$slots.actions" class="gs-actions"><slot name="actions" /></div>
         </div>
       </div>
 
