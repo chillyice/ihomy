@@ -69,7 +69,10 @@
 
     <div class="card settings-card health-shortcut">
       <div class="section-label">{{ $t('settings.health.tplTitle') }}</div>
-      <div class="share-tip">{{ $t('settings.health.tplHint') }}</div>
+      <div class="share-tip">
+        {{ $t('settings.health.tplHint') }}
+        <router-link class="tpl-more" to="/help#health">{{ $t('settings.health.tplMore') }}</router-link>
+      </div>
 
       <ol class="tpl-steps">
         <li>{{ $t('settings.health.tplStep1') }}</li>
@@ -181,6 +184,8 @@ import { Delete } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { formatDateTime } from '@/utils/datetime'
 import { isAndroidApp } from '@/utils/platform'
+import { copyText as copyToClipboard } from '@/utils/clipboard'
+import { SHORTCUT_BODY } from '@/utils/healthShortcut'
 
 const { t } = useI18n()
 
@@ -190,24 +195,8 @@ const SOURCES = [
   { value: 'IOS_NATIVE', labelKey: 'settings.health.sourceNative' },
 ]
 
-// iOS 快捷指令请求体模板:睡眠传分期区间(服务端聚合成会话),其余指标按天或按小时聚合传;
-// 用真实示例值(不是占位符),用户点复制后改日期/数值就能跑通,也避免模板里出现会被误替换的符号
-const TPL_BODY = `{
-  "provider": "SHORTCUT",
-  "timezone": "+08:00",
-  "samples": [
-    { "metric": "STEPS", "period": "DAY", "date": "2026-11-18", "value": 8240, "source": "APPLE" },
-    { "metric": "RESTING_HR", "period": "DAY", "date": "2026-11-18", "value": 56, "source": "APPLE" },
-    { "metric": "HEART_RATE", "period": "POINT", "start": "2026-11-18T09:00:00",
-      "end": "2026-11-18T10:00:00", "avg": 72, "min": 60, "max": 96, "count": 58, "source": "APPLE" }
-  ],
-  "sleep": [
-    { "stage": "DEEP",  "start": "2026-11-17T23:20:00", "end": "2026-11-18T00:50:00", "source": "APPLE" },
-    { "stage": "LIGHT", "start": "2026-11-18T00:50:00", "end": "2026-11-18T03:10:00", "source": "APPLE" },
-    { "stage": "REM",   "start": "2026-11-18T03:10:00", "end": "2026-11-18T04:20:00", "source": "APPLE" },
-    { "stage": "AWAKE", "start": "2026-11-18T04:20:00", "end": "2026-11-18T04:35:00", "source": "APPLE" }
-  ]
-}`
+// 请求体示例与帮助页共用(utils/healthShortcut.js),这里有复制按钮直接取用
+const TPL_BODY = SHORTCUT_BODY
 
 const loading = ref(false)
 const creating = ref(false)
@@ -375,32 +364,9 @@ const createToken = async () => {
   }
 }
 
-/** 复制统一入口:内嵌壳/局域网 http 下 navigator.clipboard 不可用,退回 execCommand */
+/** 复制统一入口:成功后提示;共用 utils/clipboard(内嵌壳/局域网 http 下 clipboard 不可用) */
 const copyText = async (text) => {
-  if (!text) return
-  let ok = false
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-      ok = true
-    }
-  } catch (e) {
-    /* 走 execCommand 兜底 */
-  }
-  if (!ok) {
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      ok = document.execCommand('copy')
-      document.body.removeChild(ta)
-    } catch (e) {
-      ok = false
-    }
-  }
+  const ok = await copyToClipboard(text)
   if (ok) ElMessage.success(t('settings.health.copied'))
   else ElMessage.warning(t('settings.health.copyFailed'))
 }
@@ -487,6 +453,11 @@ onMounted(() => {
 }
 .health-shortcut {
   margin-top: 16px;
+}
+.tpl-more {
+  margin-left: 6px;
+  color: var(--color-primary);
+  white-space: nowrap;
 }
 .tpl-steps {
   margin: 10px 0 0;

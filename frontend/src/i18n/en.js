@@ -3106,6 +3106,7 @@ export default {
       viewlogScopeExport: 'Data export',
       tplTitle: 'iOS Shortcut template',
       tplHint: 'No app needed: on iPhone, a Shortcut can send your health data here once a day.',
+      tplMore: 'Full steps',
       tplStep1: 'Create a Shortcut and add "Find Health Samples" for each item you want to sync (sleep, steps, heart rate…).',
       tplStep2:
         'Add "Get Contents of URL": use the upload address above, method POST, and an Authorization header with Bearer plus your token.',
@@ -6598,6 +6599,52 @@ export default {
       title: 'On a phone',
       body: 'Open ihomy in your phone browser and choose "Add to Home Screen" from the browser menu. It gets its own icon and opens like any other app. For a screen that just stays on as ambience, open the wallpaper page and add it the same way.',
     },
+    health: {
+      title: 'Bring your phone health data here',
+      lead: 'On an iPhone you do not need our app: the built-in Shortcuts app sends sleep, steps and heart rate here every day. On Android, tap allow once inside the app. Setting it up takes a few minutes, and then you can forget about it.',
+      tokenTitle: 'Step one: get a key',
+      tokenItems: [
+        'On this phone open Settings → Health data, give it any name (for example "My iPhone") and tap create.',
+        'The string starting with hk_ is shown only once; copy it into your notes right away.',
+        'The same page shows an upload address; you need it in the next step. This key can only send data, nothing else.',
+      ],
+      shortcutTitle: 'Step two: build one Shortcut',
+      shortcutItems: [
+        'Open the built-in Shortcuts app, tap the plus at the top right and create one named "Health upload".',
+        'Add a Text action and paste the body below, changing the dates and numbers to your own first.',
+        'Add a Get Contents of URL action: the upload address as the URL, POST as the method.',
+        'Add one header named Authorization whose value is Bearer, one space, then your hk_ key.',
+        'Set the request body to JSON with that text as the content; run it once by hand and success in the reply means it works.',
+      ],
+      bodyLabel: 'Fill the request body like this',
+      copy: 'Copy',
+      bodyNote:
+        'For sleep send only the start and end times; the total is calculated here. Steps, heart rate and the like go one row per day or per hour.',
+      stageTitle: 'Sleep stage names',
+      stageNote:
+        'The phone names sleep stages in words; replace them with the values on the right. If you only have start and end times without stages, that still gets recorded.',
+      stageItems: ['Deep sleep → DEEP', 'Core sleep, light sleep → LIGHT', 'REM sleep → REM', 'Awake → AWAKE', 'In bed → INBED'],
+      autoTitle: 'Step three: let it run daily',
+      autoItems: [
+        'Switch to the Automation tab at the bottom of Shortcuts, create one and choose Sleep → Wakes Up (a fixed time such as 9 a.m. works too).',
+        'Choose Run Immediately and turn off Ask Before Running, otherwise it waits for your answer.',
+        'Pick the "Health upload" shortcut you just built.',
+      ],
+      checkTitle: 'How to tell it worked',
+      checkItems: [
+        'Back in Settings → Health data, tap refresh: a non-zero accepted count in the last upload means it landed.',
+        'Open the Health page; sleep and steps should already be there.',
+        'When rows are rejected the page lists which one, which metric and why; skipped usually means you have not turned on consent for that metric.',
+      ],
+      limitTitle: 'Worth knowing',
+      limitItems: [
+        'At most two thousand rows per upload spanning at most thirty-one days; split a first-time backfill over several days.',
+        'Automations may not run while the phone is locked or in low power mode; if no new data shows up for a couple of days, run the shortcut by hand once.',
+        'New phone or lost key: delete the old one on the health settings page and create a new key; the old one stops working at once.',
+        'Garmin and Huawei watches must first share with Apple Health inside their own app; data the phone does not have cannot arrive here.',
+      ],
+      androidNote:
+        'Android is simpler: install the ihomy app, open Settings → Health data, find phone sync and allow once; it then syncs every day on its own.',
     visible: {
       title: 'Who can see what',
       items: [
