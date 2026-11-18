@@ -1,26 +1,26 @@
 <template>
-  <div ref="pageEl" class="page game-page">
-    <!-- 顶栏:返回 + 全屏 + 宽屏(工具按钮统一进顶栏,与物品定位一致) -->
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        :fullscreen-label="$t('games.petlink.fullscreen')"
-        :exit-label="$t('games.petlink.exitFullscreen')"
-        @back="goBack"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
+  <GameShell ref="shellEl" class="pl-shell" :title="$t('games.petlink.title')" body-align="start" @back="goBack">
+    <template #rules>
+      <p>{{ $t('games.petlink.coverHint') }}</p>
+    </template>
+
+    <template #extras>
+      <GameRoomBar
+        v-if="screen === 'game'"
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="score"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
       />
-    </PageToolbar>
+    </template>
 
-    <div ref="gameCardEl" class="game-card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader :title="$t('games.petlink.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #rules>
-          <p>{{ $t('games.petlink.coverHint') }}</p>
-        </template>
-      </GameHeader>
-
-      <!-- 封面(复刻原版标题屏):开始/继续 + 版权;游戏名与玩法说明在统一卡头 -->
+    <div class="pl-layout" @contextmenu.prevent @dblclick.prevent>
+      <!-- 封面(复刻原版标题屏):开始/继续 + 版权;玩法说明在规则弹窗 -->
       <div v-if="screen === 'cover'" class="cover">
         <button class="start-btn" type="button" @click="continueGame">
           {{ savedState ? $t('games.petlink.resume') : $t('games.petlink.start') }}
@@ -33,17 +33,6 @@
 
       <!-- 游戏 -->
       <template v-else>
-        <GameRoomBar
-          :room="play.room"
-          :is-host="play.isHost"
-          :score="score"
-          :reported="play.reported"
-          :ended="play.ended"
-          :result="play.spec?.result"
-          :my-id="play.myId"
-          @submit="submitRoomScore"
-          @leave="play.leave"
-        />
         <!-- 顶部信息栏(复刻原版 HUD):关卡+关卡名 / 重排 / 倒计时条 / 得分 -->
         <div class="game-hud">
           <div class="hud-level">
@@ -169,7 +158,7 @@
         </Transition>
       </template>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -186,11 +175,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -474,12 +460,11 @@ let ticker = null
 let hintTimer = null
 let resizeObserver = null
 
-// 全屏 / 宽屏 / 一屏适配;全屏目标仍是 .game-card
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+// 统一外壳持有全屏/宽屏;棋盘缩放按外壳游戏区实测高度重算
+const shellEl = ref(null)
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 function onFullscreenChange() {
-  // 全屏/退出后可用宽高变化,重新计算缩放(退出恢复 1.6 上限)
+  // 全屏/退出后可用宽高变化,重新计算缩放
   nextTick(() => updateBoardScale())
 }
 
@@ -940,14 +925,14 @@ function updateBoardScale() {
   if (!el) return
   const availW = el.clientWidth
   let scale = availW > 0 ? availW / svgW : 1
-  if (isFullscreen.value) {
-    // 全屏:同时按可用宽/高取较小者,让棋盘铺满屏幕(不再 1.6 封顶),大屏不累眼
-    const card = gameCardEl.value
-    const hud = card?.querySelector('.game-hud')
-    const bar = card?.querySelector('.game-bottombar')
+  // 按外壳游戏区实测高取较小者,棋盘铺满可用区(不封顶,大屏不累眼)
+  const bodyEl = shellEl.value?.bodyEl
+  if (bodyEl) {
+    const hud = bodyEl.querySelector('.game-hud')
+    const bar = bodyEl.querySelector('.game-bottombar')
     const hudH = hud ? hud.offsetHeight + 12 : 0 // .game-hud margin-bottom 12px
     const barH = bar ? bar.offsetHeight + 12 : 0 // .game-bottombar margin-top 12px
-    const availH = (card ? card.clientHeight : window.innerHeight) - 40 - hudH - barH // 40 = .game-card 上下 padding
+    const availH = bodyEl.clientHeight - 16 - hudH - barH
     if (availH > 0) scale = Math.min(scale, availH / svgH)
     scale = Math.max(0.5, scale)
   } else {
@@ -1054,6 +1039,14 @@ watch(
   { deep: true },
 )
 
+// 封面 → 游戏:棋盘挂载后重算缩放并接管尺寸观察(外壳游戏区高度固定,不重算会溢出被裁)
+watch(screen, () => {
+  nextTick(() => {
+    updateBoardScale()
+    if (boardScrollRef.value && resizeObserver) resizeObserver.observe(boardScrollRef.value)
+  })
+})
+
 const onVisibilityChange = () => {
   if (document.hidden) saveState()
 }
@@ -1117,31 +1110,23 @@ function onKeydown(e) {
 </script>
 
 <style scoped>
-.game-card {
+/* 连连看自带深色底:整页叠一层深色渐变(--gs-bg 必须同时给 dark 档),棋盘区透出 */
+.pl-shell {
+  --gs-bg: linear-gradient(rgba(12, 14, 11, 0.88), rgba(7, 9, 7, 0.94));
+}
+html.dark .pl-shell {
+  --gs-bg: linear-gradient(rgba(5, 6, 5, 0.92), rgba(3, 4, 3, 0.96));
+}
+.pl-layout {
   position: relative;
-  min-height: 480px;
-  background: #000;
-  border-radius: 14px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 卡头顶部通栏,其余内容向下排;封面自己居中,游戏态按内容自然高 */
-  justify-content: flex-start;
-  padding: 20px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   color: #fff;
-}
-.game-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  min-height: 100vh;
-  border-radius: 0;
-}
-
-/* 统一卡头通栏置顶(容器垂直居中,卡头不能跟着居中) */
-.game-card > .game-header {
-  align-self: stretch;
-  margin: -20px -20px 0;
 }
 
 /* 封面 */
@@ -1479,6 +1464,9 @@ function onKeydown(e) {
 /* 底部操作 */
 .game-bottombar {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
