@@ -4,6 +4,7 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import tools.jackson.databind.ObjectMapper;
 import com.ihomy.security.JwtAuthenticationFilter;
+import com.ihomy.security.HealthTokenFilter;
 import com.ihomy.security.OpsAccessFilter;
 import com.ihomy.service.FileAccessService;
 import org.springframework.security.authorization.AuthorizationDecision;
@@ -29,6 +30,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final HealthTokenFilter healthTokenFilter;
     private final OpsAccessFilter opsAccessFilter;
     private final FileAccessService fileAccessService;
     private final ObjectMapper objectMapper;
@@ -107,7 +109,11 @@ public class SecurityConfig {
                     resp.setCharacterEncoding("UTF-8");
                     resp.getWriter().write(objectMapper.writeValueAsString(Result.fail(ResultCode.FORBIDDEN)));
                 }))
+            // 健康数据上报令牌(hk_...)先于 JWT 过滤器:JWT 解析不了 hk_ 令牌,
+            // 由本过滤器构造最小权限 principal(只放行 /health/ingest 与 /health/ping)。
+            // 注意顺序:必须先注册 JWT 过滤器,它才能作为 addFilterBefore 的锚点(自定义过滤器没注册前没有 order)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(healthTokenFilter, JwtAuthenticationFilter.class)
             // OPS 角色白名单限制（放在 JWT 过滤器之后,认证完成后拦截）
             .addFilterAfter(opsAccessFilter, JwtAuthenticationFilter.class);
         return http.build();

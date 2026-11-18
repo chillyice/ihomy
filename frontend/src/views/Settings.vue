@@ -42,6 +42,7 @@
         </div>
 
         <div v-show="activeId === 'profile'"><ProfileSettings /></div>
+        <div v-show="activeId === 'health'"><HealthSettings /></div>
         <div v-show="activeId === 'family'"><FamilySettings /></div>
         <div v-show="activeId === 'ai'"><AiSettings /></div>
         <div v-show="activeId === 'backup'"><BackupSettings /></div>
@@ -75,6 +76,7 @@ import { useDevice } from '@/composables/useDevice'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import StorageView from '@/views/storage/Storage.vue'
 import ProfileSettings from './settings/ProfileSettings.vue'
+import HealthSettings from './settings/HealthSettings.vue'
 import FamilySettings from './settings/FamilySettings.vue'
 import AiSettings from './settings/AiSettings.vue'
 import BackupSettings from './settings/BackupSettings.vue'
@@ -97,6 +99,7 @@ const { isMobile } = useDevice()
 // 大类清单:移动端列表与桌面侧栏共用这一份;perm/nativeOnly 决定可见性
 const PANELS = [
   { id: 'profile', icon: '👤', labelKey: 'settings.cat.profile' },
+  { id: 'health', icon: '❤️', labelKey: 'settings.cat.health' },
   { id: 'family', icon: '🏠', labelKey: 'settings.cat.family' },
   { id: 'pointsRule', icon: '🏅', labelKey: 'settings.cat.pointsRule', perm: 'points:manage' },
   { id: 'ai', icon: '🤖', labelKey: 'settings.cat.ai', perm: 'family:manage' },
@@ -110,7 +113,7 @@ const PANELS = [
 
 // 分组顺序:账号 → 家庭 → 内容与媒体 → 外观与设备
 const GROUPS = [
-  { key: 'account', labelKey: 'settings.group.account', ids: ['profile'] },
+  { key: 'account', labelKey: 'settings.group.account', ids: ['profile', 'health'] },
   { key: 'family', labelKey: 'settings.group.family', ids: ['family', 'pointsRule', 'ai', 'backup'] },
   { key: 'content', labelKey: 'settings.group.content', ids: ['content', 'media', 'storage'] },
   { key: 'device', labelKey: 'settings.group.device', ids: ['appearance', 'client'] },

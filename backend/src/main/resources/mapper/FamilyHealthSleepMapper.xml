@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyHealthSleepMapper">
+
+    <!--
+      睡眠会话是服务端聚合出的派生数据,重算即整窗替换;表上不设 deleted 逻辑删列,
+      删除一律物理删,故走自定义 XML(MP 的 deleteById 是软删语义,踩坑速查 §后端规范 5)。
+    -->
+
+    <select id="selectOverlappingIds" resultType="java.lang.Long">
+        SELECT `id` FROM `family_health_sleep`
+        WHERE `user_id` = #{userId}
+          AND `source_app` = #{sourceApp}
+          AND `start_time` &lt; #{to}
+          AND `end_time` &gt; #{from}
+    </select>
+
+    <delete id="deleteByIds">
+        DELETE FROM `family_health_sleep` WHERE `id` IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteByProvider">
+        DELETE FROM `family_health_sleep`
+        WHERE `user_id` = #{userId} AND `provider` = #{provider}
+    </delete>
+
+</mapper>

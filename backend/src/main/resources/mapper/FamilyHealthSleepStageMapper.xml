@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyHealthSleepStageMapper">
+
+    <!-- 分期区间是派生数据:随所属会话重算物理删/批量插,表无逻辑删列,故走自定义 XML -->
+
+    <delete id="deleteBySleepIds">
+        DELETE FROM `family_health_sleep_stage` WHERE `sleep_id` IN
+        <foreach collection="sleepIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteBySleepId">
+        DELETE FROM `family_health_sleep_stage` WHERE `sleep_id` = #{sleepId}
+    </delete>
+
+    <!-- 清除某来源:先按会话子查询删分期(调用方保证先分期后会话,否则子查询已无父行) -->
+    <delete id="deleteByProvider">
+        DELETE FROM `family_health_sleep_stage`
+        WHERE `user_id` = #{userId}
+          AND `sleep_id` IN (
+            SELECT `id` FROM `family_health_sleep`
+            WHERE `user_id` = #{userId} AND `provider` = #{provider}
+          )
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO `family_health_sleep_stage`
+        (`family_id`, `user_id`, `sleep_id`, `stage`, `start_time`, `end_time`, `duration_min`)
+        VALUES
+        <foreach collection="list" item="s" separator=",">
+            (#{s.familyId}, #{s.userId}, #{s.sleepId}, #{s.stage},
+             #{s.startTime}, #{s.endTime}, #{s.durationMin})
+        </foreach>
+    </insert>
+
+</mapper>

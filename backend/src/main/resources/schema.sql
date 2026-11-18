@@ -3113,3 +3113,153 @@ CREATE TABLE `sys_backup_job` (
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份与迁移任务记录';
 
+-- ------------------------------------------------------------
+-- 86. 健康数据(V12.88):家庭成员睡眠与体征(设计见 docs/设计想法/功能/健康数据接入-计划.md)
+--     family_health_sleep / family_health_sleep_stage 是服务端从上报区间聚合出的派生数据,
+--     重算即整窗替换,故不设 deleted 逻辑删列(物理删一律走 Mapper XML,禁 MP deleteById)。
+--     sys_health_token 是账号级上报令牌(不属家庭内容),family_id 只作签发时快照。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_health_sleep`;
+CREATE TABLE `family_health_sleep` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT,
+  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭',
+  `user_id`      BIGINT      NOT NULL COMMENT '成员',
+  `sleep_date`   DATE        NOT NULL COMMENT '入睡日(凌晨入睡归前一天)',
+  `kind`         VARCHAR(10) NOT NULL DEFAULT 'NIGHT' COMMENT 'NIGHT夜睡/NAP小睡',
+  `start_time`   DATETIME    NOT NULL COMMENT '入睡时刻',
+  `end_time`     DATETIME    NOT NULL COMMENT '醒来时刻',
+  `total_min`    INT         NOT NULL COMMENT '在床总时长(含中途清醒)',
+  `deep_min`     INT         DEFAULT NULL COMMENT '深睡分钟',
+  `light_min`    INT         DEFAULT NULL COMMENT '浅睡分钟',
+  `rem_min`      INT         DEFAULT NULL COMMENT 'REM 分钟',
+  `awake_min`    INT         DEFAULT NULL COMMENT '清醒分钟',
+  `stage_level`  VARCHAR(10) NOT NULL DEFAULT 'NONE' COMMENT 'NONE仅起止/SUMMARY含清醒/FULL含深浅REM',
+  `source`       VARCHAR(20) NOT NULL COMMENT 'GARMIN/HUAWEI/APPLE/XIAOMI/OPPO/SAMSUNG/OTHER',
+  `source_app`   VARCHAR(120) NOT NULL COMMENT '来源 App(Health Connect 包名 / 快捷指令固定 APPLE_HEALTH)',
+  `provider`     VARCHAR(20) NOT NULL COMMENT 'SHORTCUT/HEALTH_CONNECT/IOS_NATIVE',
+  `computed_at`  DATETIME    NOT NULL COMMENT '本次聚合时间',
+  `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_src_start` (`user_id`, `source_app`, `start_time`),
+  KEY `idx_family_date` (`family_id`, `sleep_date`),
+  KEY `idx_user_date` (`user_id`, `sleep_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员睡眠会话(派生数据)';
+
+DROP TABLE IF EXISTS `family_health_sleep_stage`;
+CREATE TABLE `family_health_sleep_stage` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT,
+  `family_id`    BIGINT      NOT NULL,
+  `user_id`      BIGINT      NOT NULL,
+  `sleep_id`     BIGINT      NOT NULL COMMENT '指向 family_health_sleep.id(派生数据,重算时物理删)',
+  `stage`        VARCHAR(10) NOT NULL COMMENT 'AWAKE/LIGHT/DEEP/REM/INBED/UNKNOWN',
+  `start_time`   DATETIME    NOT NULL,
+  `end_time`     DATETIME    NOT NULL,
+  `duration_min` INT         NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sleep` (`sleep_id`),
+  KEY `idx_user_time` (`user_id`, `start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='睡眠分段区间';
+
+DROP TABLE IF EXISTS `family_health_sample`;
+CREATE TABLE `family_health_sample` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT,
+  `family_id`    BIGINT        NOT NULL,
+  `user_id`      BIGINT        NOT NULL,
+  `metric`       VARCHAR(40)   NOT NULL COMMENT '指标码,见 HealthMetric',
+  `period`       VARCHAR(10)   NOT NULL COMMENT 'POINT单点或小时聚合/DAY日聚合',
+  `start_time`   DATETIME      NOT NULL COMMENT 'POINT=区段起点;DAY=当日 00:00',
+  `end_time`     DATETIME      DEFAULT NULL COMMENT 'POINT=区段终点;DAY 为空',
+  `value_num`    DECIMAL(10,2) NOT NULL COMMENT '值(心率取平均)',
+  `value_min`    DECIMAL(10,2) DEFAULT NULL COMMENT '小时聚合最小值',
+  `value_max`    DECIMAL(10,2) DEFAULT NULL COMMENT '小时聚合最大值',
+  `sample_count` INT           DEFAULT NULL COMMENT '聚合内样本数',
+  `unit`         VARCHAR(16)   NOT NULL COMMENT '冗余单位,便于导出可读',
+  `source`       VARCHAR(20)   NOT NULL,
+  `source_app`   VARCHAR(120)  NOT NULL,
+  `provider`     VARCHAR(20)   NOT NULL,
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_metric_start` (`user_id`, `metric`, `start_time`, `source_app`),
+  KEY `idx_family_metric_time` (`family_id`, `metric`, `start_time`),
+  KEY `idx_user_metric_time` (`user_id`, `metric`, `start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员健康样本(日聚合/小时聚合)';
+
+DROP TABLE IF EXISTS `family_health_view_log`;
+CREATE TABLE `family_health_view_log` (
+  `id`             BIGINT      NOT NULL AUTO_INCREMENT,
+  `family_id`      BIGINT      NOT NULL,
+  `viewer_id`      BIGINT      NOT NULL COMMENT '查看者',
+  `target_user_id` BIGINT      NOT NULL COMMENT '被查看的成员',
+  `scope`          VARCHAR(20) NOT NULL COMMENT 'SLEEP/OVERVIEW/METRIC/SUMMARY',
+  `metric`         VARCHAR(40) DEFAULT NULL COMMENT 'scope=METRIC 时的指标码',
+  `from_date`      DATE        DEFAULT NULL COMMENT '查询区间起(排障/纠纷时定位范围用)',
+  `to_date`        DATE        DEFAULT NULL,
+  `viewer_ip`      VARCHAR(45) DEFAULT NULL COMMENT 'IPv4/IPv6',
+  `created_at`     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_target_time` (`target_user_id`, `created_at`),
+  KEY `idx_family_time` (`family_id`, `created_at`),
+  KEY `idx_viewer_time` (`viewer_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康数据查看审计(90 天保留)';
+
+DROP TABLE IF EXISTS `sys_health_token`;
+CREATE TABLE `sys_health_token` (
+  `id`             BIGINT       NOT NULL AUTO_INCREMENT,
+  `user_id`        BIGINT       NOT NULL,
+  `family_id`      BIGINT       DEFAULT NULL COMMENT '签发时快照;家庭变更后按成员实时解析',
+  `name`           VARCHAR(50)  NOT NULL COMMENT '设备名,如「iPhone 快捷指令」',
+  `token_hash`     CHAR(64)     NOT NULL COMMENT 'SHA-256(明文只在生成时返回一次)',
+  `token_prefix`   VARCHAR(16)  NOT NULL COMMENT '前 8 位,列表展示用',
+  `last_used_at`   DATETIME     DEFAULT NULL,
+  `last_ingest_at` DATETIME     DEFAULT NULL,
+  `revoked`        TINYINT      NOT NULL DEFAULT 0,
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_hash` (`token_hash`),
+  KEY `idx_user` (`user_id`, `revoked`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康数据上报令牌';
+
+-- ------------------------------------------------------------
+-- 87. 健康数据权限与指标字典(V12.88)
+--     health:view:查看家庭成员健康数据;本人读自己恒可读,OWNER 恒可读全家。
+--     MENSTRUAL_FLOW(月经流量)属敏感组:默认不采,成员在设置页自开后仅本人可见。
+-- ------------------------------------------------------------
+INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('health:view', '查看健康数据', 'HEALTH', '查看家庭成员健康数据(本人恒可读自己)');
+
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
+WHERE r.role_code = 'OWNER' AND a.auth_code = 'health:view';
+
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
+WHERE r.role_code = 'MEMBER' AND a.auth_code = 'health:view';
+
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('health_metric', 'SLEEP',           '睡眠'),
+('health_metric', 'STEPS',           '步数'),
+('health_metric', 'DISTANCE',        '步行跑步距离'),
+('health_metric', 'ACTIVE_ENERGY',   '活动消耗'),
+('health_metric', 'TOTAL_ENERGY',    '总消耗'),
+('health_metric', 'FLIGHTS',         '爬楼层数'),
+('health_metric', 'EXERCISE_MIN',    '锻炼分钟'),
+('health_metric', 'STAND_HOUR',      '站立小时'),
+('health_metric', 'MINDFUL_MIN',     '正念分钟'),
+('health_metric', 'HEART_RATE',      '心率'),
+('health_metric', 'RESTING_HR',      '静息心率'),
+('health_metric', 'HRV',             '心率变异性'),
+('health_metric', 'SPO2',            '血氧饱和度'),
+('health_metric', 'RESP_RATE',       '呼吸频率'),
+('health_metric', 'BODY_TEMP',       '体温'),
+('health_metric', 'BASAL_TEMP',      '基础体温'),
+('health_metric', 'BLOOD_GLUCOSE',   '血糖'),
+('health_metric', 'BP_SYSTOLIC',     '收缩压'),
+('health_metric', 'BP_DIASTOLIC',    '舒张压'),
+('health_metric', 'WEIGHT',          '体重'),
+('health_metric', 'BODY_FAT',        '体脂率'),
+('health_metric', 'HEIGHT',          '身高'),
+('health_metric', 'WAIST',           '腰围'),
+('health_metric', 'VO2MAX',          '最大摄氧量'),
+('health_metric', 'MENSTRUAL_FLOW',  '月经流量');
+

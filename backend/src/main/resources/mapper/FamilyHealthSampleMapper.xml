@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyHealthSampleMapper">
+
+    <!--
+      重复上报与厂商修正历史都走同一条路:按唯一键 (user_id, metric, start_time, source_app)
+      upsert 覆盖值。批量写用 XML,避免逐条 insert。
+    -->
+    <insert id="upsertBatch">
+        INSERT INTO `family_health_sample`
+        (`family_id`, `user_id`, `metric`, `period`, `start_time`, `end_time`,
+         `value_num`, `value_min`, `value_max`, `sample_count`,
+         `unit`, `source`, `source_app`, `provider`)
+        VALUES
+        <foreach collection="list" item="s" separator=",">
+            (#{s.familyId}, #{s.userId}, #{s.metric}, #{s.period}, #{s.startTime}, #{s.endTime},
+             #{s.valueNum}, #{s.valueMin}, #{s.valueMax}, #{s.sampleCount},
+             #{s.unit}, #{s.source}, #{s.sourceApp}, #{s.provider})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            `family_id` = VALUES(`family_id`),
+            `period` = VALUES(`period`),
+            `end_time` = VALUES(`end_time`),
+            `value_num` = VALUES(`value_num`),
+            `value_min` = VALUES(`value_min`),
+            `value_max` = VALUES(`value_max`),
+            `sample_count` = VALUES(`sample_count`),
+            `unit` = VALUES(`unit`),
+            `source` = VALUES(`source`),
+            `provider` = VALUES(`provider`)
+    </insert>
+
+    <delete id="deleteByProvider">
+        DELETE FROM `family_health_sample`
+        WHERE `user_id` = #{userId} AND `provider` = #{provider}
+    </delete>
+
+    <delete id="deleteByMetric">
+        DELETE FROM `family_health_sample`
+        WHERE `user_id` = #{userId} AND `metric` = #{metric}
+    </delete>
+
+</mapper>

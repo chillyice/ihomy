@@ -768,3 +768,25 @@ export const iotApi = {
   history: (deviceId, hours) => request.get('/iot/history', { params: { deviceId, hours } }),
   control: (data) => request.post('/iot/control', data),
 }
+
+// 健康数据(iOS 快捷指令 / Android 健康连接上报):令牌管理、隐私同意、查看审计与读侧趋势
+export const healthApi = {
+  // 上报与自检(令牌或本人登录态均可)
+  ingest: (data) => request.post('/health/ingest', data),
+  ping: () => request.get('/health/ping'),
+  // 上报令牌:明文只在生成时返回一次
+  tokens: () => request.get('/health/token'),
+  createToken: (data) => request.post('/health/token', data),
+  revokeToken: (id) => request.delete(`/health/token/${id}`),
+  // 隐私:敏感指标同意开关(服务端为准)与查看审计
+  consent: () => request.get('/health/consent'),
+  saveConsent: (data) => request.put('/health/consent', data),
+  viewLog: (days) => request.get('/health/view-log', { params: days ? { days } : {} }),
+  clearData: (source) => request.delete('/health/data', { params: { source } }),
+  // 读侧:概况 / 睡眠会话 / 分期 / 单指标趋势 / 首页摘要
+  overview: (params) => request.get('/health/overview', { params }),
+  sleep: (params) => request.get('/health/sleep', { params }),
+  stages: (id) => request.get(`/health/sleep/${id}/stages`),
+  metric: (params) => request.get('/health/metric', { params }),
+  summary: (days) => request.get('/health/summary', { params: days ? { days } : {} }),
+}
