@@ -591,8 +591,10 @@ onBeforeUnmount(() => {
   .ms-meta .gh-chip {
     justify-content: space-between;
   }
+  /* 按钮并排贴棋盘一侧(三款横屏同一口径:按钮靠右、芯片整列) */
   .ms-meta-actions {
     order: -1;
+    justify-content: flex-end;
     margin-left: 0;
   }
   .ms-board-wrap {

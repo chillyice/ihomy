@@ -113,7 +113,7 @@
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
            冲突直接画在格子上,提示次数只在通关结果里报。
-           撤销/新游戏放在这条的右端(棋盘右上角);横屏时这条在棋盘左上方,按钮落到用时上面 -->
+           撤销/新游戏放在这条的右端(棋盘右上角);横屏时这条在棋盘左侧一列,按钮并排贴棋盘一侧 -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
@@ -2379,7 +2379,7 @@ html.dark .sd-cell.conflict {
 }
 
 /* 手机横屏(游戏区高 ≤ 520):用时/撤销/新游戏收成棋盘左侧一列,靠上排,
-   自上而下 新游戏 → 撤销 → 时间(用户指定口径);棋盘吃满中间一列的高度 */
+   按钮并排贴棋盘一侧(和扫雷一致),下面是时间;棋盘吃满中间一列的高度 */
 @container (min-aspect-ratio: 6/5) and (max-height: 520px) {
   .sd-layout {
     /* 左列固定 132;右列按比例收窄(手机横屏让棋盘吃满高度),上限 200 保持平板手感 */
@@ -2397,24 +2397,25 @@ html.dark .sd-cell.conflict {
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: start;
     align-self: start;
     width: 100%;
     height: auto;
-    gap: 6px;
+    gap: 8px;
   }
   .sd-meta > .gh-chip {
     order: 2;
     justify-content: space-between;
     min-height: var(--gs-control-h);
   }
+  /* 撤销/新游戏并排贴棋盘一侧,不和棋盘之间空一截 */
   .sd-meta-actions {
-    order: 1;
-    flex-direction: column-reverse;
-    align-items: flex-start;
+    order: -1;
+    justify-content: flex-end;
     flex: 0 0 auto;
     margin-left: 0;
   }
-  /* EP 给相邻按钮加 margin-left:12px,竖排时会顶偏一格 */
+  /* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
   .sd-meta-actions .el-button + .el-button {
     margin-left: 0;
   }

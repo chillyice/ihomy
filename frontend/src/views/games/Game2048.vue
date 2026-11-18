@@ -66,7 +66,7 @@
 
     <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图。
          撤销/新游戏放在这条的右端(棋盘右上角);手机横屏时整条改成棋盘左侧一列,
-         自上而下:新游戏、撤销、最高分、分数(芯片各带类名,横屏按类名重排) -->
+         按钮并排贴棋盘一侧,下面是最高分、分数(芯片各带类名,横屏按类名重排) -->
     <div class="bf-layout">
       <div class="bf-meta">
         <span v-a11y-click class="gh-chip is-shareable bf-chip-score" :title="$t('games.share.chipHint')" @click="shareOpen = true"
@@ -578,8 +578,8 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 手机横屏:整条挪到棋盘左侧,自上而下 新游戏 → 撤销 → 最高分 → 分数(用户指定口径)。
-   棋盘边长跟着「游戏区剩余高」走,不再被这条减掉一行高度 */
+/* 手机横屏:整条挪到棋盘左侧,上面是并排的撤销/新游戏(贴棋盘一侧,和扫雷一致),
+   下面是 最高分 → 分数。棋盘边长跟着「游戏区剩余高」走,不再被这条减掉一行高度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .bf-layout {
     --bf-meta-w: 132px;
@@ -593,23 +593,22 @@ onBeforeUnmount(() => {
   .bf-meta {
     flex-direction: column;
     align-items: stretch;
+    justify-content: start;
     height: auto;
-    gap: 6px;
+    gap: 8px;
   }
   /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
   .bf-meta > .gh-chip {
     justify-content: space-between;
     min-height: var(--gs-control-h);
   }
-  /* 按钮也是竖排,顺序按用户要求:新游戏在上、撤销在下 */
+  /* 按钮并排靠棋盘一侧,免得按钮和棋盘之间空一截 */
   .bf-meta-actions {
-    order: 1;
-    flex-direction: column-reverse;
-    align-items: flex-start;
-    gap: 6px;
+    order: -1;
+    justify-content: flex-end;
     margin-left: 0;
   }
-  /* EP 给相邻按钮加 margin-left:12px,竖排时会顶偏一格,间距只走 gap */
+  /* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
   .bf-meta-actions .el-button + .el-button {
     margin-left: 0;
   }
