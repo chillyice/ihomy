@@ -3,25 +3,11 @@
      本页做发牌/回合驱动/交互与结算展示,单机赢一局走统一 H5 奖励通道(每日限次)。
      房间局:房主权威跑牌局,公共盘面广播、每个人只收到自己的手牌,其余三家只看剩牌数。 -->
 <template>
-  <div ref="pageEl" class="page game-page game-page-readable">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        :fullscreen-label="$t('games.mahjong.fullscreen')"
-        :exit-label="$t('games.mahjong.exitFullscreen')"
-        @back="goBack"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
-    </PageToolbar>
-
-    <div ref="gameCardEl" class="game-surface mahjong-card" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader :title="$t('games.mahjong.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #rules>
-          <p>{{ $t('games.mahjong.coverHint') }}</p>
-        </template>
-      </GameHeader>
+  <GameShell ref="shellEl" class="mj-shell" :title="$t('games.mahjong.title')" body-align="stretch" readable @back="goBack">
+    <template #rules>
+      <p>{{ $t('games.mahjong.coverHint') }}</p>
+    </template>
+    <template #extras>
       <GameRoomBar
         v-if="play.active"
         :room="play.room"
@@ -36,7 +22,9 @@
         @leave="play.leave"
         @auto="onAutoToggle"
       />
+    </template>
 
+    <div class="mahjong-card" @contextmenu.prevent @dblclick.prevent>
       <!-- 封面(仅单机;房间局由房主选规则后开牌):开局规则选择 + 开始按钮,游戏名与玩法说明在统一卡头 -->
       <div v-if="phase === 'idle' && !play.active" class="cover">
         <!-- 开局规则选择:按规则名单选(每条规则自带胡牌口径) -->
@@ -357,7 +345,7 @@
         </Transition>
       </template>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -366,11 +354,8 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gameApi, roomApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -433,15 +418,8 @@ const TileFace = (props) => {
 }
 TileFace.props = { kind: { type: Number, required: true } }
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-// 盘面自管尺寸(设计画布 + 等比缩放),这里只借 useGameView 把页面锁成一屏高
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({
-  page: pageEl,
-  stage: gameCardEl,
-  fit: true,
-  scale: false,
-})
+const shellEl = ref(null)
+// 盘面自管尺寸(设计画布 + 等比缩放),外壳已把页面锁成一屏高
 
 // 只缩放盘面,顶栏和房间横幅按内容页尺寸排版。offsetWidth/Height 不受 transform 影响。
 const stageEl = ref(null)
@@ -1567,17 +1545,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 页面高度由 useGameView 锁成一屏,卡片吃掉剩余高度,盘面才有确定的可用区分母 */
+  /* 外壳把游戏区锁成一屏,这里吃满剩余高度,盘面才有确定的可用区分母 */
   flex: 1;
   min-height: 0;
-}
-.mahjong-card.game-surface {
-  margin-inline: 0;
-}
-.mahjong-card:fullscreen {
-  padding: clamp(8px, 2vw, 20px);
-  overflow: hidden;
-  background: var(--color-bg);
+  min-width: 0;
 }
 
 /* 矮窗里规则/结算面板可独立滚动,牌桌本身始终按可用宽高等比缩放。 */
