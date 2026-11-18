@@ -579,7 +579,8 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 /* 手机横屏:整条挪到棋盘左侧,上面是并排的撤销/新游戏(贴棋盘一侧,和扫雷一致),
-   下面是 最高分 → 分数。棋盘边长跟着「游戏区剩余高」走,不再被这条减掉一行高度 */
+   下面是 最高分 → 分数。棋盘边长 = 游戏区高 − 6(上下各 ~3),
+   底边离页面底边只剩「外壳底边距(6,手机上叠安全区) + 3」 */
 @media (orientation: landscape) and (max-height: 520px) {
   .bf-layout {
     --bf-meta-w: 132px;
@@ -588,7 +589,7 @@ onBeforeUnmount(() => {
     align-items: start;
     column-gap: 10px;
     row-gap: 0;
-    width: min(calc(100% - 16px), calc(100cqh - 8px + var(--bf-meta-w) + 10px));
+    width: min(calc(100% - 16px), calc(100cqh - 6px + var(--bf-meta-w) + 10px));
   }
   .bf-meta {
     flex-direction: column;

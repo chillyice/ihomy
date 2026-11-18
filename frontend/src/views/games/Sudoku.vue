@@ -2379,19 +2379,28 @@ html.dark .sd-cell.conflict {
 }
 
 /* 手机横屏(游戏区高 ≤ 520):用时/撤销/新游戏收成棋盘左侧一列,靠上排,
-   按钮并排贴棋盘一侧(和扫雷一致),下面是时间;棋盘吃满中间一列的高度 */
+   按钮并排贴棋盘一侧(和扫雷一致),下面是时间;棋盘吃满中间一列的高度,
+   底边压到离页面底边只剩「外壳底边距(6,手机上叠安全区) + 4」 */
 @container (min-aspect-ratio: 6/5) and (max-height: 520px) {
   .sd-layout {
-    /* 左列固定 132;右列按比例收窄(手机横屏让棋盘吃满高度),上限 200 保持平板手感 */
-    --sd-meta-w: 132px;
+    /* 左列 116(按钮 62、芯片 ~100 都装得下),间隙固定 8,宽度全让给棋盘;
+       右列按比例收窄(手机横屏让棋盘吃满高度),上限 200 保持平板手感 */
+    --sd-meta-w: 116px;
     --sd-side-w: clamp(118px, 22%, 200px);
-    --sd-gap: clamp(10px, 2cqi, 24px);
+    --sd-gap: 8px;
     grid-template-columns: var(--sd-meta-w) minmax(0, 1fr) var(--sd-side-w);
     grid-template-rows: minmax(0, 1fr);
     grid-template-areas: 'meta board panel';
     gap: var(--sd-gap);
     /* 棋盘边长:横向扣掉左右两列,纵向不扣用时条(它已在左列,不占棋盘高度) */
     --sd-frame-size: min(calc(100cqw - var(--sd-meta-w) - var(--sd-side-w) - 2 * var(--sd-gap) - 8px), calc(100cqh - 8px), 560px);
+  }
+  /* 棋盘与数字盘底边贴齐、一起往页面底边压(margin 只留 4 缓冲);
+     用时/按钮列仍靠上 */
+  .sd-frame,
+  .sd-panel {
+    align-self: end;
+    margin-bottom: 4px;
   }
   .sd-meta {
     flex-direction: column;

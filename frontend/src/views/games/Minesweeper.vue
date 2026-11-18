@@ -562,11 +562,12 @@ onBeforeUnmount(() => {
   margin-left: 0;
 }
 /* 手机横屏:数据与按钮竖排成棋盘左侧一列(和外壳 rail 同向),棋盘独占右侧;
-   此时纵向预算不再扣数据条,横向预算扣掉这一列的宽度 */
+   此时纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区),
+   横向预算扣掉这一列的宽度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .ms-layout {
     --ms-meta-w: 132px;
-    --ms-cell-h: calc((100cqh - 24px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
+    --ms-cell-h: calc((100cqh - 16px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
     --ms-cell-w: calc((100cqw - var(--ms-meta-w) - 10px - 24px - (var(--ms-cols) - 1) * var(--ms-gap)) / var(--ms-cols));
     display: grid;
     grid-template-columns: var(--ms-meta-w) minmax(0, 1fr);

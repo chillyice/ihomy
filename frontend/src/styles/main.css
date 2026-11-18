@@ -562,6 +562,8 @@ html.game-wide .page.game-page {
  * 游戏区实测宽高由外壳写成 --gs-w / --gs-h,棋盘尺寸按它们推导,不再写 calc(100dvh - Npx)。 */
 .page.game-shell {
   --gs-pad: 12px;
+  /* 底边距单独一档:横屏矮屏档把棋盘底边往页面底边压近(手机沉浸态再叠安全区) */
+  --gs-pad-b: var(--gs-pad);
   --gs-gap: 8px;
   --gs-head-h: 44px;
   --gs-control-h: 32px;
@@ -570,12 +572,14 @@ html.game-wide .page.game-page {
   --gs-bg: transparent;
   max-width: none;
   padding: var(--gs-pad);
+  padding-bottom: var(--gs-pad-b);
   background: var(--gs-bg);
 }
 /* 暖居主题把内容页的上/左右内边距清零(留白交给 gc-main 一层),游戏外壳必须保留自己四周的一圈,
    否则头部与棋盘会贴到容器边缘;这里显式压过 `html.theme-warm .page`,任何主题档 --gs-pad 都生效 */
 html.theme-warm .page.game-shell {
   padding: var(--gs-pad);
+  padding-bottom: var(--gs-pad-b);
 }
 /* 信息栏 = 头 + 规则面板 + 控件行 + 房间条。竖屏时它就是页面顶部的一摞(段间距由各段自己的 padding 给),
    横屏时整块挪到左列,游戏区独占右侧(见下面的横屏档) */
@@ -879,8 +883,9 @@ html.theme-warm .page.game-shell {
   .page.game-shell :is(.gs-head, .gs-controls) .el-button:not(.is-link) {
     padding: 0 10px;
   }
-  /* 宽屏模式只是放开内容宽度上限、收起侧栏,手机上本来就吃满整宽,按钮留着没用;
-     让出这个图标位,标题后面的设置/数据才和返回、规则挤在同一行(不再折成两行) */
+  /* 手机用不到全屏/宽屏(系统即全屏、宽度已吃满),去掉这两个图标位,
+     让出空间,标题后面的设置/数据才和返回、规则挤在同一行(不再折成两行) */
+  .gs-head .gs-fullscreen,
   .gs-head .gs-wide {
     display: none;
   }
@@ -930,6 +935,9 @@ html.game-shell .mobile-game-chrome {
 @media (orientation: landscape) and (max-height: 520px) {
   .page.game-shell {
     --gs-rail-w: min(38%, 240px);
+    /* 底边少留一点:棋盘底边更贴近页面底边(页面自身内边距 8 → 6),
+       手机沉浸态会在下面那条规则里再叠加 env(安全区),iPhone 小白条不贴边 */
+    --gs-pad-b: 6px;
     display: grid;
     grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
@@ -950,13 +958,22 @@ html.game-shell .mobile-game-chrome {
   .gs-footer {
     grid-area: footer;
   }
-  /* 头一行放不下「全屏 宽屏 规则」时,图标落到第二行而不是把标题挤没 */
+  /* 手机横屏同样没有全屏/宽屏(与 ≤768px 档同一口径) */
+  .gs-head .gs-fullscreen,
+  .gs-head .gs-wide {
+    display: none;
+  }
+  /* 规则按钮左对齐:标题不再撑满整行、图标组取消右推,整头按内容靠左排 */
+  .gs-head .gs-title {
+    flex: 0 1 auto;
+  }
+  .gs-head .gs-end {
+    margin-left: 0;
+  }
+  /* 头一行放不下时,后面的图标/规则落到第二行而不是把标题挤没 */
   .gs-head {
     flex-wrap: wrap;
     align-content: flex-start;
-  }
-  .gs-head .gs-title {
-    flex: 1 1 auto;
   }
   /* 控件竖排:选择框一行、数据芯片一行、按钮一行,统一靠左 */
   .gs-controls {
@@ -1021,10 +1038,11 @@ html.game-mobile-immersive .mobile-sub-content .page {
   overflow: hidden;
 }
 /* 统一外壳页自己带内边距:上面那条把内边距压成只剩安全区,棋盘/按钮会贴到屏幕边缘,
-   这里把外壳的 --gs-pad 叠在安全区之外(安全区本身仍保留,横屏刘海不被盖住) */
+   这里把外壳的 --gs-pad 叠在安全区之外(安全区本身仍保留,横屏刘海不被盖住);
+   底边走 --gs-pad-b(横屏矮屏档压近到 6px,iPhone 小白条由 env 兜住) */
 html.game-mobile-immersive .mobile-sub-content .page.game-shell {
   padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--gs-pad))
-    calc(env(safe-area-inset-right, 0px) + var(--gs-pad)) calc(env(safe-area-inset-bottom, 0px) + var(--gs-pad))
+    calc(env(safe-area-inset-right, 0px) + var(--gs-pad)) calc(env(safe-area-inset-bottom, 0px) + var(--gs-pad-b, var(--gs-pad)))
     calc(env(safe-area-inset-left, 0px) + var(--gs-pad)) !important;
 }
 html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
