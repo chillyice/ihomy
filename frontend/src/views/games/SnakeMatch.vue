@@ -2,18 +2,14 @@
      本地输入即时上屏并经 WS game-signal 转发;一方跑结束后等对方,双方都结束按比分结算。
      状态机与判定在 utils/games/snakeMatch.js(纯函数),本页只做渲染/转发/上报 -->
 <template>
-  <div ref="pageEl" class="page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        @back="router.push(`/games/match/${matchId}`)"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
-    </PageToolbar>
-
-    <div ref="gameCardEl" class="duel-card card game-surface" @contextmenu.prevent @dblclick.prevent>
+  <GameShell
+    ref="shellEl"
+    class="sm-shell"
+    :title="$t('games.snake.title') + ' · ' + $t('games.match.tag')"
+    body-align="stretch"
+    @back="router.push(`/games/match/${matchId}`)"
+  >
+    <div ref="gameCardEl" class="duel-card" @contextmenu.prevent @dblclick.prevent>
       <div class="duel-head">
         <div class="duel-side" :class="{ dead: match.host.status !== STATUS.PLAYING }">
           <span class="duel-dot host"></span>{{ match.hostName || $t('games.match.host') }}
@@ -42,7 +38,7 @@
 
       <div class="duel-hint">{{ $t('games.snake.duelTip') }}</div>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -55,10 +51,8 @@ import { ElMessage } from 'element-plus'
 import { matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
-import { useGameView } from '@/composables/useGameView'
+import GameShell from '@/components/games/GameShell.vue'
 import { applyInput, createMatch, stepMatch, HOST, GUEST, STATUS } from '@/utils/games/snakeMatch'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
 
 const TICK_MS = 150
 
@@ -74,10 +68,8 @@ const started = ref(false)
 const reported = ref(false)
 const offHandler = ref(null)
 
-const pageEl = ref(null)
 const gameCardEl = ref(null)
 const canvasEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 
 const iAmHost = computed(() => match.value.hostId === userStore.userInfo?.id)
 const mySide = computed(() => (iAmHost.value ? HOST : GUEST))

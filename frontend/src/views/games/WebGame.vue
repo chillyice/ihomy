@@ -1,58 +1,34 @@
 <!-- 网页游戏:站内 iframe 打开外部游戏页(LINK 类型),不跳出 ihomy
-     触控守卫沿用 .game-surface(禁双击放大/长按选字/长按菜单);全屏=浏览器全屏 API,
-     页面全屏=站内沉浸浮层(不按 F11);站点登录信息统一存家庭保险箱 -->
+     触控守卫由外壳 .gs-body 提供(禁双击放大/长按选字/长按菜单);全屏由外壳统一提供;
+     站内沉浸浮层只盖住游戏区(外壳游戏区带布局遏制,fixed 会被困住,§27);
+     站点登录信息统一存家庭保险箱 -->
 <template>
-  <div ref="pageEl" class="page web-game-page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <el-button class="gt-back" size="small" round @click="router.push('/games')">
-        <el-icon><ArrowLeft /></el-icon>
-        <span class="gt-label">{{ $t('games.back') }}</span>
+  <GameShell ref="shellEl" class="wg-shell" :title="game?.name || $t('games.title')" body-align="stretch" @back="router.push('/games')">
+    <template #head>
+      <el-button size="small" round :title="$t('games.web.reload')" :aria-label="$t('games.web.reload')" @click="reloadFrame">
+        <el-icon><Refresh /></el-icon>
+        <span class="wg-btn-label">{{ $t('games.web.reload') }}</span>
       </el-button>
-      <span class="wg-title">{{ game?.name || $t('games.title') }}</span>
-      <div class="game-top-actions">
-        <el-button size="small" round :title="$t('games.web.reload')" :aria-label="$t('games.web.reload')" @click="reloadFrame">
-          <el-icon><Refresh /></el-icon>
-          <span class="wg-btn-label">{{ $t('games.web.reload') }}</span>
-        </el-button>
-        <el-button
-          size="small"
-          round
-          :title="$t('games.web.openExternal')"
-          :aria-label="$t('games.web.openExternal')"
-          @click="openExternal"
-        >
-          <el-icon><TopRight /></el-icon>
-          <span class="wg-btn-label">{{ $t('games.web.openExternal') }}</span>
-        </el-button>
-        <el-button v-if="canVault" size="small" round :title="$t('games.web.vault')" :aria-label="$t('games.web.vault')" @click="openVault">
-          <el-icon><Lock /></el-icon>
-          <span class="wg-btn-label">{{ $t('games.web.vault') }}</span>
-        </el-button>
-        <el-button
-          class="gt-pagefull"
-          size="small"
-          round
-          :title="pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen')"
-          @click="togglePageFull"
-        >
-          <el-icon><Fold v-if="pageFull" /><Expand v-else /></el-icon>
-          <span class="wg-btn-label">{{ pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen') }}</span>
-        </el-button>
-        <el-button
-          class="gt-fullscreen"
-          size="small"
-          round
-          :title="isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen')"
-          :aria-label="isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen')"
-          @click="toggleFullscreen"
-        >
-          <el-icon><FullScreen /></el-icon>
-          <span class="wg-btn-label">{{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}</span>
-        </el-button>
-      </div>
-    </PageToolbar>
+      <el-button size="small" round :title="$t('games.web.openExternal')" :aria-label="$t('games.web.openExternal')" @click="openExternal">
+        <el-icon><TopRight /></el-icon>
+        <span class="wg-btn-label">{{ $t('games.web.openExternal') }}</span>
+      </el-button>
+      <el-button v-if="canVault" size="small" round :title="$t('games.web.vault')" :aria-label="$t('games.web.vault')" @click="openVault">
+        <el-icon><Lock /></el-icon>
+        <span class="wg-btn-label">{{ $t('games.web.vault') }}</span>
+      </el-button>
+      <el-button
+        size="small"
+        round
+        :title="pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen')"
+        @click="togglePageFull"
+      >
+        <el-icon><Fold v-if="pageFull" /><Expand v-else /></el-icon>
+        <span class="wg-btn-label">{{ pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen') }}</span>
+      </el-button>
+    </template>
 
-    <div ref="stageEl" class="wg-stage card game-surface" :class="{ 'is-page-full': pageFull }">
+    <div ref="stageEl" class="wg-stage" :class="{ 'is-page-full': pageFull }">
       <iframe
         v-if="game?.linkUrl"
         ref="frameEl"
@@ -89,18 +65,17 @@
         </el-button>
       </div>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Close, Expand, Fold, FullScreen, Lock, Refresh, TopRight } from '@element-plus/icons-vue'
-import PageToolbar from '@/components/PageToolbar.vue'
+import { Close, Expand, Fold, Lock, Refresh, TopRight } from '@element-plus/icons-vue'
+import GameShell from '@/components/games/GameShell.vue'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import { useGameView } from '@/composables/useGameView'
 import { useIframeFit } from '@/composables/useIframeFit'
 
 const route = useRoute()
@@ -108,7 +83,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
-const pageEl = ref(null)
+const shellEl = ref(null)
 const game = ref(null)
 const stageEl = ref(null)
 const frameEl = ref(null)
@@ -116,8 +91,6 @@ const frameKey = ref(0)
 const frameLoaded = ref(false)
 const loadError = ref(false)
 const pageFull = ref(false)
-// iframe 本身不缩放(缩了字会糊);暖居下 fullBleed 把高度交给 CSS 拉满主区,iframe 用 flex 撑满
-const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false, fullBleed: true })
 // 站内同源页面内容比可视区高时等比缩小;跨源外部网页读不到文档,自动跳过照常滚动
 const { refit: refitFrame } = useIframeFit({ stage: stageEl, frame: frameEl })
 
@@ -196,20 +169,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.wg-title {
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .wg-stage {
   position: relative;
   flex: 1 1 auto;
   height: auto;
   min-height: 320px;
-  padding: 0;
   overflow: hidden;
   background: #1b1b1b;
 }
@@ -221,13 +185,9 @@ onBeforeUnmount(() => {
   background: var(--color-bg-2);
   touch-action: manipulation;
 }
-.wg-stage:fullscreen {
-  height: 100%;
-  border-radius: 0;
-}
-/* 页面全屏:站内沉浸浮层,盖住侧栏/页脚/顶栏(不触发浏览器 F11) */
+/* 站内沉浸浮层:游戏区带布局遏制,fixed 会困在游戏区里,这里用 absolute 盖满游戏区 */
 .wg-stage.is-page-full {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: var(--z-immersive);
   height: auto;

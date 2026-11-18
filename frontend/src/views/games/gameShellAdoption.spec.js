@@ -12,11 +12,12 @@ const SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
 const GAME_DIR = join(SRC, 'views/games')
 const CARDS_DIR = join(GAME_DIR, 'cards')
 
-/** 已迁到 GameShell 的游戏页 */
+/** 已迁到 GameShell 的游戏页(全部自研舞台页;P9/P10 的 embed 本地化完成后再逐个挪入) */
 const MIGRATED = [
   'Baohuang.vue',
   'Cards.vue',
   'Doudizhu.vue',
+  'EmbedGame.vue',
   'Game2048.vue',
   'Gouji.vue',
   'Guandan.vue',
@@ -27,12 +28,14 @@ const MIGRATED = [
   'PetLinkLink.vue',
   'Runway52.vue',
   'Snake.vue',
+  'SnakeMatch.vue',
   'Sudoku.vue',
   'Tetris.vue',
+  'WebGame.vue',
 ]
 
 /** 尚未迁移(按计划分批进行);不是游戏舞台的页面归 EXEMPT */
-const PENDING = ['EmbedGame.vue', 'SnakeMatch.vue', 'WebGame.vue']
+const PENDING = []
 
 /** 不是游戏舞台:大厅/房间/详情/播放器分发/桌面下载/模拟器 */
 const EXEMPT = ['DesktopGame.vue', 'EmulatorPlayer.vue', 'GamePlayer.vue', 'GameRoom.vue', 'Games.vue', 'MatchDetail.vue']
