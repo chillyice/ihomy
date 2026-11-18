@@ -658,9 +658,11 @@ html.theme-warm .page.game-shell {
   font-size: 13px;
 }
 /* 图标按钮(全屏/宽屏/撤销/新游戏):正方形、不吃左右内边距,功能靠 title + aria-label 说明。
+   撤销/新游戏可以落在游戏区(贴棋盘那条)里,所以 .gs-body 也算;
    选择器压过下面那条 `.el-button:not(.is-link)`(0,5,0)的 `padding: 0 12px` */
-.page.game-shell :is(.gs-head, .gs-controls) .el-button.gs-icon-btn {
+.page.game-shell :is(.gs-head, .gs-controls, .gs-body) .el-button.gs-icon-btn {
   width: var(--gs-control-h);
+  height: var(--gs-control-h);
   padding: 0;
 }
 .gs-head .gs-icon-btn.rounded {

@@ -16,20 +16,6 @@
         <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
       </el-select>
     </template>
-    <template #actions>
-      <el-button
-        class="gs-icon-btn"
-        :disabled="!history.length"
-        :title="$t('games.sudoku.undo')"
-        :aria-label="$t('games.sudoku.undo')"
-        @click="undo"
-      >
-        <el-icon><RefreshLeft /></el-icon>
-      </el-button>
-      <el-button class="gs-icon-btn" :title="$t('games.sudoku.newGame')" :aria-label="$t('games.sudoku.newGame')" @click="startNew">
-        <el-icon><Plus /></el-icon>
-      </el-button>
-    </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
         <p>{{ $t('games.sudoku.tip') }}</p>
@@ -126,12 +112,34 @@
 
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
-           冲突直接画在格子上,提示次数只在通关结果里报 -->
+           冲突直接画在格子上,提示次数只在通关结果里报。
+           撤销/新游戏放在这条的右端(棋盘右上角);横屏时这条在棋盘左上方,按钮落到用时上面 -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
           ><b>{{ timeText }}</b></span
         >
+        <div class="sd-meta-actions">
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :disabled="!history.length"
+            :title="$t('games.sudoku.undo')"
+            :aria-label="$t('games.sudoku.undo')"
+            @click="undo"
+          >
+            <el-icon><RefreshLeft /></el-icon>
+          </el-button>
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :title="$t('games.sudoku.newGame')"
+            :aria-label="$t('games.sudoku.newGame')"
+            @click="startNew"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
       </div>
       <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
         <template v-if="variant === 'SKYSCRAPER'">
@@ -1549,6 +1557,14 @@ onBeforeUnmount(() => {
   height: var(--gs-control-h);
   min-width: 0;
 }
+/* 撤销/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会按容器查询挪到用时上面 */
+.sd-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
 .sd-panel {
   grid-area: panel;
   display: grid;
@@ -2327,7 +2343,18 @@ html.dark .sd-cell.conflict {
       'meta panel'
       'board panel';
     gap: clamp(12px, 3cqi, 30px);
+    /* 横屏这条在棋盘左上:按钮独占一行落到用时上面,所以高度按两行算 */
+    --sd-meta-h: calc(var(--gs-control-h) * 2 + 16px);
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
+  }
+  .sd-meta {
+    flex-wrap: wrap;
+    height: auto;
+  }
+  .sd-meta-actions {
+    order: -1;
+    flex: 0 0 100%;
+    margin-left: 0;
   }
   .sd-panel {
     max-height: 100%;

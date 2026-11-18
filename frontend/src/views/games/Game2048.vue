@@ -13,27 +13,6 @@
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
       </el-select>
     </template>
-    <template #actions>
-      <el-button
-        v-if="!matchId && !play.active"
-        class="gs-icon-btn bf-undo"
-        :disabled="!history.length"
-        :title="$t('games.g2048.undo')"
-        :aria-label="$t('games.g2048.undo')"
-        @click="undo"
-      >
-        <el-icon><RefreshLeft /></el-icon>
-      </el-button>
-      <el-button
-        v-if="!matchId"
-        class="gs-icon-btn bf-new"
-        :title="$t('games.g2048.newGame')"
-        :aria-label="$t('games.g2048.newGame')"
-        @click="startNew"
-      >
-        <el-icon><Plus /></el-icon>
-      </el-button>
-    </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
         <p>{{ $t('games.g2048.tip') }}</p>
@@ -85,7 +64,8 @@
       />
     </template>
 
-    <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图 -->
+    <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图。
+         撤销/新游戏放在这条的右端(棋盘右上角),横屏时落到分数上面 -->
     <div class="bf-layout">
       <div class="bf-meta">
         <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
@@ -96,6 +76,29 @@
           ><span>{{ $t('games.g2048.best') }}</span
           ><b>{{ best }}</b></span
         >
+        <div class="bf-meta-actions">
+          <el-button
+            v-if="!matchId && !play.active"
+            size="small"
+            class="gs-icon-btn bf-undo"
+            :disabled="!history.length"
+            :title="$t('games.g2048.undo')"
+            :aria-label="$t('games.g2048.undo')"
+            @click="undo"
+          >
+            <el-icon><RefreshLeft /></el-icon>
+          </el-button>
+          <el-button
+            v-if="!matchId"
+            size="small"
+            class="gs-icon-btn bf-new"
+            :title="$t('games.g2048.newGame')"
+            :aria-label="$t('games.g2048.newGame')"
+            @click="startNew"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
       </div>
 
       <div class="bf-stage" @contextmenu.prevent @dblclick.prevent>
@@ -565,6 +568,29 @@ onBeforeUnmount(() => {
   gap: 6px;
   height: var(--gs-control-h);
   min-width: 0;
+}
+/* 撤销/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会挪到分数上面 */
+.bf-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* 手机横屏:和数独同一口径 —— 按钮在分数上面,整条靠棋盘左上;
+   按钮独占一行(两个芯片仍并排,不让它们也竖起来占高度) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .bf-layout {
+    --bf-meta-h: calc(var(--gs-control-h) * 2 + 16px);
+  }
+  .bf-meta {
+    height: auto;
+  }
+  .bf-meta-actions {
+    order: -1;
+    flex: 0 0 100%;
+    margin-left: 0;
+  }
 }
 .bf-stage {
   position: relative;
