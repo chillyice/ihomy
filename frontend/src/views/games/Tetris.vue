@@ -1,44 +1,10 @@
 <template>
-  <div ref="pageEl" class="page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
+  <GameShell ref="shellEl" class="tt-shell" :title="title" body-align="center" @back="goBack">
+    <template #rules>
+      <p>{{ $t('games.tetris.tip') }}</p>
+    </template>
 
-    <div ref="gameCardEl" class="tt-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader
-        :title="$t('games.tetris.title') + (play.active ? ' · ' + $t('games.room.together') : '')"
-        :fullscreen="isFullscreen"
-        @exit-fullscreen="toggleFullscreen"
-      >
-        <template #stats>
-          <span class="gh-chip"
-            ><span>{{ $t('games.tetris.score') }}</span
-            ><b>{{ game.score }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.tetris.best') }}</span
-            ><b>{{ best }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.tetris.lines') }}</span
-            ><b>{{ game.lines }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.tetris.level') }}</span
-            ><b>{{ game.level }}</b></span
-          >
-        </template>
-        <template #actions>
-          <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
-            {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
-          </el-button>
-          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
-        </template>
-        <template #rules>
-          <p>{{ $t('games.tetris.tip') }}</p>
-        </template>
-      </GameHeader>
-
+    <template #extras>
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -50,6 +16,52 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
+    </template>
+
+    <!-- 数据条贴棋盘:与棋盘+侧栏同宽的细条,左对齐排在棋盘上方;
+         暂停/新游戏放在这条的右端;手机横屏时整条(按钮+芯片)和按键条
+         收成棋盘左侧一列(按钮靠上贴棋盘一侧、芯片整列、按键落列底),
+         棋盘+暂存/预告侧栏独占右侧按游戏区高度铺满 -->
+    <div class="tt-layout" @contextmenu.prevent @dblclick.prevent>
+      <div class="tt-meta">
+        <span class="gh-chip"
+          ><span>{{ $t('games.tetris.score') }}</span
+          ><b>{{ game.score }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.tetris.best') }}</span
+          ><b>{{ best }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.tetris.lines') }}</span
+          ><b>{{ game.lines }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.tetris.level') }}</span
+          ><b>{{ game.level }}</b></span
+        >
+        <div class="tt-meta-actions">
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :disabled="game.status !== 'PLAYING'"
+            :title="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
+            :aria-label="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
+            @click="togglePause"
+          >
+            <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+          </el-button>
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :title="$t('games.tetris.newGame')"
+            :aria-label="$t('games.tetris.newGame')"
+            @click="startNew"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
+      </div>
 
       <div class="tt-stage">
         <div class="tt-board-wrap">
@@ -115,7 +127,7 @@
         </div>
       </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -124,15 +136,12 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@element-plus/icons-vue'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, Plus, RefreshRight, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { seededRng } from '@/utils/games/seededRng'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import {
   SHAPES,
@@ -157,15 +166,14 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+const shellEl = ref(null)
 const play = useGameRoomPlay()
 /** 房间局返回房间大厅;单机回小游戏列表 */
 const goBack = () => {
   if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
   else router.push('/games')
 }
+const title = computed(() => t('games.tetris.title') + (play.active ? ' · ' + t('games.room.together') : ''))
 /** 房间模式下的种子随机数:7-bag 序列两端一致 */
 let rng = null
 const game = ref(createGame())
@@ -410,32 +418,58 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.tt-card {
-  position: relative;
+/* 数据条 + 棋盘(含暂存/预告侧栏) + 按键条:竖屏自上而下三段;
+   棋盘是 1:2 竖条,边长按「游戏区高 − 数据条 − 按键条」折半推(容器查询单位);
+   手机横屏时数据条与按键条收成棋盘左侧一列,棋盘+侧栏独占右侧 */
+.tt-layout {
+  --tt-meta-h: calc(var(--gs-control-h) + 8px);
+  --tt-pad-h: calc(var(--gs-control-h) + 8px);
+  --tt-side-w: clamp(58px, 12cqw, 86px);
+  --tt-board-w: min(calc((100cqh - var(--tt-meta-h) - var(--tt-pad-h) - 28px) / 2), calc((100cqw - var(--tt-side-w) - 34px) / 1), 300px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 18px 16px 16px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-primary, #2b2b2b);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
 }
-.tt-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding-top: 24px;
+/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip) */
+.tt-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, calc(var(--tt-board-w) + var(--tt-side-w) + 30px));
+  height: var(--gs-control-h);
+  min-width: 0;
+}
+/* 暂停/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会挪到数据上面 */
+.tt-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
+.tt-meta-actions .el-button + .el-button {
+  margin-left: 0;
+}
+/* 页面数据条里的按钮与外壳控件同规格(外壳的尺寸规则只罩住 .gs-controls) */
+.tt-meta-actions .el-button {
+  height: var(--gs-control-h);
 }
 
 .tt-stage {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: clamp(8px, 2vw, 18px);
-  width: 100%;
+  gap: clamp(8px, 2cqw, 18px);
+  width: min(100%, calc(var(--tt-board-w) + var(--tt-side-w) + 40px));
+  min-width: 0;
+  min-height: 0;
 }
 .tt-board-wrap {
   padding: 5px;
@@ -448,7 +482,7 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(10, minmax(0, 1fr));
   grid-template-rows: repeat(20, minmax(0, 1fr));
   gap: 1px;
-  width: min(74vw, 300px);
+  width: var(--tt-board-w);
   aspect-ratio: 1 / 2;
 }
 .tt-cell {
@@ -467,7 +501,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: clamp(58px, 12vw, 86px);
+  width: var(--tt-side-w);
 }
 .tt-box {
   display: flex;
@@ -511,13 +545,14 @@ onBeforeUnmount(() => {
   min-width: 78px;
 }
 
+/* 暂停/结算浮层只盖住棋盘舞台,不挡外壳与按键条 */
 .tt-overlay {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(250, 248, 239, 0.72);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -578,12 +613,51 @@ html.dark .tt-overlay {
   background: rgba(20, 20, 20, 0.72);
 }
 
-@media (max-width: 560px) {
-  .tt-card {
-    padding: 14px 10px;
+/* 手机横屏:数据条与按键条收成棋盘左侧一列(和贪吃蛇同一配方),
+   按钮行贴棋盘一侧靠上、芯片整列,按键落列底;棋盘+侧栏独占右侧吃满高度 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tt-layout {
+    --tt-meta-w: 132px;
+    --tt-board-w: min(calc((100cqh - 16px) / 2), calc(100cqw - var(--tt-meta-w) - var(--tt-side-w) - 36px));
+    display: grid;
+    grid-template-columns: var(--tt-meta-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'meta stage';
+    column-gap: 10px;
+    width: min(100%, calc(var(--tt-meta-w) + 10px + var(--tt-board-w) + var(--tt-side-w) + 46px));
+    max-height: 100%;
   }
-  .tt-board {
-    width: min(68vw, 250px);
+  .tt-meta {
+    grid-area: meta;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: start;
+    align-self: start;
+    width: 100%;
+    height: auto;
+    gap: 8px;
+  }
+  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
+  .tt-meta .gh-chip {
+    justify-content: space-between;
+  }
+  /* 按钮并排贴棋盘一侧,不和棋盘之间空一截 */
+  .tt-meta-actions {
+    order: -1;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+  .tt-stage {
+    grid-area: stage;
+    align-self: center;
+    width: 100%;
+  }
+  /* 按键条与数据条同格:数据条靠上、按键贴列底,高度够就不重叠 */
+  .tt-pad {
+    grid-area: meta;
+    align-self: end;
+    margin-left: 0;
   }
 }
 </style>
