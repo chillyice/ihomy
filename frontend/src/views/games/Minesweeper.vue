@@ -1,10 +1,40 @@
 <template>
-  <div ref="pageEl" class="page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
+  <GameShell
+    ref="shellEl"
+    class="ms-shell"
+    :class="'ms-' + board.level.toLowerCase()"
+    :title="title"
+    :rules-pages="[$t('games.minesweeper.rules.pagePlay'), $t('games.minesweeper.rules.pageControl')]"
+    body-align="center"
+    @back="goBack"
+  >
+    <!-- 等级跟游戏名走(和 2048 的棋盘规格同一处),控件行只留数据与按钮 -->
+    <template #titleExtra>
+      <el-select :model-value="level" class="ms-level" :teleported="!isFullscreen" @change="onLevelChange">
+        <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
+      </el-select>
+    </template>
 
-    <div ref="gameCardEl" class="ms-card card game-surface" @contextmenu.prevent @dblclick.prevent>
+    <template #rules="{ page }">
+      <template v-if="page === 0">
+        <p>{{ $t('games.minesweeper.tip') }}</p>
+        <ul>
+          <li>{{ $t('games.minesweeper.rules.play1') }}</li>
+          <li>{{ $t('games.minesweeper.rules.play2') }}</li>
+          <li>{{ $t('games.minesweeper.rules.play3') }}</li>
+          <li>{{ $t('games.minesweeper.rules.play4') }}</li>
+        </ul>
+      </template>
+      <ul v-else>
+        <li>{{ $t('games.minesweeper.rules.ctrl1') }}</li>
+        <li>{{ $t('games.minesweeper.rules.ctrl2') }}</li>
+        <li>{{ $t('games.minesweeper.rules.ctrl3') }}</li>
+        <li>{{ $t('games.minesweeper.rules.ctrl4') }}</li>
+        <li>{{ $t('games.minesweeper.rules.ctrl5') }}</li>
+      </ul>
+    </template>
+
+    <template #extras>
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -16,39 +46,50 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
-      <GameHeader :title="$t('games.minesweeper.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #settings>
-          <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="onLevelChange">
-            <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
-          </el-select>
-        </template>
-        <template #stats>
-          <span class="gh-chip"
-            ><span>{{ $t('games.minesweeper.flags') }}</span
-            ><b>{{ remainingMines(board) }}</b></span
+    </template>
+
+    <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
+         旗标模式/新游戏放在这条的右端(棋盘右上角),横屏时落到数据芯片上面 -->
+    <div class="ms-layout" @contextmenu.prevent @dblclick.prevent>
+      <div class="ms-meta">
+        <span class="gh-chip"
+          ><span>{{ $t('games.minesweeper.flags') }}</span
+          ><b>{{ remainingMines(board) }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.minesweeper.time') }}</span
+          ><b>{{ formatClock(elapsed) }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.minesweeper.best') }}</span
+          ><b>{{ bestText }}</b></span
+        >
+        <div class="ms-meta-actions">
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :type="flagMode ? 'primary' : 'default'"
+            :title="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+            :aria-label="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+            :aria-pressed="flagMode"
+            @click="flagMode = !flagMode"
           >
-          <span class="gh-chip"
-            ><span>{{ $t('games.minesweeper.time') }}</span
-            ><b>{{ formatClock(elapsed) }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.minesweeper.best') }}</span
-            ><b>{{ bestText }}</b></span
-          >
-        </template>
-        <template #actions>
-          <el-button size="small" round :type="flagMode ? 'primary' : 'default'" @click="flagMode = !flagMode">
-            {{ flagMode ? $t('games.minesweeper.flagMode') : $t('games.minesweeper.revealMode') }}
+            <el-icon><Flag /></el-icon>
           </el-button>
-          <el-button size="small" round @click="onNewGameClick">{{ $t('games.minesweeper.newGame') }}</el-button>
-        </template>
-        <template #rules>
-          <p>{{ $t('games.minesweeper.tip') }}</p>
-        </template>
-      </GameHeader>
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :title="$t('games.minesweeper.newGame')"
+            :aria-label="$t('games.minesweeper.newGame')"
+            @click="onNewGameClick"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
+      </div>
 
       <div class="ms-board-wrap">
-        <div class="ms-board" :class="board.level.toLowerCase()">
+        <div class="ms-board">
           <button
             v-for="(cell, i) in board.cells"
             :key="i"
@@ -86,7 +127,7 @@
         </div>
       </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -95,12 +136,10 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import { Flag, Plus } from '@element-plus/icons-vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { formatClock } from '@/utils/games/gameClock'
@@ -124,9 +163,10 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+// 外壳自己管全屏/宽屏/一屏适配;页面只读它的状态(全屏时下拉要留在全屏元素内)
+const shellEl = ref(null)
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
+
 const level = ref('EASY')
 const board = ref(createBoard('EASY'))
 const elapsed = ref(0)
@@ -137,6 +177,7 @@ const bestTimes = ref({})
 // ---------- 「一起玩」房间(扫雷只允许合作) ----------
 // 房主权威:只有房主布雷/翻格/插旗,操作结果全量广播;其他成员点击只发意图,倒计时跟房主走。
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+const title = computed(() => t('games.minesweeper.title') + (play.active ? ' · ' + t('games.room.together') : ''))
 /** 房间局返回房间大厅;单机回小游戏列表 */
 const goBack = () => {
   if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
@@ -463,69 +504,109 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ms-card {
+/* 数据条 + 棋盘同宽:格子大小由游戏区实测宽高推出(容器查询单位),
+   纵向预算 = 游戏区高 − 数据条 − 间距,横向预算 = 游戏区宽,两者取小;
+   困难 30 列在手机竖屏一屏放不满时只横向滚动,格子不会被缩到点不准 */
+.ms-layout {
+  --ms-meta-h: calc(var(--gs-control-h) + 8px);
+  --ms-gap: 2px;
+  /* 格子边长:先按游戏区宽/高各算一遍能放多大,取小者(两向都装得下);
+     上限按等级封顶,下限 16px 只在「高度还够」时兜底 —— 窄屏(手机竖屏玩困难)
+     宁可横向滚动也不把格子缩到点不准。高度那一路永远优先,纵向不会出现滚动条 */
+  --ms-cell-w: calc((100cqw - 24px - (var(--ms-cols) - 1) * var(--ms-gap)) / var(--ms-cols));
+  --ms-cell-h: calc((100cqh - var(--ms-meta-h) - 24px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
+  --ms-cell: min(var(--ms-cell-max), var(--ms-cell-h), max(var(--ms-cell-w), min(16px, var(--ms-cell-h))));
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 16px 16px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-primary, #2b2b2b);
+  gap: 8px;
+  width: min(calc(100cqw - 4px), calc(var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px));
+  max-height: 100%;
 }
-.ms-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding-top: 24px;
+.ms-shell.ms-easy {
+  --ms-cols: 9;
+  --ms-rows: 9;
+  --ms-cell-max: 46px;
+}
+.ms-shell.ms-medium {
+  --ms-cols: 16;
+  --ms-rows: 16;
+  --ms-cell-max: 34px;
+}
+.ms-shell.ms-hard {
+  --ms-cols: 30;
+  --ms-rows: 16;
+  --ms-cell-max: 26px;
+}
+
+/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip) */
+.ms-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  height: var(--gs-control-h);
+  min-width: 0;
+}
+/* 旗标模式/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会挪到数据上面 */
+.ms-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* 手机横屏:和 2048/数独同一口径 —— 按钮在数据芯片上面,整条靠棋盘左上;
+   按钮独占一行(芯片仍并排,不让它们也竖起来占高度) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ms-layout {
+    --ms-meta-h: calc(var(--gs-control-h) * 2 + 16px);
+  }
+  .ms-meta {
+    height: auto;
+  }
+  .ms-meta-actions {
+    order: -1;
+    flex: 0 0 100%;
+    margin-left: 0;
+  }
 }
 
 .ms-level {
   width: 96px;
 }
 
+/* 窄屏困难盘只横向滚动:高度已按预算算过,纵向不会再出滚动条 */
 .ms-board-wrap {
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
   padding: 4px;
   border-radius: 12px;
 }
 .ms-board {
   display: grid;
-  gap: 2px;
+  grid-template-columns: repeat(var(--ms-cols), var(--ms-cell));
+  gap: var(--ms-gap);
   padding: 4px;
   border-radius: 10px;
   background: var(--color-border, #d9d2c7);
   touch-action: manipulation;
   user-select: none;
 }
-.ms-board.easy {
-  --ms-size: clamp(28px, 7vw, 38px);
-  grid-template-columns: repeat(9, var(--ms-size));
-}
-.ms-board.medium {
-  --ms-size: clamp(20px, 4.6vw, 30px);
-  grid-template-columns: repeat(16, var(--ms-size));
-}
-.ms-board.hard {
-  --ms-size: clamp(18px, 3.4vw, 26px);
-  grid-template-columns: repeat(30, var(--ms-size));
-}
 .ms-cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--ms-size);
-  height: var(--ms-size);
+  width: var(--ms-cell);
+  height: var(--ms-cell);
   padding: 0;
   border: none;
   border-radius: 4px;
   background: linear-gradient(160deg, #d8dde3, #b9c1ca);
   color: #2b2b2b;
-  font-size: calc(var(--ms-size) * 0.52);
+  font-size: calc(var(--ms-cell) * 0.52);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
@@ -601,7 +682,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(250, 248, 239, 0.72);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -644,7 +725,7 @@ html.dark .ms-cell.open {
 html.dark .ms-cell.boom {
   background: rgba(201, 116, 116, 0.38);
 }
-/* 翻开格底色随卡片转深,数字配色整体提亮(浅色档在深底上读不清) */
+/* 翻开格底色随底板转深,数字配色整体提亮(浅色档在深底上读不清) */
 html.dark .ms-cell.n1 {
   color: #6ea8ff;
 }
@@ -671,11 +752,5 @@ html.dark .ms-cell.n8 {
 }
 html.dark .ms-overlay {
   background: rgba(20, 20, 20, 0.72);
-}
-
-@media (max-width: 560px) {
-  .ms-card {
-    padding: 14px 10px;
-  }
 }
 </style>
