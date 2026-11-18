@@ -144,8 +144,7 @@ public class HealthIngestService {
                 addDetail(rejectedDetail, i, "SLEEP", reason);
                 continue;
             }
-            String stage = it.getStage() == null ? "UNKNOWN" : it.getStage().trim().toUpperCase(Locale.ROOT);
-            if (!HealthMetric.SLEEP_STAGES.contains(stage)) stage = "UNKNOWN";
+            String stage = HealthMetric.normalizeSleepStage(it.getStage());
             String app = sourceApp(it.getSourceApp(), provider);
             byApp.computeIfAbsent(app, k -> new ArrayList<>())
                     .add(new HealthSleepAggregator.Interval(a.wall(), b.wall(), stage));

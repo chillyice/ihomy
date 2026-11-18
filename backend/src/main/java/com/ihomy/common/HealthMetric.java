@@ -31,6 +31,43 @@ public final class HealthMetric {
 
     public static final Set<String> SLEEP_STAGES = Set.of("AWAKE", "LIGHT", "DEEP", "REM", "INBED", "UNKNOWN");
 
+    /**
+     * 睡眠阶段归一:除枚举本身,也认 Apple 健康那份本地化写法——快捷指令「查找健康样本」取到的
+     * 「值」直接透传就是「深睡/核心睡眠/快速眼动睡眠/清醒/在床」这类文字(英文机则是 Asleep (Core) 等),
+     * 不必在手机上搭条件分支。认不出才落 UNKNOWN(只记会话、不分期),不会因此整条拒收。
+     */
+    public static String normalizeSleepStage(String raw) {
+        if (raw == null) {
+            return "UNKNOWN";
+        }
+        String t = raw.trim().toUpperCase(Locale.ROOT);
+        if (t.isEmpty()) {
+            return "UNKNOWN";
+        }
+        if (SLEEP_STAGES.contains(t)) {
+            return t;
+        }
+        if (t.contains("深") || t.contains("DEEP")) {
+            return "DEEP";
+        }
+        if (t.contains("快速眼动") || t.contains("REM")) {
+            return "REM";
+        }
+        if (t.contains("核心") || t.contains("浅") || t.contains("CORE") || t.contains("LIGHT")) {
+            return "LIGHT";
+        }
+        if (t.contains("清醒") || t.contains("AWAKE")) {
+            return "AWAKE";
+        }
+        if (t.contains("在床") || t.contains("IN BED") || t.contains("INBED")) {
+            return "INBED";
+        }
+        if (t.contains("睡眠") || t.contains("ASLEEP") || t.contains("SLEEP")) {
+            return "LIGHT";
+        }
+        return "UNKNOWN";
+    }
+
     private static final Set<String> SOURCES = Set.of(
             "GARMIN", "HUAWEI", "APPLE", "XIAOMI", "OPPO", "SAMSUNG", "HONOR", "VIVO", "OTHER");
 

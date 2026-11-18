@@ -67,4 +67,26 @@ class HealthMetricTest {
                 "SHORTCUT", "HEALTH_CONNECT", "IOS_NATIVE");
         assertThat(HealthMetric.SLEEP_STAGES).contains("DEEP", "LIGHT", "REM", "AWAKE", "INBED", "UNKNOWN");
     }
+
+    /** 快捷指令把「查找健康样本」的「值」原样透传时,这里是唯一把中文/英文分期名换成枚举的地方 */
+    @Test
+    void normalizesSleepStageFromAppleLocalizedNames() {
+        assertThat(HealthMetric.normalizeSleepStage("DEEP")).isEqualTo("DEEP");
+        assertThat(HealthMetric.normalizeSleepStage("deep")).isEqualTo("DEEP");
+        assertThat(HealthMetric.normalizeSleepStage("深度睡眠")).isEqualTo("DEEP");
+        assertThat(HealthMetric.normalizeSleepStage("深睡")).isEqualTo("DEEP");
+        assertThat(HealthMetric.normalizeSleepStage("Asleep (Deep)")).isEqualTo("DEEP");
+        assertThat(HealthMetric.normalizeSleepStage("核心睡眠")).isEqualTo("LIGHT");
+        assertThat(HealthMetric.normalizeSleepStage("浅睡")).isEqualTo("LIGHT");
+        assertThat(HealthMetric.normalizeSleepStage("睡眠")).isEqualTo("LIGHT");
+        assertThat(HealthMetric.normalizeSleepStage("Asleep (Core)")).isEqualTo("LIGHT");
+        assertThat(HealthMetric.normalizeSleepStage("快速眼动睡眠")).isEqualTo("REM");
+        assertThat(HealthMetric.normalizeSleepStage("清醒")).isEqualTo("AWAKE");
+        assertThat(HealthMetric.normalizeSleepStage("Awake")).isEqualTo("AWAKE");
+        assertThat(HealthMetric.normalizeSleepStage("在床")).isEqualTo("INBED");
+        assertThat(HealthMetric.normalizeSleepStage("In Bed")).isEqualTo("INBED");
+        assertThat(HealthMetric.normalizeSleepStage(null)).isEqualTo("UNKNOWN");
+        assertThat(HealthMetric.normalizeSleepStage("  ")).isEqualTo("UNKNOWN");
+        assertThat(HealthMetric.normalizeSleepStage("无法识别")).isEqualTo("UNKNOWN");
+    }
 }
