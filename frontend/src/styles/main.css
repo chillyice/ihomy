@@ -2811,11 +2811,6 @@ html.dark .el-badge__content {
   flex: 1 1 auto;
   min-height: 0;
 }
-/* 统一卡头要浮在封面/结算浮层之上(idle 也要能点开规则) */
-.fight-card > .game-header {
-  position: relative;
-  z-index: 6;
-}
 .fight-overlay {
   position: absolute;
   inset: 0;

@@ -2,23 +2,18 @@
      憋三与名次积分都在 utils/games/gouji.js(纯函数,单测覆盖);本页只做发牌、回合驱动与结算展示。
      我方积分领先走统一 H5 奖励通道(按天限次)。 -->
 <template>
-  <div ref="pageEl" class="page game-page game-page-readable">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
+  <GameShell ref="shellEl" class="gj-shell" :title="$t('games.gouji.title')" body-align="stretch" readable @back="goBack">
+    <template #rules>
+      <ul>
+        <li>{{ $t('games.gouji.rules1') }}</li>
+        <li>{{ $t('games.gouji.rules2') }}</li>
+        <li>{{ $t('games.gouji.rules3') }}</li>
+        <li>{{ $t('games.gouji.rules4') }}</li>
+        <li>{{ $t('games.gouji.rules5') }}</li>
+      </ul>
+    </template>
 
-    <div ref="gameCardEl" class="fight-card">
-      <GameHeader :title="$t('games.gouji.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #rules>
-          <ul>
-            <li>{{ $t('games.gouji.rules1') }}</li>
-            <li>{{ $t('games.gouji.rules2') }}</li>
-            <li>{{ $t('games.gouji.rules3') }}</li>
-            <li>{{ $t('games.gouji.rules4') }}</li>
-            <li>{{ $t('games.gouji.rules5') }}</li>
-          </ul>
-        </template>
-      </GameHeader>
+    <div class="fight-card">
       <FightTable
         :seats="seatViews"
         :hand="myHand"
@@ -76,7 +71,7 @@
         </template>
       </FightTable>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -85,11 +80,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
 import FightTable from '@/components/games/FightTable.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
-import { useGameView } from '@/composables/useGameView'
+import GameShell from '@/components/games/GameShell.vue'
 import { gameApi } from '@/api'
 import { gjAiChoose, gjCanBeat, gjCombo, gjDeal, gjLegal, gjOpposite, gjPlays, gjRankText, gjScores, gjValue } from '@/utils/games/gouji'
 
@@ -99,13 +91,7 @@ const AI_DELAY = 700
 const router = useRouter()
 const { t } = useI18n()
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({
-  page: pageEl,
-  stage: gameCardEl,
-  scale: false,
-})
+const shellEl = ref(null)
 const goBack = () => router.push('/games')
 
 const phase = ref('idle') // idle | playing | ended
