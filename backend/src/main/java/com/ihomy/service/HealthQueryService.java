@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.HealthCsv;
 import com.ihomy.common.HealthMetric;
+import com.ihomy.common.HealthSleepStats;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.FamilyHealthSample;
 import com.ihomy.entity.FamilyHealthSleep;
@@ -128,6 +129,70 @@ public class HealthQueryService {
         data.put("to", end);
         data.put("items", list);
         return data;
+    }
+
+    // ==================== 睡眠统计(周/月/半年/年) ====================
+
+    /**
+     * 睡眠统计:DAY = 每天睡了多久(周/月视图),MONTH = 每月平均每晚多久(半年/年视图)。
+     * 前端只负责铺日期/月份网格,合计与平均的口径都在这里定,避免「iOS 算的和别处不一样」。
+     */
+    public Map<String, Object> sleepStats(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to,
+                                          String bucket) {
+        SysUser target = requireTarget(viewer, targetUserId);
+        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate begin = from == null ? end.minusDays(29) : from;
+        if (begin.isAfter(end)) {
+            LocalDate t = begin;
+            begin = end;
+            end = t;
+        }
+        if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
+            throw new BizException(ResultCode.BAD_REQUEST, "单次最多查看 366 天睡眠数据");
+        }
+        boolean monthly = "MONTH".equalsIgnoreCase(bucket);
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        if (monthly) {
+            for (Map<String, Object> r : sleepMapper.selectMonthlyStats(target.getId(), begin, end)) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("month", String.valueOf(r.get("month")));
+                item.put("avgMin", HealthSleepStats.nightlyAvg(
+                        intOf(r.get("nightMin")), intOf(r.get("nightCount")),
+                        intOf(r.get("totalMin")), intOf(r.get("nights"))));
+                item.put("nights", intOf(r.get("nights")));
+                list.add(item);
+            }
+        } else {
+            for (Map<String, Object> r : sleepMapper.selectDailyStats(target.getId(), begin, end)) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("date", String.valueOf(r.get("date")));
+                item.put("totalMin", intOf(r.get("totalMin")));
+                item.put("nights", intOf(r.get("nights")));
+                list.add(item);
+            }
+        }
+
+        privacyService.logView(viewer.id(), viewer.ip(), target.getId(), viewer.familyId(),
+                "SLEEP", null, begin, end);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("userId", target.getId());
+        data.put("from", begin);
+        data.put("to", end);
+        data.put("bucket", monthly ? "MONTH" : "DAY");
+        data.put("buckets", list);
+        return data;
+    }
+
+    private static Integer intOf(Object v) {
+        if (v == null) return 0;
+        if (v instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     // ==================== 睡眠分段 ====================

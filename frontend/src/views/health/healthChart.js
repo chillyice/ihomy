@@ -187,3 +187,103 @@ export function timelineSegments(stages, start, end) {
     }
   })
 }
+
+// ========== 睡眠进度轴(按钟点铺的夜视图) ==========
+
+/** 泳道画布:四行阶段自下而上「深睡 → 核心 → 快速眼动 → 清醒」,左侧一行文字标签 */
+export const LANE = { w: 360, h: 160, padL: 48, padR: 10, padT: 8, padB: 22, rowH: 30, rowGap: 2 }
+/** 行顺序自上而下(SVG 的 y 向下长),所以清醒在最上、深睡在最下 */
+export const LANE_ROWS = ['AWAKE', 'REM', 'LIGHT', 'DEEP']
+
+const MIN_MS = 60 * 1000
+const HOUR_MS = 60 * MIN_MS
+const LANE_INNER_W = () => LANE.w - LANE.padL - LANE.padR
+
+const timeOf = (v) => {
+  const ms = Date.parse(v)
+  return Number.isFinite(ms) ? ms : null
+}
+const floorHour = (ms) => {
+  const d = new Date(ms)
+  d.setMinutes(0, 0, 0)
+  return d.getTime()
+}
+const ceilHour = (ms) => {
+  const d = new Date(ms)
+  d.setMinutes(0, 0, 0)
+  return d.getTime() < ms ? d.getTime() + HOUR_MS : d.getTime()
+}
+const clamp01 = (v) => Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0))
+
+/**
+ * 进度轴横轴:入睡前 30 分钟 → 起床后 30 分钟,两端再向外扩到整点
+ * (22:35 入睡 → 22:00 起轴;07:05 起床 → 08:00 收轴)。
+ * 入参缺失时用分期区间自身的最早/最晚兜底;没有可用时间返回 null(页面显示空态)。
+ * @return {{from:number,to:number,span:number}|null} 绝对毫秒
+ */
+export function sleepAxis(startTime, endTime, stages) {
+  const list = (stages || []).filter((s) => s && s.startTime && s.endTime)
+  const starts = list.map((s) => timeOf(s.startTime)).filter((v) => v != null)
+  const ends = list.map((s) => timeOf(s.endTime)).filter((v) => v != null)
+  const t0 = timeOf(startTime) ?? (starts.length ? Math.min(...starts) : null)
+  const t1 = timeOf(endTime) ?? (ends.length ? Math.max(...ends) : null)
+  if (t0 == null || t1 == null || t1 <= t0) return null
+  const from = floorHour(t0 - 30 * MIN_MS)
+  const to = ceilHour(t1 + 30 * MIN_MS)
+  return { from, to, span: to - from }
+}
+
+/** 整点刻度:跨度超 12 小时按 2 小时一格,8px 字才不会挤成一团 */
+export function sleepAxisTicks(axis) {
+  if (!axis || !axis.span) return []
+  const stepH = axis.span > 12 * HOUR_MS ? 2 : 1
+  const out = []
+  for (let t = axis.from; t <= axis.to; t += stepH * HOUR_MS) {
+    const d = new Date(t)
+    out.push({
+      x: LANE.padL + LANE_INNER_W() * ((t - axis.from) / axis.span),
+      label: `${String(d.getHours()).padStart(2, '0')}:00`,
+    })
+  }
+  return out
+}
+
+/** 四行标签(纯几何,配色由页面按 code 取 CSS 变量) */
+export function sleepLaneRows() {
+  return LANE_ROWS.map((code, i) => ({
+    code,
+    y: LANE.padT + i * (LANE.rowH + LANE.rowGap),
+  }))
+}
+
+/**
+ * 分期区间 → 泳道矩形。只画四行已知阶段(在床/未分期不占行,免得把整夜糊成一条),
+ * 超出横轴的部分按轴两端裁掉;合法区间起点=终点(上游已跳过)这里也不画。
+ */
+export function sleepLaneBars(stages, axis) {
+  if (!axis || !axis.span) return []
+  const inner = LANE_INNER_W()
+  const out = []
+  for (const s of stages || []) {
+    const code = String(s?.stage || '').toUpperCase()
+    const row = LANE_ROWS.indexOf(code)
+    if (row < 0) continue
+    const a = timeOf(s.startTime)
+    const b = timeOf(s.endTime)
+    if (a == null || b == null || b <= a) continue
+    const x0 = LANE.padL + inner * clamp01((a - axis.from) / axis.span)
+    const x1 = LANE.padL + inner * clamp01((b - axis.from) / axis.span)
+    if (x1 <= x0) continue
+    out.push({
+      code,
+      x: x0,
+      w: Math.max(1.2, x1 - x0),
+      y: LANE.padT + row * (LANE.rowH + LANE.rowGap),
+      h: LANE.rowH,
+      from: a,
+      to: b,
+      minutes: s.durationMin,
+    })
+  }
+  return out
+}

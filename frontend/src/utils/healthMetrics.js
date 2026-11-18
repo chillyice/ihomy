@@ -88,7 +88,7 @@ export const sleepHM = (min) => {
 export const sleepText = (t, min) => {
   const hm = sleepHM(min)
   if (!hm) return '—'
-  return hm.h ? t('health.hm', { h: hm.h, m: hm.m }) : t('health.m', { m: hm.m })
+  return hm.h ? t('health.hm', { h: hm.h, m: hm.m }) : t('health.m', { n: hm.m })
 }
 
 /** 睡眠分期:顺序即 stacked bar 顺序(清醒在顶) + 深色主题下的颜色变量 */

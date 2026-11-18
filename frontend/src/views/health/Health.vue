@@ -84,9 +84,75 @@
         </div>
       </el-tab-pane>
 
-      <!-- 睡眠:时长周柱(点柱子选某一晚) + 分期堆叠条 + 入睡散点 + 选中那晚的时间轴 -->
+      <!-- 睡眠:范围 tab(日/周/月/半年/一年)→ 顶部主卡(日=进度轴,其余=睡眠时间统计)+ 原来那四张卡 -->
       <el-tab-pane :label="$t('health.tabs.sleep')" name="sleep">
         <div class="tab-body">
+          <div class="chip-row">
+            <button
+              v-for="r in SLEEP_RANGES"
+              :key="r"
+              type="button"
+              class="metric-chip"
+              :class="{ active: sleepRange === r }"
+              @click="selectSleepRange(r)"
+            >
+              {{ $t(`health.sleep.range.${r.toLowerCase()}`) }}
+            </button>
+          </div>
+
+          <div class="card chart-card">
+            <div class="chart-head">
+              <span class="section-label">{{ sleepRange === 'DAY' ? $t('health.sleep.lane') : $t('health.sleep.stats') }}</span>
+              <span class="range-note">{{ sleepSpanText }}</span>
+            </div>
+
+            <!-- 日:某一晚的睡眠进度轴,横轴钟点、纵轴四行分期 -->
+            <template v-if="sleepRange === 'DAY'">
+              <template v-if="dayNight">
+                <div class="detail-head">
+                  <span>{{ $t('health.sleep.start') }} {{ clockText(dayNight.startTime) }}</span>
+                  <span>{{ $t('health.sleep.end') }} {{ clockText(dayNight.endTime) }}</span>
+                  <span>{{ sleepText($t, dayNight.totalMin) }}</span>
+                </div>
+                <HealthSleepNight
+                  v-if="dayStages.length"
+                  :stages="dayStages"
+                  :start-time="dayNight.startTime"
+                  :end-time="dayNight.endTime"
+                  :label="$t('health.sleep.lane')"
+                />
+                <div v-else class="empty-hint">{{ detailLoading ? $t('health.loading') : $t('health.sleep.noStages') }}</div>
+                <div class="stage-legend">
+                  <span v-for="s in legend" :key="s.code" class="legend-item">
+                    <i class="legend-dot" :style="{ background: s.color }" />{{ $t(s.labelKey) }}
+                  </span>
+                </div>
+              </template>
+              <div v-else class="empty-hint">{{ $t('health.sleep.noData') }}</div>
+            </template>
+
+            <!-- 周/月=每天睡了多久;半年/年=每月平均每晚 -->
+            <template v-else>
+              <div v-if="statsSummary.avg != null" class="stat-row">
+                <span v-if="statsSummary.total != null" class="stat-inline">
+                  {{ $t('health.trend.total') }} <b>{{ sleepText($t, statsSummary.total) }}</b>
+                </span>
+                <span class="stat-inline">
+                  {{ $t('health.sleep.avgNight') }} <b>{{ sleepText($t, statsSummary.avg) }}</b>
+                </span>
+                <span class="stat-inline">{{ $t('health.sleep.nights', { n: statsSummary.nights }) }}</span>
+              </div>
+              <HealthTrendChart
+                v-if="statsSeries.values.length"
+                mode="bar"
+                :values="statsSeries.values"
+                :labels="statsSeries.labels"
+                :label="$t('health.sleep.stats')"
+              />
+              <div v-else class="empty-hint">{{ statsLoading ? $t('health.loading') : $t('health.sleep.noData') }}</div>
+            </template>
+          </div>
+
           <div class="card chart-card">
             <div class="section-label">{{ $t('health.sleep.duration') }}</div>
             <HealthTrendChart
@@ -232,6 +298,7 @@ import { healthApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { saveBlobResponse } from '@/utils/download'
 import HealthTrendChart from './HealthTrendChart.vue'
+import HealthSleepNight from './HealthSleepNight.vue'
 import { stackBar, timelineSegments } from './healthChart'
 import {
   SLEEP_STAGES,
@@ -246,11 +313,13 @@ import {
   withUnit,
 } from '@/utils/healthMetrics'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 
 const TABS = ['overview', 'sleep', 'vitals', 'activity', 'body']
+// 睡眠页范围:日=某一晚的进度轴,周/月=当期每天睡了多久,半年/年=每月平均每晚
+const SLEEP_RANGES = ['DAY', 'WEEK', 'MONTH', 'HALF', 'YEAR']
 // 一天多次采样的点指标只画今天,不然几百个点在 360px 上糊成一条带
 const DENSE_POINT = ['HEART_RATE', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC']
 const RANGE_DAYS = 14
@@ -269,6 +338,9 @@ const series = ref({})
 const pickedId = ref(null)
 const sleepDetail = ref(null)
 const detailLoading = ref(false)
+const sleepRange = ref('DAY')
+const statsBuckets = ref({})
+const statsLoading = ref(false)
 const clearVisible = ref(false)
 const clearSource = ref('SHORTCUT')
 const clearing = ref(false)
@@ -318,6 +390,73 @@ const timeline = computed(() =>
   ),
 )
 
+// ===== 睡眠范围:日=选中那一晚;周/月按天合计;半年/年按月平均 =====
+const dayNight = computed(() => pickedNight.value)
+const dayStages = computed(() => sleepDetail.value?.stages || [])
+
+/** 范围窗口(周从本周一起、月从 1 号起;半年/年按月需要 6/12 个自然月) */
+const sleepWindow = computed(() => {
+  const to = shiftDay(0)
+  if (sleepRange.value === 'WEEK') return { from: weekStartDay(), to, bucket: 'DAY' }
+  if (sleepRange.value === 'MONTH') return { from: monthStartDay(), to, bucket: 'DAY' }
+  if (sleepRange.value === 'HALF') return { from: monthsAgoStart(5), to, bucket: 'MONTH' }
+  if (sleepRange.value === 'YEAR') return { from: monthsAgoStart(11), to, bucket: 'MONTH' }
+  return null
+})
+const statsKey = computed(() => `${viewingId.value}:${sleepRange.value}`)
+const statsRows = computed(() => statsBuckets.value[statsKey.value] || [])
+
+/** 补齐网格:没数据的那天/那个月留 null(不画柱子,不伪造 0) */
+const statsSeries = computed(() => {
+  const win = sleepWindow.value
+  if (!win) return { labels: [], values: [] }
+  const labels = []
+  const values = []
+  const cur = parseIsoDay(win.from)
+  const end = parseIsoDay(win.to)
+  const dayMap = win.bucket === 'DAY' ? new Map(statsRows.value.map((r) => [String(r.date), Number(r.totalMin)])) : null
+  const monthMap =
+    win.bucket === 'MONTH' ? new Map(statsRows.value.map((r) => [String(r.month), r.avgMin == null ? null : Number(r.avgMin)])) : null
+  while (cur <= end) {
+    if (win.bucket === 'DAY') {
+      const key = isoDay(cur)
+      labels.push(dayLabel(key))
+      values.push(dayMap.has(key) ? dayMap.get(key) : null)
+      cur.setDate(cur.getDate() + 1)
+    } else {
+      const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
+      labels.push(monthLabel(key))
+      values.push(monthMap.has(key) ? monthMap.get(key) : null)
+      cur.setMonth(cur.getMonth() + 1)
+    }
+  }
+  return { labels, values }
+})
+
+const statsSummary = computed(() => {
+  const win = sleepWindow.value
+  if (!win) return { avg: null, total: null, nights: 0 }
+  const rows = statsRows.value
+  const nights = rows.reduce((a, r) => a + Number(r.nights || 0), 0)
+  if (win.bucket === 'DAY') {
+    // 周/月:合计是这段时间的睡眠总量,平均按「晚」算而不是按天
+    const total = rows.reduce((a, r) => a + Number(r.totalMin || 0), 0)
+    return { avg: nights ? Math.round(total / nights) : null, total, nights }
+  }
+  // 半年/年:每月一个平均值,再在这些月之间取平均
+  const list = rows.map((r) => Number(r.avgMin)).filter((v) => Number.isFinite(v))
+  return {
+    avg: list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null,
+    total: null,
+    nights,
+  }
+})
+
+const sleepSpanText = computed(() => {
+  if (sleepRange.value === 'DAY') return dayNight.value ? dayLabel(dayNight.value.sleepDate) : ''
+  return t(`health.sleep.span.${sleepRange.value.toLowerCase()}`)
+})
+
 const sleep7 = computed(() => ({
   labels: nightLabels.value.slice(-7),
   values: nightValues.value.slice(-7),
@@ -366,6 +505,35 @@ function shiftDay(offset) {
   d.setHours(12, 0, 0, 0)
   d.setDate(d.getDate() + offset)
   return isoDay(d)
+}
+function parseIsoDay(value) {
+  const [y, m, d] = String(value || '')
+    .split('-')
+    .map(Number)
+  return new Date(y, (m || 1) - 1, d || 1, 12)
+}
+/** 本周一(周日算上周第一天,ISO 周口径) */
+function weekStartDay() {
+  const d = new Date()
+  d.setHours(12, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return isoDay(d)
+}
+function monthStartDay() {
+  return monthsAgoStart(0)
+}
+/** n 个自然月前那个月的 1 号(半年=5、一年=11,含本月正好 6/12 个月) */
+function monthsAgoStart(n) {
+  const d = new Date()
+  d.setHours(12, 0, 0, 0)
+  d.setDate(1)
+  d.setMonth(d.getMonth() - n)
+  return isoDay(d)
+}
+/** 月份短标签走 Intl:中文「11月」、英文「Nov」,不另外维护 12 个月名 */
+function monthLabel(ym) {
+  const [y, m] = String(ym).split('-').map(Number)
+  return new Intl.DateTimeFormat(locale.value, { month: 'short' }).format(new Date(y, m - 1, 1))
 }
 const rangeDays = (code) => (DENSE_POINT.includes(code) ? 1 : RANGE_DAYS)
 const tail = (obj, n) => ({ labels: obj.labels.slice(-n), values: obj.values.slice(-n), points: obj.points.slice(-n) })
@@ -438,14 +606,61 @@ function resetDetail() {
   sleepDetail.value = null
 }
 
+/** 周/月/半年/年:统计接口按 DAY / MONTH 分桶返回,前端只负责补网格 */
+async function loadStats() {
+  const win = sleepWindow.value
+  if (!win || !userStore.isLoggedIn || !viewingId.value) return
+  const key = statsKey.value
+  if (statsBuckets.value[key]) return
+  statsLoading.value = true
+  try {
+    const data = await healthApi.sleepStats({ userId: viewingId.value, from: win.from, to: win.to, bucket: win.bucket }).catch(() => null)
+    statsBuckets.value = { ...statsBuckets.value, [key]: Array.isArray(data?.buckets) ? data.buckets : [] }
+  } finally {
+    statsLoading.value = false
+  }
+}
+
+async function loadStages(night) {
+  if (!night) return
+  pickedId.value = night.id
+  detailLoading.value = true
+  try {
+    sleepDetail.value = await healthApi.stages(night.id).catch(() => null)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+/** 日视图默认看最近一晚(不算用户「点选」,换成员/刷新都会重新定位) */
+async function ensureDayDetail() {
+  if (!nights.value.length) return
+  const night = pickedNight.value || nights.value[nights.value.length - 1]
+  if (sleepDetail.value && pickedId.value === night.id) return
+  await loadStages(night)
+}
+
+async function ensureSleepView() {
+  if (sleepRange.value === 'DAY') await ensureDayDetail()
+  else await loadStats()
+}
+
+async function selectSleepRange(key) {
+  sleepRange.value = key
+  await ensureSleepView()
+}
+
 async function reloadAll() {
   if (!userStore.isLoggedIn || !viewingId.value) return
   loading.value = true
   try {
     series.value = {}
+    statsBuckets.value = {}
     resetDetail()
     await Promise.all([loadOverview(), loadNights(), loadSeries('STEPS')])
     if (['vitals', 'activity', 'body'].includes(tab.value)) await loadSeries(selected[tab.value])
+    // 睡眠页才需要分期/统计,其它 tab 不必多发这一轮请求
+    if (tab.value === 'sleep') await ensureSleepView()
   } finally {
     loading.value = false
   }
@@ -457,6 +672,7 @@ async function onMemberChange() {
 }
 
 async function onTabChange(name) {
+  if (name === 'sleep') await ensureSleepView()
   if (['vitals', 'activity', 'body'].includes(name)) await loadSeries(selected[name])
 }
 
@@ -465,17 +681,12 @@ async function selectMetric(name, code) {
   await loadSeries(code)
 }
 
+/** 点柱子:切到「日」看那一晚的进度轴(下方「这一晚」明细条也一起更新) */
 async function pickNight(index) {
   const night = nights.value[index]
   if (!night) return
-  pickedId.value = night.id
-  sleepDetail.value = null
-  detailLoading.value = true
-  try {
-    sleepDetail.value = await healthApi.stages(night.id).catch(() => null)
-  } finally {
-    detailLoading.value = false
-  }
+  sleepRange.value = 'DAY'
+  await loadStages(night)
 }
 
 async function doClear() {

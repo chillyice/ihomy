@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   BED_MAX,
+  LANE,
+  LANE_ROWS,
   axisMax,
   bandPaths,
   bars,
@@ -8,6 +10,10 @@ import {
   bedtimeOffset,
   bedtimeTicks,
   linePaths,
+  sleepAxis,
+  sleepAxisTicks,
+  sleepLaneBars,
+  sleepLaneRows,
   stackBar,
   timelineSegments,
   xTicks,
@@ -130,5 +136,91 @@ describe('睡眠堆叠与时间轴', () => {
   it('timelineSegments 没有分段时返回空数组(页面显示「没有分期」)', () => {
     expect(timelineSegments([], '2026-11-17T23:00:00', '2026-11-18T07:00:00')).toEqual([])
     expect(timelineSegments(null)).toEqual([])
+  })
+})
+
+// 夜视图进度轴:横轴是钟点(入睡前后各留半小时再扩到整点),纵轴是四行阶段
+describe('睡眠进度轴几何', () => {
+  const hms = (ms) => {
+    const d = new Date(ms)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  it('两端各留半小时后再向外扩到整点', () => {
+    const axis = sleepAxis('2026-11-17T22:35:00', '2026-11-18T07:05:00')
+    expect(hms(axis.from)).toBe('22:00')
+    expect(hms(axis.to)).toBe('08:00')
+    expect(axis.span).toBe(10 * 60 * 60 * 1000)
+    // 22:30 入睡减去半小时正好是整点:不多扩一格
+    const tight = sleepAxis('2026-11-17T22:30:00', '2026-11-18T07:00:00')
+    expect(hms(tight.from)).toBe('22:00')
+    expect(hms(tight.to)).toBe('08:00')
+  })
+
+  it('没传起止时用分期区间兜底,数据不可用返回 null', () => {
+    const axis = sleepAxis(null, null, [
+      { stage: 'LIGHT', startTime: '2026-11-17T22:40:00', endTime: '2026-11-17T23:00:00' },
+      { stage: 'DEEP', startTime: '2026-11-18T06:00:00', endTime: '2026-11-18T06:20:00' },
+    ])
+    expect(hms(axis.from)).toBe('22:00')
+    expect(hms(axis.to)).toBe('07:00')
+    expect(sleepAxis(null, null, [])).toBeNull()
+    expect(sleepAxis('2026-11-18T07:00:00', '2026-11-17T23:00:00')).toBeNull()
+  })
+
+  it('整点刻度:常规跨度 1 小时一格、超 12 小时 2 小时一格', () => {
+    const ticks = sleepAxisTicks(sleepAxis('2026-11-17T22:35:00', '2026-11-18T07:05:00'))
+    expect(ticks[0].label).toBe('22:00')
+    expect(ticks[ticks.length - 1].label).toBe('08:00')
+    expect(ticks).toHaveLength(11)
+    const wide = sleepAxisTicks(sleepAxis('2026-11-17T15:00:00', '2026-11-18T09:00:00'))
+    expect(wide.map((t) => t.label)).toEqual([
+      '14:00',
+      '16:00',
+      '18:00',
+      '20:00',
+      '22:00',
+      '00:00',
+      '02:00',
+      '04:00',
+      '06:00',
+      '08:00',
+      '10:00',
+    ])
+    expect(ticks[0].x).toBeCloseTo(LANE.padL, 6)
+  })
+
+  it('四行自下而上是深睡→核心→快速眼动→清醒', () => {
+    const rows = sleepLaneRows()
+    expect(rows.map((r) => r.code)).toEqual(['AWAKE', 'REM', 'LIGHT', 'DEEP'])
+    expect(rows[0].y).toBe(LANE.padT)
+    expect(rows[3].y).toBeGreaterThan(rows[0].y)
+  })
+
+  it('分期区间按钟点铺进对应行,在床/未分期不占行', () => {
+    const axis = sleepAxis('2026-11-17T23:00:00', '2026-11-18T07:00:00')
+    const bars = sleepLaneBars(
+      [
+        { stage: 'DEEP', startTime: '2026-11-17T23:00:00', endTime: '2026-11-18T00:00:00' },
+        { stage: 'INBED', startTime: '2026-11-18T00:00:00', endTime: '2026-11-18T06:00:00' },
+        { stage: 'AWAKE', startTime: '2026-11-18T06:00:00', endTime: '2026-11-18T07:00:00' },
+        { stage: 'LIGHT', startTime: '2026-11-18T07:00:00', endTime: '2026-11-18T07:00:00' },
+      ],
+      axis,
+    )
+    expect(bars.map((b) => b.code)).toEqual(['DEEP', 'AWAKE'])
+    expect(bars[0].y).toBe(LANE.padT + LANE_ROWS.indexOf('DEEP') * (LANE.rowH + LANE.rowGap))
+    // 23:00 入睡 → 轴从 22:00 起共 10 小时,深睡条距左内边 1/10
+    const inner = LANE.w - LANE.padL - LANE.padR
+    expect(bars[0].x - LANE.padL).toBeCloseTo(inner / 10, 6)
+    expect(bars[0].w).toBeCloseTo(inner / 10, 6)
+  })
+
+  it('越界区间被轴两端裁掉,没有轴时不画', () => {
+    const axis = sleepAxis('2026-11-17T23:00:00', '2026-11-18T07:00:00')
+    const bars = sleepLaneBars([{ stage: 'LIGHT', startTime: '2026-11-17T21:00:00', endTime: '2026-11-18T09:00:00' }], axis)
+    expect(bars[0].x).toBeCloseTo(LANE.padL, 6)
+    expect(bars[0].x + bars[0].w).toBeCloseTo(LANE.w - LANE.padR, 6)
+    expect(sleepLaneBars([], null)).toEqual([])
   })
 })

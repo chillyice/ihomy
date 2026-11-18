@@ -5,8 +5,10 @@ import com.ihomy.entity.FamilyHealthSleep;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 睡眠会话映射:派生数据重算即整窗物理删(表无逻辑删列),删除与重叠查询走自定义 XML。
@@ -25,4 +27,14 @@ public interface FamilyHealthSleepMapper extends BaseMapper<FamilyHealthSleep> {
 
     /** 清除某成员某来源的全部睡眠会话(换设备/误配) */
     int deleteByProvider(@Param("userId") Long userId, @Param("provider") String provider);
+
+    /** 按入睡日合计(周/月视图:每天睡了多少,夜睡+小睡一起算) */
+    List<Map<String, Object>> selectDailyStats(@Param("userId") Long userId,
+                                               @Param("from") LocalDate from,
+                                               @Param("to") LocalDate to);
+
+    /** 按月合计(半年/年视图:每月平均每晚多久,夜睡与小睡分开计数供口径判定) */
+    List<Map<String, Object>> selectMonthlyStats(@Param("userId") Long userId,
+                                                 @Param("from") LocalDate from,
+                                                 @Param("to") LocalDate to);
 }

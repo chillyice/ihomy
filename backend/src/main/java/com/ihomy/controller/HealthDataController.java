@@ -165,6 +165,16 @@ public class HealthDataController {
         return Result.success(queryService.sleep(viewer(), userId, from, to));
     }
 
+    @Operation(summary = "睡眠统计(按天合计或按月平均,≤366 天)")
+    @GetMapping("/sleep/stats")
+    public Result<Map<String, Object>> sleepStats(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "DAY") String bucket) {
+        return Result.success(queryService.sleepStats(viewer(), userId, from, to, bucket));
+    }
+
     @Operation(summary = "某晚睡眠分期区间")
     @GetMapping("/sleep/{id}/stages")
     public Result<Map<String, Object>> stages(@PathVariable Long id) {

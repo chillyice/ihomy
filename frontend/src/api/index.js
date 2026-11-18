@@ -783,10 +783,11 @@ export const healthApi = {
   saveConsent: (data) => request.put('/health/consent', data),
   viewLog: (days) => request.get('/health/view-log', { params: days ? { days } : {} }),
   clearData: (source) => request.delete('/health/data', { params: { source } }),
-  // 读侧:概况 / 睡眠会话 / 分期 / 单指标趋势 / 首页摘要
+  // 读侧:概况 / 睡眠会话 / 分期 / 睡眠统计 / 单指标趋势 / 首页摘要
   overview: (params) => request.get('/health/overview', { params }),
   sleep: (params) => request.get('/health/sleep', { params }),
   stages: (id) => request.get(`/health/sleep/${id}/stages`),
+  sleepStats: (params) => request.get('/health/sleep/stats', { params }),
   metric: (params) => request.get('/health/metric', { params }),
   summary: (days) => request.get('/health/summary', { params: days ? { days } : {} }),
   // 导出:长表 CSV(睡眠/分期/样本),直接回文件流;失败时后端仍回 JSON,由 saveBlobResponse 识别

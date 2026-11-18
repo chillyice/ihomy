@@ -27,4 +27,36 @@
         WHERE `user_id` = #{userId} AND `provider` = #{provider}
     </delete>
 
+    <!--
+      周/月视图:一天一条合计。夜睡 + 小睡都算进「那天睡了多久」,
+      日期用 DATE_FORMAT 取字符串,避免 Map 里出现 java.sql.Date 的时区/序列化歧义。
+    -->
+    <select id="selectDailyStats" resultType="java.util.Map">
+        SELECT DATE_FORMAT(`sleep_date`, '%Y-%m-%d') AS `date`,
+               SUM(`total_min`) AS `totalMin`,
+               COUNT(*)         AS `nights`
+        FROM `family_health_sleep`
+        WHERE `user_id` = #{userId}
+          AND `sleep_date` BETWEEN #{from} AND #{to}
+        GROUP BY `sleep_date`
+        ORDER BY `sleep_date`
+    </select>
+
+    <!--
+      半年/年视图:一月一条。平均按夜睡算,故夜睡与小睡分开汇总,
+      某个只有小睡的月份由业务层退回全部会话(口径见 common/HealthSleepStats)。
+    -->
+    <select id="selectMonthlyStats" resultType="java.util.Map">
+        SELECT DATE_FORMAT(`sleep_date`, '%Y-%m') AS `month`,
+               SUM(`total_min`) AS `totalMin`,
+               COUNT(*)         AS `nights`,
+               SUM(CASE WHEN `kind` = 'NIGHT' THEN `total_min` ELSE 0 END) AS `nightMin`,
+               SUM(CASE WHEN `kind` = 'NIGHT' THEN 1 ELSE 0 END)          AS `nightCount`
+        FROM `family_health_sleep`
+        WHERE `user_id` = #{userId}
+          AND `sleep_date` BETWEEN #{from} AND #{to}
+        GROUP BY DATE_FORMAT(`sleep_date`, '%Y-%m')
+        ORDER BY `month`
+    </select>
+
 </mapper>
