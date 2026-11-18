@@ -5,7 +5,14 @@
       <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
     </PageToolbar>
 
-    <div ref="gameCardEl" v-loading="generating" class="sd-card game-surface" @contextmenu.prevent @dblclick.prevent>
+    <div
+      ref="gameCardEl"
+      v-loading="generating"
+      class="sd-card game-surface"
+      :class="{ 'has-hint': !!hint }"
+      @contextmenu.prevent
+      @dblclick.prevent
+    >
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -25,6 +32,8 @@
           <el-select v-model="difficulty" size="small" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
+          <el-button size="small" round class="sd-head-btn" @click="openSaves">{{ $t('games.sudoku.saves.button') }}</el-button>
+          <el-button size="small" round class="sd-head-btn" @click="teachOpen = true">{{ $t('games.sudoku.teach.button') }}</el-button>
         </template>
         <template #stats>
           <span class="gh-chip"
@@ -36,7 +45,7 @@
         </template>
       </GameHeader>
 
-      <div class="sd-layout">
+      <div class="sd-layout" :class="{ 'has-hint': !!hint }">
         <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
           <template v-if="variant === 'SKYSCRAPER'">
             <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
@@ -183,8 +192,19 @@
             <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
               {{ $t('games.sudoku.undo') }}
             </button>
-            <button type="button" class="sd-tool" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
+            <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
             <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
+          </div>
+          <div v-if="hint" class="sd-hint-note" role="status" aria-live="polite">
+            <div class="sd-hint-head">
+              <b v-if="hintTechName" class="sd-hint-tech">{{ hintTechName }}</b>
+              <button type="button" class="sd-hint-close" :aria-label="$t('games.sudoku.hintDismiss')" @click="hint = null">×</button>
+            </div>
+            <p class="sd-hint-text">{{ hintText }}</p>
+            <div v-if="hint.via && hint.via.length" class="sd-hint-via">
+              <span class="sd-hint-via-label">{{ $t('games.sudoku.hintResult.viaLabel') }}</span>
+              <span v-for="(key, i) in hint.via" :key="key + i" class="sd-hint-chip">{{ $t('games.sudoku.tech.' + key + '.name') }}</span>
+            </div>
           </div>
           <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
             {{ $t('games.sudoku.variantTip.' + variant) }}
@@ -204,6 +224,46 @@
         </div>
       </Transition>
     </div>
+
+    <!-- 存档槽:本地多份进度(自动存档只管崩溃恢复) -->
+    <el-dialog v-model="saveOpen" class="dialog-md" append-to-body :title="$t('games.sudoku.saves.title')">
+      <div class="sd-save-top">
+        <el-button type="primary" size="small" round :disabled="!canSave" @click="saveCurrent">
+          {{ $t('games.sudoku.saves.saveCurrent') }}
+        </el-button>
+        <span class="sd-save-tip">{{ $t('games.sudoku.saves.limit', { n: SAVE_LIMIT }) }}</span>
+      </div>
+      <p v-if="!saves.length" class="sd-save-empty">{{ $t('games.sudoku.saves.empty') }}</p>
+      <ul v-else class="sd-save-list">
+        <li v-for="slot in saves" :key="slot.id" class="sd-save-item">
+          <div class="sd-save-meta">
+            <b>{{ slotTitle(slot) }}</b>
+            <span class="sd-save-sub">
+              <span>{{ $t('games.sudoku.saves.progress', { filled: slotFilled(slot), total: CELLS }) }}</span>
+              <span>{{ slotTime(slot) }}</span>
+              <span>{{ slotDate(slot) }}</span>
+            </span>
+          </div>
+          <div class="sd-save-actions">
+            <el-button size="small" round @click="loadSlot(slot)">{{ $t('games.sudoku.saves.load') }}</el-button>
+            <el-button size="small" round text @click="removeSlot(slot.id)">{{ $t('games.sudoku.saves.delete') }}</el-button>
+          </div>
+        </li>
+      </ul>
+      <p v-if="saveMsg" class="sd-save-msg">{{ saveMsg }}</p>
+    </el-dialog>
+
+    <!-- 技巧教学:与提示引擎同一套技巧阶梯 -->
+    <el-dialog v-model="teachOpen" class="dialog-md" append-to-body :title="$t('games.sudoku.teach.title')">
+      <p class="sd-teach-intro">{{ $t('games.sudoku.teach.intro') }}</p>
+      <ol class="sd-teach-list">
+        <li v-for="item in TECH_LIST" :key="item" class="sd-teach-item">
+          <b>{{ $t('games.sudoku.tech.' + item + '.name') }}</b>
+          <p>{{ $t('games.sudoku.tech.' + item + '.desc') }}</p>
+        </li>
+      </ol>
+      <p class="sd-teach-foot">{{ $t('games.sudoku.teach.foot') }}</p>
+    </el-dialog>
   </div>
 </template>
 
@@ -227,6 +287,7 @@ import {
   CELLS,
   DIFFICULTY_KEYS,
   EDGE_REL,
+  HINT_TECHNIQUE,
   VARIANT_KEYS,
   buildPeers,
   cageIndexOf,
@@ -234,6 +295,7 @@ import {
   digitCounts,
   extraGroupsFor,
   findConflicts,
+  findNextHint,
   generatePuzzle,
   isSolved,
   isValidArithPaths,
@@ -247,7 +309,6 @@ import {
   isValidSkyscrapers,
   isValidThermos,
   notesOf,
-  pickHintIndex,
   regionIndexOf,
 } from '@/utils/games/sudoku'
 
@@ -256,9 +317,21 @@ const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const STORAGE_KEY = 'ihomy:games:sudoku:v1'
+const SAVES_KEY = 'ihomy:games:sudoku:saves:v1'
 const QUICK_FILL_KEY = 'ihomy:games:sudoku:quickfill:v1'
+const SAVE_LIMIT = 8
 const MAX_HISTORY = 120
 const LONG_PRESS_MS = 500
+
+/** 技巧教学弹窗按难度阶梯列出的条目(提示引擎用到的同一套技巧) */
+const TECH_LIST = [
+  HINT_TECHNIQUE.NAKED_SINGLE,
+  HINT_TECHNIQUE.HIDDEN_SINGLE,
+  HINT_TECHNIQUE.LOCKED_CANDIDATES,
+  HINT_TECHNIQUE.SUBSET,
+  HINT_TECHNIQUE.X_WING,
+  HINT_TECHNIQUE.GUESS,
+]
 
 const pageEl = ref(null)
 const gameCardEl = ref(null)
@@ -292,6 +365,13 @@ const elapsed = ref(0)
 const won = ref(false)
 const rewardMsg = ref('')
 const hintFlash = ref(-1)
+// 最近一次提示:技巧推导结果(格子、数字、用了哪几招);CONFLICT/DEAD 只用于面板文案
+const hint = ref(null)
+// 存档槽(本地多份进度),存档弹窗与教学弹窗各自独立
+const saves = ref([])
+const saveOpen = ref(false)
+const teachOpen = ref(false)
+const saveMsg = ref('')
 
 // ---------- 「一起玩」房间(数独只允许合作) ----------
 // 房主生成题面并权威落子;其他成员的操作(落子/擦除/提示/撤销/长按直填/换题)都发给房主执行,
@@ -349,6 +429,7 @@ function applyRoomState(state) {
   hintsUsed.value = Math.max(0, Number(state.hintsUsed) || 0)
   won.value = !!state.won
   history.value = []
+  hint.value = null
   if (won.value) stopTimer()
 }
 
@@ -382,7 +463,7 @@ function onRoomSignal(data) {
   const at = Number.isInteger(index) && index >= 0 && index < CELLS ? index : -1
   if (data.kind === 'input' && Number.isInteger(Number(data.n))) applyInput(Number(data.n), at, !!data.notes)
   else if (data.kind === 'erase') applyErase(at)
-  else if (data.kind === 'hint') applyHint(at)
+  else if (data.kind === 'hint') applyHint()
   else if (data.kind === 'undo') applyUndo()
   else if (data.kind === 'promote') applyPromote(at)
   else if (data.kind === 'newGame') startNewWith({ difficulty: data.difficulty, variant: data.variant })
@@ -453,11 +534,12 @@ const remaining = computed(() => {
   for (let n = 1; n <= 9; n++) left[n] = Math.max(0, 9 - counts.value[n])
   return left
 })
-const timeText = computed(() => {
-  const m = Math.floor(elapsed.value / 60)
-  const s = elapsed.value % 60
+const formatTime = (sec) => {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-})
+}
+const timeText = computed(() => formatTime(elapsed.value))
 
 // 约束邻居与高亮:笔记清理、选中格影响范围共用同一份邻居口径(不规则区替代九宫、附加组计入)
 const peersAll = computed(() => buildPeers(currentConstraints.value))
@@ -469,6 +551,26 @@ const cellLabel = (index, value) =>
   value
     ? t('games.sudoku.cellFilled', { row: Math.floor(index / 9) + 1, col: (index % 9) + 1, value })
     : t('games.sudoku.cellEmpty', { row: Math.floor(index / 9) + 1, col: (index % 9) + 1 })
+
+// 提示面板:技巧名单独显示,这里拼「为什么是这一格」
+const hintText = computed(() => {
+  const h = hint.value
+  if (!h) return ''
+  if (h.technique === 'CONFLICT') return t('games.sudoku.hintResult.conflict')
+  if (h.technique === HINT_TECHNIQUE.DEAD) return t('games.sudoku.hintResult.dead')
+  const row = Math.floor(h.index / 9) + 1
+  const col = (h.index % 9) + 1
+  const cell = t('games.sudoku.hintCell', { row, col })
+  if (h.technique === HINT_TECHNIQUE.GUESS) return t('games.sudoku.hintResult.deep', { cell, value: h.value })
+  if (h.technique === HINT_TECHNIQUE.NAKED_SINGLE) return t('games.sudoku.hintResult.nakedSingle', { row, col, value: h.value })
+  const unit = t('games.sudoku.hintUnit.' + (h.unitType || 'extra'), { n: (h.unitIndex || 0) + 1 })
+  return t('games.sudoku.hintResult.hiddenSingle', { unit, cell, value: h.value })
+})
+const hintTechName = computed(() => {
+  const h = hint.value
+  if (!h || h.technique === 'CONFLICT' || h.technique === HINT_TECHNIQUE.DEAD) return ''
+  return t('games.sudoku.tech.' + h.technique + '.name')
+})
 
 const cellClass = (index) => {
   const row = Math.floor(index / 9)
@@ -732,38 +834,42 @@ const clearState = () => {
     // 忽略
   }
 }
+/** 校验并归一化一份进度(自动存档与存档槽共用同一份口径,脏档返回 null) */
+const normalizeSave = (raw) => {
+  if (!raw || typeof raw !== 'object') return null
+  // 旧版存档没有 variant 字段,按标准数独处理;已下线变体的存档直接丢弃
+  if (raw.variant && !VARIANT_KEYS.includes(raw.variant)) return null
+  const savedVariant = raw.variant || 'CLASSIC'
+  if (!DIFFICULTY_KEYS.includes(raw.difficulty)) return null
+  if (savedVariant === 'KILLER' && !isValidCages(raw.cages)) return null
+  if (savedVariant === 'JIGSAW' && !isValidRegions(raw.regions)) return null
+  if (savedVariant === 'GREATER' && !isValidInequalities(raw.inequalities)) return null
+  if (savedVariant === 'ODD_EVEN' && !isValidParity(raw.parity)) return null
+  if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV' || savedVariant === 'NON_CONSECUTIVE') && !isValidEdges(raw.edges)) {
+    return null
+  }
+  if (savedVariant === 'THERMO' && (!isValidThermos(raw.thermos) || !isValidInequalities(raw.inequalities))) return null
+  if (savedVariant === 'SKYSCRAPER' && !isValidSkyscrapers(raw.skyscrapers)) return null
+  if (savedVariant === 'ARITHMETIC' && !isValidArithPaths(raw.arith)) return null
+  if (savedVariant === 'PALINDROME' && !isValidPalindromePaths(raw.palindromes)) return null
+  if (!isValidBoard(raw.puzzle) || !isValidBoard(raw.board) || !isValidBoard(raw.solution, { allowZero: false })) {
+    return null
+  }
+  if (!Array.isArray(raw.notes) || raw.notes.length !== CELLS || raw.notes.some((m) => !Number.isInteger(m))) {
+    return null
+  }
+  for (let i = 0; i < CELLS; i++) {
+    if (raw.puzzle[i] && raw.board[i] !== raw.puzzle[i]) return null
+  }
+  // 终盘必须真的满足该变体约束,挡掉变体/约束对不上的旧档
+  const opts = constraintsOf(savedVariant, raw)
+  if (!isSolved(raw.solution, opts)) return null
+  return { ...raw, variant: savedVariant }
+}
+
 const loadState = () => {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
-    if (!raw) return null
-    // 旧版存档没有 variant 字段,按标准数独处理;已下线变体的存档直接丢弃
-    if (raw.variant && !VARIANT_KEYS.includes(raw.variant)) return null
-    const savedVariant = raw.variant || 'CLASSIC'
-    if (!DIFFICULTY_KEYS.includes(raw.difficulty)) return null
-    if (savedVariant === 'KILLER' && !isValidCages(raw.cages)) return null
-    if (savedVariant === 'JIGSAW' && !isValidRegions(raw.regions)) return null
-    if (savedVariant === 'GREATER' && !isValidInequalities(raw.inequalities)) return null
-    if (savedVariant === 'ODD_EVEN' && !isValidParity(raw.parity)) return null
-    if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV' || savedVariant === 'NON_CONSECUTIVE') && !isValidEdges(raw.edges)) {
-      return null
-    }
-    if (savedVariant === 'THERMO' && (!isValidThermos(raw.thermos) || !isValidInequalities(raw.inequalities))) return null
-    if (savedVariant === 'SKYSCRAPER' && !isValidSkyscrapers(raw.skyscrapers)) return null
-    if (savedVariant === 'ARITHMETIC' && !isValidArithPaths(raw.arith)) return null
-    if (savedVariant === 'PALINDROME' && !isValidPalindromePaths(raw.palindromes)) return null
-    if (!isValidBoard(raw.puzzle) || !isValidBoard(raw.board) || !isValidBoard(raw.solution, { allowZero: false })) {
-      return null
-    }
-    if (!Array.isArray(raw.notes) || raw.notes.length !== CELLS || raw.notes.some((m) => !Number.isInteger(m))) {
-      return null
-    }
-    for (let i = 0; i < CELLS; i++) {
-      if (raw.puzzle[i] && raw.board[i] !== raw.puzzle[i]) return null
-    }
-    // 终盘必须真的满足该变体约束,挡掉变体/约束对不上的旧档
-    const opts = constraintsOf(savedVariant, raw)
-    if (!isSolved(raw.solution, opts)) return null
-    return { ...raw, variant: savedVariant }
+    return normalizeSave(JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'))
   } catch (e) {
     return null
   }
@@ -776,6 +882,90 @@ const scheduleSave = () => {
     saveTimer = null
     saveState()
   }, 800)
+}
+
+// ---------- 存档槽(本地多份进度;自动存档只管崩溃恢复,这里是玩家主动留的档) ----------
+const readSaves = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SAVES_KEY) || '[]')
+    if (!Array.isArray(raw)) return []
+    return raw.filter((slot) => slot && typeof slot === 'object' && Number(slot.id) > 0)
+  } catch (e) {
+    return []
+  }
+}
+const persistSaves = () => {
+  try {
+    localStorage.setItem(SAVES_KEY, JSON.stringify(saves.value))
+  } catch (e) {
+    // 隐私模式/配额满时放弃,不影响游戏
+  }
+}
+const canSave = computed(() => !play.active && !won.value && solution.value.length > 0)
+const openSaves = () => {
+  saveMsg.value = ''
+  saves.value = readSaves()
+  saveOpen.value = true
+}
+const saveCurrent = () => {
+  if (!canSave.value) return
+  const slot = { id: Date.now(), savedAt: Date.now(), ...snapshotRoomState() }
+  saves.value = [slot, ...saves.value].slice(0, SAVE_LIMIT)
+  persistSaves()
+  saveMsg.value = t('games.sudoku.saves.saved')
+}
+const removeSlot = (id) => {
+  saves.value = saves.value.filter((slot) => slot.id !== id)
+  persistSaves()
+}
+const loadSlot = (slot) => {
+  const saved = normalizeSave(slot)
+  if (!saved) {
+    saveMsg.value = t('games.sudoku.saves.loadFailed')
+    return
+  }
+  applySavedState(saved)
+  saveOpen.value = false
+  saveMsg.value = ''
+}
+const slotTitle = (slot) =>
+  t('games.sudoku.saves.slotTitle', {
+    variant: t('games.sudoku.variant.' + slot.variant),
+    difficulty: t('games.sudoku.difficulty.' + slot.difficulty),
+  })
+const slotFilled = (slot) => (Array.isArray(slot.board) ? slot.board.reduce((n, v) => n + (v ? 1 : 0), 0) : 0)
+const slotTime = (slot) => formatTime(Number(slot.elapsed) || 0)
+const slotDate = (slot) => {
+  const d = new Date(Number(slot.savedAt) || Number(slot.id))
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** 把一份校验过的进度铺到棋盘上(自动恢复与手动载入共用) */
+const applySavedState = (saved) => {
+  variant.value = saved.variant
+  difficulty.value = saved.difficulty
+  puzzle.value = saved.puzzle
+  solution.value = saved.solution
+  cages.value = saved.variant === 'KILLER' ? saved.cages : null
+  regions.value = saved.variant === 'JIGSAW' ? saved.regions : null
+  inequalities.value = saved.variant === 'GREATER' || saved.variant === 'THERMO' ? saved.inequalities : null
+  parity.value = saved.variant === 'ODD_EVEN' ? saved.parity : null
+  edges.value = saved.variant === 'CONSECUTIVE' || saved.variant === 'XV' || saved.variant === 'NON_CONSECUTIVE' ? saved.edges : null
+  thermos.value = saved.variant === 'THERMO' ? saved.thermos : null
+  skyscrapers.value = saved.variant === 'SKYSCRAPER' ? saved.skyscrapers : null
+  arith.value = saved.variant === 'ARITHMETIC' ? saved.arith : null
+  palindromes.value = saved.variant === 'PALINDROME' ? saved.palindromes : null
+  board.value = saved.board
+  notes.value = saved.notes
+  elapsed.value = Number.isInteger(saved.elapsed) ? saved.elapsed : 0
+  hintsUsed.value = Number.isInteger(saved.hintsUsed) ? saved.hintsUsed : 0
+  won.value = false
+  selected.value = -1
+  focusDigit.value = 0
+  hint.value = null
+  history.value = []
+  startTimer()
 }
 // ---------- 游戏流程 ----------
 let generateSeq = 0
@@ -822,6 +1012,7 @@ const startNew = async () => {
   won.value = false
   rewardMsg.value = ''
   hintFlash.value = -1
+  hint.value = null
   clearState()
   generating.value = false
   startTimer()
@@ -915,6 +1106,7 @@ const input = (n, at = selected.value) => {
 const applyInput = (n, at, asNotes) => {
   const index = at
   if (won.value || generating.value || index < 0 || isGiven(index)) return
+  hint.value = null
   if (asNotes) {
     if (board.value[index]) return
     snapshot()
@@ -943,6 +1135,7 @@ const erase = () => {
 const applyErase = (index) => {
   if (won.value || index < 0 || isGiven(index)) return
   if (!board.value[index] && !notes.value[index]) return
+  hint.value = null
   snapshot()
   board.value[index] = 0
   notes.value[index] = 0
@@ -1016,6 +1209,7 @@ const undo = () => {
 
 const applyUndo = () => {
   if (won.value || !history.value.length) return
+  hint.value = null
   const last = history.value.pop()
   board.value = last.board
   notes.value = last.notes
@@ -1024,25 +1218,36 @@ const applyUndo = () => {
 const useHint = () => {
   if (won.value || generating.value) return
   if (coopGuest.value) {
-    play.send('op', { kind: 'hint', index: selected.value })
+    play.send('op', { kind: 'hint' })
     return
   }
-  applyHint(selected.value)
+  applyHint()
 }
 
-const applyHint = (at) => {
+// 提示 = 按人解技巧推出「下一步该填的格子」,不再跟着当前选中的格子走;
+// 冲突或走不通时只给说明、不落子,也不计提示次数。
+const applyHint = () => {
   if (won.value || generating.value) return
-  let index = at
-  if (index < 0 || board.value[index]) index = pickHintIndex(board.value)
-  if (index < 0) return
+  if (conflictCount.value > 0) {
+    hint.value = { technique: 'CONFLICT' }
+    return
+  }
+  const result = findNextHint(board.value, {
+    ...currentConstraints.value,
+    solution: solution.value,
+    variant: variant.value,
+  })
+  if (!result) return
+  hint.value = result
+  if (result.technique === HINT_TECHNIQUE.DEAD) return
   snapshot()
-  board.value[index] = solution.value[index]
-  notes.value[index] = 0
-  clearNotesAround(index, solution.value[index])
+  board.value[result.index] = result.value
+  notes.value[result.index] = 0
+  clearNotesAround(result.index, result.value)
   hintsUsed.value += 1
-  selected.value = index
-  focusDigit.value = solution.value[index]
-  flashCell(index)
+  selected.value = result.index
+  focusDigit.value = result.value
+  flashCell(result.index)
   if (solvedNow()) finish()
 }
 
@@ -1051,6 +1256,7 @@ const finish = () => {
   won.value = true
   stopTimer()
   selected.value = -1
+  hint.value = null
   clearState()
   if (play.active) {
     if (play.isHost) play.report(elapsed.value)
@@ -1131,6 +1337,7 @@ onMounted(async () => {
   } catch (e) {
     quickFill.value = false
   }
+  saves.value = readSaves()
 
   if (play.active) {
     // 房间:跳过本地存档,房主出题并广播,访客等房主同步
@@ -1141,28 +1348,8 @@ onMounted(async () => {
   }
 
   const saved = loadState()
-  if (saved) {
-    variant.value = saved.variant
-    difficulty.value = saved.difficulty
-    puzzle.value = saved.puzzle
-    solution.value = saved.solution
-    cages.value = saved.variant === 'KILLER' ? saved.cages : null
-    regions.value = saved.variant === 'JIGSAW' ? saved.regions : null
-    inequalities.value = saved.variant === 'GREATER' || saved.variant === 'THERMO' ? saved.inequalities : null
-    parity.value = saved.variant === 'ODD_EVEN' ? saved.parity : null
-    edges.value = saved.variant === 'CONSECUTIVE' || saved.variant === 'XV' ? saved.edges : null
-    thermos.value = saved.variant === 'THERMO' ? saved.thermos : null
-    skyscrapers.value = saved.variant === 'SKYSCRAPER' ? saved.skyscrapers : null
-    arith.value = saved.variant === 'ARITHMETIC' ? saved.arith : null
-    palindromes.value = saved.variant === 'PALINDROME' ? saved.palindromes : null
-    board.value = saved.board
-    notes.value = saved.notes
-    elapsed.value = Number.isInteger(saved.elapsed) ? saved.elapsed : 0
-    hintsUsed.value = Number.isInteger(saved.hintsUsed) ? saved.hintsUsed : 0
-    startTimer()
-  } else {
-    nextTick(startNew)
-  }
+  if (saved) applySavedState(saved)
+  else nextTick(startNew)
 })
 
 onBeforeUnmount(() => {
@@ -1809,6 +1996,173 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 
+.sd-head-btn {
+  margin-left: 0;
+}
+
+/* 提示说明:技巧名 + 为什么 + 用过的技巧链 */
+.sd-hint-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(100%, 520px);
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sd-user) 28%, transparent);
+  background: var(--sd-peer);
+  text-align: left;
+}
+.sd-hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sd-hint-tech {
+  font-size: 12px;
+  color: var(--sd-user);
+}
+.sd-hint-close {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary, #8a8a8a);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sd-hint-close:hover {
+  color: var(--color-text-primary, #2b2b2b);
+}
+.sd-hint-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary, #2b2b2b);
+}
+.sd-hint-via {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sd-hint-via-label {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-hint-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sd-line);
+  font-size: 11px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+
+/* 存档槽(弹窗 append-to-body,只能用全局变量,拿不到 .sd-card 上的 --sd-*) */
+.sd-save-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.sd-save-tip {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-save-empty {
+  margin: 0;
+  padding: 18px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-save-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sd-save-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  background: var(--color-surface, #fff);
+}
+.sd-save-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--color-text-primary, #2b2b2b);
+}
+.sd-save-meta b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-save-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #8a8a8a);
+  font-variant-numeric: tabular-nums;
+}
+.sd-save-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.sd-save-msg {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-accent, #a8483a);
+}
+
+/* 技巧教学 */
+.sd-teach-intro,
+.sd-teach-foot {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sd-teach-intro {
+  margin-bottom: 10px;
+}
+.sd-teach-foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+}
+.sd-teach-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 20px;
+}
+.sd-teach-item {
+  font-size: 13px;
+  color: var(--color-text-primary, #2b2b2b);
+}
+.sd-teach-item b {
+  font-size: 13px;
+}
+.sd-teach-item p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+
 .sd-overlay {
   position: absolute;
   inset: 0;
@@ -1890,6 +2244,23 @@ html.dark .sd-stat.warn b {
     padding: 8px 0;
     font-size: 15px;
     border-radius: 8px;
+  }
+  /* 窄屏下棋盘/数字盘都是通栏,提示条跟着通栏走,别做成贴屏幕边的圆角卡片 */
+  .sd-hint-note {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  /* 提示条会占掉 60~90px:棋盘先让一点高度,否则工具区会被顶出一屏外 */
+  .sd-layout.has-hint {
+    --sd-frame-size: min(100%, clamp(220px, calc(100dvh - 522px - var(--room-bar-h, 0px)), 520px));
+  }
+}
+
+/* 兜底:矮屏 + 长提示文案仍超一屏时,让卡片自己滚(页面 overflow:hidden 会直接裁掉底部) */
+@media (max-height: 720px) {
+  .sd-card.has-hint {
+    overflow-y: auto;
   }
 }
 

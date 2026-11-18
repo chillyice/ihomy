@@ -383,6 +383,34 @@ const popcount = (x) => {
   return n
 }
 
+/**
+ * 杀手笼候选过滤:笼内未用过 + 扣掉该数字后,剩余格的可攻和区间要装得下剩余数字。
+ * 求解、评级与提示共用同一份口径。
+ */
+function cageCandidatesAt(cageOf, cageUsed, cageSum, cageLeft, cell, mask) {
+  const g = cageOf[cell]
+  if (g < 0) return mask
+  let m = mask & ~cageUsed[g]
+  let filtered = 0
+  while (m) {
+    const bit = m & -m
+    m ^= bit
+    const rest = cageSum[g] - BIT_VALUE[bit]
+    const restCells = cageLeft[g] - 1
+    if (rest < 0) continue
+    if (restCells === 0) {
+      if (rest !== 0) continue
+    } else {
+      // restCells 个互异数字:最小和 = 1+…+restCells,最大和 = 9+8+…
+      const minSum = (restCells * (restCells + 1)) / 2
+      const maxSum = (restCells * (19 - restCells)) / 2
+      if (rest < minSum || rest > maxSum) continue
+    }
+    filtered |= bit
+  }
+  return filtered
+}
+
 /** 9 个标准九宫(不规则数独换成 regions 时,它同时是兜底布局) */
 export const BOX_GROUPS = (() => {
   const groups = []
@@ -654,30 +682,8 @@ export function countSolutions(input, limit = 2, opts = {}) {
     }
   }
 
-  // 依笼约束过滤候选:笼内未用过 + 扣掉该数字后,剩余格的可攻和区间要装得下剩余数字
-  const cageCandidates = (cell, mask) => {
-    const g = cageOf[cell]
-    if (g < 0) return mask
-    let m = mask & ~cageUsed[g]
-    let filtered = 0
-    while (m) {
-      const bit = m & -m
-      m ^= bit
-      const rest = cageSum[g] - BIT_VALUE[bit]
-      const restCells = cageLeft[g] - 1
-      if (rest < 0) continue
-      if (restCells === 0) {
-        if (rest !== 0) continue
-      } else {
-        // restCells 个互异数字:最小和 = 1+…+restCells,最大和 = 9+8+…
-        const minSum = (restCells * (restCells + 1)) / 2
-        const maxSum = (restCells * (19 - restCells)) / 2
-        if (rest < minSum || rest > maxSum) continue
-      }
-      filtered |= bit
-    }
-    return filtered
-  }
+  // 依笼约束过滤候选(与提示引擎同一份实现)
+  const cageCandidates = (cell, mask) => cageCandidatesAt(cageOf, cageUsed, cageSum, cageLeft, cell, mask)
 
   // 依相邻格的比较关系剪枝:邻格已填时,本格候选必须落在符号指向的一侧
   const inequalityCandidates = (cell, mask) => {
@@ -783,6 +789,145 @@ export function countSolutions(input, limit = 2, opts = {}) {
 }
 
 // ---------- 人解技巧评级 ----------
+
+/**
+ * 区块摒除:某数字在一个单元里的候选全落到同一条行/列(或反过来,某行里全落进同一单元)
+ * 就把这条线/这个单元之外的该数字删掉。单元与线互斥的写法对异形区、对角线同样成立。
+ * 返回是否改动了候选(消元本身不落子,消完要再看有没有唯一余数/唯一位置)。
+ */
+function eliminateLockedCandidates(cand, board, unitGroups, lineGroups) {
+  for (const unit of unitGroups) {
+    if (lineGroups.includes(unit)) continue
+    const unitSet = new Set(unit)
+    for (const line of lineGroups) {
+      const lineSet = new Set(line)
+      for (let v = 1; v <= SIZE; v++) {
+        const bit = 1 << (v - 1)
+        let unitSpots = 0
+        let confinedToLine = true
+        for (const cell of unit) {
+          if (board[cell] || !(cand[cell] & bit)) continue
+          unitSpots += 1
+          if (!lineSet.has(cell)) confinedToLine = false
+        }
+        if (unitSpots >= 2 && confinedToLine) {
+          let changed = false
+          for (const cell of line) {
+            if (board[cell] || unitSet.has(cell) || !(cand[cell] & bit)) continue
+            cand[cell] &= ~bit
+            changed = true
+          }
+          if (changed) return true
+        }
+        let lineSpots = 0
+        let confinedToUnit = true
+        for (const cell of line) {
+          if (board[cell] || !(cand[cell] & bit)) continue
+          lineSpots += 1
+          if (!unitSet.has(cell)) confinedToUnit = false
+        }
+        if (lineSpots >= 2 && confinedToUnit) {
+          let changed = false
+          for (const cell of unit) {
+            if (board[cell] || lineSet.has(cell) || !(cand[cell] & bit)) continue
+            cand[cell] &= ~bit
+            changed = true
+          }
+          if (changed) return true
+        }
+      }
+    }
+  }
+  return false
+}
+
+/** 数对:裸对(两格候选完全相同且仅两数)与隐对(两个数字只落在这两格),返回是否改动 */
+function eliminateSubsets(cand, board, unitGroups) {
+  for (const unit of unitGroups) {
+    const byMask = new Map()
+    for (const cell of unit) {
+      if (board[cell]) continue
+      const mask = cand[cell]
+      if (popcount(mask) !== 2) continue
+      const list = byMask.get(mask)
+      if (list) list.push(cell)
+      else byMask.set(mask, [cell])
+    }
+    for (const [mask, cells] of byMask) {
+      if (cells.length !== 2) continue
+      let changed = false
+      for (const cell of unit) {
+        if (board[cell] || cell === cells[0] || cell === cells[1]) continue
+        if (cand[cell] & mask) {
+          cand[cell] &= ~mask
+          changed = true
+        }
+      }
+      if (changed) return true
+    }
+    const spots = []
+    for (let v = 1; v <= SIZE; v++) {
+      const bit = 1 << (v - 1)
+      const list = []
+      for (const cell of unit) if (!board[cell] && cand[cell] & bit) list.push(cell)
+      spots.push(list)
+    }
+    for (let v1 = 0; v1 < SIZE; v1++) {
+      const s1 = spots[v1]
+      if (s1.length !== 2) continue
+      for (let v2 = v1 + 1; v2 < SIZE; v2++) {
+        const s2 = spots[v2]
+        if (s2.length !== 2 || s2[0] !== s1[0] || s2[1] !== s1[1]) continue
+        const keep = (1 << v1) | (1 << v2)
+        let changed = false
+        for (const cell of s1) {
+          if (cand[cell] !== keep) {
+            cand[cell] = keep
+            changed = true
+          }
+        }
+        if (changed) return true
+      }
+    }
+  }
+  return false
+}
+
+/** X-Wing:某数字在两条平行线上都只剩同样两条交叉线上的两格,交叉线上的其余该数字可删 */
+function eliminateXWings(cand, board) {
+  for (const base of [rowGroups, colGroups]) {
+    const cross = base === rowGroups ? colGroups : rowGroups
+    const crossOf = base === rowGroups ? (cell) => cell % SIZE : (cell) => (cell / SIZE) | 0
+    for (let v = 1; v <= SIZE; v++) {
+      const bit = 1 << (v - 1)
+      const doubled = []
+      for (let b = 0; b < SIZE; b++) {
+        const list = []
+        for (const cell of base[b]) if (!board[cell] && cand[cell] & bit) list.push(cell)
+        if (list.length === 2) doubled.push({ line: base[b], spots: list.map(crossOf) })
+      }
+      for (let a = 0; a < doubled.length; a++) {
+        for (let b = a + 1; b < doubled.length; b++) {
+          const first = doubled[a]
+          const second = doubled[b]
+          if (first.spots[0] !== second.spots[0] || first.spots[1] !== second.spots[1]) continue
+          let changed = false
+          for (const ci of first.spots) {
+            for (const cell of cross[ci]) {
+              if (board[cell] || first.line.includes(cell) || second.line.includes(cell)) continue
+              if (cand[cell] & bit) {
+                cand[cell] &= ~bit
+                changed = true
+              }
+            }
+          }
+          if (changed) return true
+        }
+      }
+    }
+  }
+  return false
+}
 
 /**
  * 人解技巧阶梯:值 = 解完这道题用到的最高阶技巧。
@@ -899,142 +1044,6 @@ export function ratePuzzle(puzzle, { extraGroups = null, regions = null, parity 
     return changed
   }
 
-  // 区块摒除:某数字在一个单元里的候选全落到同一条行/列(或反过来,某行里全落进同一单元)
-  // 就把这条线/这个单元之外的该数字删掉。单元与线互斥的写法对异形区、对角线同样成立。
-  const eliminateLockedCandidates = () => {
-    for (const unit of unitGroups) {
-      if (lineGroups.includes(unit)) continue
-      const unitSet = new Set(unit)
-      for (const line of lineGroups) {
-        const lineSet = new Set(line)
-        for (let v = 1; v <= SIZE; v++) {
-          const bit = 1 << (v - 1)
-          let unitSpots = 0
-          let confinedToLine = true
-          for (const cell of unit) {
-            if (board[cell] || !(cand[cell] & bit)) continue
-            unitSpots += 1
-            if (!lineSet.has(cell)) confinedToLine = false
-          }
-          if (unitSpots >= 2 && confinedToLine) {
-            let changed = false
-            for (const cell of line) {
-              if (board[cell] || unitSet.has(cell) || !(cand[cell] & bit)) continue
-              cand[cell] &= ~bit
-              changed = true
-            }
-            if (changed) return true
-          }
-          let lineSpots = 0
-          let confinedToUnit = true
-          for (const cell of line) {
-            if (board[cell] || !(cand[cell] & bit)) continue
-            lineSpots += 1
-            if (!unitSet.has(cell)) confinedToUnit = false
-          }
-          if (lineSpots >= 2 && confinedToUnit) {
-            let changed = false
-            for (const cell of unit) {
-              if (board[cell] || lineSet.has(cell) || !(cand[cell] & bit)) continue
-              cand[cell] &= ~bit
-              changed = true
-            }
-            if (changed) return true
-          }
-        }
-      }
-    }
-    return false
-  }
-
-  // 数对:裸对(两格候选完全相同且仅两数)与隐对(两个数字只落在这两格)
-  const eliminateSubsets = () => {
-    for (const unit of unitGroups) {
-      const byMask = new Map()
-      for (const cell of unit) {
-        if (board[cell]) continue
-        const mask = cand[cell]
-        if (popcount(mask) !== 2) continue
-        const list = byMask.get(mask)
-        if (list) list.push(cell)
-        else byMask.set(mask, [cell])
-      }
-      for (const [mask, cells] of byMask) {
-        if (cells.length !== 2) continue
-        let changed = false
-        for (const cell of unit) {
-          if (board[cell] || cell === cells[0] || cell === cells[1]) continue
-          if (cand[cell] & mask) {
-            cand[cell] &= ~mask
-            changed = true
-          }
-        }
-        if (changed) return true
-      }
-      const spots = []
-      for (let v = 1; v <= SIZE; v++) {
-        const bit = 1 << (v - 1)
-        const list = []
-        for (const cell of unit) if (!board[cell] && cand[cell] & bit) list.push(cell)
-        spots.push(list)
-      }
-      for (let v1 = 0; v1 < SIZE; v1++) {
-        const s1 = spots[v1]
-        if (s1.length !== 2) continue
-        for (let v2 = v1 + 1; v2 < SIZE; v2++) {
-          const s2 = spots[v2]
-          if (s2.length !== 2 || s2[0] !== s1[0] || s2[1] !== s1[1]) continue
-          const keep = (1 << v1) | (1 << v2)
-          let changed = false
-          for (const cell of s1) {
-            if (cand[cell] !== keep) {
-              cand[cell] = keep
-              changed = true
-            }
-          }
-          if (changed) return true
-        }
-      }
-    }
-    return false
-  }
-
-  // X-Wing:某数字在两条平行线上都只剩同样两条交叉线上的两格,交叉线上的其余该数字可删
-  const eliminateXWings = () => {
-    for (const base of [rowGroups, colGroups]) {
-      const cross = base === rowGroups ? colGroups : rowGroups
-      const crossOf = base === rowGroups ? (cell) => cell % SIZE : (cell) => (cell / SIZE) | 0
-      for (let v = 1; v <= SIZE; v++) {
-        const bit = 1 << (v - 1)
-        const doubled = []
-        for (let b = 0; b < SIZE; b++) {
-          const list = []
-          for (const cell of base[b]) if (!board[cell] && cand[cell] & bit) list.push(cell)
-          if (list.length === 2) doubled.push({ line: base[b], spots: list.map(crossOf) })
-        }
-        for (let a = 0; a < doubled.length; a++) {
-          for (let b = a + 1; b < doubled.length; b++) {
-            const first = doubled[a]
-            const second = doubled[b]
-            if (first.spots[0] !== second.spots[0] || first.spots[1] !== second.spots[1]) continue
-            let changed = false
-            for (const ci of first.spots) {
-              for (const cell of cross[ci]) {
-                if (board[cell] || first.line.includes(cell) || second.line.includes(cell)) continue
-                if (cand[cell] & bit) {
-                  cand[cell] &= ~bit
-                  changed = true
-                }
-              }
-            }
-            if (changed) return true
-          }
-        }
-      }
-    }
-    return false
-  }
-
   let tier = 0
   for (let guard = 0; guard < 400; guard++) {
     if (fillNakedSingles()) {
@@ -1045,15 +1054,15 @@ export function ratePuzzle(puzzle, { extraGroups = null, regions = null, parity 
       tier = Math.max(tier, RATING_TIER.HIDDEN_SINGLE)
       continue
     }
-    if (eliminateLockedCandidates()) {
+    if (eliminateLockedCandidates(cand, board, unitGroups, lineGroups)) {
       tier = Math.max(tier, RATING_TIER.LOCKED_CANDIDATES)
       continue
     }
-    if (eliminateSubsets()) {
+    if (eliminateSubsets(cand, board, unitGroups)) {
       tier = Math.max(tier, RATING_TIER.SUBSET)
       continue
     }
-    if (eliminateXWings()) {
+    if (eliminateXWings(cand, board)) {
       tier = Math.max(tier, RATING_TIER.X_WING)
       continue
     }
@@ -1061,6 +1070,216 @@ export function ratePuzzle(puzzle, { extraGroups = null, regions = null, parity 
   }
   const solved = filled === CELLS
   return { tier: solved ? Math.max(tier, RATING_TIER.NAKED_SINGLE) : RATING_TIER.GUESS, solved }
+}
+
+// ---------- 提示引擎(人解技巧) ----------
+
+/**
+ * 提示会用到的技巧,与难度评级同一套阶梯。
+ * 前五种都能直接推出「哪一格填什么」;GUESS 表示基础技巧推不动、直接按答案给一格,
+ * DEAD 表示盘面已经走不通(候选为空,通常要撤回前面填错的数字)。
+ */
+export const HINT_TECHNIQUE = {
+  NAKED_SINGLE: 'NAKED_SINGLE',
+  HIDDEN_SINGLE: 'HIDDEN_SINGLE',
+  LOCKED_CANDIDATES: 'LOCKED_CANDIDATES',
+  SUBSET: 'SUBSET',
+  X_WING: 'X_WING',
+  GUESS: 'GUESS',
+  DEAD: 'DEAD',
+}
+
+/** 9 格附加组在提示文案里的叫法(与变体同名的区域) */
+const EXTRA_UNIT_TYPE = {
+  DIAGONAL: 'diagonal',
+  WINDOW: 'window',
+  DRAGON: 'dragon',
+}
+
+/**
+ * 按当前盘面算每格候选(全部变体约束都计入),提示与技巧说明共用。
+ * units 只收「完整单元」(行/列/宫或异形区、9 格附加组)——
+ * 唯一位置/数对一类技巧要求单元内 1~9 各出现一次,杀手笼、反马步/反王步的格对不满足。
+ * 盘面已矛盾(某格没有候选、给定重复)时返回 null。
+ */
+function hintCandidates(board, opts = {}) {
+  const notEmpty = (list) => (list && list.length ? list : null)
+  const extraGroups = notEmpty(opts.extraGroups)
+  const regions = notEmpty(opts.regions)
+  const cages = notEmpty(opts.cages)
+  const inequalities = notEmpty(opts.inequalities)
+  const parity = opts.parity || null
+  const edges = notEmpty(opts.edges)
+  const arith = notEmpty(opts.arith)
+  const palindromes = notEmpty(opts.palindromes)
+
+  const masks = buildMasks(board, extraGroups, regions)
+  if (!masks) return null
+  const { rows, cols, units, unitOf, extras, membership } = masks
+
+  // 杀手笼状态:各笼剩余和 / 未填格数 / 笼内已用数字
+  let cageOf = null
+  let cageSum = null
+  let cageLeft = null
+  let cageUsed = null
+  if (cages) {
+    cageOf = new Int16Array(CELLS).fill(-1)
+    cageSum = []
+    cageLeft = []
+    cageUsed = []
+    cages.forEach((cage, g) => {
+      for (const cell of cage.cells) cageOf[cell] = g
+      cageSum.push(cage.sum)
+      cageLeft.push(cage.cells.length)
+      cageUsed.push(0)
+    })
+    for (let i = 0; i < CELLS; i++) {
+      const v = board[i]
+      if (!v) continue
+      const g = cageOf[i]
+      if (g < 0) continue
+      const bit = 1 << (v - 1)
+      if (cageUsed[g] & bit) return null
+      cageUsed[g] |= bit
+      cageSum[g] -= v
+      cageLeft[g] -= 1
+    }
+  }
+
+  const ineqAdj = inequalities ? inequalityAdjacency(inequalities) : null
+  const edgeAdj = edges ? edgeAdjacency(edges) : null
+  const arithAdj = arith ? sequenceAdjacency(arith) : null
+  const palindromeAdj = palindromes ? sequenceAdjacency(palindromes) : null
+
+  const cand = new Array(CELLS).fill(0)
+  for (let i = 0; i < CELLS; i++) {
+    if (board[i]) continue
+    let mask = ALL & ~(rows[(i / SIZE) | 0] | cols[i % SIZE] | units[unitOf[i]])
+    if (extras && membership[i].length) {
+      for (const g of membership[i]) mask &= ~extras[g]
+    }
+    if (parity) {
+      if (parity[i] === 1) mask &= ODD_MASK
+      else if (parity[i] === 2) mask &= EVEN_MASK
+    }
+    if (cageOf) mask = cageCandidatesAt(cageOf, cageUsed, cageSum, cageLeft, i, mask)
+    if (ineqAdj) {
+      const rels = ineqAdj[i]
+      if (rels) {
+        for (const rel of rels) {
+          const v = board[rel.other]
+          if (!v) continue
+          mask &= rel.less ? LT_MASK[v] : GT_MASK[v]
+        }
+      }
+    }
+    if (edgeAdj) mask = edgeCandidatesAt(board, edgeAdj, i, mask)
+    if (arithAdj) mask = arithCandidates(board, arithAdj, i, mask)
+    if (palindromeAdj) mask = palindromeCandidates(board, palindromeAdj, i, mask)
+    if (!mask) return null
+    cand[i] = mask
+  }
+
+  const extraType = EXTRA_UNIT_TYPE[opts.variant] || 'extra'
+  const unitsInfo = []
+  rowGroups.forEach((cells, index) => unitsInfo.push({ cells, type: 'row', index }))
+  colGroups.forEach((cells, index) => unitsInfo.push({ cells, type: 'col', index }))
+  ;(regions || BOX_GROUPS).forEach((cells, index) => unitsInfo.push({ cells, type: regions ? 'region' : 'box', index }))
+  if (extraGroups) {
+    extraGroups.forEach((cells, index) => {
+      if (cells.length === SIZE) unitsInfo.push({ cells, type: extraType, index })
+    })
+  }
+  return { cand, units: unitsInfo }
+}
+
+/** 唯一位置:某个数字在一个完整单元里只剩一个格子能放 */
+function findHiddenSingle(board, cand, units) {
+  for (const unit of units) {
+    for (let v = 1; v <= SIZE; v++) {
+      const bit = 1 << (v - 1)
+      let spot = -1
+      let count = 0
+      let placed = false
+      for (const cell of unit.cells) {
+        if (board[cell] === v) {
+          placed = true
+          break
+        }
+        if (!board[cell] && cand[cell] & bit) {
+          spot = cell
+          count += 1
+        }
+      }
+      if (placed || count !== 1) continue
+      return { index: spot, value: v, unitType: unit.type, unitIndex: unit.index }
+    }
+  }
+  return null
+}
+
+/**
+ * 算出下一步该填哪一格、填几:按人解技巧阶梯挑第一处能确定的落子。
+ * 顺序:唯一余数 → 唯一位置 → 区块摒除/数对/X-Wing 先消元,消完再找落子。
+ * 技巧推不动(或盘面已矛盾)时,用传入的 solution 直接给出一格答案。
+ * opts 与 countSolutions 同口径,另可加 { solution, variant }(variant 只影响文案里的区域叫法)。
+ * 返回 { index, value, technique, via, unitType?, unitIndex? };棋盘已填满或无法给出时返回 null。
+ */
+export function findNextHint(board, opts = {}) {
+  const state = hintCandidates(board, opts)
+  if (!state) return { technique: HINT_TECHNIQUE.DEAD }
+  const { cand, units } = state
+  const unitGroups = units.map((unit) => unit.cells)
+  const lineGroups = [...rowGroups, ...colGroups]
+  const via = []
+  const markVia = (key) => {
+    if (!via.includes(key)) via.push(key)
+  }
+
+  for (let guard = 0; guard < 400; guard++) {
+    // 唯一余数:这一格只剩一个候选
+    for (let i = 0; i < CELLS; i++) {
+      if (board[i]) continue
+      const mask = cand[i]
+      if (mask && (mask & (mask - 1)) === 0) {
+        return { index: i, value: BIT_VALUE[mask], technique: HINT_TECHNIQUE.NAKED_SINGLE, via: via.slice() }
+      }
+    }
+    // 唯一位置:某个数字在这个单元里只剩一个落点
+    const hidden = findHiddenSingle(board, cand, units)
+    if (hidden) return { ...hidden, technique: HINT_TECHNIQUE.HIDDEN_SINGLE, via: via.slice() }
+    // 消元技巧只缩小候选、不直接落子:记下用过哪一招,消完再回头找落子
+    if (eliminateLockedCandidates(cand, board, unitGroups, lineGroups)) {
+      markVia(HINT_TECHNIQUE.LOCKED_CANDIDATES)
+      continue
+    }
+    if (eliminateSubsets(cand, board, unitGroups)) {
+      markVia(HINT_TECHNIQUE.SUBSET)
+      continue
+    }
+    if (eliminateXWings(cand, board)) {
+      markVia(HINT_TECHNIQUE.X_WING)
+      continue
+    }
+    break
+  }
+
+  // 技巧推不动:按答案挑候选最少的一格直接给出,并说明这一步要试探
+  const solution = opts.solution
+  if (!Array.isArray(solution)) return null
+  let index = -1
+  let bestCount = SIZE + 1
+  for (let i = 0; i < CELLS; i++) {
+    if (board[i]) continue
+    const n = cand[i] ? popcount(cand[i]) : SIZE
+    if (n < bestCount) {
+      bestCount = n
+      index = i
+      if (n === 1) break
+    }
+  }
+  if (index < 0 || !solution[index]) return null
+  return { index, value: solution[index], technique: HINT_TECHNIQUE.GUESS, via }
 }
 
 /**
@@ -2036,14 +2255,6 @@ export function notesOf(mask) {
   const out = []
   for (let v = 1; v <= SIZE; v++) if (mask & (1 << (v - 1))) out.push(v)
   return out
-}
-
-/** 随机挑一个空格作为提示(没有空格返回 -1) */
-export function pickHintIndex(board, random = Math.random) {
-  const empty = []
-  for (let i = 0; i < CELLS; i++) if (!board[i]) empty.push(i)
-  if (!empty.length) return -1
-  return empty[Math.min(empty.length - 1, Math.floor(random() * empty.length))]
 }
 
 /** 本地存档结构校验(读回 localStorage 时挡掉脏数据) */

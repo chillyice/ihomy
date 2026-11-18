@@ -1410,6 +1410,72 @@ export default {
       tip: 'Select a cell and enter a number with the keyboard or number pad. Select a number to highlight its placements and related cells. In Quick fill, choose a number first, then tap cells to enter or replace it. Press and hold a cell with one note to enter that number.',
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
+      hintDismiss: 'Dismiss hint',
+      hintCell: 'Row {row}, column {col}',
+      hintResult: {
+        nakedSingle: 'Row {row}, column {col} has only {value} left as a candidate, so fill it in.',
+        hiddenSingle: '{unit} has just one cell that can take {value}: {cell}.',
+        deep: 'The usual techniques no longer pin down a digit. Try {value} at {cell}; if you get stuck, come back and try another candidate.',
+        conflict: 'The board already has duplicate numbers (red cells). Fix those before asking for a hint.',
+        dead: 'The candidates contradict each other, so nothing can be deduced. Undo a few moves and try again.',
+        viaLabel: 'Used first',
+      },
+      hintUnit: {
+        row: 'Row {n}',
+        col: 'Column {n}',
+        box: 'Box {n}',
+        region: 'Region {n}',
+        diagonal: 'Main diagonal {n}',
+        window: 'Window {n}',
+        dragon: 'Dragon {n}',
+        extra: 'Extra region {n}',
+      },
+      tech: {
+        NAKED_SINGLE: {
+          name: 'Naked single',
+          desc: 'The row, column and box around this cell already use eight of the nine numbers, so only one is left for it.',
+        },
+        HIDDEN_SINGLE: {
+          name: 'Hidden single',
+          desc: 'Watch one number: inside its row, column or box every other empty cell is ruled out, so only one spot can take it.',
+        },
+        LOCKED_CANDIDATES: {
+          name: 'Locked candidates',
+          desc: "When a number's only spots in a box sit on one row (or column), it cannot go anywhere else on that row (or column), so those candidates can be crossed out.",
+        },
+        SUBSET: {
+          name: 'Pairs and triples',
+          desc: 'Two cells in a unit share the same two candidates (three cells and three numbers work the same way). Those numbers are taken, so cross them out of the other cells in the unit.',
+        },
+        X_WING: {
+          name: 'X-Wing',
+          desc: 'One number has the same two columns available in two rows. Those four cells form a rectangle, so the rest of both columns cannot take it.',
+        },
+        GUESS: {
+          name: 'Trial',
+          desc: 'When the techniques above stall, try a number in the cell with the fewest candidates and back up if it leads nowhere.',
+        },
+      },
+      teach: {
+        button: 'Techniques',
+        title: 'Solving techniques',
+        intro:
+          'Hints look for the next move in this order: the simplest idea first, harder ones only when needed. Follow the list while practising and you will need hints less and less.',
+        foot: 'The hint panel also records which techniques this step used; when it says "Trial", the position is beyond standard techniques and a guess is expected.',
+      },
+      saves: {
+        button: 'Saves',
+        title: 'Save slots',
+        saveCurrent: 'Save progress',
+        limit: 'Up to {n} saves, newest first',
+        empty: 'No saves yet. Save a game when you want to switch puzzles for a while.',
+        load: 'Load',
+        delete: 'Delete',
+        saved: 'Progress saved',
+        loadFailed: 'That save could not be read, try another one',
+        progress: '{filled}/{total} filled',
+        slotTitle: '{variant} · {difficulty}',
+      },
     },
     g2048: {
       title: '2048',

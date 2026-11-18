@@ -3,6 +3,7 @@ import {
   CELLS,
   DIFFICULTIES,
   EDGE_REL,
+  HINT_TECHNIQUE,
   VARIANT_KEYS,
   cageIndexOf,
   clearPeerNotes,
@@ -10,6 +11,7 @@ import {
   digitCounts,
   extraGroupsFor,
   findConflicts,
+  findNextHint,
   generateJigsawRegions,
   generatePuzzle,
   generateSolution,
@@ -25,7 +27,6 @@ import {
   isValidPalindromePaths,
   isValidSkyscrapers,
   notesOf,
-  pickHintIndex,
   RATING_TIER,
   ratePuzzle,
   regionIndexOf,
@@ -216,19 +217,139 @@ describe('数独判定', () => {
     expect(notesOf(notes[40])).toEqual([])
   })
 
-  it('提示只挑空格', () => {
-    const board = emptyBoard()
-    for (let i = 0; i < CELLS - 1; i++) board[i] = 1
-    expect(pickHintIndex(board, () => 0.99)).toBe(CELLS - 1)
-    const full = generateSolution(seeded(5))
-    expect(pickHintIndex(full)).toBe(-1)
-  })
-
   it('存档结构校验挡脏数据', () => {
     expect(isValidBoard(emptyBoard())).toBe(true)
     expect(isValidBoard(new Array(80).fill(0))).toBe(false)
     expect(isValidBoard([...emptyBoard().slice(1), 'x'])).toBe(false)
     expect(isValidBoard([...emptyBoard().slice(1), 10])).toBe(false)
+  })
+})
+
+describe('数独提示', () => {
+  // 按提示一路往下填:每一步只认 findNextHint 给的那一格
+  const followHints = (start, solution, opts = {}, limit = CELLS) => {
+    const board = start.slice()
+    const steps = []
+    for (let i = 0; i < limit; i++) {
+      const hint = findNextHint(board, { ...opts, solution })
+      if (!hint) break
+      steps.push(hint)
+      if (hint.technique === HINT_TECHNIQUE.DEAD) break
+      expect(board[hint.index]).toBe(0)
+      expect(hint.value).toBe(solution[hint.index])
+      board[hint.index] = hint.value
+    }
+    return { board, steps }
+  }
+
+  it('简单/中档题不需要试探,一路提示能填满且每步都与答案一致', () => {
+    for (const [difficulty, seed] of [
+      ['EASY', 101],
+      ['EASY', 102],
+      ['MEDIUM', 111],
+    ]) {
+      const { puzzle, solution } = generatePuzzle(difficulty, seeded(seed))
+      const { board, steps } = followHints(puzzle, solution)
+      expect(steps.length).toBeGreaterThan(0)
+      expect(steps.some((step) => step.technique === HINT_TECHNIQUE.GUESS)).toBe(false)
+      expect(steps.some((step) => step.technique === HINT_TECHNIQUE.NAKED_SINGLE)).toBe(true)
+      expect(board).toEqual(solution)
+    }
+  })
+
+  it('困难/专家题:提示给出的落子也与答案一致,且能一路填完', () => {
+    for (const [difficulty, seed] of [
+      ['HARD', 201],
+      ['HARD', 202],
+      ['EXPERT', 211],
+    ]) {
+      const { puzzle, solution } = generatePuzzle(difficulty, seeded(seed))
+      const { board, steps } = followHints(puzzle, solution)
+      expect(steps.length).toBeGreaterThan(0)
+      expect(board).toEqual(solution)
+    }
+  })
+
+  it('唯一位置:报告的区域里该数字确实只剩一个落点', () => {
+    const basicCandidates = (board, index) => {
+      const row = Math.floor(index / 9)
+      const col = index % 9
+      const used = new Set()
+      for (let k = 0; k < 9; k++) {
+        used.add(board[row * 9 + k])
+        used.add(board[k * 9 + col])
+      }
+      const br = Math.floor(row / 3) * 3
+      const bc = Math.floor(col / 3) * 3
+      for (let dr = 0; dr < 3; dr++) for (let dc = 0; dc < 3; dc++) used.add(board[(br + dr) * 9 + bc + dc])
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((v) => !used.has(v))
+    }
+    const unitCells = (type, index) => {
+      if (type === 'row') return Array.from({ length: 9 }, (_, c) => index * 9 + c)
+      if (type === 'col') return Array.from({ length: 9 }, (_, r) => r * 9 + index)
+      const br = Math.floor(index / 3) * 3
+      const bc = (index % 3) * 3
+      return Array.from({ length: 9 }, (_, k) => (br + Math.floor(k / 3)) * 9 + bc + (k % 3))
+    }
+
+    let seen = 0
+    for (let seed = 111; seed < 131 && !seen; seed++) {
+      const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(seed))
+      const board = puzzle.slice()
+      for (let guard = 0; guard < CELLS; guard++) {
+        const hint = findNextHint(board, { solution })
+        if (!hint || hint.technique === HINT_TECHNIQUE.DEAD) break
+        if (hint.technique === HINT_TECHNIQUE.HIDDEN_SINGLE) {
+          seen += 1
+          const cells = unitCells(hint.unitType, hint.unitIndex)
+          expect(cells).toContain(hint.index)
+          const spots = cells.filter((cell) => !board[cell] && basicCandidates(board, cell).includes(hint.value))
+          expect(spots).toEqual([hint.index])
+        }
+        board[hint.index] = hint.value
+      }
+    }
+    expect(seen).toBeGreaterThan(0)
+  })
+
+  it('提示不再依赖选中格:每次都给「按解法该填的那一格」,填满后返回 null', () => {
+    const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(401))
+    let board = puzzle.slice()
+    for (let guard = 0; guard < CELLS; guard++) {
+      const hint = findNextHint(board, { solution })
+      if (!hint) break
+      expect(hint.index).toBeGreaterThanOrEqual(0)
+      expect(board[hint.index]).toBe(0)
+      board[hint.index] = hint.value
+    }
+    expect(board).toEqual(solution)
+    expect(findNextHint(board, { solution })).toBeNull()
+  })
+
+  it('变体口径:对角线/杀手/不等式都能给出与答案一致的落子', () => {
+    const results = [
+      generatePuzzle('MEDIUM', seeded(411), { variant: 'DIAGONAL' }),
+      generatePuzzle('EASY', seeded(412), { variant: 'KILLER' }),
+      generatePuzzle('MEDIUM', seeded(413), { variant: 'GREATER' }),
+    ]
+    for (const result of results) {
+      const opts = {
+        variant: result.variant,
+        extraGroups: extraGroupsFor(result.variant),
+        regions: result.regions,
+        cages: result.cages,
+        inequalities: result.inequalities,
+        parity: result.parity,
+        edges: result.edges,
+        arith: result.arith,
+        palindromes: result.palindromes,
+      }
+      const board = result.puzzle.slice()
+      const hint = findNextHint(board, { ...opts, solution: result.solution })
+      expect(hint).not.toBeNull()
+      expect(hint.value).toBe(result.solution[hint.index])
+      expect(hint.index).toBeGreaterThanOrEqual(0)
+    }
   })
 })
 
