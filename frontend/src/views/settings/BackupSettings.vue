@@ -56,11 +56,16 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Download } from '@element-plus/icons-vue'
 import { familyBackupApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import { formatBytes } from '@/utils/backupRules'
 import { saveBlobResponse } from '@/utils/download'
 import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
+const userStore = useUserStore()
+
+// 家长专属(V12.54):与 AiSettings 同款守卫,面板对成员隐藏后不挂载,双保险防误发 403
+const canManageBackup = computed(() => userStore.hasPerm('family:manage'))
 
 const loading = ref(false)
 const creating = ref(false)
@@ -78,6 +83,7 @@ const statusKey = (status) =>
     .toLowerCase()
 
 const load = async () => {
+  if (!userStore.isLoggedIn || !canManageBackup.value) return
   loading.value = true
   try {
     const data = await familyBackupApi.jobs({ current: 1, size: 10 })

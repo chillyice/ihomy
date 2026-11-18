@@ -31,7 +31,8 @@
         </div>
       </div>
 
-      <!-- 配置区:移动端单大类带返回条;桌面端全部 v-show 保留状态 -->
+      <!-- 配置区:移动端单大类带返回条;桌面端全部 v-show 保留状态。
+           无权限的大类(pointsRule/ai/backup)连挂载都跳过,组件不发请求也就不弹 403 -->
       <div v-else class="settings-body">
         <div v-if="isMobile" class="panel-bar">
           <div v-a11y-click class="panel-back" @click="closePanel">
@@ -44,9 +45,9 @@
         <div v-show="activeId === 'profile'"><ProfileSettings /></div>
         <div v-show="activeId === 'health'"><HealthSettings /></div>
         <div v-show="activeId === 'family'"><FamilySettings /></div>
-        <div v-show="activeId === 'ai'"><AiSettings /></div>
-        <div v-show="activeId === 'backup'"><BackupSettings /></div>
-        <div v-show="activeId === 'pointsRule'"><PointsRuleSettings /></div>
+        <div v-if="panelVisible('pointsRule')" v-show="activeId === 'pointsRule'"><PointsRuleSettings /></div>
+        <div v-if="panelVisible('ai')" v-show="activeId === 'ai'"><AiSettings /></div>
+        <div v-if="panelVisible('backup')" v-show="activeId === 'backup'"><BackupSettings /></div>
         <!-- 首页内容:每日内容 + 天气(天气仅家长可配) -->
         <div v-show="activeId === 'content'">
           <div id="settings-daily"><DailySettings /></div>
@@ -97,6 +98,8 @@ const router = useRouter()
 const { isMobile } = useDevice()
 
 // 大类清单:移动端列表与桌面侧栏共用这一份;perm/nativeOnly 决定可见性
+// perm 与后端 @RequirePermission 同码:面板对无权角色隐藏,挂载也一并跳过(防隐形面板发请求吃 403)
+// 健康面板不加 perm:令牌/同意/审计全是本人自助端点,孩子与访客也能配自己的
 const PANELS = [
   { id: 'profile', icon: '👤', labelKey: 'settings.cat.profile' },
   { id: 'health', icon: '❤️', labelKey: 'settings.cat.health' },
@@ -123,6 +126,8 @@ const GROUPS = [
 const TAB_ALIAS = { daily: 'content', weather: 'content', light: 'appearance', display: 'appearance' }
 
 const visiblePanels = computed(() => PANELS.filter((p) => (!p.perm || userStore.hasPerm(p.perm)) && (!p.nativeOnly || isNativeApp())))
+
+const panelVisible = (id) => visiblePanels.value.some((p) => p.id === id)
 
 const groups = computed(() =>
   GROUPS.map((g) => ({ ...g, items: g.ids.map((id) => visiblePanels.value.find((p) => p.id === id)).filter(Boolean) })).filter(
