@@ -681,6 +681,13 @@ html.theme-warm .page.game-shell {
   gap: var(--gs-gap);
   min-width: 0;
 }
+/* 控件行里的右半区(芯片 + 按钮):头部那份 .gs-end 是 flex:0 0 auto(图标组不许被挤),
+   搬进控件行后它按「最大内容宽」撑开(手机竖屏实测 440px > 370px 容器),
+   把「新游戏」顶到右边界之外。这里允许它收缩到容器宽、内部再换行,宽屏下仍是一行靠右 */
+.gs-controls .gs-end {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
 .gs-controls .el-button {
   height: var(--gs-control-h);
   padding: 0 12px;
