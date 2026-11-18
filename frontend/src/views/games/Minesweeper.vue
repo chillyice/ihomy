@@ -49,7 +49,8 @@
     </template>
 
     <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
-         旗标模式/新游戏放在这条的右端(棋盘右上角),横屏时落到数据芯片上面 -->
+         旗标模式/新游戏放在这条的右端(棋盘右上角);手机横屏时整条(按钮+芯片)
+         竖排成棋盘左侧一列,把高度全留给棋盘 -->
     <div class="ms-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="ms-meta">
         <span class="gh-chip"
@@ -556,19 +557,42 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 手机横屏:和 2048/数独同一口径 —— 按钮在数据芯片上面,整条靠棋盘左上;
-   按钮独占一行(芯片仍并排,不让它们也竖起来占高度) */
+/* 手机横屏:数据与按钮竖排成棋盘左侧一列(和外壳 rail 同向),棋盘独占右侧;
+   此时纵向预算不再扣数据条,横向预算扣掉这一列的宽度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .ms-layout {
-    --ms-meta-h: calc(var(--gs-control-h) * 2 + 16px);
+    --ms-meta-w: 132px;
+    --ms-cell-h: calc((100cqh - 24px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
+    --ms-cell-w: calc((100cqw - var(--ms-meta-w) - 10px - 24px - (var(--ms-cols) - 1) * var(--ms-gap)) / var(--ms-cols));
+    display: grid;
+    grid-template-columns: var(--ms-meta-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 0;
+    /* 装得下时整块按实际宽度收缩(数据列紧贴棋盘,由外壳居中);
+       装不下(困难盘窄屏)时吃满宽度,棋盘只横向滚动 */
+    width: min(100%, calc(var(--ms-meta-w) + 10px + var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px));
+    max-height: 100%;
   }
   .ms-meta {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 8px;
     height: auto;
+  }
+  /* 竖排后芯片撑满这一列宽,标签靠左、数值靠右,扫一眼就能读 */
+  .ms-meta .gh-chip {
+    justify-content: space-between;
   }
   .ms-meta-actions {
     order: -1;
-    flex: 0 0 100%;
     margin-left: 0;
+  }
+  .ms-board-wrap {
+    min-width: 0;
+    max-height: 100%;
   }
 }
 
@@ -594,6 +618,10 @@ onBeforeUnmount(() => {
   background: var(--color-border, #d9d2c7);
   touch-action: manipulation;
   user-select: none;
+  /* 棋盘按格子实宽收缩:横屏时它只占左侧数据列旁边的位置,
+     剩余空间由 auto 外边距居中;棋盘宽过容器(困难盘窄屏)时外边距归零,照常横向滚动 */
+  width: max-content;
+  margin-inline: auto;
 }
 .ms-cell {
   display: flex;
