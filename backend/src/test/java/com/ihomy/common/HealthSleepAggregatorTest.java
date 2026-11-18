@@ -117,4 +117,14 @@ class HealthSleepAggregatorTest {
         assertThat(HealthSleepAggregator.aggregate(List.of())).isEmpty();
         assertThat(HealthSleepAggregator.aggregate(null)).isEmpty();
     }
+
+    /** Apple 健康编辑记录后会留下开始=结束的样本:上游按「跳过」而不是「拒收」 */
+    @Test
+    void detectsZeroLengthInterval() {
+        assertThat(HealthSleepAggregator.isZeroLength(
+                LocalDateTime.parse("2026-11-18T15:25:00"), LocalDateTime.parse("2026-11-18T15:25:00"))).isTrue();
+        assertThat(HealthSleepAggregator.isZeroLength(
+                LocalDateTime.parse("2026-11-18T15:25:00"), LocalDateTime.parse("2026-11-18T15:26:00"))).isFalse();
+        assertThat(HealthSleepAggregator.isZeroLength(null, LocalDateTime.parse("2026-11-18T15:26:00"))).isFalse();
+    }
 }

@@ -136,7 +136,11 @@ public class HealthIngestService {
             HealthTime.Stamp b = HealthTime.parseStamp(it.getEnd(), offset);
             String reason = null;
             if (a == null || b == null) reason = "时间格式不正确";
-            else if (!b.wall().isAfter(a.wall())) reason = "结束时间必须晚于开始时间";
+            else if (HealthSleepAggregator.isZeroLength(a.wall(), b.wall())) {
+                // Apple 健康编辑/合并记录后会留下开始=结束的样本,不算用户填错,按跳过处理
+                skipped++;
+                continue;
+            } else if (!b.wall().isAfter(a.wall())) reason = "结束时间必须晚于开始时间";
             else if (HealthTime.toServerZone(b.wall(), b.offset()).isAfter(futureLimit)) reason = "时间超出允许范围";
             if (reason != null) {
                 rejected++;

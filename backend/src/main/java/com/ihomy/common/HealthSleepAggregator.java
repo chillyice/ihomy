@@ -24,6 +24,14 @@ public final class HealthSleepAggregator {
     public record Interval(LocalDateTime start, LocalDateTime end, String stage) {
     }
 
+    /**
+     * 零时长区间(开始 = 结束):Apple 健康在编辑/合并睡眠记录后会留下这种样本,
+     * 不是用户填错,上游按「跳过」处理,不进拒收统计。
+     */
+    public static boolean isZeroLength(LocalDateTime start, LocalDateTime end) {
+        return start != null && end != null && start.isEqual(end);
+    }
+
     /** 聚合出的会话:start/end 为入库用的服务器时区时间,睡眠日/夜睡小睡按上报端墙钟时间判定 */
     public record Session(LocalDateTime start, LocalDateTime end,
                           java.time.LocalDate sleepDate, String kind,
