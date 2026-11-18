@@ -134,7 +134,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /** 通话信令事件集:end 由服务端代落 CALL 记录,其余(含群组成员自行离开的 leave)按 to 定向转发
-     *  (不排队补发,离线由主叫超时逻辑兜底);多人通话协议见 docs/设计想法/功能/多人通话-计划.md §2.2 */
+     *  (不排队补发,离线由主叫超时逻辑兜底);多人通话协议见 docs/设计想法/完成/多人通话-计划.md §2.2 */
     private static final java.util.Set<String> CALL_EVENTS =
             java.util.Set.of("invite", "accept", "reject", "busy", "offer", "answer", "ice", "leave");
 
