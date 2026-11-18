@@ -1,40 +1,10 @@
 <template>
-  <div ref="pageEl" class="page game-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
+  <GameShell ref="shellEl" class="sn-shell" :title="title" body-align="center" @back="goBack">
+    <template #rules>
+      <p>{{ $t('games.snake.tip') }}</p>
+    </template>
 
-    <div ref="gameCardEl" class="sn-card card game-surface" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader
-        :title="$t('games.snake.title') + (play.active ? ' · ' + $t('games.room.together') : '')"
-        :fullscreen="isFullscreen"
-        @exit-fullscreen="toggleFullscreen"
-      >
-        <template #stats>
-          <span class="gh-chip"
-            ><span>{{ $t('games.snake.score') }}</span
-            ><b>{{ game.score }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.snake.best') }}</span
-            ><b>{{ best }}</b></span
-          >
-          <span class="gh-chip"
-            ><span>{{ $t('games.snake.length') }}</span
-            ><b>{{ game.snake.length }}</b></span
-          >
-        </template>
-        <template #actions>
-          <el-button size="small" round :disabled="game.status !== 'PLAYING'" @click="togglePause">
-            {{ paused ? $t('games.snake.resume') : $t('games.snake.pause') }}
-          </el-button>
-          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
-        </template>
-        <template #rules>
-          <p>{{ $t('games.snake.tip') }}</p>
-        </template>
-      </GameHeader>
-
+    <template #extras>
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -46,9 +16,77 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
+    </template>
 
-      <div class="sn-board" :style="{ '--sn-cols': game.cols }" @touchstart="onTouchStart" @touchend="onTouchEnd">
-        <div v-for="(cell, i) in viewCells" :key="i" class="sn-cell" :class="{ snake: cell.snake, head: cell.head, food: cell.food }"></div>
+    <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
+         暂停/新游戏放在这条的右端(棋盘右上角);手机横屏时整条(按钮+芯片)和方向键
+         收成棋盘左侧一列(按钮靠上贴棋盘一侧、芯片整列、方向键落列底),
+         棋盘独占右侧按游戏区高度铺满 -->
+    <div class="sn-layout" @contextmenu.prevent @dblclick.prevent>
+      <div class="sn-meta">
+        <span class="gh-chip"
+          ><span>{{ $t('games.snake.score') }}</span
+          ><b>{{ game.score }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.snake.best') }}</span
+          ><b>{{ best }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.snake.length') }}</span
+          ><b>{{ game.snake.length }}</b></span
+        >
+        <div class="sn-meta-actions">
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :disabled="game.status !== 'PLAYING'"
+            :title="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
+            :aria-label="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
+            @click="togglePause"
+          >
+            <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+          </el-button>
+          <el-button
+            size="small"
+            class="gs-icon-btn"
+            :title="$t('games.snake.newGame')"
+            :aria-label="$t('games.snake.newGame')"
+            @click="startNew"
+          >
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
+      </div>
+
+      <div class="sn-stage">
+        <div class="sn-board" :style="{ '--sn-cols': game.cols }" @touchstart="onTouchStart" @touchend="onTouchEnd">
+          <div
+            v-for="(cell, i) in viewCells"
+            :key="i"
+            class="sn-cell"
+            :class="{ snake: cell.snake, head: cell.head, food: cell.food }"
+          ></div>
+        </div>
+
+        <Transition name="game-overlay">
+          <div v-if="paused || game.status !== 'PLAYING'" class="sn-overlay game-overlay">
+            <div class="sn-overlay-card game-overlay-card">
+              <div class="sn-overlay-icon">{{ game.status === 'WON' ? '🏆' : game.status === 'LOST' ? '💥' : '⏸' }}</div>
+              <div class="sn-overlay-title">
+                {{
+                  game.status === 'WON' ? $t('games.snake.win') : game.status === 'LOST' ? $t('games.snake.lose') : $t('games.snake.paused')
+                }}
+              </div>
+              <div class="sn-overlay-meta">{{ $t('games.snake.meta', { score: game.score }) }}</div>
+              <div v-if="game.status !== 'PLAYING' && rewardMsg" class="sn-overlay-reward">{{ rewardMsg }}</div>
+              <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
+                {{ $t('games.snake.resume') }}
+              </el-button>
+              <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <div class="sn-pad">
@@ -57,27 +95,8 @@
         <button type="button" class="sn-key sn-down" :aria-label="$t('games.snake.down')" @click="turnTo('down')">▼</button>
         <button type="button" class="sn-key sn-right" :aria-label="$t('games.snake.right')" @click="turnTo('right')">▶</button>
       </div>
-
-      <Transition name="game-overlay">
-        <div v-if="paused || game.status !== 'PLAYING'" class="sn-overlay game-overlay">
-          <div class="sn-overlay-card game-overlay-card">
-            <div class="sn-overlay-icon">{{ game.status === 'WON' ? '🏆' : game.status === 'LOST' ? '💥' : '⏸' }}</div>
-            <div class="sn-overlay-title">
-              {{
-                game.status === 'WON' ? $t('games.snake.win') : game.status === 'LOST' ? $t('games.snake.lose') : $t('games.snake.paused')
-              }}
-            </div>
-            <div class="sn-overlay-meta">{{ $t('games.snake.meta', { score: game.score }) }}</div>
-            <div v-if="game.status !== 'PLAYING' && rewardMsg" class="sn-overlay-reward">{{ rewardMsg }}</div>
-            <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
-              {{ $t('games.snake.resume') }}
-            </el-button>
-            <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
-          </div>
-        </div>
-      </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -86,12 +105,10 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import { Plus, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
 import { gameApi } from '@/api'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { seededRng } from '@/utils/games/seededRng'
@@ -105,15 +122,14 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+const shellEl = ref(null)
 const play = useGameRoomPlay()
 /** 房间局返回房间大厅;单机回小游戏列表 */
 const goBack = () => {
   if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
   else router.push('/games')
 }
+const title = computed(() => t('games.snake.title') + (play.active ? ' · ' + t('games.room.together') : ''))
 /** 房间模式下的种子随机数:两条蛇/食物序列由同一 seed 生成,各自跑各自的盘面 */
 let rng = null
 const game = ref(createGame())
@@ -344,31 +360,62 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sn-card {
-  position: relative;
+/* 数据条 + 棋盘 + 方向键:竖屏自上而下三段,棋盘边长按「游戏区高 − 数据条 − 方向键」推
+   (容器查询单位,不依赖 JS 测量时机);手机横屏时数据条与方向键收成棋盘左侧一列 */
+.sn-layout {
+  --sn-meta-h: calc(var(--gs-control-h) + 8px);
+  --sn-pad-h: calc(40px * 2 + 6px);
+  /* 棋盘边长按容器尺寸直接推(舞台是内容定宽,百分比会循环解析,必须用 cqw/cqh) */
+  --sn-board: min(calc(100cqw - 16px), calc(100cqh - var(--sn-meta-h) - var(--sn-pad-h) - 24px), 420px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 18px 16px 16px;
-  border-radius: 14px;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-primary, #2b2b2b);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
 }
-.sn-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding-top: 24px;
+/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip) */
+.sn-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, calc(var(--sn-board) + 8px));
+  height: var(--gs-control-h);
+  min-width: 0;
+}
+/* 暂停/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会挪到数据上面 */
+.sn-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
+.sn-meta-actions .el-button + .el-button {
+  margin-left: 0;
+}
+/* 页面数据条里的文字/图标按钮与外壳控件同规格(外壳的尺寸规则只罩住 .gs-controls) */
+.sn-meta-actions .el-button {
+  height: var(--gs-control-h);
+}
+
+.sn-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
 }
 
 .sn-board {
   display: grid;
   grid-template-columns: repeat(var(--sn-cols, 20), minmax(0, 1fr));
   gap: 1px;
-  width: min(88vw, 420px);
+  width: var(--sn-board);
   aspect-ratio: 1;
   padding: 6px;
   border-radius: 12px;
@@ -405,7 +452,6 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(3, 46px);
   grid-template-rows: repeat(2, 40px);
   gap: 6px;
-  margin-top: 2px;
 }
 .sn-key {
   border: 1px solid var(--color-border, #ddd6ca);
@@ -439,13 +485,14 @@ onBeforeUnmount(() => {
   grid-row: 2;
 }
 
+/* 暂停/结算浮层只盖住棋盘舞台,不挡外壳与方向键 */
 .sn-overlay {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(250, 248, 239, 0.72);
   backdrop-filter: blur(2px);
   z-index: 5;
@@ -485,9 +532,54 @@ html.dark .sn-overlay {
   background: rgba(20, 20, 20, 0.72);
 }
 
-@media (max-width: 560px) {
-  .sn-card {
-    padding: 14px 10px;
+/* 手机横屏:数据条与方向键收成棋盘左侧一列(和 2048/数独/扫雷同一配方),
+   按钮行贴棋盘一侧靠上、芯片整列,方向键落列底(拇指区);棋盘独占右侧吃满高度 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sn-layout {
+    --sn-meta-w: 132px;
+    --sn-board: min(calc(100cqh - 16px), calc(100cqw - var(--sn-meta-w) - 26px));
+    display: grid;
+    grid-template-columns: var(--sn-meta-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'meta stage';
+    column-gap: 10px;
+    /* 装得下时整块按实际宽度收缩(数据列紧贴棋盘,由外壳居中) */
+    width: min(100%, calc(var(--sn-meta-w) + 10px + var(--sn-board) + 16px));
+    max-height: 100%;
+  }
+  .sn-meta {
+    grid-area: meta;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: start;
+    align-self: start;
+    width: 100%;
+    height: auto;
+    gap: 8px;
+  }
+  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
+  .sn-meta .gh-chip {
+    justify-content: space-between;
+  }
+  /* 按钮并排贴棋盘一侧,不和棋盘之间空一截 */
+  .sn-meta-actions {
+    order: -1;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+  .sn-stage {
+    grid-area: stage;
+    min-height: 0;
+  }
+  /* 方向键与数据条同格:数据条靠上、方向键贴列底(拇指区),高度够就不重叠 */
+  .sn-pad {
+    grid-area: meta;
+    align-self: end;
+    margin-left: 0;
+  }
+  .sn-board {
+    width: var(--sn-board);
   }
 }
 </style>
