@@ -7,7 +7,8 @@
     body-align="center"
     @back="goBack"
   >
-    <template #settings>
+    <!-- 棋盘规格跟游戏名走:和数独的模式/难度同一处,控件行只留数据与按钮 -->
+    <template #titleExtra>
       <el-select v-if="!matchId && !play.active" v-model="size" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
       </el-select>
