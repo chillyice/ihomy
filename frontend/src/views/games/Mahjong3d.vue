@@ -2,26 +2,12 @@
      规则内核与平面麻将共用 utils/games/mahjong.js(判胡/听牌/计番/AI/骰子);
      本页负责单机对局循环与 3D 场景驱动,布局数学在 utils/games/mahjong3dTable.js。 -->
 <template>
-  <div ref="pageEl" class="page game-page game-page-readable">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        :fullscreen-label="$t('games.mahjong.fullscreen')"
-        :exit-label="$t('games.mahjong.exitFullscreen')"
-        @back="goBack"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
-    </PageToolbar>
+  <GameShell ref="shellEl" class="m3-shell" :title="$t('games.mahjong3d.title')" body-align="stretch" readable @back="goBack">
+    <template #rules>
+      <p>{{ $t('games.mahjong.coverHint') }}</p>
+    </template>
 
-    <div ref="gameCardEl" class="game-surface mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
-      <GameHeader :title="$t('games.mahjong3d.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #rules>
-          <p>{{ $t('games.mahjong.coverHint') }}</p>
-        </template>
-      </GameHeader>
-
+    <div class="mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
       <!-- 3D 舞台 -->
       <div ref="stageEl" class="m3-stage" />
 
@@ -136,7 +122,7 @@
         </div>
       </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -146,10 +132,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
-import { useGameView } from '@/composables/useGameView'
+import GameShell from '@/components/games/GameShell.vue'
 import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
 import { createMahjong3dTable } from '@/utils/games/mahjong3dTable'
 import {
@@ -181,10 +164,8 @@ const tileSrc = (kind) => mahjongTileSrc(kind)
 const tileClass = (kind) => (kind >= 27 ? `honor-${HONOR_KEYS[kind - 27]}` : `suit-${Math.floor(kind / 9)}`)
 const windName = (seat) => t(`games.mahjong.honor.${WIND_KEYS[((seat % 4) + 4) % 4]}`)
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
+const shellEl = ref(null)
 const stageEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, scale: false })
 
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended
@@ -687,12 +668,18 @@ onMounted(async () => {
   table.setView(view.value)
   stageEl.value.addEventListener('click', onStageClick)
   stageEl.value.addEventListener('pointermove', onStageMove)
+  // 牌桌内部靠 ResizeObserver 跟随舞台,个别 WebView(如安卓壳)RO 不派发,补 window resize 兜底
+  window.addEventListener('resize', onWinResize)
   renderTable()
 })
+
+const onWinResize = () => table?.resize?.()
+
 onBeforeUnmount(() => {
   session += 1
   stageEl.value?.removeEventListener('click', onStageClick)
   stageEl.value?.removeEventListener('pointermove', onStageMove)
+  window.removeEventListener('resize', onWinResize)
   table?.dispose()
   table = null
 })
@@ -705,12 +692,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
-}
-/* 统一卡头要浮在封面浮层之上(idle 也要能点开规则) */
-.mahjong3d-card > .game-header {
-  position: relative;
-  z-index: calc(var(--z-overlay) + 1);
 }
 .m3-stage {
   position: relative;

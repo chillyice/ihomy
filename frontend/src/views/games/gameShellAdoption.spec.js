@@ -13,21 +13,20 @@ const GAME_DIR = join(SRC, 'views/games')
 const CARDS_DIR = join(GAME_DIR, 'cards')
 
 /** 已迁到 GameShell 的游戏页 */
-const MIGRATED = ['Cards.vue', 'Game2048.vue', 'Mahjong.vue', 'Minesweeper.vue', 'PetLinkLink.vue', 'Snake.vue', 'Sudoku.vue', 'Tetris.vue']
+const MIGRATED = [
+  'Cards.vue',
+  'Game2048.vue',
+  'Mahjong.vue',
+  'Mahjong3d.vue',
+  'Minesweeper.vue',
+  'PetLinkLink.vue',
+  'Snake.vue',
+  'Sudoku.vue',
+  'Tetris.vue',
+]
 
 /** 尚未迁移(按计划分批进行);不是游戏舞台的页面归 EXEMPT */
-const PENDING = [
-  'Baohuang.vue',
-  'Doudizhu.vue',
-  'EmbedGame.vue',
-  'Gouji.vue',
-  'Guandan.vue',
-  'Ludo.vue',
-  'Mahjong3d.vue',
-  'Runway52.vue',
-  'SnakeMatch.vue',
-  'WebGame.vue',
-]
+const PENDING = ['Baohuang.vue', 'Doudizhu.vue', 'EmbedGame.vue', 'Gouji.vue', 'Guandan.vue', 'Ludo.vue', 'Runway52.vue', 'SnakeMatch.vue', 'WebGame.vue']
 
 /** 不是游戏舞台:大厅/房间/详情/播放器分发/桌面下载/模拟器 */
 const EXEMPT = ['DesktopGame.vue', 'EmulatorPlayer.vue', 'GamePlayer.vue', 'GameRoom.vue', 'Games.vue', 'MatchDetail.vue']
