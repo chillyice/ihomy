@@ -20,17 +20,19 @@ const MIGRATED = [
   'Game2048.vue',
   'Gouji.vue',
   'Guandan.vue',
+  'Ludo.vue',
   'Mahjong.vue',
   'Mahjong3d.vue',
   'Minesweeper.vue',
   'PetLinkLink.vue',
+  'Runway52.vue',
   'Snake.vue',
   'Sudoku.vue',
   'Tetris.vue',
 ]
 
 /** 尚未迁移(按计划分批进行);不是游戏舞台的页面归 EXEMPT */
-const PENDING = ['EmbedGame.vue', 'Ludo.vue', 'Runway52.vue', 'SnakeMatch.vue', 'WebGame.vue']
+const PENDING = ['EmbedGame.vue', 'SnakeMatch.vue', 'WebGame.vue']
 
 /** 不是游戏舞台:大厅/房间/详情/播放器分发/桌面下载/模拟器 */
 const EXEMPT = ['DesktopGame.vue', 'EmulatorPlayer.vue', 'GamePlayer.vue', 'GameRoom.vue', 'Games.vue', 'MatchDetail.vue']

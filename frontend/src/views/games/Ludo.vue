@@ -3,13 +3,8 @@
      本页只做盘面绘制、逐格动画、骰子与回合驱动。房间局由房主权威跑引擎并把 state 广播给全房,
      其他人只发操作意图(掷骰/选子),所以两端画面永远一致。 -->
 <template>
-  <div ref="pageEl" class="page game-page game-page-readable ludo-page">
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
-
-    <div ref="gameCardEl" class="game-surface ludo-card" @contextmenu.prevent>
-      <GameTopActions v-if="isFullscreen" :show-back="false" :show-wide="false" :is-fullscreen="true" @fullscreen="toggleFullscreen" />
+  <GameShell ref="shellEl" class="ld-shell" :title="$t('games.ludo.title')" body-align="stretch" readable @back="goBack">
+    <template #extras>
       <GameRoomBar
         v-if="play.active"
         :room="play.room"
@@ -24,7 +19,9 @@
         @leave="play.leave"
         @auto="onAutoToggle"
       />
+    </template>
 
+    <div class="ludo-card" @contextmenu.prevent>
       <div class="ludo-layout">
         <div class="ludo-board-wrap">
           <div class="ludo-board-stage" :class="{ live: isMyTurn && !gameOver }">
@@ -245,7 +242,7 @@
         </div>
       </Transition>
     </div>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -253,10 +250,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { roomApi } from '@/api'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import { useGameView } from '@/composables/useGameView'
 import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -328,9 +323,7 @@ const router = useRouter()
 const { t } = useI18n()
 const chatStore = useChatStore()
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, fit: false })
+const shellEl = ref(null)
 
 /** 还没开局时给盘面一份「四色飞机都在停机坪」的预览态,封面背后就是完整盘面 */
 const previewState = createLudoState([0, 1, 2, 3].map((color) => ({ color, userId: null, name: '', ai: false })))
@@ -915,10 +908,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ludo-page {
-  padding-bottom: 16px;
-}
-
 .ludo-card {
   position: relative;
   display: flex;
@@ -930,23 +919,12 @@ onBeforeUnmount(() => {
   /* 棋盘 1:1 恒定方形:宽取「撑满卡片」与「视口高扣除顶栏页脚后折算」较小者;
      230px ≈ 顶栏 + 页脚 + 页面/卡片内边距 + 组间距 + 页底留白(方形盘比 16:10 桌多扣);
      「一起玩」横幅实测高度走 --room-bar-h */
-  --ludo-board-max: min(620px, calc(100dvh - 230px - var(--room-bar-h, 0px)));
+  --ludo-board-max: min(620px, calc(100cqh - 150px - var(--room-bar-h, 0px)));
 }
 
 html.dark .ludo-card {
   --ludo-paper: #1b2536;
   --ludo-cell-line: rgba(255, 255, 255, 0.06);
-}
-
-.ludo-card:fullscreen {
-  overflow: auto;
-  background: var(--color-bg);
-  /* 全屏扣卡内边距 + 卡内全屏动作行 + 组间距,横幅实测高度由变量如实上报 */
-  --ludo-board-max: min(780px, calc(84dvh - 84px - var(--room-bar-h, 0px)));
-}
-
-.ludo-card:fullscreen .ludo-board {
-  max-height: none;
 }
 
 .ludo-layout {
@@ -1504,7 +1482,7 @@ html.dark .ludo-card {
   /* 纵向堆叠:棋盘再扣侧栏(状态+骰子+玩家压缩态实测约 308px)与顶栏页脚约 475px,
      横幅走 --room-bar-h;堆叠态侧栏全宽展开,不封顶 */
   .ludo-card {
-    --ludo-board-max: min(620px, calc(100dvh - 475px - var(--room-bar-h, 0px)));
+    --ludo-board-max: min(620px, calc(100cqh - 395px - var(--room-bar-h, 0px)));
   }
 
   .ludo-side {
@@ -1562,13 +1540,13 @@ html.dark .ludo-card {
 
 /* 手机沉浸态:页头/底栏/游戏工具栏都不在布局里了,棋盘按真实可用高度放大 */
 :global(html.game-mobile-immersive) .ludo-card {
-  --ludo-board-max: min(620px, calc(100dvh - 56px - var(--room-bar-h, 0px)));
+  --ludo-board-max: min(620px, calc(100cqh - 16px - var(--room-bar-h, 0px)));
 }
 
 @media (max-width: 860px) and (orientation: portrait) {
   :global(html.game-mobile-immersive) .ludo-card {
     /* 竖屏堆叠:只扣卡片内边距 + 侧栏(状态/骰子/玩家/规则)实测高度 */
-    --ludo-board-max: min(620px, calc(100dvh - 380px - var(--room-bar-h, 0px)));
+    --ludo-board-max: min(620px, calc(100cqh - 340px - var(--room-bar-h, 0px)));
   }
 }
 </style>
