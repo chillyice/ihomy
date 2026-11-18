@@ -55,6 +55,7 @@ const RUNTIME_VARS = {
   '--sol-gap': '纸牌棋盘间距',
   '--sol-card-w': '纸牌卡宽(useGameView 实测)',
   '--room-bar-h': '一起玩横幅实测高度(GameRoomBar 写进父级游戏卡,盘面公式扣减)',
+  '--sd-panel-h': '数独数字盘/工具面板实测高度(Sudoku 写进 .sd-layout,棋盘按剩余高度定边长)',
   '--gs-h': '统一游戏外壳实测游戏区高度(GameShell 写入,棋盘按它定边长)',
   '--gs-w': '统一游戏外壳实测游戏区宽度(GameShell 写入)',
   '--pc': 'Ludo 玩家卡按座位配色注入(与盘面棋子同色)',

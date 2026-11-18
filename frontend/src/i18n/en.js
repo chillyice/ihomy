@@ -1398,6 +1398,7 @@ export default {
       blanks: 'Empty',
       conflicts: 'Conflicts',
       hints: 'Hints',
+      time: 'Time',
       notes: 'Notes',
       quickFill: 'Quick fill',
       erase: 'Erase',
@@ -1408,6 +1409,20 @@ export default {
       winMeta: 'Time {time} · Hints {hints}',
       playAgain: 'Play again',
       tip: 'Select a cell and enter a number with the keyboard or number pad. Select a number to highlight its placements and related cells. In Quick fill, choose a number first, then tap cells to enter or replace it. Press and hold a cell with one note to enter that number.',
+      rules: {
+        pagePlay: 'How to play',
+        pageControls: 'Controls',
+        pageVariants: 'Variants',
+        play1: 'Fill 1-9 into the 9×9 grid: no repeats in any row, column or 3×3 box.',
+        play2: 'The numbers given at the start cannot be changed; digits you enter use the accent color, and clashing cells turn red.',
+        play3: 'Clear every cell without conflicts to solve it — harder levels start with fewer numbers.',
+        ctrl1: 'Select a cell, then use the arrow keys to move, number keys to fill and backspace to erase, or tap the number pad below.',
+        ctrl2: 'Notes records candidates; tap it again to go back to entering digits.',
+        ctrl3: 'Quick fill: pick a number first, then tap cells to write or overwrite it.',
+        ctrl4: 'Undo steps back one move; Snapshot saves the current board and Revert takes you back to that moment.',
+        ctrl5: 'Hint gives the next step with a solving technique, and the Techniques button explains the thinking used.',
+        variantsIntro: '17 variants in total — switching starts a new puzzle. These add extra restrictions on top of the standard rules:',
+      },
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
       hintDismiss: 'Dismiss hint',
@@ -6645,6 +6660,7 @@ export default {
       ],
       androidNote:
         'Android is simpler: install the ihomy app, open Settings → Health data, find phone sync and allow once; it then syncs every day on its own.',
+    },
     visible: {
       title: 'Who can see what',
       items: [

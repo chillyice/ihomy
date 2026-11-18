@@ -1,18 +1,65 @@
 <template>
-  <div ref="pageEl" class="page game-page game-page-readable">
-    <!-- 顶栏:返回 + 全屏 + 宽屏(与连连看/物品定位同构) -->
-    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
-    </PageToolbar>
-
-    <div
-      ref="gameCardEl"
-      v-loading="generating"
-      class="sd-card game-surface"
-      :class="{ 'has-hint': !!hint }"
-      @contextmenu.prevent
-      @dblclick.prevent
-    >
+  <GameShell
+    ref="shellEl"
+    class="sd-shell"
+    :title="$t('games.sudoku.title')"
+    :rules-pages="[rulesPagePlay, rulesPageControls, rulesPageVariants]"
+    body-align="stretch"
+    @back="goBack"
+  >
+    <template #settings>
+      <el-select v-model="variant" class="sd-variant" :teleported="!isFullscreen" @change="changeVariant">
+        <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
+      </el-select>
+      <el-select v-model="difficulty" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
+        <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
+      </el-select>
+      <el-button class="sd-teach-btn" round @click="teachOpen = true">{{ $t('games.sudoku.teach.button') }}</el-button>
+    </template>
+    <template #stats>
+      <span class="gh-chip"
+        ><span>{{ $t('games.sudoku.time') }}</span
+        ><b>{{ timeText }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.sudoku.blanks') }}</span
+        ><b>{{ blanksLeft }}</b></span
+      >
+      <span class="gh-chip" :class="{ 'is-warn': conflictCount > 0 }">
+        <span>{{ $t('games.sudoku.conflicts') }}</span
+        ><b>{{ conflictCount }}</b>
+      </span>
+      <span v-if="hintsUsed" class="gh-chip"
+        ><span>{{ $t('games.sudoku.hints') }}</span
+        ><b>{{ hintsUsed }}</b></span
+      >
+    </template>
+    <template #actions>
+      <el-button :disabled="!history.length" @click="undo">{{ $t('games.sudoku.undo') }}</el-button>
+      <el-button @click="startNew">{{ $t('games.sudoku.newGame') }}</el-button>
+    </template>
+    <template #rules="{ page }">
+      <template v-if="page === 0">
+        <p>{{ $t('games.sudoku.tip') }}</p>
+        <ul>
+          <li>{{ $t('games.sudoku.rules.play1') }}</li>
+          <li>{{ $t('games.sudoku.rules.play2') }}</li>
+          <li>{{ $t('games.sudoku.rules.play3') }}</li>
+        </ul>
+      </template>
+      <ul v-else-if="page === 1">
+        <li v-for="n in 5" :key="n">{{ $t('games.sudoku.rules.ctrl' + n) }}</li>
+      </ul>
+      <template v-else>
+        <p>{{ $t('games.sudoku.rules.variantsIntro') }}</p>
+        <ul>
+          <li v-for="key in VARIANT_TIPS" :key="key">
+            <b>{{ $t('games.sudoku.variant.' + key) }}</b> · {{ $t('games.sudoku.variantTip.' + key) }}
+          </li>
+        </ul>
+      </template>
+    </template>
+    <template #extras>
       <GameRoomBar
         :room="play.room"
         :is-host="play.isHost"
@@ -24,202 +71,177 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
-      <GameHeader :title="$t('games.sudoku.title')" :fullscreen="isFullscreen" @exit-fullscreen="toggleFullscreen">
-        <template #settings>
-          <el-select v-model="variant" size="small" class="sd-variant" :teleported="!isFullscreen" @change="changeVariant">
-            <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
-          </el-select>
-          <el-select v-model="difficulty" size="small" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
-            <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
-          </el-select>
-          <el-button size="small" round class="sd-head-btn" @click="teachOpen = true">{{ $t('games.sudoku.teach.button') }}</el-button>
-        </template>
-        <template #stats>
-          <span class="gh-chip"
-            ><b>{{ timeText }}</b></span
-          >
-        </template>
-        <template #rules>
-          <p>{{ $t('games.sudoku.tip') }}</p>
-        </template>
-      </GameHeader>
+    </template>
 
-      <div class="sd-layout" :class="{ 'has-hint': !!hint }">
-        <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
-          <template v-if="variant === 'SKYSCRAPER'">
-            <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
-              <span v-if="value" class="sd-sky sd-sky-top" :style="{ gridColumnStart: String(col + 2), gridRowStart: '1' }">{{
-                value
-              }}</span>
-            </template>
-            <template v-for="(value, col) in skyBottom" :key="'sky-b' + col">
-              <span v-if="value" class="sd-sky sd-sky-bottom" :style="{ gridColumnStart: String(col + 2), gridRowStart: '11' }">{{
-                value
-              }}</span>
-            </template>
-            <template v-for="(value, row) in skyLeft" :key="'sky-l' + row">
-              <span v-if="value" class="sd-sky sd-sky-left" :style="{ gridColumnStart: '1', gridRowStart: String(row + 2) }">{{
-                value
-              }}</span>
-            </template>
-            <template v-for="(value, row) in skyRight" :key="'sky-r' + row">
-              <span v-if="value" class="sd-sky sd-sky-right" :style="{ gridColumnStart: '11', gridRowStart: String(row + 2) }">{{
-                value
-              }}</span>
-            </template>
+    <!-- 技巧教学:与提示引擎同一套技巧阶梯;页面级弹窗挂 #overlay,全屏时留在整页里 -->
+    <template #overlay>
+      <el-dialog v-model="teachOpen" class="dialog-md" :append-to-body="!isFullscreen" :title="$t('games.sudoku.teach.title')">
+        <p class="sd-teach-intro">{{ $t('games.sudoku.teach.intro') }}</p>
+        <ol class="sd-teach-list">
+          <li v-for="item in TECH_LIST" :key="item" class="sd-teach-item">
+            <b>{{ $t('games.sudoku.tech.' + item + '.name') }}</b>
+            <p>{{ $t('games.sudoku.tech.' + item + '.desc') }}</p>
+          </li>
+        </ol>
+        <p class="sd-teach-foot">{{ $t('games.sudoku.teach.foot') }}</p>
+      </el-dialog>
+    </template>
+
+    <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
+      <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
+        <template v-if="variant === 'SKYSCRAPER'">
+          <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
+            <span v-if="value" class="sd-sky sd-sky-top" :style="{ gridColumnStart: String(col + 2), gridRowStart: '1' }">{{ value }}</span>
           </template>
+          <template v-for="(value, col) in skyBottom" :key="'sky-b' + col">
+            <span v-if="value" class="sd-sky sd-sky-bottom" :style="{ gridColumnStart: String(col + 2), gridRowStart: '11' }">{{
+              value
+            }}</span>
+          </template>
+          <template v-for="(value, row) in skyLeft" :key="'sky-l' + row">
+            <span v-if="value" class="sd-sky sd-sky-left" :style="{ gridColumnStart: '1', gridRowStart: String(row + 2) }">{{
+              value
+            }}</span>
+          </template>
+          <template v-for="(value, row) in skyRight" :key="'sky-r' + row">
+            <span v-if="value" class="sd-sky sd-sky-right" :style="{ gridColumnStart: '11', gridRowStart: String(row + 2) }">{{
+              value
+            }}</span>
+          </template>
+        </template>
 
-          <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
-            <button
-              v-for="(value, index) in board"
-              :key="index"
-              type="button"
-              class="sd-cell"
-              :class="cellClass(index)"
-              :aria-label="cellLabel(index, value)"
-              @click="select(index)"
-              @pointerdown="onCellPressStart(index, $event)"
-              @pointerup="onCellPressEnd"
-              @pointerleave="onCellPressEnd"
-              @pointercancel="onCellPressEnd"
-            >
-              <template v-if="variant === 'KILLER'">
-                <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
-                <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
-                <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
-                <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
-                <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
-              </template>
-              <template v-if="variant === 'WINDOW'">
-                <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
-                <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
-                <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
-                <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
-              </template>
-              <template v-if="variant === 'DRAGON'">
-                <i
-                  v-for="dir in dragonDirs(index)"
-                  :key="dir"
-                  class="sd-thermo-seg sd-dragon-seg"
-                  :class="'sd-thermo-to-' + dir"
-                  aria-hidden="true"
-                ></i>
-              </template>
-              <template v-if="variant === 'THERMO' && thermoInfo[index]">
-                <i
-                  v-if="thermoInfo[index].prev"
-                  class="sd-thermo-seg"
-                  :class="'sd-thermo-to-' + thermoInfo[index].prev"
-                  aria-hidden="true"
-                ></i>
-                <i
-                  v-if="thermoInfo[index].next"
-                  class="sd-thermo-seg"
-                  :class="'sd-thermo-to-' + thermoInfo[index].next"
-                  aria-hidden="true"
-                ></i>
-                <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
-              </template>
-              <template v-if="variant === 'PALINDROME' && palInfo[index]">
-                <i
-                  v-if="palInfo[index].prev"
-                  class="sd-thermo-seg sd-pal-seg"
-                  :class="'sd-thermo-to-' + palInfo[index].prev"
-                  aria-hidden="true"
-                ></i>
-                <i
-                  v-if="palInfo[index].next"
-                  class="sd-thermo-seg sd-pal-seg"
-                  :class="'sd-thermo-to-' + palInfo[index].next"
-                  aria-hidden="true"
-                ></i>
-                <i v-if="palInfo[index].end" class="sd-pal-dot" aria-hidden="true"></i>
-              </template>
-              <i v-if="variant === 'ARITHMETIC' && arithInfo[index]" :class="arithCellClass(index)" aria-hidden="true"></i>
-              <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
-              <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
-              <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
-              <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
-              <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
-              <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
-              <Transition name="sd-pop" mode="out-in">
-                <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
-                <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
-                  <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
-                </span>
-              </Transition>
-            </button>
+        <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
+          <button
+            v-for="(value, index) in board"
+            :key="index"
+            type="button"
+            class="sd-cell"
+            :class="cellClass(index)"
+            :aria-label="cellLabel(index, value)"
+            @click="select(index)"
+            @pointerdown="onCellPressStart(index, $event)"
+            @pointerup="onCellPressEnd"
+            @pointerleave="onCellPressEnd"
+            @pointercancel="onCellPressEnd"
+          >
+            <template v-if="variant === 'KILLER'">
+              <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
+              <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
+            </template>
+            <template v-if="variant === 'WINDOW'">
+              <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
+            </template>
+            <template v-if="variant === 'DRAGON'">
+              <i
+                v-for="dir in dragonDirs(index)"
+                :key="dir"
+                class="sd-thermo-seg sd-dragon-seg"
+                :class="'sd-thermo-to-' + dir"
+                aria-hidden="true"
+              ></i>
+            </template>
+            <template v-if="variant === 'THERMO' && thermoInfo[index]">
+              <i
+                v-if="thermoInfo[index].prev"
+                class="sd-thermo-seg"
+                :class="'sd-thermo-to-' + thermoInfo[index].prev"
+                aria-hidden="true"
+              ></i>
+              <i
+                v-if="thermoInfo[index].next"
+                class="sd-thermo-seg"
+                :class="'sd-thermo-to-' + thermoInfo[index].next"
+                aria-hidden="true"
+              ></i>
+              <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
+            </template>
+            <template v-if="variant === 'PALINDROME' && palInfo[index]">
+              <i
+                v-if="palInfo[index].prev"
+                class="sd-thermo-seg sd-pal-seg"
+                :class="'sd-thermo-to-' + palInfo[index].prev"
+                aria-hidden="true"
+              ></i>
+              <i
+                v-if="palInfo[index].next"
+                class="sd-thermo-seg sd-pal-seg"
+                :class="'sd-thermo-to-' + palInfo[index].next"
+                aria-hidden="true"
+              ></i>
+              <i v-if="palInfo[index].end" class="sd-pal-dot" aria-hidden="true"></i>
+            </template>
+            <i v-if="variant === 'ARITHMETIC' && arithInfo[index]" :class="arithCellClass(index)" aria-hidden="true"></i>
+            <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
+            <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
+            <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
+            <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
+            <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
+            <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
+            <Transition name="sd-pop" mode="out-in">
+              <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
+              <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
+                <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
+              </span>
+            </Transition>
+          </button>
+        </div>
+      </div>
+      <div class="sd-panel">
+        <div class="sd-numpad">
+          <button
+            v-for="n in 9"
+            :key="n"
+            type="button"
+            class="sd-num"
+            :class="{ done: remaining[n] <= 0, active: quickFill ? activeNumber === n : focusDigit === n }"
+            :disabled="remaining[n] <= 0"
+            @click="pickNumber(n)"
+          >
+            <b>{{ n }}</b>
+            <span class="sd-num-left">{{ remaining[n] > 0 ? remaining[n] : '' }}</span>
+          </button>
+        </div>
+        <div class="sd-tools">
+          <button type="button" class="sd-tool" :class="{ active: notesMode }" :aria-pressed="notesMode" @click="notesMode = !notesMode">
+            {{ $t('games.sudoku.notes') }}
+          </button>
+          <button type="button" class="sd-tool" :class="{ active: quickFill }" :aria-pressed="quickFill" @click="toggleQuickFill">
+            {{ $t('games.sudoku.quickFill') }}
+          </button>
+          <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
+          <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
+            {{ $t('games.sudoku.snapshot.save') }}
+          </button>
+          <button
+            type="button"
+            class="sd-tool"
+            :disabled="!snapAt || play.active || won"
+            :title="snapAt ? $t('games.sudoku.snapshot.revertTip', { time: snapTime }) : $t('games.sudoku.snapshot.none')"
+            @click="restoreSnapshot"
+          >
+            {{ $t('games.sudoku.snapshot.revert') }}
+          </button>
+          <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
+        </div>
+        <div v-if="hint" class="sd-hint-note" role="status" aria-live="polite">
+          <div class="sd-hint-head">
+            <b v-if="hintTechName" class="sd-hint-tech">{{ hintTechName }}</b>
+            <button type="button" class="sd-hint-close" :aria-label="$t('games.sudoku.hintDismiss')" @click="hint = null">×</button>
+          </div>
+          <p class="sd-hint-text">{{ hintText }}</p>
+          <div v-if="hint.via && hint.via.length" class="sd-hint-via">
+            <span class="sd-hint-via-label">{{ $t('games.sudoku.hintResult.viaLabel') }}</span>
+            <span v-for="(key, i) in hint.via" :key="key + i" class="sd-hint-chip">{{ $t('games.sudoku.tech.' + key + '.name') }}</span>
           </div>
         </div>
-        <div class="sd-panel">
-          <div class="sd-stats">
-            <span class="sd-stat">
-              <span class="sd-stat-label">{{ $t('games.sudoku.blanks') }}</span>
-              <b>{{ blanksLeft }}</b>
-            </span>
-            <span class="sd-stat" :class="{ warn: conflictCount > 0 }">
-              <span class="sd-stat-label">{{ $t('games.sudoku.conflicts') }}</span>
-              <b>{{ conflictCount }}</b>
-            </span>
-            <span v-if="hintsUsed" class="sd-stat">
-              <span class="sd-stat-label">{{ $t('games.sudoku.hints') }}</span>
-              <b>{{ hintsUsed }}</b>
-            </span>
-          </div>
-          <div class="sd-numpad">
-            <button
-              v-for="n in 9"
-              :key="n"
-              type="button"
-              class="sd-num"
-              :class="{ done: remaining[n] <= 0, active: quickFill ? activeNumber === n : focusDigit === n }"
-              :disabled="remaining[n] <= 0"
-              @click="pickNumber(n)"
-            >
-              <b>{{ n }}</b>
-              <span class="sd-num-left">{{ remaining[n] > 0 ? remaining[n] : '' }}</span>
-            </button>
-          </div>
-          <div class="sd-tools">
-            <button type="button" class="sd-tool" :class="{ active: notesMode }" :aria-pressed="notesMode" @click="notesMode = !notesMode">
-              {{ $t('games.sudoku.notes') }}
-            </button>
-            <button type="button" class="sd-tool" :class="{ active: quickFill }" :aria-pressed="quickFill" @click="toggleQuickFill">
-              {{ $t('games.sudoku.quickFill') }}
-            </button>
-            <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
-            <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
-              {{ $t('games.sudoku.undo') }}
-            </button>
-            <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
-              {{ $t('games.sudoku.snapshot.save') }}
-            </button>
-            <button
-              type="button"
-              class="sd-tool"
-              :disabled="!snapAt || play.active || won"
-              :title="snapAt ? $t('games.sudoku.snapshot.revertTip', { time: snapTime }) : $t('games.sudoku.snapshot.none')"
-              @click="restoreSnapshot"
-            >
-              {{ $t('games.sudoku.snapshot.revert') }}
-            </button>
-            <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
-            <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
-          </div>
-          <div v-if="hint" class="sd-hint-note" role="status" aria-live="polite">
-            <div class="sd-hint-head">
-              <b v-if="hintTechName" class="sd-hint-tech">{{ hintTechName }}</b>
-              <button type="button" class="sd-hint-close" :aria-label="$t('games.sudoku.hintDismiss')" @click="hint = null">×</button>
-            </div>
-            <p class="sd-hint-text">{{ hintText }}</p>
-            <div v-if="hint.via && hint.via.length" class="sd-hint-via">
-              <span class="sd-hint-via-label">{{ $t('games.sudoku.hintResult.viaLabel') }}</span>
-              <span v-for="(key, i) in hint.via" :key="key + i" class="sd-hint-chip">{{ $t('games.sudoku.tech.' + key + '.name') }}</span>
-            </div>
-          </div>
-          <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
-            {{ $t('games.sudoku.variantTip.' + variant) }}
-          </div>
+        <div v-if="variant !== 'CLASSIC'" class="sd-hint sd-variant-tip">
+          {{ $t('games.sudoku.variantTip.' + variant) }}
         </div>
       </div>
 
@@ -235,19 +257,7 @@
         </div>
       </Transition>
     </div>
-
-    <!-- 技巧教学:与提示引擎同一套技巧阶梯 -->
-    <el-dialog v-model="teachOpen" class="dialog-md" append-to-body :title="$t('games.sudoku.teach.title')">
-      <p class="sd-teach-intro">{{ $t('games.sudoku.teach.intro') }}</p>
-      <ol class="sd-teach-list">
-        <li v-for="item in TECH_LIST" :key="item" class="sd-teach-item">
-          <b>{{ $t('games.sudoku.tech.' + item + '.name') }}</b>
-          <p>{{ $t('games.sudoku.tech.' + item + '.desc') }}</p>
-        </li>
-      </ol>
-      <p class="sd-teach-foot">{{ $t('games.sudoku.teach.foot') }}</p>
-    </el-dialog>
-  </div>
+  </GameShell>
 </template>
 
 <script setup>
@@ -260,11 +270,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import PageToolbar from '@/components/PageToolbar.vue'
-import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
-import GameHeader from '@/components/games/GameHeader.vue'
-import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
 import {
@@ -316,9 +323,30 @@ const TECH_LIST = [
   HINT_TECHNIQUE.GUESS,
 ]
 
-const pageEl = ref(null)
-const gameCardEl = ref(null)
-const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl, fit: false })
+const shellEl = ref(null)
+const layoutEl = ref(null)
+// 全屏/宽屏由外壳持有(全屏目标是整页,头部与控件在全屏里仍可点);弹窗按它决定是否 teleport
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
+
+const rulesPagePlay = computed(() => t('games.sudoku.rules.pagePlay'))
+const rulesPageControls = computed(() => t('games.sudoku.rules.pageControls'))
+const rulesPageVariants = computed(() => t('games.sudoku.rules.pageVariants'))
+/** 规则第三页只列有额外规则的变体(标准玩法已在第一页讲了) */
+const VARIANT_TIPS = VARIANT_KEYS.filter((key) => key !== 'CLASSIC')
+
+// 竖排时数字盘在棋盘下方:实测它的高度写成变量,棋盘才能吃到真正的剩余高度。
+// 观察器 + 窗口 resize 双保险:视口/字号变化时面板可能是在观察回调之外变高的
+let panelObserver = null
+let panelHeight = -1
+const syncPanelHeight = () => {
+  const layout = layoutEl.value
+  if (!layout) return
+  const panel = layout.querySelector('.sd-panel')
+  const next = panel ? Math.round(panel.offsetHeight) : 0
+  if (next === panelHeight) return
+  panelHeight = next
+  layout.style.setProperty('--sd-panel-h', `${next}px`)
+}
 
 const variant = ref('CLASSIC')
 const difficulty = ref('MEDIUM')
@@ -1323,7 +1351,16 @@ watch(
 
 onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', syncPanelHeight, { passive: true })
   sunLight?.suspendEffects()
+
+  await nextTick()
+  syncPanelHeight()
+  const panel = layoutEl.value?.querySelector('.sd-panel')
+  if (panel && typeof ResizeObserver !== 'undefined') {
+    panelObserver = new ResizeObserver(syncPanelHeight)
+    panelObserver.observe(panel)
+  }
 
   try {
     quickFill.value = localStorage.getItem(QUICK_FILL_KEY) === '1'
@@ -1348,6 +1385,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   stopTimer()
   cancelCellPress()
+  panelObserver?.disconnect()
+  panelObserver = null
+  window.removeEventListener('resize', syncPanelHeight)
   if (saveTimer) clearTimeout(saveTimer)
   if (roomTimer) clearTimeout(roomTimer)
   saveState()
@@ -1357,13 +1397,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sd-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  container: sudoku / inline-size;
+/* 页面本体透明:棋盘与操作面板直接铺在内容页底板上(UI §43),不再套圆角外框。
+   风格色只用 --sd-* 一组,深浅色各一份 */
+.sd-shell {
   color: var(--color-text-primary, #2b2b2b);
   --sd-line: rgba(0, 0, 0, 0.12);
   --sd-line-strong: rgba(0, 0, 0, 0.32);
@@ -1385,15 +1421,6 @@ onBeforeUnmount(() => {
   --sd-pal: rgba(196, 86, 146, 0.7);
   --sd-dragon: rgba(188, 116, 46, 0.62);
 }
-.sd-card:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  justify-content: flex-start;
-  overflow-y: auto;
-  padding: clamp(12px, 2vw, 24px);
-  background: var(--color-bg);
-}
 
 .sd-variant {
   width: 140px;
@@ -1402,65 +1429,38 @@ onBeforeUnmount(() => {
   width: 104px;
 }
 
-.sd-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  justify-content: center;
-  width: 100%;
-  font-size: 12px;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.sd-stat b {
-  font-size: 14px;
-  color: var(--color-text-primary, #2b2b2b);
-  font-variant-numeric: tabular-nums;
-}
-.sd-stat.warn b {
-  color: #d64c4c;
-}
-
+/* 棋盘 + 操作面板:竖屏=棋盘在上、数字盘在下;横屏改左右两栏(见下面的容器查询)。
+   外壳的 .gs-body 是尺寸容器,这里直接用 100cqh 扣掉「实测面板高度」,
+   不再按屏高减魔法数,也不整块 transform 缩放 */
 .sd-layout {
-  /* 442px = 顶栏/页脚/内边距 212 + 竖屏时下方数字盘面板(统计+9键+工具+帮助)实测约 230;
-     「一起玩」横幅高度由 --room-bar-h 实测变量扣减,横竖屏都保一屏不滚动 */
-  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 442px - var(--room-bar-h, 0px)), 520px));
+  --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-panel-h, 0px) - 18px), 560px);
+  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* 两行都按内容走、整体垂直居中:棋盘被宽度卡住时(手机竖屏/平板竖屏)棋盘与数字盘
+     贴在一起居中,而不是被 1fr 行拉开一大段空白 */
+  grid-template-rows: auto auto;
   justify-items: center;
   align-items: center;
-  gap: 12px;
+  align-content: center;
+  gap: 10px;
+  flex: 1 1 auto;
   width: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 .sd-panel {
   display: grid;
   gap: 10px;
-  width: min(100%, 520px);
-}
-@container sudoku (min-width: 550px) {
-  .sd-layout {
-    /* 宽卡双栏:棋盘列宽按视口高折算,166px ≈ 顶栏/页脚/内边距,横幅走 --room-bar-h */
-    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 166px - var(--room-bar-h, 0px)), 540px)) minmax(0, 232px);
-    justify-content: center;
-    gap: clamp(16px, 4cqi, 36px);
-  }
-  .sd-layout .sd-frame {
-    width: 100%;
-  }
-  .sd-panel .sd-numpad {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .sd-panel .sd-tools {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
-/* 棋盘外框:摩天楼要用四边留出提示轨道,其余变体只有中间 9×9 */
+/* 棋盘外框:摩天楼要用四边留出提示轨道,其余变体只有中间 9×9。
+   外框自身是尺寸容器,外圈提示数字按 cqi 跟随棋盘大小 */
 .sd-frame {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   grid-template-rows: repeat(9, minmax(0, 1fr));
@@ -1475,6 +1475,7 @@ onBeforeUnmount(() => {
 
 .sd-board {
   grid-area: 1 / 1 / 10 / 10;
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   /* 行也必须显式等分:自动行高会跟着格内数字/笔记的内容走,填数后整盘会跳尺寸 */
@@ -1496,7 +1497,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(9px, 2.2vw, 13px);
+  font-size: clamp(8px, 2.2cqi, 13px);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -1529,7 +1530,8 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--sd-line);
   background: transparent;
   color: var(--sd-user);
-  font-size: clamp(16px, 4.6vw, 28px);
+  /* 字号跟棋盘走(cqi = 棋盘宽度):小屏不溢出、大屏不显小 */
+  font-size: clamp(12px, 6.4cqi, 27px);
   font-weight: 600;
   cursor: pointer;
   overflow: hidden;
@@ -1632,7 +1634,7 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 1;
   padding: 0 1px;
-  font-size: clamp(8px, 2vw, 11px);
+  font-size: clamp(7px, 2.4cqi, 12px);
   font-weight: 700;
   line-height: 1;
   color: var(--sd-line-strong);
@@ -1681,7 +1683,7 @@ onBeforeUnmount(() => {
   border-radius: 3px;
   background: var(--sd-cell-bg);
   color: var(--sd-xv);
-  font-size: clamp(8px, 1.9vw, 12px);
+  font-size: clamp(7px, 2.2cqi, 12px);
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
@@ -1882,7 +1884,7 @@ onBeforeUnmount(() => {
   padding: 0 3px;
   border-radius: 0 0 4px 0;
   background: var(--sd-cell-bg);
-  font-size: clamp(7px, 1.7vw, 10px);
+  font-size: clamp(6px, 1.9cqi, 10px);
   font-weight: 700;
   line-height: 1.4;
   color: var(--color-text-secondary, #8a8a8a);
@@ -1898,7 +1900,7 @@ onBeforeUnmount(() => {
   grid-template-rows: repeat(3, 1fr);
   padding: 3px;
   box-sizing: border-box;
-  font-size: clamp(7px, 1.7vw, 10px);
+  font-size: clamp(6px, 2.1cqi, 10px);
   font-weight: 500;
   color: var(--color-text-secondary, #8a8a8a);
 }
@@ -1945,7 +1947,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 6px;
-  width: min(100%, 520px);
+  width: 100%;
 }
 .sd-num {
   position: relative;
@@ -1989,16 +1991,12 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 
-.sd-head-btn {
-  margin-left: 0;
-}
-
 /* 提示说明:技巧名 + 为什么 + 用过的技巧链 */
 .sd-hint-note {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: min(100%, 520px);
+  width: 100%;
   padding: 9px 12px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--sd-user) 28%, transparent);
@@ -2126,7 +2124,7 @@ onBeforeUnmount(() => {
   color: #e0933a;
 }
 
-html.dark .sd-card {
+html.dark .sd-shell {
   --sd-line: rgba(255, 255, 255, 0.13);
   --sd-line-strong: rgba(255, 255, 255, 0.34);
   --sd-cell-bg: rgba(255, 255, 255, 0.03);
@@ -2149,14 +2147,15 @@ html.dark .sd-card {
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
 }
-html.dark .sd-stat.warn b {
+.sd-shell .gh-chip.is-warn b {
+  color: #d64c4c;
+}
+html.dark .sd-shell .gh-chip.is-warn b {
   color: #ff9a9a;
 }
 
-@container sudoku (max-width: 549px) {
-  .sd-stats {
-    gap: 12px;
-  }
+/* 窄窗(手机竖):数字盘与工具键压一档,棋盘仍是通栏最大尺寸 */
+@container (max-width: 549px) {
   .sd-tool {
     padding: 6px 11px;
     font-size: 12px;
@@ -2169,19 +2168,10 @@ html.dark .sd-stat.warn b {
     font-size: 15px;
     border-radius: 8px;
   }
-  /* 窄屏下棋盘/数字盘都是通栏,提示条跟着通栏走,别做成贴屏幕边的圆角卡片 */
-  .sd-hint-note {
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
-  }
-  /* 提示条会占掉 60~110px:棋盘先让一点高度,否则工具区会被顶出一屏外 */
+  /* 提示条会占掉一两行高度:棋盘由 --sd-panel-h 自动缩,这里只把间隙收紧一档 */
   .sd-layout.has-hint {
-    --sd-frame-size: min(100%, clamp(220px, calc(100dvh - 522px - var(--room-bar-h, 0px)), 520px));
     gap: 8px;
   }
-  /* 375px 宽下工具键折成两行,再叠上最长的提示(两行文案 + 三个技巧标签)就只剩十几像素:
-     出提示时把竖向间隙整体收紧一档,375×667 仍能一屏放下 */
   .sd-layout.has-hint .sd-panel {
     gap: 6px;
   }
@@ -2191,35 +2181,38 @@ html.dark .sd-stat.warn b {
   .sd-layout.has-hint .sd-hint-note {
     padding-block: 6px;
   }
-  .sd-card.has-hint {
-    gap: 8px;
-  }
 }
 
-/* 兜底:矮屏 + 长提示文案仍超一屏时,让卡片自己滚(页面 overflow:hidden 会直接裁掉底部) */
-@media (max-height: 720px) {
-  .sd-card.has-hint {
-    overflow-y: auto;
+/* 横屏(游戏区宽 > 高):棋盘按高度铺满左列,数字盘/工具收成右侧一列。
+   必须放在最后:上面 .sd-numpad/.sd-tools/.sd-num/.sd-tool 的基础声明会按书写顺序覆盖同权重的容器规则 */
+@container (min-aspect-ratio: 6/5) {
+  .sd-layout {
+    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感 */
+    grid-template-columns: minmax(0, 1fr) clamp(148px, 30%, 232px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: clamp(12px, 3cqi, 30px);
+    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
   }
-}
-
-/* 手机沉浸态:页头/底栏/游戏工具栏已收起,棋盘把省下来的高度吃掉 */
-:global(html.game-mobile-immersive) .sd-layout {
-  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 340px - var(--room-bar-h, 0px)), 560px));
-}
-@container sudoku (min-width: 550px) {
-  :global(html.game-mobile-immersive) .sd-layout {
-    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 100px - var(--room-bar-h, 0px)), 560px)) minmax(0, 232px);
-  }
-}
-
-/* 横屏矮窗:右侧面板(统计/数字盘/工具/帮助)展开后可能比棋盘还高,
-   让面板自己滚动,否则页面 overflow:hidden 会把下半截直接裁掉 */
-@media (max-height: 520px) {
   .sd-panel {
-    max-height: calc(100dvh - 72px);
+    max-height: 100%;
     overflow-y: auto;
-    padding-bottom: 4px;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+  .sd-numpad {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sd-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sd-num {
+    padding: 8px 0;
+    font-size: 15px;
+  }
+  .sd-tool {
+    padding: 6px 8px;
+    font-size: 12px;
   }
 }
 </style>

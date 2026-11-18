@@ -13,7 +13,7 @@ const GAME_DIR = join(SRC, 'views/games')
 const CARDS_DIR = join(GAME_DIR, 'cards')
 
 /** 已迁到 GameShell 的游戏页 */
-const MIGRATED = ['Game2048.vue']
+const MIGRATED = ['Game2048.vue', 'Sudoku.vue']
 
 /** 尚未迁移(按计划分批进行);不是游戏舞台的页面归 EXEMPT */
 const PENDING = [
@@ -31,7 +31,6 @@ const PENDING = [
   'Runway52.vue',
   'Snake.vue',
   'SnakeMatch.vue',
-  'Sudoku.vue',
   'Tetris.vue',
   'WebGame.vue',
 ]

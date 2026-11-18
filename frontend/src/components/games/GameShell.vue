@@ -54,6 +54,8 @@
             size="small"
             round
             :type="rulesOpen ? 'primary' : 'default'"
+            :title="$t('games.rulesLabel')"
+            :aria-label="$t('games.rulesLabel')"
             aria-haspopup="dialog"
             :aria-expanded="rulesOpen"
             @click="openRules"
