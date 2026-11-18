@@ -1014,6 +1014,7 @@ export default {
   games: {
     title: 'Games',
     rulesLabel: 'Rules',
+    rulesAck: 'Got it',
     share: {
       dialogTitle: 'Share your score',
       hint: 'Send this card to the family, or keep it as a keepsake',
@@ -1423,6 +1424,17 @@ export default {
       continue: 'Keep going',
       playAgain: 'Play again',
       tip: 'Arrow keys / WASD / swipe to move; equal tiles merge when they collide',
+      rules: {
+        pagePlay: 'How to play',
+        pageControl: 'Controls & tips',
+        play1: 'The board starts at 4×4; pick 5×5 up to 8×8 from the top-left selector. Every tile is a power of 2.',
+        play2: 'Swipe any direction and all tiles slide together; equal tiles merge into one and the merged value is added to your score.',
+        play3: 'Each move drops a new tile (2 or 4) into an empty cell. Reach 2048 to win — then keep going for a higher score.',
+        ctrl1: 'Use the arrow keys or WASD on a keyboard, or swipe directly on the board on a phone.',
+        ctrl2: 'Tap Undo to take back a move, or New game to start over.',
+        ctrl3: 'Keep your biggest tile in a corner and line the rows up in descending order — the most reliable route to 2048.',
+        ctrl4: 'On a small screen tap the fullscreen button at the top right and the board fills the available space.',
+      },
     },
     minesweeper: {
       title: 'Minesweeper',
@@ -2677,6 +2689,8 @@ export default {
     hm: '{h} h {m} min',
     selfOnly: 'Your own data only',
     refresh: 'Refresh',
+    exportCsv: 'Export CSV',
+    exportDone: 'Exported data from {from} to {to}',
     settings: 'Sync settings',
     clearEntry: 'Clear data',
     loading: 'Loading…',
@@ -2982,7 +2996,7 @@ export default {
       tokenOnce: 'Token created — copy and save it now (shown only once)',
       copy: 'Copy',
       copied: 'Copied to clipboard',
-      copyFailed: 'Copy failed; select the token and copy it manually',
+      copyFailed: 'Copy failed; select the text and copy it manually',
       usage: 'Paste the token into the sync script on your phone. If it leaks, revoke it and create a new one.',
       tokenName: 'Name',
       prefix: 'Prefix',
@@ -3025,6 +3039,17 @@ export default {
       viewlogScopeOverview: 'Day overview',
       viewlogScopeSleep: 'Sleep records',
       viewlogScopeMetric: 'Metric trend',
+      viewlogScopeExport: 'Data export',
+      tplTitle: 'iOS Shortcut template',
+      tplHint: 'No app needed: on iPhone, a Shortcut can send your health data here once a day.',
+      tplStep1: 'Create a Shortcut and add "Find Health Samples" for each item you want to sync (sleep, steps, heart rate…).',
+      tplStep2:
+        'Add "Get Contents of URL": use the upload address above, method POST, and an Authorization header with Bearer plus your token.',
+      tplStep3: 'Set the request body to JSON and follow the template below: sleep as stage intervals, other metrics per day or per hour.',
+      tplStep4: 'Automate it daily; once "Last ingest" on this page shows a non-zero accepted count, it works.',
+      tplBodyLabel: 'Request body example (replace dates and values with Shortcut variables)',
+      tplBodyNote:
+        'Up to 2000 items per request; sleep intervals are merged into one night by the server, so you do not add up total time.',
       androidTitle: 'Phone sync (Android)',
       androidHint:
         'After you grant access on the phone, the app syncs watch sleep, activity and vitals here every day; groups you do not grant are never read.',

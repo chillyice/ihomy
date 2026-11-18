@@ -54,18 +54,15 @@
             size="small"
             round
             :type="rulesOpen ? 'primary' : 'default'"
+            aria-haspopup="dialog"
             :aria-expanded="rulesOpen"
-            @click="rulesOpen = !rulesOpen"
+            @click="openRules"
           >
             <el-icon><Reading /></el-icon>
             <span class="gs-rules-label">{{ $t('games.rulesLabel') }}</span>
           </el-button>
         </div>
       </header>
-
-      <div v-show="rulesOpen" class="gs-rules-panel">
-        <slot name="rules" />
-      </div>
 
       <div v-if="$slots.settings || $slots.stats || $slots.actions" class="gs-controls">
         <div class="gs-settings"><slot name="settings" /></div>
@@ -78,6 +75,38 @@
       <div v-if="$slots.extras" class="gs-extras"><slot name="extras" /></div>
       <!-- 页面级浮层(分享弹窗等):挂在信息栏里,游戏区是尺寸容器会把 fixed 定位困住 -->
       <slot name="overlay" />
+
+      <!-- 规则弹窗:规则搬进模态框后不再挤占棋盘高度,页数多时顶部出分页标签。
+           与分享弹窗同一处理:不 teleport 进 body,全屏时挂在整页里才看得见(§43) -->
+      <el-dialog
+        v-model="rulesOpen"
+        class="gs-rules-dialog"
+        width="min(560px, 92vw)"
+        :title="rulesTitle"
+        :append-to-body="!isFullscreen"
+        :lock-scroll="false"
+      >
+        <div v-if="rulesPageLabels.length > 1" class="gs-rules-tabs" role="tablist">
+          <button
+            v-for="(label, i) in rulesPageLabels"
+            :key="label + i"
+            type="button"
+            class="gs-rules-tab"
+            :class="{ 'is-active': i === rulesPage }"
+            role="tab"
+            :aria-selected="i === rulesPage"
+            @click="rulesPage = i"
+          >
+            {{ label }}
+          </button>
+        </div>
+        <div class="gs-rules-body">
+          <slot name="rules" :page="rulesPage" />
+        </div>
+        <template #footer>
+          <el-button type="primary" @click="rulesOpen = false">{{ $t('games.rulesAck') }}</el-button>
+        </template>
+      </el-dialog>
     </div>
 
     <div ref="bodyEl" class="gs-body game-surface" :class="[`is-${bodyAlign}`, bodyClass]">
@@ -89,7 +118,8 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, FullScreen, Monitor, Reading } from '@element-plus/icons-vue'
 import { useGameView } from '@/composables/useGameView'
 
@@ -107,10 +137,22 @@ const props = defineProps({
   bodyAlign: { type: String, default: 'center' },
   /** 追加到游戏区的类(个别游戏需要自己的定位上下文) */
   bodyClass: { type: [String, Array, Object], default: '' },
+  /** 规则弹窗的分页标签,长度 >1 时顶部出分页;每页内容由 #rules 插槽按 page 渲染 */
+  rulesPages: { type: Array, default: () => [] },
 })
 defineEmits(['back'])
 
+const { t } = useI18n()
+
 const rulesOpen = ref(false)
+const rulesPage = ref(0)
+const rulesPageLabels = computed(() => (Array.isArray(props.rulesPages) ? props.rulesPages.map(String).filter(Boolean) : []))
+// 弹窗标题带上游戏名,避免只写「规则」看不出是哪个游戏
+const rulesTitle = computed(() => (props.title ? `${props.title} · ${t('games.rulesLabel')}` : t('games.rulesLabel')))
+const openRules = () => {
+  rulesPage.value = 0
+  rulesOpen.value = true
+}
 const pageEl = ref(null)
 const bodyEl = ref(null)
 

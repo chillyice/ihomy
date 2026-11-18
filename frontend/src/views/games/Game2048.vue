@@ -1,5 +1,12 @@
 <template>
-  <GameShell ref="shellEl" class="bf-shell" :title="title" body-align="center" @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="bf-shell"
+    :title="title"
+    :rules-pages="[$t('games.g2048.rules.pagePlay'), $t('games.g2048.rules.pageControl')]"
+    body-align="center"
+    @back="goBack"
+  >
     <template #settings>
       <el-select v-if="!matchId && !play.active" v-model="size" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
@@ -19,8 +26,21 @@
       <el-button v-if="!matchId && !play.active" :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
       <el-button v-if="!matchId" @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
     </template>
-    <template #rules>
-      <p>{{ $t('games.g2048.tip') }}</p>
+    <template #rules="{ page }">
+      <template v-if="page === 0">
+        <p>{{ $t('games.g2048.tip') }}</p>
+        <ul>
+          <li>{{ $t('games.g2048.rules.play1') }}</li>
+          <li>{{ $t('games.g2048.rules.play2') }}</li>
+          <li>{{ $t('games.g2048.rules.play3') }}</li>
+        </ul>
+      </template>
+      <ul v-else>
+        <li>{{ $t('games.g2048.rules.ctrl1') }}</li>
+        <li>{{ $t('games.g2048.rules.ctrl2') }}</li>
+        <li>{{ $t('games.g2048.rules.ctrl3') }}</li>
+        <li>{{ $t('games.g2048.rules.ctrl4') }}</li>
+      </ul>
     </template>
 
     <template #extras>

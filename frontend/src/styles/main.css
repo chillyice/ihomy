@@ -716,23 +716,86 @@ html.theme-warm .page.game-shell {
   align-items: center;
 }
 
-/* --- 规则面板(默认收起,替代各页常驻的说明条) --- */
-.gs-rules-panel {
+/* --- 规则弹窗(规则不再常驻/折叠在页面里:模态框放得下长规则,还能分页) --- */
+.gs-rules-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gs-rules-tabs::-webkit-scrollbar {
+  display: none;
+}
+.gs-rules-tab {
   flex: 0 0 auto;
-  padding: 2px 2px 10px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary, #8a8a8a);
   font-size: 12.5px;
-  line-height: 1.7;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.gs-rules-tab:hover {
+  color: var(--color-text, #2f2f2f);
+}
+.gs-rules-tab.is-active {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+/* 正文自己滚:弹窗高度不随规则长短乱跳,矮屏也不会把「知道了」顶出屏幕 */
+.gs-rules-body {
+  max-height: min(56vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  font-size: 13px;
+  line-height: 1.75;
   color: var(--color-text-secondary, #8a8a8a);
 }
-.gs-rules-panel p {
-  margin: 2px 0;
+.gs-rules-body p {
+  margin: 0 0 8px;
 }
-.gs-rules-panel ul {
-  margin: 4px 0;
+.gs-rules-body p:last-child {
+  margin-bottom: 0;
+}
+.gs-rules-body ul,
+.gs-rules-body ol {
+  margin: 6px 0 10px;
   padding-left: 18px;
 }
-.gs-rules-panel li {
-  margin: 3px 0;
+.gs-rules-body li {
+  margin: 4px 0;
+}
+.gs-rules-body h4 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #2f2f2f);
+}
+.gs-rules-body h4:first-child {
+  margin-top: 0;
+}
+.gs-rules-body strong,
+.gs-rules-body b {
+  color: var(--color-text, #2f2f2f);
+  font-weight: 600;
+}
+/* 手机横屏只有 390 高:让出标题与页脚,正文还能滚 */
+@media (max-height: 560px) {
+  .gs-rules-body {
+    max-height: 44vh;
+  }
 }
 
 /* --- 附加区(房间条/对战横幅)与游戏区 --- */
