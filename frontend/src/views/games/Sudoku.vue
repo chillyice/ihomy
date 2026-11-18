@@ -32,7 +32,6 @@
           <el-select v-model="difficulty" size="small" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
-          <el-button size="small" round class="sd-head-btn" @click="openSaves">{{ $t('games.sudoku.saves.button') }}</el-button>
           <el-button size="small" round class="sd-head-btn" @click="teachOpen = true">{{ $t('games.sudoku.teach.button') }}</el-button>
         </template>
         <template #stats>
@@ -192,6 +191,18 @@
             <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
               {{ $t('games.sudoku.undo') }}
             </button>
+            <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
+              {{ $t('games.sudoku.snapshot.save') }}
+            </button>
+            <button
+              type="button"
+              class="sd-tool"
+              :disabled="!snapAt || play.active || won"
+              :title="snapAt ? $t('games.sudoku.snapshot.revertTip', { time: snapTime }) : $t('games.sudoku.snapshot.none')"
+              @click="restoreSnapshot"
+            >
+              {{ $t('games.sudoku.snapshot.revert') }}
+            </button>
             <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
             <button type="button" class="sd-tool" @click="startNew">{{ $t('games.sudoku.newGame') }}</button>
           </div>
@@ -225,34 +236,6 @@
       </Transition>
     </div>
 
-    <!-- 存档槽:本地多份进度(自动存档只管崩溃恢复) -->
-    <el-dialog v-model="saveOpen" class="dialog-md" append-to-body :title="$t('games.sudoku.saves.title')">
-      <div class="sd-save-top">
-        <el-button type="primary" size="small" round :disabled="!canSave" @click="saveCurrent">
-          {{ $t('games.sudoku.saves.saveCurrent') }}
-        </el-button>
-        <span class="sd-save-tip">{{ $t('games.sudoku.saves.limit', { n: SAVE_LIMIT }) }}</span>
-      </div>
-      <p v-if="!saves.length" class="sd-save-empty">{{ $t('games.sudoku.saves.empty') }}</p>
-      <ul v-else class="sd-save-list">
-        <li v-for="slot in saves" :key="slot.id" class="sd-save-item">
-          <div class="sd-save-meta">
-            <b>{{ slotTitle(slot) }}</b>
-            <span class="sd-save-sub">
-              <span>{{ $t('games.sudoku.saves.progress', { filled: slotFilled(slot), total: CELLS }) }}</span>
-              <span>{{ slotTime(slot) }}</span>
-              <span>{{ slotDate(slot) }}</span>
-            </span>
-          </div>
-          <div class="sd-save-actions">
-            <el-button size="small" round @click="loadSlot(slot)">{{ $t('games.sudoku.saves.load') }}</el-button>
-            <el-button size="small" round text @click="removeSlot(slot.id)">{{ $t('games.sudoku.saves.delete') }}</el-button>
-          </div>
-        </li>
-      </ul>
-      <p v-if="saveMsg" class="sd-save-msg">{{ saveMsg }}</p>
-    </el-dialog>
-
     <!-- 技巧教学:与提示引擎同一套技巧阶梯 -->
     <el-dialog v-model="teachOpen" class="dialog-md" append-to-body :title="$t('games.sudoku.teach.title')">
       <p class="sd-teach-intro">{{ $t('games.sudoku.teach.intro') }}</p>
@@ -274,6 +257,7 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -317,9 +301,8 @@ const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const STORAGE_KEY = 'ihomy:games:sudoku:v1'
-const SAVES_KEY = 'ihomy:games:sudoku:saves:v1'
+const SNAP_KEY = 'ihomy:games:sudoku:snapshot:v1'
 const QUICK_FILL_KEY = 'ihomy:games:sudoku:quickfill:v1'
-const SAVE_LIMIT = 8
 const MAX_HISTORY = 120
 const LONG_PRESS_MS = 500
 
@@ -367,11 +350,16 @@ const rewardMsg = ref('')
 const hintFlash = ref(-1)
 // 最近一次提示:技巧推导结果(格子、数字、用了哪几招);CONFLICT/DEAD 只用于面板文案
 const hint = ref(null)
-// 存档槽(本地多份进度),存档弹窗与教学弹窗各自独立
-const saves = ref([])
-const saveOpen = ref(false)
+// 快照:一键存下当前盘面,走投无路时一键回退(与技巧教学弹窗各自独立)
+const snapAt = ref(0)
 const teachOpen = ref(false)
-const saveMsg = ref('')
+
+const snapTime = computed(() => {
+  if (!snapAt.value) return ''
+  const d = new Date(snapAt.value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+})
 
 // ---------- 「一起玩」房间(数独只允许合作) ----------
 // 房主生成题面并权威落子;其他成员的操作(落子/擦除/提示/撤销/长按直填/换题)都发给房主执行,
@@ -834,7 +822,7 @@ const clearState = () => {
     // 忽略
   }
 }
-/** 校验并归一化一份进度(自动存档与存档槽共用同一份口径,脏档返回 null) */
+/** 校验并归一化一份进度(自动存档与快照共用同一份口径,脏数据返回 null) */
 const normalizeSave = (raw) => {
   if (!raw || typeof raw !== 'object') return null
   // 旧版存档没有 variant 字段,按标准数独处理;已下线变体的存档直接丢弃
@@ -884,61 +872,64 @@ const scheduleSave = () => {
   }, 800)
 }
 
-// ---------- 存档槽(本地多份进度;自动存档只管崩溃恢复,这里是玩家主动留的档) ----------
-const readSaves = () => {
+// ---------- 快照(一键存当前盘面,走投无路时一键回退) ----------
+// 只留一份,且只对当前这道题有效:换题/换变体即作废,避免回退到别的题。
+const snapFits = (saved) =>
+  Array.isArray(saved.puzzle) && puzzle.value.length === CELLS && saved.puzzle.join(',') === puzzle.value.join(',')
+const readSnapshot = () => {
   try {
-    const raw = JSON.parse(localStorage.getItem(SAVES_KEY) || '[]')
-    if (!Array.isArray(raw)) return []
-    return raw.filter((slot) => slot && typeof slot === 'object' && Number(slot.id) > 0)
+    return normalizeSave(JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'))
   } catch (e) {
-    return []
+    return null
   }
 }
-const persistSaves = () => {
+const clearSnapshot = () => {
+  snapAt.value = 0
   try {
-    localStorage.setItem(SAVES_KEY, JSON.stringify(saves.value))
+    localStorage.removeItem(SNAP_KEY)
   } catch (e) {
-    // 隐私模式/配额满时放弃,不影响游戏
+    // 忽略
   }
 }
-const canSave = computed(() => !play.active && !won.value && solution.value.length > 0)
-const openSaves = () => {
-  saveMsg.value = ''
-  saves.value = readSaves()
-  saveOpen.value = true
+/** 进页面时对一下:本地那份快照还是不是当前这道题的(不是就丢掉) */
+const syncSnapMeta = () => {
+  const saved = readSnapshot()
+  if (saved && snapFits(saved)) snapAt.value = Number(saved.savedAt) || 0
+  else clearSnapshot()
 }
-const saveCurrent = () => {
-  if (!canSave.value) return
-  const slot = { id: Date.now(), savedAt: Date.now(), ...snapshotRoomState() }
-  saves.value = [slot, ...saves.value].slice(0, SAVE_LIMIT)
-  persistSaves()
-  saveMsg.value = t('games.sudoku.saves.saved')
-}
-const removeSlot = (id) => {
-  saves.value = saves.value.filter((slot) => slot.id !== id)
-  persistSaves()
-}
-const loadSlot = (slot) => {
-  const saved = normalizeSave(slot)
-  if (!saved) {
-    saveMsg.value = t('games.sudoku.saves.loadFailed')
+const canSnap = computed(() => !play.active && !won.value && !generating.value && solution.value.length === CELLS)
+
+const takeSnapshot = () => {
+  if (!canSnap.value) return
+  const saved = { savedAt: Date.now(), ...snapshotRoomState() }
+  try {
+    localStorage.setItem(SNAP_KEY, JSON.stringify(saved))
+  } catch (e) {
+    // 隐私模式/配额满:说一声就好,不影响继续玩
+    ElMessage.error(t('games.sudoku.snapshot.saveFailed'))
     return
   }
-  applySavedState(saved)
-  saveOpen.value = false
-  saveMsg.value = ''
+  snapAt.value = saved.savedAt
+  ElMessage.success(t('games.sudoku.snapshot.saved'))
 }
-const slotTitle = (slot) =>
-  t('games.sudoku.saves.slotTitle', {
-    variant: t('games.sudoku.variant.' + slot.variant),
-    difficulty: t('games.sudoku.difficulty.' + slot.difficulty),
-  })
-const slotFilled = (slot) => (Array.isArray(slot.board) ? slot.board.reduce((n, v) => n + (v ? 1 : 0), 0) : 0)
-const slotTime = (slot) => formatTime(Number(slot.elapsed) || 0)
-const slotDate = (slot) => {
-  const d = new Date(Number(slot.savedAt) || Number(slot.id))
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+const restoreSnapshot = () => {
+  if (play.active || won.value) return
+  if (!snapAt.value) {
+    ElMessage.info(t('games.sudoku.snapshot.none'))
+    return
+  }
+  const saved = readSnapshot()
+  if (!saved || !snapFits(saved)) {
+    clearSnapshot()
+    ElMessage.warning(t('games.sudoku.snapshot.invalid'))
+    return
+  }
+  // 不做二次确认:回退本身进撤销栈,按错了「撤销」就能找回刚才的盘面
+  const before = { board: board.value.slice(), notes: notes.value.slice() }
+  applySavedState(saved)
+  history.value = [before]
+  ElMessage.success(t('games.sudoku.snapshot.restored'))
 }
 
 /** 把一份校验过的进度铺到棋盘上(自动恢复与手动载入共用) */
@@ -1014,6 +1005,8 @@ const startNew = async () => {
   hintFlash.value = -1
   hint.value = null
   clearState()
+  // 新题面 = 旧快照作废,否则「回退」会把人送回上一道题
+  clearSnapshot()
   generating.value = false
   startTimer()
 }
@@ -1337,8 +1330,6 @@ onMounted(async () => {
   } catch (e) {
     quickFill.value = false
   }
-  saves.value = readSaves()
-
   if (play.active) {
     // 房间:跳过本地存档,房主出题并广播,访客等房主同步
     await play.load()
@@ -1349,7 +1340,9 @@ onMounted(async () => {
 
   const saved = loadState()
   if (saved) applySavedState(saved)
-  else nextTick(startNew)
+  else await startNew()
+  // 刷新后本地那份快照若仍属于这道题就继续可用,否则丢掉
+  syncSnapMeta()
 })
 
 onBeforeUnmount(() => {
@@ -2058,75 +2051,6 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #8a8a8a);
 }
 
-/* 存档槽(弹窗 append-to-body,只能用全局变量,拿不到 .sd-card 上的 --sd-*) */
-.sd-save-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  margin-bottom: 12px;
-}
-.sd-save-tip {
-  font-size: 12px;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-save-empty {
-  margin: 0;
-  padding: 18px 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-save-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sd-save-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
-  background: var(--color-surface, #fff);
-}
-.sd-save-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--color-text-primary, #2b2b2b);
-}
-.sd-save-meta b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sd-save-sub {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: 11px;
-  color: var(--color-text-secondary, #8a8a8a);
-  font-variant-numeric: tabular-nums;
-}
-.sd-save-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 6px;
-}
-.sd-save-msg {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--color-accent, #a8483a);
-}
-
 /* 技巧教学 */
 .sd-teach-intro,
 .sd-teach-foot {
@@ -2251,9 +2175,24 @@ html.dark .sd-stat.warn b {
     border-left: 0;
     border-right: 0;
   }
-  /* 提示条会占掉 60~90px:棋盘先让一点高度,否则工具区会被顶出一屏外 */
+  /* 提示条会占掉 60~110px:棋盘先让一点高度,否则工具区会被顶出一屏外 */
   .sd-layout.has-hint {
     --sd-frame-size: min(100%, clamp(220px, calc(100dvh - 522px - var(--room-bar-h, 0px)), 520px));
+    gap: 8px;
+  }
+  /* 375px 宽下工具键折成两行,再叠上最长的提示(两行文案 + 三个技巧标签)就只剩十几像素:
+     出提示时把竖向间隙整体收紧一档,375×667 仍能一屏放下 */
+  .sd-layout.has-hint .sd-panel {
+    gap: 6px;
+  }
+  .sd-layout.has-hint .sd-tools {
+    row-gap: 6px;
+  }
+  .sd-layout.has-hint .sd-hint-note {
+    padding-block: 6px;
+  }
+  .sd-card.has-hint {
+    gap: 8px;
   }
 }
 
