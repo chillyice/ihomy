@@ -60,6 +60,7 @@
           class="m3-board"
           @click="onBoardClick"
           @pointerdown="onBoardDown"
+          @pointermove="onBoardMove"
           @pointerup="onBoardUp"
           @pointercancel="onBoardCancel"
         ></div>
@@ -186,6 +187,8 @@ var noticeVars = null // interpolation values for the status line
 var endWin = false // result of the finished game
 var cascadeDepth = 0 // safety cap on refill->clear loops
 var dragFrom = null // [r, c] where a drag started
+var dragStart = null // {x, y} client coords where the drag started
+var dragLimit = 0 // swipe trigger distance sampled at pointerdown
 var suppressClick = false // swallow the click that follows a drag
 var rng = Math.random // swappable for a seeded generator
 var lastFrameTs = 0 // previous rAF timestamp
@@ -878,19 +881,49 @@ function posOfCell(el) {
   return null
 }
 
+/* Client coords carried by a pointer event, or null when it has none. */
+function pointerXY(ev) {
+  if (!ev || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return null
+  return { x: ev.clientX, y: ev.clientY }
+}
+
 /* Resolve a pointer event to a board cell using the container's client rect.
  * Returns null when the coordinates are unavailable. */
 function posFromEvent(ev) {
-  if (!ev || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return null
+  var xy = pointerXY(ev)
+  if (!xy) return null
   if (!boardEl.value || typeof boardEl.value.getBoundingClientRect !== 'function') return null
   var rect = boardEl.value.getBoundingClientRect()
   if (!rect || !rect.width || !rect.height) return null
   var cw = rect.width / cols
   var ch = rect.height / rows
-  var c = Math.floor((ev.clientX - rect.left) / cw)
-  var r = Math.floor((ev.clientY - rect.top) / ch)
+  var c = Math.floor((xy.x - rect.left) / cw)
+  var r = Math.floor((xy.y - rect.top) / ch)
   if (r < 0 || r >= rows || c < 0 || c >= cols) return null
   return [r, c]
+}
+
+/* Resolve a pointer event to a board cell: the tile under the pointer first
+ * (exact, includes gaps), the container rect only as a fallback for synthetic
+ * events whose target is not a tile. */
+function cellFromEvent(ev) {
+  var t = ev && ev.target
+  var cellEl = t && typeof t.closest === 'function' ? t.closest('.cell') : null
+  if (cellEl) {
+    var pos = posOfCell(cellEl)
+    if (pos) return pos
+  }
+  return posFromEvent(ev)
+}
+
+/* Swipe trigger distance. One tile is the natural step on a match-3 board, so a
+ * drag only has to clear a share of it (24px cap, 16px floor for narrow boards)
+ * instead of landing exactly one cell away — a fast flick overshoots and a
+ * thumb drifts, both of which used to fall outside the adjacency test. */
+function swipeLimit() {
+  var rect = boardEl.value && typeof boardEl.value.getBoundingClientRect === 'function' ? boardEl.value.getBoundingClientRect() : null
+  var pitch = rect && rect.width ? rect.width / cols : 0
+  return Math.min(24, Math.max(16, pitch * 0.4))
 }
 
 /* Click-select flow: first click selects, a second click on a neighbour swaps. */
@@ -1171,30 +1204,76 @@ function onBoardClick(ev) {
 }
 
 function onBoardDown(ev) {
-  if (status !== 'playing' || phase !== 'idle') return
-  var pos = posFromEvent(ev)
-  if (!pos) {
-    var t = ev && ev.target
-    var cellEl = t && typeof t.closest === 'function' ? t.closest('.cell') : t
-    pos = cellEl ? posOfCell(cellEl) : null
-  }
+  /* The click that follows the previous gesture has already been delivered by
+   * now, so a fresh press clears the flag and the next tap selects again. */
+  suppressClick = false
+  dragFrom = null
+  dragStart = null
+  dragLimit = 0
+  /* Armed even while a resolve/fall is still running: the gesture must survive
+   * the animation tail instead of being dropped for touching down too early. */
+  if (status !== 'playing') return
+  var pos = cellFromEvent(ev)
+  if (!pos) return
   dragFrom = pos
+  dragStart = pointerXY(ev)
+  /* The board cannot resize mid-gesture, so measure once instead of on every
+   * pointermove. */
+  dragLimit = swipeLimit()
+}
+
+/* A press-drag is resolved as soon as it clears the trigger distance, so the
+ * swap lands mid-drag instead of waiting for the finger to lift on the exact
+ * neighbour tile (fast flicks flew past it, diagonal thumbs missed the row). */
+function onBoardMove(ev) {
+  if (!dragFrom || !dragStart) return
+  trySwipe(ev)
 }
 
 function onBoardUp(ev) {
-  if (!dragFrom) return
-  var from = dragFrom
+  /* Fallback for a flick that delivered no pointermove at all. */
+  if (dragFrom && dragStart) trySwipe(ev)
   dragFrom = null
-  var pos = posFromEvent(ev)
-  if (pos && (pos[0] !== from[0] || pos[1] !== from[1]) && isAdjacent(from[0], from[1], pos[0], pos[1])) {
-    suppressClick = true
-    selected = null
-    attemptSwap(from[0], from[1], pos[0], pos[1])
-  }
+  dragStart = null
+  dragLimit = 0
 }
 
 function onBoardCancel() {
   dragFrom = null
+  dragStart = null
+  dragLimit = 0
+}
+
+/* Turn the current drag into a one-step swap along its dominant axis. Below the
+ * trigger distance nothing happens here — the trailing click selects instead. */
+function trySwipe(ev) {
+  if (!dragFrom || !dragStart) return
+  var xy = pointerXY(ev)
+  if (!xy) return
+  var dx = xy.x - dragStart.x
+  var dy = xy.y - dragStart.y
+  var limit = dragLimit || swipeLimit()
+  if (Math.abs(dx) < limit && Math.abs(dy) < limit) return
+  /* Still resolving / falling: stay armed and let the next pointermove retry,
+   * so a swipe begun during the animation tail lands the moment the board
+   * settles instead of vanishing. */
+  if (phase !== 'idle') return
+
+  var from = dragFrom
+  dragFrom = null
+  dragStart = null
+
+  var dr = 0,
+    dc = 0
+  if (Math.abs(dx) >= Math.abs(dy)) dc = dx > 0 ? 1 : -1
+  else dr = dy > 0 ? 1 : -1
+
+  var r = from[0] + dr
+  var c = from[1] + dc
+  if (r < 0 || r >= rows || c < 0 || c >= cols) return
+  suppressClick = true
+  selected = null
+  attemptSwap(from[0], from[1], r, c)
 }
 
 function onKeydown(ev) {
