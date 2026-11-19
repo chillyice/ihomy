@@ -50,13 +50,10 @@
         ><span>{{ $t('games.minesweeper.best') }}</span
         ><b>{{ bestText }}</b></span
       >
-    </template>
-
-    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用数据条右端 -->
-    <template #actions>
+      <!-- 旗标键跟在数据下面:手机横屏时棋盘左侧那条竖栏里,数据在上、按钮在下 -->
       <el-button
         size="small"
-        class="gs-icon-btn"
+        class="gs-icon-btn ms-flag-btn"
         :type="flagMode ? 'primary' : 'default'"
         :title="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
         :aria-label="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
@@ -82,8 +79,8 @@
     </template>
 
     <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
-         旗标模式/新游戏放在这条的右端(棋盘右上角);手机横屏时整条(按钮+芯片)
-         竖排成棋盘左侧一列,把高度全留给棋盘 -->
+         旗标模式放在这条的右端(棋盘右上角);手机横屏时整条隐去,
+         数据与旗标键都进外壳中栏,把高度全留给棋盘 -->
     <div class="ms-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="ms-meta">
         <span class="gh-chip"
@@ -573,7 +570,7 @@ onBeforeUnmount(() => {
   height: var(--gs-control-h);
   min-width: 0;
 }
-/* 旗标模式/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会挪到数据上面 */
+/* 旗标模式靠这条的右端(竖屏/桌面);手机横屏时整条隐去,按钮进外壳中栏 */
 .ms-meta-actions {
   display: flex;
   align-items: center;
@@ -585,19 +582,25 @@ onBeforeUnmount(() => {
 .ms-meta-actions .el-button + .el-button {
   margin-left: 0;
 }
-/* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
-   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
-.ms-shell :deep(.gs-stats),
-.ms-shell :deep(.gs-controls) {
+/* 外壳里的数据是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
+   外壳的中栏只在手机横屏出现(样式在 main.css 横屏档)。 */
+.ms-shell :deep(.gs-stats) {
   display: none;
 }
 
-/* 手机横屏:数据与旗标按钮搬进外壳(中栏 + 左栏第三行),数据条整条让位,棋盘独占游戏区;
+/* 手机横屏:数据整条搬进外壳中栏,旗标键跟在数据下面(同一竖栏,数据在上按钮在下);
+   数据条整条让位,棋盘独占游戏区;
    纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区) */
 @media (orientation: landscape) and (max-height: 520px) {
-  .ms-shell :deep(.gs-stats),
-  .ms-shell :deep(.gs-controls) {
+  .ms-shell :deep(.gs-stats) {
     display: flex;
+  }
+  /* 中栏只有芯片宽(50px 上下),旗标键取通栏:图标居中、高与芯片齐,不吃左右内边距 */
+  .ms-shell :deep(.gs-stats) .ms-flag-btn {
+    align-self: stretch;
+    width: auto;
+    height: var(--gs-control-h);
+    padding: 0;
   }
   .ms-layout {
     --ms-cell-h: calc((100cqh - 16px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
