@@ -28,8 +28,36 @@ export const HEALTH_METRICS = {
   // 身体成分
   WEIGHT: { group: 'BODY', period: 'POINT', unit: 'kg', digits: 1, nameKey: 'health.metrics.weight' },
   BODY_FAT: { group: 'BODY', period: 'POINT', unit: '%', digits: 1, nameKey: 'health.metrics.bodyFat' },
+  BMI: { group: 'BODY', period: 'POINT', unit: '', digits: 1, nameKey: 'health.metrics.bmi' },
   HEIGHT: { group: 'BODY', period: 'POINT', unit: 'cm', digits: 0, nameKey: 'health.metrics.height' },
   WAIST: { group: 'BODY', period: 'POINT', unit: 'cm', digits: 1, nameKey: 'health.metrics.waist' },
+  // 步态(手机/手表自动采集,按天给平均值;后端分组 GAIT,页面上跟活动一起看)
+  WALKING_SPEED: { group: 'ACTIVITY', period: 'DAY', unit: 'km/h', digits: 1, nameKey: 'health.metrics.walkingSpeed' },
+  WALKING_STEP_LENGTH: {
+    group: 'ACTIVITY',
+    period: 'DAY',
+    unit: 'cm',
+    digits: 1,
+    nameKey: 'health.metrics.walkingStepLength',
+  },
+  WALKING_DOUBLE_SUPPORT: {
+    group: 'ACTIVITY',
+    period: 'DAY',
+    unit: '%',
+    digits: 1,
+    nameKey: 'health.metrics.walkingDoubleSupport',
+  },
+  WALKING_ASYMMETRY: { group: 'ACTIVITY', period: 'DAY', unit: '%', digits: 1, nameKey: 'health.metrics.walkingAsymmetry' },
+  WALKING_STEADINESS: {
+    group: 'ACTIVITY',
+    period: 'DAY',
+    unit: '%',
+    digits: 1,
+    nameKey: 'health.metrics.walkingSteadiness',
+  },
+  // 音量暴露(耳机/环境声级,按天一个平均声级;后端分组 AUDIO)
+  HEADPHONE_AUDIO: { group: 'VITAL', period: 'DAY', unit: 'dB', digits: 0, nameKey: 'health.metrics.headphoneAudio' },
+  AMBIENT_AUDIO: { group: 'VITAL', period: 'DAY', unit: 'dB', digits: 0, nameKey: 'health.metrics.ambientAudio' },
   // 体能(后端归 FITNESS,页面上跟体征一起看)
   VO2MAX: { group: 'VITAL', period: 'DAY', unit: 'ml/kg/min', digits: 1, nameKey: 'health.metrics.vo2max' },
 }
@@ -38,9 +66,34 @@ export const HEALTH_METRICS = {
  *  体征页除心率/血氧外还列血糖、收缩压/舒张压、呼吸频率与最大摄氧量(手表有就自动出现,没有就是空态);
  *  活动页补正念与爬楼。新增指标仍按目录加一行,这里只决定挂在哪个 tab。 */
 export const TAB_METRICS = {
-  ACTIVITY: ['STEPS', 'DISTANCE', 'ACTIVE_ENERGY', 'EXERCISE_MIN', 'MINDFUL_MIN', 'FLIGHTS'],
-  VITAL: ['HEART_RATE', 'RESTING_HR', 'HRV', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC', 'RESP_RATE', 'VO2MAX'],
-  BODY: ['WEIGHT', 'BODY_FAT', 'WAIST'],
+  ACTIVITY: [
+    'STEPS',
+    'DISTANCE',
+    'ACTIVE_ENERGY',
+    'EXERCISE_MIN',
+    'MINDFUL_MIN',
+    'FLIGHTS',
+    'WALKING_SPEED',
+    'WALKING_STEP_LENGTH',
+    'WALKING_DOUBLE_SUPPORT',
+    'WALKING_ASYMMETRY',
+    'WALKING_STEADINESS',
+  ],
+  VITAL: [
+    'HEART_RATE',
+    'RESTING_HR',
+    'HRV',
+    'SPO2',
+    'BODY_TEMP',
+    'BLOOD_GLUCOSE',
+    'BP_SYSTOLIC',
+    'BP_DIASTOLIC',
+    'RESP_RATE',
+    'VO2MAX',
+    'HEADPHONE_AUDIO',
+    'AMBIENT_AUDIO',
+  ],
+  BODY: ['WEIGHT', 'BODY_FAT', 'BMI', 'WAIST'],
 }
 
 /** 指标码归一(大小写不敏感),未知返回 null */
@@ -69,6 +122,31 @@ export const withUnit = (code, text) => {
   const unit = metricUnit(code)
   if (!unit || text === '—') return text
   return `${text} ${unit}`
+}
+
+/** 训练类型目录:与后端 common/HealthWorkout.TYPES、字典 health_workout_type 同口径。
+ *  上报端传 Apple 的 HKWorkoutActivityTypeXxx 也行,服务端归一成这里的码;认不出的归 OTHER。 */
+export const WORKOUT_TYPES = [
+  { code: 'WALKING', labelKey: 'health.workout.walking' },
+  { code: 'RUNNING', labelKey: 'health.workout.running' },
+  { code: 'CYCLING', labelKey: 'health.workout.cycling' },
+  { code: 'HIKING', labelKey: 'health.workout.hiking' },
+  { code: 'SWIMMING', labelKey: 'health.workout.swimming' },
+  { code: 'BADMINTON', labelKey: 'health.workout.badminton' },
+  { code: 'BASKETBALL', labelKey: 'health.workout.basketball' },
+  { code: 'FOOTBALL', labelKey: 'health.workout.football' },
+  { code: 'STRENGTH', labelKey: 'health.workout.strength' },
+  { code: 'YOGA', labelKey: 'health.workout.yoga' },
+  { code: 'CARDIO', labelKey: 'health.workout.cardio' },
+  { code: 'MIND_BODY', labelKey: 'health.workout.mindBody' },
+  { code: 'OTHER', labelKey: 'health.workout.other' },
+]
+
+/** 训练类型文案(未知码原样回显,不吞掉数据) */
+export const workoutLabel = (t, code) => {
+  const code0 = String(code || '').toUpperCase()
+  const hit = WORKOUT_TYPES.find((w) => w.code === code0)
+  return hit ? t(hit.labelKey) : code0 || '—'
 }
 
 /** 睡眠分钟 → { h, m }(四舍五入到分钟,不出现 60 分) */

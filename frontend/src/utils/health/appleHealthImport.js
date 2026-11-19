@@ -37,7 +37,26 @@ const DAY_SUM_TYPES = {
 const POINT_TYPES = {
   HKQuantityTypeIdentifierBodyMass: 'WEIGHT',
   HKQuantityTypeIdentifierHeight: 'HEIGHT',
+  HKQuantityTypeIdentifierBodyMassIndex: 'BMI',
 }
+
+/**
+ * 按天取平均的指标(步态/音量):导出里一天几十条样本,报「平均水平」而不是累加。
+ * scale=100 的是 Apple 用 0~1 小数存的百分比(双支撑/不对称/稳定性),
+ * 兼容个别版本直接给百分数:值 >1.5 就当已经是百分比。
+ */
+const DAY_AVG_TYPES = {
+  HKQuantityTypeIdentifierWalkingSpeed: { metric: 'WALKING_SPEED', scale: 1 },
+  HKQuantityTypeIdentifierWalkingStepLength: { metric: 'WALKING_STEP_LENGTH', scale: 1 },
+  HKQuantityTypeIdentifierWalkingDoubleSupportPercentage: { metric: 'WALKING_DOUBLE_SUPPORT', scale: 100 },
+  HKQuantityTypeIdentifierWalkingAsymmetryPercentage: { metric: 'WALKING_ASYMMETRY', scale: 100 },
+  HKQuantityTypeIdentifierAppleWalkingSteadiness: { metric: 'WALKING_STEADINESS', scale: 100 },
+  HKQuantityTypeIdentifierHeadphoneAudioExposure: { metric: 'HEADPHONE_AUDIO', scale: 1 },
+  HKQuantityTypeIdentifierEnvironmentalAudioExposure: { metric: 'AMBIENT_AUDIO', scale: 1 },
+}
+
+// 声级 0 是「没播/没收音」的占位,不是真实环境声,写进去会把日均拉成 0
+const ZERO_IS_EMPTY = new Set(['HEADPHONE_AUDIO', 'AMBIENT_AUDIO'])
 
 const SLEEP_TYPE = 'HKCategoryTypeIdentifierSleepAnalysis'
 
@@ -126,14 +145,18 @@ export function createCollector() {
   return {
     // `${hourMs}` → Map(source → { total, count, min, max })
     hr: new Map(),
-    // `${metric}|${day}|${source}` → 和
+    // `${metric}|${day}|${source}` → 和 (STEPS 等累加量) 或 { total, count }(DAY_AVG)
     daySum: new Map(),
+    // `${metric}|${day}|${source}` → { total, count }:步态/音量的日均值
+    dayAvg: new Map(),
     // day → { ACTIVE_ENERGY, EXERCISE_MIN, STAND_HOUR }
     rings: new Map(),
     points: [],
     sleep: [],
-    // [day, minutes]:没有活动圆环时用它兜底锻炼分钟
-    workouts: [],
+    // 训练:[{ type, start, end, durationMin, distanceKm, energyKcal, avgHr, sourceName }]
+    exercises: [],
+    // 正在解析的 <Workout> 块:嵌套的 <WorkoutStatistics> 要挂到它身上,遇到 </Workout> 清空
+    openWorkout: null,
     // 原始条数统计(界面上给用户对账用)
     seen: {},
     tail: '',
@@ -197,7 +220,23 @@ function handleRecord(c, a) {
   if (pointMetric) {
     const value = toNum(a.value)
     if (value == null) return
+    // BMI 导出里混着 0.39 这类坏值(单位错乱的旧记录),服务端范围 5~100,先在本地丢掉
+    if (pointMetric === 'BMI' && (value < 5 || value > 100)) return
     c.points.push({ metric: pointMetric, ts: start, value, sourceName: unescapeXml(a.sourceName || '') })
+    return
+  }
+
+  const avgDef = DAY_AVG_TYPES[type]
+  if (avgDef) {
+    let value = toNum(a.value)
+    if (value == null) return
+    if (avgDef.scale === 100 && value <= 1.5) value *= 100
+    if (ZERO_IS_EMPTY.has(avgDef.metric) && value <= 0) return
+    const key = `${avgDef.metric}|${dayOf(start)}|${unescapeXml(a.sourceName || '')}`
+    const acc = c.dayAvg.get(key) || { total: 0, count: 0 }
+    acc.total += value
+    acc.count += 1
+    c.dayAvg.set(key, acc)
   }
 }
 
@@ -218,15 +257,75 @@ function handleRing(c, a) {
   if (Object.keys(rings).length) c.rings.set(day, rings)
 }
 
+/** 训练时长 → 分钟;导出里 durationUnit 有 min/sec/hr 三种 */
+function durationMinOf(a) {
+  const dur = toNum(a.duration)
+  if (!dur || dur <= 0) return null
+  const unit = String(a.durationUnit || 'min').toLowerCase()
+  if (unit === 'sec') return dur / 60
+  if (unit === 'hr') return dur * 60
+  return dur
+}
+
+/** 距离/消耗:优先用 <Workout> 的 totalDistance/totalEnergyBurned,缺失时由嵌套统计补 */
+function distanceKmOf(a) {
+  const v = toNum(a.totalDistance)
+  if (v == null || v < 0) return null
+  const unit = String(a.totalDistanceUnit || 'km').toLowerCase()
+  if (unit === 'mi') return v * 1.609344
+  if (unit === 'm') return v / 1000
+  return v
+}
+
+function energyKcalOf(a) {
+  const v = toNum(a.totalEnergyBurned)
+  if (v == null || v < 0) return null
+  return String(a.totalEnergyBurnedUnit || 'kcal').toLowerCase() === 'kj' ? v * 0.2390057 : v
+}
+
 function handleWorkout(c, a) {
   const start = parseAppleTs(a.startDate)
   if (!start) return
-  const dur = toNum(a.duration) || 0
-  const unit = String(a.durationUnit || 'min').toLowerCase()
-  const mins = unit === 'min' ? dur : unit === 'sec' ? dur / 60 : unit === 'hr' ? dur * 60 : dur
-  if (mins <= 0) return
-  c.workouts.push([dayOf(start), mins])
+  const end = parseAppleTs(a.endDate)
+  const mins = durationMinOf(a) || (end ? (end.wallMs - start.wallMs) / 60000 : null)
+  // 空训练(时长 0 / 起止相同)只计数不留档,服务端也会拒
+  if (!mins || mins <= 0) {
+    bump(c.seen, '<Workout>')
+    c.openWorkout = null
+    return
+  }
+  const w = {
+    type: unescapeXml(a.workoutActivityType || ''),
+    start,
+    end,
+    durationMin: round2(Math.min(mins, 1440)),
+    distanceKm: distanceKmOf(a),
+    energyKcal: energyKcalOf(a),
+    avgHr: null,
+    sourceName: unescapeXml(a.sourceName || ''),
+  }
+  c.exercises.push(w)
+  c.openWorkout = w
   bump(c.seen, '<Workout>')
+}
+
+/** <WorkoutStatistics>:训练详情里的距离/消耗/心率,只有 <Workout> 缺属性时才用 */
+function handleWorkoutStatistic(c, a) {
+  const w = c.openWorkout
+  if (!w) return
+  const type = unescapeXml(a.type || '')
+  const sum = toNum(a.sum)
+  const avg = toNum(a.average)
+  const unit = String(a.unit || '').toLowerCase()
+  if (w.distanceKm == null && sum != null && /Distance/i.test(type)) {
+    if (unit === 'mi') w.distanceKm = sum * 1.609344
+    else if (unit === 'm') w.distanceKm = sum / 1000
+    else if (unit === 'km' || unit === '') w.distanceKm = sum
+  } else if (w.energyKcal == null && sum != null && /EnergyBurned/i.test(type)) {
+    w.energyKcal = unit === 'kj' ? sum * 0.2390057 : sum
+  } else if (w.avgHr == null && avg != null && /HeartRate/i.test(type)) {
+    w.avgHr = avg
+  }
 }
 
 function handleTag(c, tag, attrStr) {
@@ -234,13 +333,15 @@ function handleTag(c, tag, attrStr) {
   if (tag === 'Record') handleRecord(c, a)
   else if (tag === 'ActivitySummary') handleRing(c, a)
   else if (tag === 'Workout') handleWorkout(c, a)
+  else if (tag === 'WorkoutStatistics') handleWorkoutStatistic(c, a)
 }
 
-const TAG_RE = /<(Record|ActivitySummary|Workout)\s([^>]*)>/g
+const TAG_RE = /<(Record|ActivitySummary|Workout|WorkoutStatistics)\s([^>]*)>|<\/Workout>/g
 
 /**
  * 喂一块文本。块边界可能把一个标签劈成两半,残尾留到下一块拼上。
- * 只认开始标签:Record 可能是自闭合,也可能带 MetadataEntry 子节点,读属性就够。
+ * 只认开始标签:Record 可能是自闭合,也可能带 MetadataEntry 子节点,读属性就够;
+ * </Workout> 只用来收尾,让后面的 <WorkoutStatistics> 不会挂到上一条训练上。
  */
 export function feedChunk(c, text) {
   if (!text) return
@@ -249,7 +350,8 @@ export function feedChunk(c, text) {
   let last = 0
   let m
   while ((m = TAG_RE.exec(buf))) {
-    handleTag(c, m[1], m[2])
+    if (m[1]) handleTag(c, m[1], m[2])
+    else c.openWorkout = null
     last = TAG_RE.lastIndex
   }
   c.tail = buf.slice(last)
@@ -356,7 +458,10 @@ export function buildSamples(c) {
   // 锻炼分钟 / 站立小时:没有 Apple Watch 时圆环恒为 0,锻炼分钟回落到当天训练时长合计,
   // 站立小时只能留空
   const workoutMin = new Map()
-  for (const [day, mins] of c.workouts) workoutMin.set(day, (workoutMin.get(day) || 0) + mins)
+  for (const w of c.exercises) {
+    const day = dayOf(w.start)
+    workoutMin.set(day, (workoutMin.get(day) || 0) + w.durationMin)
+  }
   const exerciseDays = new Set([...c.rings.keys(), ...workoutMin.keys()])
   for (const day of [...exerciseDays].sort()) {
     const rings = c.rings.get(day) || {}
@@ -401,6 +506,39 @@ export function buildSamples(c) {
       sourceApp: 'APPLE_HEALTH',
     })
     stats.RESTING_HR = (stats.RESTING_HR || 0) + 1
+  }
+
+  // 步态/音量:同一天多来源时只信样本最多的那台(与心率同口径),再按来源取平均
+  const avgByDay = new Map()
+  for (const [key, acc] of c.dayAvg) {
+    const first = key.indexOf('|')
+    const second = key.indexOf('|', first + 1)
+    const metric = key.slice(0, first)
+    const day = key.slice(first + 1, second)
+    const src = key.slice(second + 1)
+    const id = `${metric}|${day}`
+    let bySource = avgByDay.get(id)
+    if (!bySource) {
+      bySource = new Map()
+      avgByDay.set(id, bySource)
+    }
+    const prev = bySource.get(src)
+    bySource.set(src, prev ? { total: prev.total + acc.total, count: prev.count + acc.count } : acc)
+  }
+  for (const id of [...avgByDay.keys()].sort()) {
+    const [metric, day] = id.split('|')
+    let best = null
+    for (const acc of avgByDay.get(id).values()) if (!best || acc.count > best.count) best = acc
+    if (!best || !best.count) continue
+    samples.push({
+      metric,
+      period: 'DAY',
+      date: day,
+      value: round2(best.total / best.count),
+      source: 'APPLE',
+      sourceApp: 'APPLE_HEALTH',
+    })
+    stats[metric] = (stats[metric] || 0) + 1
   }
 
   for (const p of c.points) {
@@ -455,16 +593,41 @@ export function sleepPayload(batch) {
 }
 
 /**
+ * 训练记录 → 上报行。服务端按 (成员, 来源 App, 开始时间) 幂等覆盖,重复导入不会翻倍;
+ * 缺 endDate 时用时长补一个,服务端只认「结束晚于开始」的区间。
+ */
+export function workoutPayload(c) {
+  return c.exercises.map((w) => {
+    const end = w.end || { wallMs: w.start.wallMs + Math.round(w.durationMin * 60000), offsetMin: w.start.offsetMin }
+    const row = {
+      type: w.type,
+      start: isoOf(w.start),
+      end: isoOf(end),
+      durationMin: w.durationMin,
+      source: vendorOf(w.sourceName),
+      sourceApp: sourceAppOf(w.sourceName),
+    }
+    if (w.distanceKm != null) row.distanceKm = round2(w.distanceKm)
+    if (w.energyKcal != null) row.energyKcal = round2(w.energyKcal)
+    if (w.avgHr != null) row.avgHr = round2(w.avgHr)
+    return row
+  })
+}
+
+/**
  * 中间态 → 可发送的请求批次。样本在前、睡眠在后(与命令行脚本一致)。
  * 返回 null 表示这份文件里没有可导入的记录(选错文件 / 不是导出包)。
  */
 export function buildImportPlan(c, { batchSize = IMPORT_BATCH_SIZE } = {}) {
   const { samples, stats } = buildSamples(c)
   const sleepBatches = buildSleepBatches(c)
-  if (!samples.length && !sleepBatches.length) return null
+  const workoutRows = workoutPayload(c)
+  if (!samples.length && !sleepBatches.length && !workoutRows.length) return null
 
   const sampleBatches = []
   for (let i = 0; i < samples.length; i += batchSize) sampleBatches.push(samples.slice(i, i + batchSize))
+  const workoutBatches = []
+  for (let i = 0; i < workoutRows.length; i += batchSize) workoutBatches.push(workoutRows.slice(i, i + batchSize))
 
   let from = ''
   let to = ''
@@ -475,14 +638,17 @@ export function buildImportPlan(c, { batchSize = IMPORT_BATCH_SIZE } = {}) {
   }
   for (const s of samples) touch(s.date || (s.at || '').slice(0, 10))
   for (const it of c.sleep) touch(dayOf(it.start))
+  for (const w of c.exercises) touch(dayOf(w.start))
 
   return {
     sampleBatches,
     sleepBatches,
+    workoutBatches,
     stats,
     sampleRows: samples.length,
     sleepRows: c.sleep.length,
-    requests: sampleBatches.length + sleepBatches.length,
+    workoutRows: workoutRows.length,
+    requests: sampleBatches.length + sleepBatches.length + workoutBatches.length,
     from,
     to,
   }

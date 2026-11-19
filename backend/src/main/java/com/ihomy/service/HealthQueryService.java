@@ -9,10 +9,12 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.entity.FamilyHealthSample;
 import com.ihomy.entity.FamilyHealthSleep;
 import com.ihomy.entity.FamilyHealthSleepStage;
+import com.ihomy.entity.FamilyHealthWorkout;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.FamilyHealthSampleMapper;
 import com.ihomy.mapper.FamilyHealthSleepMapper;
 import com.ihomy.mapper.FamilyHealthSleepStageMapper;
+import com.ihomy.mapper.FamilyHealthWorkoutMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +49,7 @@ public class HealthQueryService {
     private final FamilyHealthSampleMapper sampleMapper;
     private final FamilyHealthSleepMapper sleepMapper;
     private final FamilyHealthSleepStageMapper stageMapper;
+    private final FamilyHealthWorkoutMapper workoutMapper;
     private final HealthPrivacyService privacyService;
 
     /** 查看者上下文:健康数据本人独占,只需要身份与审计用的 IP */
@@ -261,6 +264,54 @@ public class HealthQueryService {
         data.put("from", begin);
         data.put("to", end);
         data.put("points", points);
+        return data;
+    }
+
+    // ==================== 训练记录 ====================
+
+    /** 训练记录:一次训练一行,按时间倒序;范围口径与单指标趋势一致(≤366 天) */
+    public Map<String, Object> workouts(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to) {
+        SysUser target = requireSelf(viewer, targetUserId);
+        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate begin = from == null ? end.minusDays(29) : from;
+        if (begin.isAfter(end)) {
+            LocalDate t = begin;
+            begin = end;
+            end = t;
+        }
+        if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
+            throw new BizException(ResultCode.BAD_REQUEST, "单次最多查看 366 天训练记录");
+        }
+        List<FamilyHealthWorkout> rows = workoutMapper.selectList(new LambdaQueryWrapper<FamilyHealthWorkout>()
+                .eq(FamilyHealthWorkout::getUserId, target.getId())
+                .ge(FamilyHealthWorkout::getStartTime, begin.atStartOfDay())
+                .lt(FamilyHealthWorkout::getStartTime, end.plusDays(1).atStartOfDay())
+                .orderByDesc(FamilyHealthWorkout::getStartTime)
+                .last("LIMIT 200"));
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (FamilyHealthWorkout r : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", r.getId());
+            item.put("type", r.getWorkoutType());
+            item.put("startTime", r.getStartTime());
+            item.put("endTime", r.getEndTime());
+            item.put("durationMin", r.getDurationMin());
+            item.put("distanceKm", r.getDistanceKm());
+            item.put("energyKcal", r.getEnergyKcal());
+            item.put("avgHr", r.getAvgHr());
+            item.put("source", r.getSource());
+            item.put("provider", r.getProvider());
+            items.add(item);
+        }
+
+        privacyService.logView(viewer.id(), viewer.ip(), target.getId(), viewer.familyId(),
+                "OVERVIEW", "WORKOUT", begin, end);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("userId", target.getId());
+        data.put("from", begin);
+        data.put("to", end);
+        data.put("items", items);
         return data;
     }
 

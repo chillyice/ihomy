@@ -28,6 +28,9 @@
         <el-tag v-if="plan.sleepRows" size="small" type="success">{{
           $t('settings.health.importSleeps', { count: plan.sleepRows })
         }}</el-tag>
+        <el-tag v-if="plan.workoutRows" size="small" type="success">{{
+          $t('settings.health.importWorkouts', { count: plan.workoutRows })
+        }}</el-tag>
       </div>
       <div class="share-tip">{{ $t('settings.health.importPlanHint') }}</div>
     </template>
@@ -197,6 +200,7 @@ const startImport = async () => {
   try {
     for (const samples of plan.value.sampleBatches) await post({ samples })
     for (const batch of plan.value.sleepBatches) await post({ sleep: sleepPayload(batch) })
+    for (const workouts of plan.value.workoutBatches) await post({ workouts })
     if (!acc.failed) acc.message = ''
     ElMessage.success(t('settings.health.importCompleted'))
   } catch (err) {

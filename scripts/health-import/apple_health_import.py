@@ -10,7 +10,10 @@
   * 步数/距离/爬楼层 → 按「天 × 来源」求和,取当天求和最大的来源(同上)
   * 活动消耗/锻炼/站立 → 优先取 ActivitySummary(Apple 已在「活动」圆环里按优先级去重),
     没有圆环的日子回落到原始样本
-  * 体重/身高 → POINT 原样上报(服务端的合理范围会挡掉 0.35kg 这类坏值)
+  * 体重/身高/体质指数 → POINT 原样上报(服务端的合理范围会挡掉 0.35kg 这类坏值)
+  * 步态五项(速度/步长/双支撑/不对称/稳定性)与耳机、环境音量 → 按「天 × 来源」取平均,
+    同一天只信样本最多的那台;Apple 用 0~1 小数存的百分比在这里 ×100
+  * 训练 → 一次训练一行(类型/起止/时长/距离/消耗/平均心率),服务端按开始时间幂等覆盖
   * 睡眠 → 分期区间交给服务端聚合(客户端不算会话,三端同口径)
 
 用法:
@@ -48,7 +51,21 @@ DAY_SUM_TYPES = {
 POINT_TYPES = {
     "HKQuantityTypeIdentifierBodyMass": "WEIGHT",
     "HKQuantityTypeIdentifierHeight": "HEIGHT",
+    "HKQuantityTypeIdentifierBodyMassIndex": "BMI",
 }
+# 步态/音量:导出里一天几十条,报「平均水平」而不是累加。
+# scale=100 的是 Apple 用 0~1 小数存的百分比(值 >1.5 就当已经是百分数)。
+DAY_AVG_TYPES = {
+    "HKQuantityTypeIdentifierWalkingSpeed": ("WALKING_SPEED", 1),
+    "HKQuantityTypeIdentifierWalkingStepLength": ("WALKING_STEP_LENGTH", 1),
+    "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": ("WALKING_DOUBLE_SUPPORT", 100),
+    "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": ("WALKING_ASYMMETRY", 100),
+    "HKQuantityTypeIdentifierAppleWalkingSteadiness": ("WALKING_STEADINESS", 100),
+    "HKQuantityTypeIdentifierHeadphoneAudioExposure": ("HEADPHONE_AUDIO", 1),
+    "HKQuantityTypeIdentifierEnvironmentalAudioExposure": ("AMBIENT_AUDIO", 1),
+}
+# 声级 0 是「没播/没收音」的占位,写进去会把日均拉成 0
+ZERO_IS_EMPTY = {"HEADPHONE_AUDIO", "AMBIENT_AUDIO"}
 SLEEP_TYPE = "HKCategoryTypeIdentifierSleepAnalysis"
 
 SLEEP_STAGES = {
@@ -81,6 +98,13 @@ def iso(dt):
     return dt.isoformat(timespec="seconds")
 
 
+def _num(raw):
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def vendor_of(source_name):
     s = (source_name or "").upper()
     for key in ("HUAWEI", "GARMIN", "ZEPP", "AMAZFIT", "APPLE", "XIAOMI", "OPPO", "SAMSUNG", "HONOR", "VIVO"):
@@ -104,12 +128,14 @@ class Collector:
         self.hr = defaultdict(lambda: [0.0, 0, None, None])
         # (指标, 日期, 来源) -> 和
         self.day_sum = defaultdict(float)
+        # (指标, 日期, 来源) -> [和, 条数]:步态/音量的日均值
+        self.day_avg = defaultdict(lambda: [0.0, 0])
         # (指标, 日期) -> 圆环值
         self.rings = {}
         self.points = []
         self.sleep = []
-        # 训练(Apple Workout):没有活动圆环时用它折算锻炼分钟(见 build_samples)
-        self.workouts = []
+        # 训练:一次训练一条 {type,start,end,durationMin,distanceKm,energyKcal,avgHr,sourceName}
+        self.exercises = []
         self.skipped = defaultdict(int)
         self.seen = defaultdict(int)
 
@@ -173,9 +199,27 @@ def collect(path, c, from_dt=None, to_dt=None):
                     value = float(el.get("value") or "")
                 except ValueError:
                     value = None
+                # BMI 导出里混着 0.39 这类单位错乱的旧记录(服务端范围 5~100),先丢掉
+                if value is not None and metric == "BMI" and not (5 <= value <= 100):
+                    value = None
                 if value is not None:
                     c.seen[metric] += 1
                     c.points.append((metric, iso(start), value, el.get("sourceName") or ""))
+            elif rtype in DAY_AVG_TYPES:
+                metric, scale = DAY_AVG_TYPES[rtype]
+                try:
+                    value = float(el.get("value") or "")
+                except ValueError:
+                    value = None
+                if value is not None and scale == 100 and value <= 1.5:
+                    value *= 100
+                if value is not None and metric in ZERO_IS_EMPTY and value <= 0:
+                    value = None
+                if value is not None:
+                    c.seen[metric] += 1
+                    acc = c.day_avg[(metric, start.date().isoformat(), el.get("sourceName") or "")]
+                    acc[0] += value
+                    acc[1] += 1
             el.clear()
         elif tag == "ActivitySummary":
             day = el.get("dateComponents")
@@ -200,14 +244,47 @@ def collect(path, c, from_dt=None, to_dt=None):
         elif tag == "Workout":
             start = parse_apple_ts(el.get("startDate"))
             if start and not ((from_dt and start < from_dt) or (to_dt and start > to_dt)):
+                end = parse_apple_ts(el.get("endDate"))
                 try:
                     dur = float(el.get("duration") or 0)
                 except ValueError:
                     dur = 0.0
                 unit = (el.get("durationUnit") or "min").lower()
                 mins = dur if unit == "min" else dur / 60 if unit == "sec" else dur * 60 if unit == "hr" else dur
+                if not mins and end:
+                    mins = (end - start).total_seconds() / 60
                 if mins > 0:
-                    c.workouts.append((start.date().isoformat(), mins))
+                    # 距离/消耗优先用 <Workout> 的 totalDistance/totalEnergyBurned,缺失时由嵌套统计补
+                    distance = _num(el.get("totalDistance"))
+                    dunit = (el.get("totalDistanceUnit") or "km").lower()
+                    if distance is not None:
+                        distance = distance * 1.609344 if dunit == "mi" else distance / 1000 if dunit == "m" else distance
+                    energy = _num(el.get("totalEnergyBurned"))
+                    eunit = (el.get("totalEnergyBurnedUnit") or "kcal").lower()
+                    if energy is not None and eunit == "kj":
+                        energy *= 0.2390057
+                    avg_hr = None
+                    for st in el.findall("WorkoutStatistics"):
+                        stype = st.get("type") or ""
+                        s_sum = _num(st.get("sum"))
+                        s_avg = _num(st.get("average"))
+                        sunit = (st.get("unit") or "").lower()
+                        if distance is None and s_sum is not None and "Distance" in stype:
+                            distance = s_sum * 1.609344 if sunit == "mi" else s_sum / 1000 if sunit == "m" else s_sum
+                        elif energy is None and s_sum is not None and "EnergyBurned" in stype:
+                            energy = s_sum * 0.2390057 if sunit == "kj" else s_sum
+                        elif avg_hr is None and s_avg is not None and "HeartRate" in stype:
+                            avg_hr = s_avg
+                    c.exercises.append({
+                        "type": el.get("workoutActivityType") or "",
+                        "start": start,
+                        "end": end or start + timedelta(minutes=min(mins, 1440)),
+                        "durationMin": round(min(mins, 1440), 2),
+                        "distanceKm": None if distance is None else round(distance, 2),
+                        "energyKcal": None if energy is None else round(energy, 2),
+                        "avgHr": None if avg_hr is None else round(avg_hr, 2),
+                        "sourceName": el.get("sourceName") or "",
+                    })
                     c.seen["<Workout>"] += 1
             el.clear()
         elif tag in ("Correlation", "ClinicalRecord", "Audiogram", "VisionPrescription"):
@@ -280,8 +357,8 @@ def build_samples(c):
     # 锻炼分钟 / 站立小时:有活动圆环才用圆环;没有 Apple Watch 时圆环恒为 0,
     # 锻炼分钟回落到「当天训练时长合计」(总比空着强,口径在 README 里写明),站立小时只能留空
     workout_min = defaultdict(float)
-    for day, mins in c.workouts:
-        workout_min[day] += mins
+    for w in c.exercises:
+        workout_min[w["start"].date().isoformat()] += w["durationMin"]
     for day in sorted(set(c.rings) | set(workout_min)):
         rings = c.rings.get(day, {})
         exercise = rings.get("EXERCISE_MIN") or workout_min.get(day)
@@ -310,6 +387,20 @@ def build_samples(c):
                         "sourceApp": source_app_of(src)})
         stats[metric] += 1
 
+    # 步态/音量:同一天多来源只信样本最多的那台(与心率同口径),再按来源取平均
+    by_day = defaultdict(lambda: defaultdict(lambda: [0.0, 0]))
+    for (metric, day, src), (total, n) in c.day_avg.items():
+        acc = by_day[(metric, day)][src]
+        acc[0] += total
+        acc[1] += n
+    for (metric, day), srcs in sorted(by_day.items()):
+        total, n = max(srcs.values(), key=lambda a: a[1])
+        if not n:
+            continue
+        samples.append({"metric": metric, "period": "DAY", "date": day,
+                        "value": round(total / n, 2), "source": "APPLE", "sourceApp": "APPLE_HEALTH"})
+        stats[metric] += 1
+
     return samples, stats
 
 
@@ -336,6 +427,23 @@ def sleep_payload(batch):
     return [{"start": iso(a), "end": iso(b), "stage": stage,
              "source": vendor_of(src), "sourceApp": source_app_of(src)}
             for a, b, stage, src in batch]
+
+
+def workout_payload(c):
+    """训练记录 → 上报行。服务端按 (成员, 来源 App, 开始时间) 幂等覆盖,重复导入不会翻倍。"""
+    rows = []
+    for w in c.exercises:
+        row = {"type": w["type"], "start": iso(w["start"]), "end": iso(w["end"]),
+               "durationMin": w["durationMin"],
+               "source": vendor_of(w["sourceName"]), "sourceApp": source_app_of(w["sourceName"])}
+        if w["distanceKm"] is not None:
+            row["distanceKm"] = w["distanceKm"]
+        if w["energyKcal"] is not None:
+            row["energyKcal"] = w["energyKcal"]
+        if w["avgHr"] is not None:
+            row["avgHr"] = w["avgHr"]
+        rows.append(row)
+    return rows
 
 
 # ---- 发送 ----
@@ -380,15 +488,19 @@ def main():
 
     samples, stats = build_samples(c)
     sleep_batches = build_sleep_batches(c)
+    workouts = workout_payload(c)
+    workout_batches = [workouts[i:i + args.batch] for i in range(0, len(workouts), args.batch)]
     print("\n=== 待导入(归一后) ===")
     for k, v in sorted(stats.items()):
         print(f"  {k:<14} {v:>7}")
     print(f"  {'SLEEP(区间)':<14} {len(c.sleep):>7}  →  {len(sleep_batches)} 个请求")
+    print(f"  {'WORKOUT(训练)':<14} {len(workouts):>7}  →  {len(workout_batches)} 个请求")
     print(f"  合计样本行:{len(samples)}(每请求 ≤{args.batch} → "
-          f"{(len(samples) + args.batch - 1) // args.batch} 个请求)+ 睡眠 {len(sleep_batches)} 个")
+          f"{(len(samples) + args.batch - 1) // args.batch} 个请求)+ 睡眠 {len(sleep_batches)} 个"
+          f" + 训练 {len(workout_batches)} 个")
 
     batches = [samples[i:i + args.batch] for i in range(0, len(samples), args.batch)]
-    total = len(batches) + len(sleep_batches)
+    total = len(batches) + len(sleep_batches) + len(workout_batches)
     if args.dry_run:
         print(f"\n(dry-run)共需 {total} 个请求,未发送。")
         return
@@ -404,10 +516,14 @@ def main():
         if i < len(batches):
             body = {"provider": args.provider, "timezone": args.timezone, "samples": batches[i]}
             label = f"样本#{i + 1}({len(batches[i])} 条)"
-        else:
+        elif i < len(batches) + len(sleep_batches):
             body = {"provider": args.provider, "timezone": args.timezone,
                     "sleep": sleep_payload(sleep_batches[i - len(batches)])}
             label = f"睡眠#{i - len(batches) + 1}({len(body['sleep'])} 段)"
+        else:
+            body = {"provider": args.provider, "timezone": args.timezone,
+                    "workouts": workout_batches[i - len(batches) - len(sleep_batches)]}
+            label = f"训练#{i - len(batches) - len(sleep_batches) + 1}({len(body['workouts'])} 次)"
         res = post(args.api, tokens[i % len(tokens)], body)
         if res.get("code") != 0:
             failures.append((label, res.get("message")))

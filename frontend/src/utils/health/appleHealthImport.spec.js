@@ -266,6 +266,124 @@ describe('buildImportPlan', () => {
   })
 })
 
+describe('步态/音量/BMI', () => {
+  const doc =
+    HEAD +
+    // 双支撑是 0~1 小数,上报要 ×100;同一天两条取平均
+    rec(
+      'HKQuantityTypeIdentifierWalkingDoubleSupportPercentage',
+      'sourceName="Apple Watch" startDate="2024-05-01 08:00:00 +0800" endDate="2024-05-01 08:00:00 +0800"',
+      '0.30',
+    ) +
+    rec(
+      'HKQuantityTypeIdentifierWalkingDoubleSupportPercentage',
+      'sourceName="Apple Watch" startDate="2024-05-01 18:00:00 +0800" endDate="2024-05-01 18:00:00 +0800"',
+      '0.40',
+    ) +
+    rec(
+      'HKQuantityTypeIdentifierWalkingSpeed',
+      'sourceName="Apple Watch" unit="km/hr" startDate="2024-05-01 09:00:00 +0800" endDate="2024-05-01 09:00:00 +0800"',
+      '4.8',
+    ) +
+    // 耳机音量为 0 的行是「没在播」的占位,不许把日均拉成 0
+    rec(
+      'HKQuantityTypeIdentifierHeadphoneAudioExposure',
+      'sourceName="Apple Watch" unit="dBASPL" startDate="2024-05-01 10:00:00 +0800" endDate="2024-05-01 10:00:00 +0800"',
+      '0',
+    ) +
+    rec(
+      'HKQuantityTypeIdentifierHeadphoneAudioExposure',
+      'sourceName="Apple Watch" unit="dBASPL" startDate="2024-05-01 11:00:00 +0800" endDate="2024-05-01 11:00:00 +0800"',
+      '62.5',
+    ) +
+    // BMI 里混着单位错乱的 0.39,本地就该丢掉
+    rec(
+      'HKQuantityTypeIdentifierBodyMassIndex',
+      'sourceName="HUAWEI Health" unit="count" startDate="2024-05-01 07:00:00 +0800" endDate="2024-05-01 07:00:00 +0800"',
+      '0.39',
+    ) +
+    rec(
+      'HKQuantityTypeIdentifierBodyMassIndex',
+      'sourceName="HUAWEI Health" unit="count" startDate="2024-05-01 07:00:00 +0800" endDate="2024-05-01 07:00:00 +0800"',
+      '23.4',
+    ) +
+    FOOT
+
+  const { samples } = buildSamples(collect(doc))
+  const pick = (metric) => samples.filter((s) => s.metric === metric)
+
+  it('百分比小数先 ×100 再按天平均', () => {
+    const ds = pick('WALKING_DOUBLE_SUPPORT')
+    expect(ds).toHaveLength(1)
+    expect(ds[0]).toMatchObject({ period: 'DAY', date: '2024-05-01' })
+    expect(ds[0].value).toBe(35)
+  })
+
+  it('步行速度按天取平均,音量跳过 0 值', () => {
+    expect(pick('WALKING_SPEED')[0].value).toBe(4.8)
+    const audio = pick('HEADPHONE_AUDIO')
+    expect(audio).toHaveLength(1)
+    expect(audio[0].value).toBe(62.5)
+    expect(pick('AMBIENT_AUDIO')).toHaveLength(0)
+  })
+
+  it('BMI 走 POINT,坏值不进来', () => {
+    const bmi = pick('BMI')
+    expect(bmi).toHaveLength(1)
+    expect(bmi[0].period).toBe('POINT')
+    expect(bmi[0].value).toBe(23.4)
+  })
+})
+
+describe('训练记录', () => {
+  const doc =
+    HEAD +
+    '<Workout workoutActivityType="HKWorkoutActivityTypeBadminton" duration="48.5" durationUnit="min" ' +
+    'sourceName="Apple Watch" startDate="2024-06-01 19:00:00 +0800" endDate="2024-06-01 19:48:30">\n' +
+    '<WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning" sum="0.46" unit="km"/>\n' +
+    '<WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" sum="310.2" unit="kcal"/>\n' +
+    '<WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate" average="128.4" unit="count/min"/>\n' +
+    '</Workout>\n' +
+    // 没有 endDate 的由时长补;durationUnit=sec 要折成分钟
+    '<Workout workoutActivityType="HKWorkoutActivityTypeYoga" duration="1800" durationUnit="sec" ' +
+    'sourceName="健康" startDate="2024-06-02 07:00:00 +0800" endDate="2024-06-02 07:30:00">\n' +
+    '</Workout>\n' +
+    FOOT
+
+  const c = collect(doc)
+  const plan = buildImportPlan(c)
+
+  it('类型原样透传(服务端归一),时长/距离/消耗/心率都取到', () => {
+    expect(c.exercises).toHaveLength(2)
+    const [badminton] = plan.workoutBatches[0]
+    expect(badminton).toMatchObject({
+      type: 'HKWorkoutActivityTypeBadminton',
+      durationMin: 48.5,
+      distanceKm: 0.46,
+      energyKcal: 310.2,
+      avgHr: 128.4,
+      start: '2024-06-01T19:00:00+08:00',
+      end: '2024-06-01T19:48:30+08:00',
+      source: 'APPLE',
+      sourceApp: 'Apple Watch',
+    })
+  })
+
+  it('秒为单位的时长折成分钟,来源 App 保留 Apple 健康', () => {
+    const yoga = plan.workoutBatches[0][1]
+    expect(yoga.durationMin).toBe(30)
+    expect(yoga.sourceApp).toBe('APPLE_HEALTH')
+    expect(yoga.end).toBe('2024-06-02T07:30:00+08:00')
+  })
+
+  it('训练也进导入计划与日期范围', () => {
+    expect(plan.workoutRows).toBe(2)
+    // 两天各 30/48.5 分钟训练,没有圆环时兜底成锻炼分钟
+    const exercise = buildSamples(c).samples.filter((s) => s.metric === 'EXERCISE_MIN')
+    expect(exercise.map((s) => s.value)).toEqual([48.5, 30])
+  })
+})
+
 describe('来源命名', () => {
   it('Apple 自家的数据留 APPLE_HEALTH,设备厂商数据按设备名归档', () => {
     expect(vendorOf('HUAWEI Health')).toBe('HUAWEI')

@@ -3815,3 +3815,55 @@ ALTER TABLE `family_health_view_log`
 DELETE FROM `sys_role_auth`
 WHERE `auth_id` IN (SELECT `id` FROM `sys_auth` WHERE `auth_code` = 'health:view');
 DELETE FROM `sys_auth` WHERE `auth_code` = 'health:view';
+
+-- ------------------------------------------------------------
+-- 2026-11-19(V13.28):健康数据补齐——步态/音量/BMI 指标与训练记录
+--   ① 新表 family_health_workout:一次训练一行(类型/起止/距离/消耗/平均心率),
+--      按 (user_id, source_app, start_time) 幂等覆盖;上报端新增 workouts 数组。
+--   ② 字典补 8 个指标码 + 13 个训练类型码;HealthMetric 目录同步(合理范围校验在那边)。
+--   ③ 体重/体脂/BMI 这类长期趋势点不再被 180 天 POINT 清理(LONG_TERM_POINT)。
+--   幂等:CREATE TABLE IF NOT EXISTS / INSERT IGNORE,重跑无害。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_health_workout` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT,
+  `family_id`    BIGINT       NOT NULL,
+  `user_id`      BIGINT       NOT NULL,
+  `workout_type` VARCHAR(30)  NOT NULL COMMENT 'WALKING/RUNNING/CYCLING/HIKING/BADMINTON/STRENGTH/CARDIO/MIND_BODY/OTHER',
+  `start_time`   DATETIME     NOT NULL,
+  `end_time`     DATETIME     NOT NULL,
+  `duration_min` INT          NOT NULL COMMENT '时长(分钟),取上报值或起止推算',
+  `distance_km`  DECIMAL(8,2) DEFAULT NULL COMMENT '距离(徒步/骑行/游泳有,力量训练没有)',
+  `energy_kcal`  DECIMAL(8,1) DEFAULT NULL COMMENT '活动消耗',
+  `avg_hr`       DECIMAL(5,1) DEFAULT NULL COMMENT '平均心率',
+  `source`       VARCHAR(20)  NOT NULL,
+  `source_app`   VARCHAR(120) NOT NULL,
+  `provider`     VARCHAR(20)  NOT NULL,
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_app_start` (`user_id`, `source_app`, `start_time`),
+  KEY `idx_user_time` (`user_id`, `start_time`),
+  KEY `idx_family_time` (`family_id`, `start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员训练记录(一次训练一行)';
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('health_metric', 'BMI',                    '身体质量指数'),
+('health_metric', 'WALKING_SPEED',          '步行速度'),
+('health_metric', 'WALKING_STEP_LENGTH',    '步长'),
+('health_metric', 'WALKING_DOUBLE_SUPPORT', '双支撑时间占比'),
+('health_metric', 'WALKING_ASYMMETRY',      '步行不对称度'),
+('health_metric', 'WALKING_STEADINESS',     '步行稳定性'),
+('health_metric', 'HEADPHONE_AUDIO',        '耳机音量'),
+('health_metric', 'AMBIENT_AUDIO',          '环境音量'),
+('health_workout_type', 'WALKING',    '步行'),
+('health_workout_type', 'RUNNING',    '跑步'),
+('health_workout_type', 'CYCLING',    '骑行'),
+('health_workout_type', 'HIKING',     '徒步'),
+('health_workout_type', 'SWIMMING',   '游泳'),
+('health_workout_type', 'BADMINTON',  '羽毛球'),
+('health_workout_type', 'BASKETBALL', '篮球'),
+('health_workout_type', 'FOOTBALL',   '足球'),
+('health_workout_type', 'STRENGTH',   '力量训练'),
+('health_workout_type', 'YOGA',       '瑜伽'),
+('health_workout_type', 'CARDIO',     '混合有氧'),
+('health_workout_type', 'MIND_BODY',  '身心训练'),
+('health_workout_type', 'OTHER',      '其他运动');

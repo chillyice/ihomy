@@ -791,6 +791,8 @@ export const healthApi = {
   stages: (id) => request.get(`/health/sleep/${id}/stages`),
   sleepStats: (params) => request.get('/health/sleep/stats', { params }),
   metric: (params) => request.get('/health/metric', { params }),
+  // 训练记录:一次训练一行(类型/起止/时长/距离/消耗),本人独占
+  workout: (params) => request.get('/health/workout', { params }),
   summary: (days) => request.get('/health/summary', { params: days ? { days } : {} }),
   // 报表:卡片可自定义;默认锚定最近一天(默认五卡:最近一晚睡眠 + 近 7 天步数/活动消耗 + 最近一天心率 + 异常提醒)
   report: (cards, date) =>

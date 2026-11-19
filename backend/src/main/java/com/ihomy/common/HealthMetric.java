@@ -69,7 +69,7 @@ public final class HealthMetric {
     }
 
     private static final Set<String> SOURCES = Set.of(
-            "GARMIN", "HUAWEI", "APPLE", "XIAOMI", "OPPO", "SAMSUNG", "HONOR", "VIVO", "OTHER");
+            "GARMIN", "HUAWEI", "APPLE", "XIAOMI", "OPPO", "SAMSUNG", "HONOR", "VIVO", "ZEPP", "OTHER");
 
     /** 一个指标的定义:周期、单位、合理范围(超出即整条拒收,不截断)、是否敏感组 */
     public record Def(String code, String group, String period, String unit,
@@ -108,8 +108,18 @@ public final class HealthMetric {
         // 身体成分
         put("WEIGHT", "BODY", PERIOD_POINT, "kg", 1, 300);
         put("BODY_FAT", "BODY", PERIOD_POINT, "%", 1, 70);
+        put("BMI", "BODY", PERIOD_POINT, "", 5, 100);
         put("HEIGHT", "BODY", PERIOD_POINT, "cm", 30, 250);
         put("WAIST", "BODY", PERIOD_POINT, "cm", 20, 250);
+        // 步态(手机/手表自动采集,按天给一个均值):数值是「平均水平」而不是当日累计
+        put("WALKING_SPEED", "GAIT", PERIOD_DAY, "km/h", 0, 25);
+        put("WALKING_STEP_LENGTH", "GAIT", PERIOD_DAY, "cm", 0, 200);
+        put("WALKING_DOUBLE_SUPPORT", "GAIT", PERIOD_DAY, "%", 0, 100);
+        put("WALKING_ASYMMETRY", "GAIT", PERIOD_DAY, "%", 0, 100);
+        put("WALKING_STEADINESS", "GAIT", PERIOD_DAY, "%", 0, 100);
+        // 音量暴露(耳机/环境声级):按天给平均声级,单位 dB(A)
+        put("HEADPHONE_AUDIO", "AUDIO", PERIOD_DAY, "dB", 0, 150);
+        put("AMBIENT_AUDIO", "AUDIO", PERIOD_DAY, "dB", 0, 150);
         // 体能
         put("VO2MAX", "FITNESS", PERIOD_DAY, "ml/kg/min", 5, 100);
         // 敏感组:默认不采,成员自开后仅本人可见
@@ -131,7 +141,7 @@ public final class HealthMetric {
      * 长期趋势指标:虽然也存 POINT,但一条就是一次测量、量极少,保留策略不清它们
      * (体重/体脂/身高/腰围是多年的趋势底稿,清掉就再也补不回来;心率那种小时级 POINT 才需要限期清理)。
      */
-    public static final Set<String> LONG_TERM_POINT = Set.of("WEIGHT", "BODY_FAT", "HEIGHT", "WAIST");
+    public static final Set<String> LONG_TERM_POINT = Set.of("WEIGHT", "BODY_FAT", "BMI", "HEIGHT", "WAIST");
 
     /** 来源归一到有限集合,未知记 OTHER(展示层按 source 标注「来自哪个 App」) */
     public static String normalizeSource(String source) {

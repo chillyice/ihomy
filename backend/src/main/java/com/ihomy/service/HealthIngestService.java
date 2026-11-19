@@ -4,14 +4,17 @@ import com.ihomy.common.BizException;
 import com.ihomy.common.HealthMetric;
 import com.ihomy.common.HealthSleepAggregator;
 import com.ihomy.common.HealthTime;
+import com.ihomy.common.HealthWorkout;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.HealthIngestDTO;
 import com.ihomy.entity.FamilyHealthSample;
 import com.ihomy.entity.FamilyHealthSleep;
 import com.ihomy.entity.FamilyHealthSleepStage;
+import com.ihomy.entity.FamilyHealthWorkout;
 import com.ihomy.mapper.FamilyHealthSampleMapper;
 import com.ihomy.mapper.FamilyHealthSleepMapper;
 import com.ihomy.mapper.FamilyHealthSleepStageMapper;
+import com.ihomy.mapper.FamilyHealthWorkoutMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -51,6 +54,7 @@ public class HealthIngestService {
     private final FamilyHealthSampleMapper sampleMapper;
     private final FamilyHealthSleepMapper sleepMapper;
     private final FamilyHealthSleepStageMapper stageMapper;
+    private final FamilyHealthWorkoutMapper workoutMapper;
     private final HealthPrivacyService privacyService;
     private final HealthTokenService tokenService;
     private final AuthGuardService authGuardService;
@@ -72,7 +76,8 @@ public class HealthIngestService {
         }
         List<HealthIngestDTO.Sample> samples = dto.getSamples() == null ? List.of() : dto.getSamples();
         List<HealthIngestDTO.SleepInterval> sleeps = dto.getSleep() == null ? List.of() : dto.getSleep();
-        if (samples.size() + sleeps.size() > MAX_ITEMS) {
+        List<HealthIngestDTO.Workout> workouts = dto.getWorkouts() == null ? List.of() : dto.getWorkouts();
+        if (samples.size() + sleeps.size() + workouts.size() > MAX_ITEMS) {
             throw new BizException(ResultCode.BAD_REQUEST, "单次最多上报 2000 条,请分批发送");
         }
         // 令牌限速:每令牌 60 次/小时(快捷指令可能被误配成每分钟跑)
@@ -126,6 +131,57 @@ public class HealthIngestService {
             rows.add(row);
         }
 
+        // 训练记录:一次训练一行;类型归一后按 (user_id, source_app, start_time) 幂等覆盖
+        List<FamilyHealthWorkout> workoutRows = new ArrayList<>();
+        for (int i = 0; i < workouts.size(); i++) {
+            HealthIngestDTO.Workout w = workouts.get(i);
+            String reason = null;
+            HealthTime.Stamp a = HealthTime.parseStamp(w.getStart(), offset);
+            HealthTime.Stamp b = HealthTime.parseStamp(w.getEnd(), offset);
+            Double minutes = w.getDurationMin();
+            if (a == null || b == null) {
+                reason = "时间格式不正确";
+            } else if (!b.wall().isAfter(a.wall())) {
+                reason = "结束时间必须晚于开始时间";
+            } else if (HealthTime.toServerZone(b.wall(), b.offset()).isAfter(futureLimit)) {
+                reason = "时间超出允许范围";
+            } else {
+                // 用毫秒折算:toMinutes() 会把 48 分 30 秒截成 48,和显式传时长的同一条记录对不上
+                if (minutes == null) minutes = Duration.between(a.wall(), b.wall()).toMillis() / 60000.0;
+                if (minutes <= 0 || minutes > 1440) {
+                    reason = "时长超出合理范围";
+                } else if (w.getDistanceKm() != null && (w.getDistanceKm() < 0 || w.getDistanceKm() > 1000)) {
+                    reason = "距离超出合理范围";
+                } else if (w.getEnergyKcal() != null && (w.getEnergyKcal() < 0 || w.getEnergyKcal() > 20000)) {
+                    reason = "消耗超出合理范围";
+                } else if (w.getAvgHr() != null && (w.getAvgHr() < 20 || w.getAvgHr() > 250)) {
+                    reason = "心率超出合理范围";
+                }
+            }
+            if (reason != null) {
+                rejected++;
+                if (firstReason == null) firstReason = "训练: " + reason;
+                addDetail(rejectedDetail, i, "WORKOUT", reason);
+                continue;
+            }
+            FamilyHealthWorkout row = new FamilyHealthWorkout();
+            row.setFamilyId(familyId);
+            row.setUserId(userId);
+            row.setWorkoutType(HealthWorkout.normalize(w.getType()));
+            row.setStartTime(HealthTime.toServerZone(a.wall(), a.offset()));
+            row.setEndTime(HealthTime.toServerZone(b.wall(), b.offset()));
+            row.setDurationMin((int) Math.round(minutes));
+            row.setDistanceKm(bd(w.getDistanceKm()));
+            row.setEnergyKcal(w.getEnergyKcal() == null ? null
+                    : BigDecimal.valueOf(w.getEnergyKcal()).setScale(1, RoundingMode.HALF_UP));
+            row.setAvgHr(w.getAvgHr() == null ? null
+                    : BigDecimal.valueOf(w.getAvgHr()).setScale(1, RoundingMode.HALF_UP));
+            row.setSource(HealthMetric.normalizeSource(w.getSource()));
+            row.setSourceApp(sourceApp(w.getSourceApp(), provider));
+            row.setProvider(provider);
+            workoutRows.add(row);
+        }
+
         // 睡眠:按来源 App 分桶,各自聚合(不同 App 的同晚数据各留一行,展示层取最长一条)
         Map<String, List<HealthSleepAggregator.Interval>> byApp = new LinkedHashMap<>();
         Map<String, String> appSource = new HashMap<>();
@@ -158,7 +214,7 @@ public class HealthIngestService {
 
         int sessionCount = byApp.values().stream()
                 .mapToInt(list -> HealthSleepAggregator.aggregate(list).size()).sum();
-        checkDailyCap(userId, rows.size() + sessionCount);
+        checkDailyCap(userId, rows.size() + sessionCount + workoutRows.size());
 
         // 同一成员的重算串行化:两路上报同时到达时「整窗删 + 重插」会互相踩(计划 §4.4)
         String lockKey = "ihomy:health:lock:" + userId;
@@ -169,6 +225,7 @@ public class HealthIngestService {
         int duplicated = 0;
         try {
             if (!rows.isEmpty()) sampleMapper.upsertBatch(rows);
+            if (!workoutRows.isEmpty()) workoutMapper.upsertBatch(workoutRows);
 
             for (Map.Entry<String, List<HealthSleepAggregator.Interval>> e : byApp.entrySet()) {
                 duplicated += rebuildSleep(userId, familyId, provider, offset,
@@ -181,7 +238,7 @@ public class HealthIngestService {
 
         if (tokenId != null) tokenService.markIngest(tokenId);
 
-        int accepted = rows.size() + acceptedIntervals;
+        int accepted = rows.size() + acceptedIntervals + workoutRows.size();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("accepted", accepted);
         result.put("duplicated", duplicated);

@@ -3190,6 +3190,28 @@ CREATE TABLE `family_health_sample` (
   KEY `idx_period_start` (`period`, `start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员健康样本(日聚合/小时聚合)';
 
+DROP TABLE IF EXISTS `family_health_workout`;
+CREATE TABLE `family_health_workout` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT,
+  `family_id`    BIGINT       NOT NULL,
+  `user_id`      BIGINT       NOT NULL,
+  `workout_type` VARCHAR(30)  NOT NULL COMMENT 'WALKING/RUNNING/CYCLING/HIKING/SWIMMING/BADMINTON/BASKETBALL/FOOTBALL/STRENGTH/YOGA/CARDIO/MIND_BODY/OTHER',
+  `start_time`   DATETIME     NOT NULL,
+  `end_time`     DATETIME     NOT NULL,
+  `duration_min` INT          NOT NULL COMMENT '时长(分钟),取上报值或起止推算',
+  `distance_km`  DECIMAL(8,2) DEFAULT NULL COMMENT '距离(徒步/骑行/游泳有,力量训练没有)',
+  `energy_kcal`  DECIMAL(8,1) DEFAULT NULL COMMENT '活动消耗',
+  `avg_hr`       DECIMAL(5,1) DEFAULT NULL COMMENT '平均心率',
+  `source`       VARCHAR(20)  NOT NULL,
+  `source_app`   VARCHAR(120) NOT NULL,
+  `provider`     VARCHAR(20)  NOT NULL,
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_app_start` (`user_id`, `source_app`, `start_time`),
+  KEY `idx_user_time` (`user_id`, `start_time`),
+  KEY `idx_family_time` (`family_id`, `start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭成员训练记录(一次训练一行)';
+
 DROP TABLE IF EXISTS `family_health_view_log`;
 CREATE TABLE `family_health_view_log` (
   `id`             BIGINT      NOT NULL AUTO_INCREMENT,
@@ -3276,5 +3298,29 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('health_metric', 'HEIGHT',          '身高'),
 ('health_metric', 'WAIST',           '腰围'),
 ('health_metric', 'VO2MAX',          '最大摄氧量'),
+('health_metric', 'BMI',             '身体质量指数'),
+('health_metric', 'WALKING_SPEED',   '步行速度'),
+('health_metric', 'WALKING_STEP_LENGTH', '步长'),
+('health_metric', 'WALKING_DOUBLE_SUPPORT', '双支撑时间占比'),
+('health_metric', 'WALKING_ASYMMETRY', '步行不对称度'),
+('health_metric', 'WALKING_STEADINESS', '步行稳定性'),
+('health_metric', 'HEADPHONE_AUDIO', '耳机音量'),
+('health_metric', 'AMBIENT_AUDIO',   '环境音量'),
 ('health_metric', 'MENSTRUAL_FLOW',  '月经流量');
+
+-- 训练类型字典(health_workout_type):上报端只传这些码,认不出的一律归 OTHER
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('health_workout_type', 'WALKING',   '步行'),
+('health_workout_type', 'RUNNING',   '跑步'),
+('health_workout_type', 'CYCLING',   '骑行'),
+('health_workout_type', 'HIKING',    '徒步'),
+('health_workout_type', 'SWIMMING',  '游泳'),
+('health_workout_type', 'BADMINTON', '羽毛球'),
+('health_workout_type', 'BASKETBALL','篮球'),
+('health_workout_type', 'FOOTBALL',  '足球'),
+('health_workout_type', 'STRENGTH',  '力量训练'),
+('health_workout_type', 'YOGA',      '瑜伽'),
+('health_workout_type', 'CARDIO',    '混合有氧'),
+('health_workout_type', 'MIND_BODY', '身心训练'),
+('health_workout_type', 'OTHER',     '其他运动');
 

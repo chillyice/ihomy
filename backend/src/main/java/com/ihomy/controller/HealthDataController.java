@@ -232,6 +232,15 @@ public class HealthDataController {
         return Result.success(queryService.metric(viewer(), userId, metric, from, to));
     }
 
+    @Operation(summary = "训练记录列表(≤366 天,按开始时间倒序)")
+    @GetMapping("/workout")
+    public Result<Map<String, Object>> workout(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return Result.success(queryService.workouts(viewer(), userId, from, to));
+    }
+
     @Operation(summary = "首页摘要(只回本人,最近 N 天)")
     @GetMapping("/summary")
     public Result<Map<String, Object>> summary(@RequestParam(required = false) Integer days) {

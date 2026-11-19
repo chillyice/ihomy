@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyHealthWorkoutMapper">
+
+    <!--
+      重复导入与厂商修正历史都走同一条路:按唯一键 (user_id, source_app, start_time)
+      upsert 覆盖。批量写用 XML,避免逐条 insert。
+    -->
+    <insert id="upsertBatch">
+        INSERT INTO `family_health_workout`
+        (`family_id`, `user_id`, `workout_type`, `start_time`, `end_time`, `duration_min`,
+         `distance_km`, `energy_kcal`, `avg_hr`, `source`, `source_app`, `provider`)
+        VALUES
+        <foreach collection="list" item="w" separator=",">
+            (#{w.familyId}, #{w.userId}, #{w.workoutType}, #{w.startTime}, #{w.endTime}, #{w.durationMin},
+             #{w.distanceKm}, #{w.energyKcal}, #{w.avgHr}, #{w.source}, #{w.sourceApp}, #{w.provider})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            `family_id` = VALUES(`family_id`),
+            `workout_type` = VALUES(`workout_type`),
+            `end_time` = VALUES(`end_time`),
+            `duration_min` = VALUES(`duration_min`),
+            `distance_km` = VALUES(`distance_km`),
+            `energy_kcal` = VALUES(`energy_kcal`),
+            `avg_hr` = VALUES(`avg_hr`),
+            `source` = VALUES(`source`),
+            `provider` = VALUES(`provider`)
+    </insert>
+
+    <delete id="deleteByProvider">
+        DELETE FROM `family_health_workout`
+        WHERE `user_id` = #{userId} AND `provider` = #{provider}
+    </delete>
+
+</mapper>

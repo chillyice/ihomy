@@ -13,6 +13,7 @@ import com.ihomy.mapper.FamilyHealthSampleMapper;
 import com.ihomy.mapper.FamilyHealthSleepMapper;
 import com.ihomy.mapper.FamilyHealthSleepStageMapper;
 import com.ihomy.mapper.FamilyHealthViewLogMapper;
+import com.ihomy.mapper.FamilyHealthWorkoutMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserPrefMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class HealthPrivacyService {
     private final FamilyHealthSampleMapper sampleMapper;
     private final FamilyHealthSleepMapper sleepMapper;
     private final FamilyHealthSleepStageMapper stageMapper;
+    private final FamilyHealthWorkoutMapper workoutMapper;
     private final FamilyHealthViewLogMapper viewLogMapper;
     private final ObjectMapper objectMapper;
 
@@ -162,10 +164,12 @@ public class HealthPrivacyService {
         int stages = stageMapper.deleteByProvider(userId, s);
         int sleeps = sleepMapper.deleteByProvider(userId, s);
         int samples = sampleMapper.deleteByProvider(userId, s);
+        int workouts = workoutMapper.deleteByProvider(userId, s);
         Map<String, Object> data = new HashMap<>();
         data.put("stages", stages);
         data.put("sleeps", sleeps);
         data.put("samples", samples);
+        data.put("workouts", workouts);
         return data;
     }
 

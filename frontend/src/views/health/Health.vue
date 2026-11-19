@@ -4,10 +4,8 @@
      报表卡片与告警口径由后端 HealthReportService / HealthAlerts 决定,这里只渲染。 -->
 <template>
   <div class="page health-page">
-    <div class="page-toolbar card">
-      <div class="tb-left">
-        <span class="tb-note">{{ $t('health.selfOnly') }}</span>
-      </div>
+    <!-- 顶部工具栏(暖居滚动后胞吐进顶栏):只有操作,不放说明文字 -->
+    <PageToolbar>
       <div class="tb-right">
         <el-button :disabled="!reportData" @click="shareVisible = true">
           <el-icon><Share /></el-icon>
@@ -19,7 +17,7 @@
         </el-button>
         <router-link to="/settings?tab=health" class="tb-link">{{ $t('health.settings') }}</router-link>
       </div>
-    </div>
+    </PageToolbar>
 
     <el-tabs v-model="tab" class="health-tabs" @tab-change="onTabChange">
       <!-- 报表:默认显示最新一天的数据,卡片可自定义;分享走工具栏「分享」 -->
@@ -227,6 +225,26 @@
             />
             <div v-else class="empty-hint">{{ $t('health.trend.noData') }}</div>
           </div>
+
+          <!-- 活动页补一段训练记录:步态/活动指标是「累加量」,一次训练是什么项目只有表里能看 -->
+          <div v-if="pane.name === 'activity'" class="card chart-card">
+            <div class="chart-head">
+              <span class="section-label">{{ $t('health.workout.title') }}</span>
+              <span class="range-note">{{ $t('health.workout.range', { n: WORKOUT_DAYS }) }}</span>
+            </div>
+            <ul v-if="workouts.length" class="workout-list">
+              <li v-for="w in workouts" :key="w.id" class="workout-row">
+                <span class="workout-type">{{ workoutLabel($t, w.type) }}</span>
+                <span class="workout-meta">
+                  <span>{{ dayLabel(w.startTime) }} {{ clockText(w.startTime) }}</span>
+                  <span>{{ $t('health.workout.duration', { n: w.durationMin == null ? 0 : w.durationMin }) }}</span>
+                  <span v-if="w.distanceKm != null">{{ $t('health.workout.distance', { n: Number(w.distanceKm).toFixed(2) }) }}</span>
+                  <span v-if="w.energyKcal != null">{{ $t('health.workout.energy', { n: Math.round(Number(w.energyKcal)) }) }}</span>
+                </span>
+              </li>
+            </ul>
+            <div v-else class="empty-hint">{{ workoutLoading ? $t('health.loading') : $t('health.workout.empty') }}</div>
+          </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -262,6 +280,7 @@ import { Refresh, Setting, Share } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
+import PageToolbar from '@/components/PageToolbar.vue'
 import HealthTrendChart from './HealthTrendChart.vue'
 import HealthSleepNight from './HealthSleepNight.vue'
 import HealthReport from './HealthReport.vue'
@@ -279,6 +298,7 @@ import {
   sleepText,
   stageMeta,
   withUnit,
+  workoutLabel,
 } from '@/utils/healthMetrics'
 
 const { t, locale } = useI18n()
@@ -298,6 +318,8 @@ const SLEEP_RANGES = ['DAY', 'WEEK', 'MONTH', 'HALF', 'YEAR']
 const DENSE_POINT = ['HEART_RATE', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC']
 const RANGE_DAYS = 14
 const SLEEP_DAYS = 14
+// 训练记录比较稀疏(不是每天都练),窗口比折线图长一档
+const WORKOUT_DAYS = 30
 
 const initialTab = LEGACY_TABS[String(route.query.tab || '')] || String(route.query.tab || '')
 const tab = ref(TABS.includes(initialTab) ? initialTab : 'report')
@@ -316,6 +338,8 @@ const detailLoading = ref(false)
 const sleepRange = ref('DAY')
 const statsBuckets = ref({})
 const statsLoading = ref(false)
+const workouts = ref([])
+const workoutLoading = ref(false)
 const selected = reactive({ vitals: 'HEART_RATE', activity: 'STEPS', body: 'WEIGHT' })
 
 const metricPanes = [
@@ -569,6 +593,18 @@ async function loadStats() {
   }
 }
 
+/** 训练记录:一次训练一行,稀疏数据给 30 天窗口;接口按开始时间倒序,直接渲染 */
+async function loadWorkouts() {
+  if (!userStore.isLoggedIn) return
+  workoutLoading.value = true
+  try {
+    const data = await healthApi.workout({ from: shiftDay(-(WORKOUT_DAYS - 1)), to: shiftDay(0) }).catch(() => null)
+    workouts.value = Array.isArray(data?.items) ? data.items : []
+  } finally {
+    workoutLoading.value = false
+  }
+}
+
 async function loadStages(night) {
   if (!night) return
   pickedId.value = night.id
@@ -605,7 +641,7 @@ async function reloadAll() {
     series.value = {}
     statsBuckets.value = {}
     resetDetail()
-    await Promise.all([loadReport(), loadNights(), loadSeries('STEPS')])
+    await Promise.all([loadReport(), loadNights(), loadSeries('STEPS'), loadWorkouts()])
     if (['vitals', 'activity', 'body'].includes(tab.value)) await loadSeries(selected[tab.value])
     // 睡眠页才需要分期/统计,其它 tab 不必多发这一轮请求
     if (tab.value === 'sleep') await ensureSleepView()
@@ -618,7 +654,6 @@ async function onTabChange(name) {
   if (name === 'sleep') await ensureSleepView()
   if (['vitals', 'activity', 'body'].includes(name)) await loadSeries(selected[name])
 }
-
 async function selectMetric(name, code) {
   selected[name] = code
   await loadSeries(code)
@@ -664,10 +699,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.tb-note {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
 .tb-link {
   font-size: 13px;
   color: var(--color-primary);
@@ -813,6 +844,35 @@ onMounted(async () => {
 .empty-hint {
   padding: 10px 0;
   font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.workout-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.workout-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.workout-row:first-child {
+  border-top: none;
+}
+.workout-type {
+  flex: none;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.workout-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
   color: var(--color-text-secondary);
 }
 .dialog-hint {

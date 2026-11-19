@@ -17,6 +17,7 @@ public class HealthIngestDTO {
     private String timezone;
     private List<Sample> samples;
     private List<SleepInterval> sleep;
+    private List<Workout> workouts;
 
     @Data
     public static class Sample {
@@ -48,6 +49,21 @@ public class HealthIngestDTO {
         private String end;
         /** AWAKE/LIGHT/DEEP/REM/INBED/UNKNOWN */
         private String stage;
+        private String source;
+        private String sourceApp;
+    }
+
+    /** 一次训练:类型可传 WALKING 这类码,也可传 Apple 的 HKWorkoutActivityTypeXxx,服务端归一 */
+    @Data
+    public static class Workout {
+        private String type;
+        private String start;
+        private String end;
+        /** 时长(分钟);不传则用起止时间推算 */
+        private Double durationMin;
+        private Double distanceKm;
+        private Double energyKcal;
+        private Double avgHr;
         private String source;
         private String sourceApp;
     }

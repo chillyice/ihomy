@@ -29,23 +29,21 @@ python -I scripts/health-import/apple_health_import.py --export <导出.xml> \
 | 总消耗 | 圆环活动 + 当日基础消耗(单来源最大) | Apple 导出没有 total 这一项,只能相加,两项都不能叠来源 |
 | 锻炼分钟 | 圆环 `appleExerciseTime`,为 0 时回落到当天**训练时长合计** | 不戴 Apple Watch 时圆环三项恒为 0(实测 1520 天全 0),写 0 会让图表画成零线,不如用训练时长兜底 |
 | 站立小时 | 圆环 `appleStandHours`,0 不写 | 同上,没有手表就没有这项能力,留空态而不是 0 |
-| 体重 / 身高 | `POINT` 原样上报,时刻用 `startDate` | 服务端合理范围会挡掉体脂秤的坏值(实测 772 条体重里有 35 条是 0.35kg 这类离群值,被拒收) |
+| 体重 / 身高 / 体质指数 | `POINT` 原样上报,时刻用 `startDate` | 服务端合理范围会挡掉体脂秤的坏值(实测 772 条体重里有 35 条是 0.35kg 这类离群值,被拒收);BMI 里混着 `0.39` 这类单位错乱的旧记录,导入端先丢掉 |
+| 步态五项 / 耳机与环境音量 | 按**天 × 来源**取平均,同一天只信样本最多的那台 | 导出里一天几十条,报「平均水平」而不是累加;百分比类是 0–1 小数(`0.175` = 17.5%),导入端 ×100;声级 0 是「没在播」的占位,跳过 |
+| 训练记录 `Workout` | 一次训练一行 `family_health_workout`:类型/起止/时长/距离/消耗/平均心率 | 服务端按 (成员, 来源 App, 开始时间) 幂等覆盖,重复导入不翻倍;类型可传 `HKWorkoutActivityTypeXxx`,服务端归一到 13 类 |
 | 睡眠分期 | 区间原样上报,服务端聚合会话 | 客户端不算会话,三端同口径;`AsleepUnspecified` 记 `UNKNOWN`(只算在床,不冒充浅睡) |
 
 睡眠按 30 天分段发送(服务端单次跨度 ≤31 天),分段点放在**正午**并向前多带 12 小时,
 免得把一晚切成两半;相邻窗口重叠的那 12 小时靠服务端「整窗重算」去重(实测重跑无重复会话)。
 
-## 这份导出覆盖不到的东西(需要产品侧支持)
+## 这份导出覆盖不到的东西
 
-- 步态/行动能力:`WalkingSpeed` / `WalkingStepLength` / `WalkingDoubleSupportPercentage` /
-  `WalkingAsymmetryPercentage` / `AppleWalkingSteadiness`——指标目录里没有,**不入库**。
-  注意 Apple 导出里百分比类是 0–1 小数(`0.175` = 17.5%),将来加指标时要在导入端 ×100。
-- 训练记录 `Workout`(类型/时长/距离/消耗/爬升):只有 `EXERCISE_MIN` 落了日合计量,明细没有落点。
-- 耳机音量暴露 `HeadphoneAudioExposure`、BMI、骑行距离、饮水:`HealthMetric` 目录里没有,本次跳过。
+- 骑行距离、饮水、爬升:指标目录里没有,本次跳过。
 - 导出里的 `Me`(生日/性别)、`SleepDurationGoal` 不导入。
 
 ## 保留策略提醒
 
-服务端每日 04:20 清理 **大于 180 天的 `POINT` 样本**(`app.health.point-retention-days`)。
-心率、体重都属于 POINT,所以历史心率只留最近半年,**体重历史也会被一起清掉**——
-体重是长期趋势指标,这条保留口径值得单独议(见当日文档)。
+服务端每日 04:20 清理 **大于 180 天的 `POINT` 样本**(`app.health.point-retention-days`),
+体重/体脂/BMI/身高/腰围在 `HealthMetric.LONG_TERM_POINT` 白名单里不清,心率这类小时级 POINT 才限期清理。
+训练记录与日聚合样本不在这条清理规则内。
