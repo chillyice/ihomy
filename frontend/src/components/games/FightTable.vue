@@ -37,7 +37,7 @@
             <span class="ft-last-name">{{ lastPlay.name }}</span>
             <span v-if="lastPlay.label" class="ft-last-combo">{{ lastPlay.label }}</span>
           </div>
-          <div class="ft-last-cards">
+          <div class="ft-last-cards" :style="{ '--fc-last-per-row': lastPerRow }">
             <span v-for="c in lastPlay.cards" :key="c.id" class="ft-mini">
               <PlayingCard :card="c" />
             </span>
@@ -119,8 +119,8 @@ const TOUCH_THRESHOLD = 10
 let dragState = null
 let justDragged = false
 
-// 落点取「最上层且本次未扫过」的牌:已选中的牌会弹起抬层,可能盖住未选的右邻条,
-// 只看 elementFromPoint 会命中已扫过的牌而漏掉它下面那张(elementsFromPoint 自上而下找)
+// 落点取「最上层且本次未扫过」的牌:叠牌层级是右压左,只看 elementFromPoint 命中的
+// 第一张可能已在本轮扫过(它下面压着左邻),自上而下找第一张未扫过的才不漏牌
 const cardIdAt = (x, y, exclude) => {
   for (const el of document.elementsFromPoint(x, y)) {
     const id = el.closest?.('.ft-card')?.dataset.id
@@ -230,6 +230,13 @@ const sortedHand = computed(() => {
   if (props.sortValue) list.sort((a, b) => props.sortValue(a) - props.sortValue(b))
   return list
 })
+/* 中央上一手牌:每行张数决定牌面宽度——张少就放大到上限,张多按两行摊开,
+   牌面始终在「能读出点数」与「不溢出中央区」之间取最大(尺寸公式见 .ft-mini) */
+const lastPerRow = computed(() => {
+  const n = props.lastPlay?.cards?.length || 0
+  if (!n) return 6
+  return n <= 8 ? n : Math.ceil(n / 2)
+})
 const seatViews = computed(() => {
   const n = Math.max(1, props.seats.length)
   const table = POSITIONS[n] || POSITIONS[6]
@@ -285,6 +292,10 @@ const cardLabel = (card) => {
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     inset 0 26px 60px rgba(0, 0, 0, 0.18);
   overflow: hidden;
+  /* 容器查询锚点:中央出牌区的可用宽度按牌桌实际宽收敛(cqw),手机/桌面/全屏一套公式 */
+  container-type: inline-size;
+  --fc-last-w: min(84cqw, 620px);
+  --fc-last-cap: 60px;
 }
 
 .ft-seat {
@@ -415,7 +426,7 @@ const cardLabel = (card) => {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  width: min(64%, 560px);
+  width: var(--fc-last-w, min(64%, 560px));
   color: #f2fff2;
   text-align: center;
   transform: translate(-50%, -50%);
@@ -467,11 +478,12 @@ const cardLabel = (card) => {
   justify-content: center;
   gap: 4px;
 }
-/* 上一手牌是牌桌的视觉焦点,牌面给到可读尺寸(角标点数清晰可辨) */
+/* 上一手牌是牌桌的视觉焦点,牌面按「每行张数」摊开取最大可读尺寸:
+   张少放大到上限(角标点数清晰可辨),张多自动缩到两行放得下,不再出现小到读不出 */
 .ft-mini {
   position: relative;
   display: block;
-  width: clamp(34px, 4.6vw, 60px);
+  width: clamp(30px, calc(var(--fc-last-w, 560px) / var(--fc-last-per-row, 6) - 4px), var(--fc-last-cap, 60px));
   aspect-ratio: 5 / 7;
   border-radius: 5px;
   background: #fdfcf8;
@@ -560,8 +572,8 @@ const cardLabel = (card) => {
   margin-left: 0;
 }
 .ft-card.sel {
-  /* 选中=向上探出一块;z-index 抬层让描边不被右邻叠牌盖住 */
-  z-index: 2;
+  /* 选中=向上探出一块;不做 z-index 抬层——手牌一律右压左,
+     探出的牌不许盖住右侧的牌(选中的牌被右邻盖住右缘是预期内的) */
   transform: translateY(calc(var(--fc-pop, 14px) * -1));
   outline: 2px solid #ffd166;
   outline-offset: -2px;
@@ -627,11 +639,9 @@ const cardLabel = (card) => {
   .ft-seat-name {
     font-size: 11px;
   }
-  .ft-center {
-    width: 70%;
-  }
-  .ft-mini {
-    width: 24px;
+  /* 窄屏中央区窄一档(70cqw),牌面宽度公式随 --fc-last-w 自动收敛 */
+  .ft-table {
+    --fc-last-w: min(70cqw, 560px);
   }
 }
 
@@ -674,8 +684,8 @@ const cardLabel = (card) => {
     --fc-card-w: clamp(16px, calc(var(--fc-step) * 1.9), 84px);
     min-height: calc(var(--fc-card-w, 54px) * 1.4 + 20px);
   }
-  .ft-mini {
-    width: clamp(34px, 4.6vw, 72px);
+  .ft-table {
+    --fc-last-cap: 72px;
   }
 }
 </style>

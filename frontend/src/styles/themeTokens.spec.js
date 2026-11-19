@@ -67,6 +67,7 @@ const RUNTIME_VARS = {
   '--spread': '消消乐碎屑扩散距离(JS 按格子序号注入)',
   '--pc': 'Ludo 玩家卡按座位配色注入(与盘面棋子同色)',
   '--pc-soft': 'Ludo 玩家卡的座位色淡底',
+  '--fc-last-per-row': '对抗牌局中央上一手牌的每行张数(FightTable 按牌数注入,牌面宽度公式用)',
   '--wide-col-max': '大屏双栏列内滚动净高(Schedule.vue 按实测头高注入)',
   '--seg-color': 'Vault 密码强度分段色',
   '--sw-a': 'ThemeSwatch 晨色',
