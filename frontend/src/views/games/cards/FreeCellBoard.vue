@@ -21,7 +21,6 @@
           $t('games.freecell.undo')
         }}</el-button>
         <el-button size="small" round @click="autoFinishAll">{{ $t('games.freecell.autoFinish') }}</el-button>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.freecell.newGame') }}</el-button>
       </div>
     </div>
 
@@ -511,6 +510,18 @@ const onVisibility = () => {
   if (missed > 0 && game.value.status === STATUS.PLAYING) elapsed.value += missed
 }
 const onResize = () => measureFelt()
+
+// ---------- 外壳对接 ----------
+/** 数据芯片(手机横屏进外壳中栏):步数/最少步数/用时 */
+const stats = computed(() => [
+  { label: t('games.freecell.moves'), value: game.value.moves },
+  { label: t('games.freecell.best'), value: best.value || '—' },
+  { label: t('games.freecell.time'), value: formatClock(elapsed.value) },
+])
+const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
+
+// 头部/中栏那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
+defineExpose({ startNew, stats, canUndo, showHint, undo, autoFinishAll })
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibility)

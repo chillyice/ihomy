@@ -3,7 +3,16 @@
      本页做发牌/回合驱动/交互与结算展示,单机赢一局走统一 H5 奖励通道(每日限次)。
      房间局:房主权威跑牌局,公共盘面广播、每个人只收到自己的手牌,其余三家只看剩牌数。 -->
 <template>
-  <GameShell ref="shellEl" class="mj-shell" :title="$t('games.mahjong.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="mj-shell"
+    :title="$t('games.mahjong.title')"
+    body-align="stretch"
+    readable
+    :new-game="!play.active && phase === 'playing'"
+    @back="goBack"
+    @new-game="startGame"
+  >
     <template #rules>
       <p>{{ $t('games.mahjong.coverHint') }}</p>
     </template>

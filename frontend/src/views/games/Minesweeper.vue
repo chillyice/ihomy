@@ -6,7 +6,9 @@
     :title="title"
     :rules-pages="[$t('games.minesweeper.rules.pagePlay'), $t('games.minesweeper.rules.pageControl')]"
     body-align="center"
+    :new-game="!play.active"
     @back="goBack"
+    @new-game="onNewGameClick"
   >
     <!-- 等级跟游戏名走(和 2048 的棋盘规格同一处),控件行只留数据与按钮 -->
     <template #titleExtra>
@@ -32,6 +34,37 @@
         <li>{{ $t('games.minesweeper.rules.ctrl4') }}</li>
         <li>{{ $t('games.minesweeper.rules.ctrl5') }}</li>
       </ul>
+    </template>
+
+    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条数据条,这一份隐藏 -->
+    <template #stats>
+      <span class="gh-chip"
+        ><span>{{ $t('games.minesweeper.flags') }}</span
+        ><b>{{ remainingMines(board) }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.minesweeper.time') }}</span
+        ><b>{{ formatClock(elapsed) }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.minesweeper.best') }}</span
+        ><b>{{ bestText }}</b></span
+      >
+    </template>
+
+    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用数据条右端 -->
+    <template #actions>
+      <el-button
+        size="small"
+        class="gs-icon-btn"
+        :type="flagMode ? 'primary' : 'default'"
+        :title="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+        :aria-label="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+        :aria-pressed="flagMode"
+        @click="flagMode = !flagMode"
+      >
+        <el-icon><Flag /></el-icon>
+      </el-button>
     </template>
 
     <template #extras>
@@ -76,15 +109,6 @@
             @click="flagMode = !flagMode"
           >
             <el-icon><Flag /></el-icon>
-          </el-button>
-          <el-button
-            size="small"
-            class="gs-icon-btn"
-            :title="$t('games.minesweeper.newGame')"
-            :aria-label="$t('games.minesweeper.newGame')"
-            @click="onNewGameClick"
-          >
-            <el-icon><Plus /></el-icon>
           </el-button>
         </div>
       </div>
@@ -137,7 +161,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Flag, Plus } from '@element-plus/icons-vue'
+import { Flag } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
@@ -561,42 +585,28 @@ onBeforeUnmount(() => {
 .ms-meta-actions .el-button + .el-button {
   margin-left: 0;
 }
-/* 手机横屏:数据与按钮竖排成棋盘左侧一列(和外壳 rail 同向),棋盘独占右侧;
-   此时纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区),
-   横向预算扣掉这一列的宽度 */
+/* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
+   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+.ms-shell :deep(.gs-stats),
+.ms-shell :deep(.gs-controls) {
+  display: none;
+}
+
+/* 手机横屏:数据与旗标按钮搬进外壳(中栏 + 左栏第三行),数据条整条让位,棋盘独占游戏区;
+   纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区) */
 @media (orientation: landscape) and (max-height: 520px) {
+  .ms-shell :deep(.gs-stats),
+  .ms-shell :deep(.gs-controls) {
+    display: flex;
+  }
   .ms-layout {
-    --ms-meta-w: 132px;
     --ms-cell-h: calc((100cqh - 16px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
-    --ms-cell-w: calc((100cqw - var(--ms-meta-w) - 10px - 24px - (var(--ms-cols) - 1) * var(--ms-gap)) / var(--ms-cols));
-    display: grid;
-    grid-template-columns: var(--ms-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    /* 数据列与棋盘同一口径靠上,和 2048/数独横屏左列一致 */
-    align-items: start;
-    column-gap: 10px;
-    row-gap: 0;
-    /* 装得下时整块按实际宽度收缩(数据列紧贴棋盘,由外壳居中);
-       装不下(困难盘窄屏)时吃满宽度,棋盘只横向滚动 */
-    width: min(100%, calc(var(--ms-meta-w) + 10px + var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px));
+    display: flex;
+    width: min(100%, calc(var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px));
     max-height: 100%;
   }
   .ms-meta {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: start;
-    gap: 8px;
-    height: auto;
-  }
-  /* 竖排后芯片撑满这一列宽,标签靠左、数值靠右,扫一眼就能读 */
-  .ms-meta .gh-chip {
-    justify-content: space-between;
-  }
-  /* 按钮并排贴棋盘一侧(三款横屏同一口径:按钮靠右、芯片整列) */
-  .ms-meta-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
+    display: none;
   }
   .ms-board-wrap {
     min-width: 0;

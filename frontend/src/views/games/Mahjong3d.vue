@@ -2,7 +2,16 @@
      规则内核与平面麻将共用 utils/games/mahjong.js(判胡/听牌/计番/AI/骰子);
      本页负责单机对局循环与 3D 场景驱动,布局数学在 utils/games/mahjong3dTable.js。 -->
 <template>
-  <GameShell ref="shellEl" class="m3-shell" :title="$t('games.mahjong3d.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="m3-shell"
+    :title="$t('games.mahjong3d.title')"
+    body-align="stretch"
+    readable
+    :new-game="phase === 'playing'"
+    @back="goBack"
+    @new-game="startGame"
+  >
     <template #rules>
       <p>{{ $t('games.mahjong.coverHint') }}</p>
     </template>

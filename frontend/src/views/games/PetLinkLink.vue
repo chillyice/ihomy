@@ -1,5 +1,13 @@
 <template>
-  <GameShell ref="shellEl" class="pl-shell" :title="$t('games.petlink.title')" body-align="start" @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="pl-shell"
+    :title="$t('games.petlink.title')"
+    body-align="start"
+    :new-game="screen === 'game' && !play.active"
+    @back="goBack"
+    @new-game="onRestartClick"
+  >
     <template #rules>
       <p>{{ $t('games.petlink.coverHint') }}</p>
     </template>
@@ -100,7 +108,6 @@
           <el-button size="small" :disabled="won || lost" @click="togglePause">
             {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
           </el-button>
-          <el-button size="small" @click="onRestartClick">↺ {{ $t('games.petlink.restart') }}</el-button>
           <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
             {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
           </el-button>

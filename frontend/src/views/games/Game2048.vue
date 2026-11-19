@@ -5,7 +5,9 @@
     :title="title"
     :rules-pages="[$t('games.g2048.rules.pagePlay'), $t('games.g2048.rules.pageControl')]"
     body-align="center"
+    :new-game="!matchId && !play.active"
     @back="goBack"
+    @new-game="startNew"
   >
     <!-- 棋盘规格跟游戏名走:和数独的模式/难度同一处,控件行只留数据与按钮 -->
     <template #titleExtra>
@@ -13,6 +15,33 @@
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
       </el-select>
     </template>
+    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条分数条,这一份隐藏 -->
+    <template #stats>
+      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        ><span>{{ $t('games.g2048.score') }}</span
+        ><b>{{ score }}</b></span
+      >
+      <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
+        ><span>{{ $t('games.g2048.best') }}</span
+        ><b>{{ best }}</b></span
+      >
+    </template>
+
+    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用分数条右端 -->
+    <template #actions>
+      <el-button
+        v-if="!matchId && !play.active"
+        size="small"
+        class="gs-icon-btn"
+        :disabled="!history.length"
+        :title="$t('games.g2048.undo')"
+        :aria-label="$t('games.g2048.undo')"
+        @click="undo"
+      >
+        <el-icon><RefreshLeft /></el-icon>
+      </el-button>
+    </template>
+
     <template #rules="{ page }">
       <template v-if="page === 0">
         <p>{{ $t('games.g2048.tip') }}</p>
@@ -89,16 +118,6 @@
           >
             <el-icon><RefreshLeft /></el-icon>
           </el-button>
-          <el-button
-            v-if="!matchId"
-            size="small"
-            class="gs-icon-btn bf-new"
-            :title="$t('games.g2048.newGame')"
-            :aria-label="$t('games.g2048.newGame')"
-            @click="startNew"
-          >
-            <el-icon><Plus /></el-icon>
-          </el-button>
         </div>
       </div>
 
@@ -150,7 +169,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Plus, RefreshLeft } from '@element-plus/icons-vue'
+import { RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi, matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -578,46 +597,22 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 手机横屏:整条挪到棋盘左侧,上面是并排的撤销/新游戏(贴棋盘一侧,和扫雷一致),
-   下面是 最高分 → 分数。棋盘边长 = 游戏区高 − 6(上下各 ~3),
-   底边离页面底边只剩「外壳底边距(6,手机上叠安全区) + 3」 */
+/* 手机横屏:分数条整条让位,分数与撤销搬进外壳(中栏积分时间 + 左栏第三行),
+   棋盘独占游戏区:边长 = 游戏区宽 / 高 / 上限三者最小值,各让 8px */
+.bf-shell :deep(.gs-stats),
+.bf-shell :deep(.gs-controls) {
+  display: none;
+}
 @media (orientation: landscape) and (max-height: 520px) {
-  .bf-layout {
-    --bf-meta-w: 132px;
-    display: grid;
-    grid-template-columns: var(--bf-meta-w) minmax(0, 1fr);
-    align-items: start;
-    column-gap: 10px;
-    row-gap: 0;
-    width: min(calc(100% - 16px), calc(100cqh - 6px + var(--bf-meta-w) + 10px));
+  .bf-shell :deep(.gs-stats),
+  .bf-shell :deep(.gs-controls) {
+    display: flex;
   }
   .bf-meta {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: start;
-    height: auto;
-    gap: 8px;
+    display: none;
   }
-  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
-  .bf-meta > .gh-chip {
-    justify-content: space-between;
-    min-height: var(--gs-control-h);
-  }
-  /* 按钮并排靠棋盘一侧,免得按钮和棋盘之间空一截 */
-  .bf-meta-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
-  }
-  /* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
-  .bf-meta-actions .el-button + .el-button {
-    margin-left: 0;
-  }
-  .bf-chip-best {
-    order: 2;
-  }
-  .bf-chip-score {
-    order: 3;
+  .bf-layout {
+    width: min(calc(100% - 16px), calc(100cqh - 16px), 760px);
   }
   .bf-stage {
     width: 100%;

@@ -29,6 +29,10 @@
           <el-tag v-if="gamepadConnected" size="small" type="success" effect="plain" class="gamepad-tag">
             {{ $t('games.gamepadReady') }}
           </el-tag>
+          <!-- 新游戏:文字键、固定在规则键左侧(桌面排在图标组之前,手机横屏与规则同处第二行) -->
+          <el-button v-if="newGame" class="gs-new-game" size="small" round :disabled="newGameDisabled" @click="$emit('newGame')">
+            {{ $t('games.newGame') }}
+          </el-button>
           <el-button
             class="gs-icon-btn gs-fullscreen"
             size="small"
@@ -68,13 +72,10 @@
         </div>
       </header>
 
-      <div v-if="$slots.settings || $slots.stats || $slots.actions" class="gs-controls">
+      <div v-if="$slots.settings || $slots.actions" class="gs-controls">
         <!-- 空插槽不渲染:否则空 div 也参与 flex gap,按钮会莫名偏离右边 -->
         <div v-if="$slots.settings" class="gs-settings"><slot name="settings" /></div>
-        <div v-if="$slots.stats || $slots.actions" class="gs-end">
-          <div v-if="$slots.stats" class="gs-stats"><slot name="stats" /></div>
-          <div v-if="$slots.actions" class="gs-actions"><slot name="actions" /></div>
-        </div>
+        <div v-if="$slots.actions" class="gs-actions"><slot name="actions" /></div>
       </div>
 
       <div v-if="$slots.extras" class="gs-extras"><slot name="extras" /></div>
@@ -114,6 +115,10 @@
       </el-dialog>
     </div>
 
+    <!-- 数据/积分栏:竖屏是头部下面独立一行(靠左),手机横屏独立成中栏紧贴棋盘,
+         页面只放真正放不进棋盘的数据芯片,见 main.css 的横屏档 -->
+    <div v-if="$slots.stats" class="gs-stats"><slot name="stats" /></div>
+
     <div ref="bodyEl" class="gs-body game-surface" :class="[`is-${bodyAlign}`, bodyClass]">
       <slot />
     </div>
@@ -144,8 +149,12 @@ const props = defineProps({
   bodyClass: { type: [String, Array, Object], default: '' },
   /** 规则弹窗的分页标签,长度 >1 时顶部出分页;每页内容由 #rules 插槽按 page 渲染 */
   rulesPages: { type: Array, default: () => [] },
+  /** 头部是否出文字「新游戏」键(固定在规则键左侧);房间对局里由页面置 false */
+  newGame: { type: Boolean, default: false },
+  /** 「新游戏」键是否禁用(例如撤销栈为空、对局进行中) */
+  newGameDisabled: { type: Boolean, default: false },
 })
-defineEmits(['back'])
+defineEmits(['back', 'newGame'])
 
 const { t } = useI18n()
 

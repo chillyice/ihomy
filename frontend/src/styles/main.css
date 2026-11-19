@@ -698,6 +698,12 @@ html.theme-warm .page.game-shell {
   gap: 6px;
   min-width: 0;
 }
+/* 数据栏是页面直属块(不再挂在控件行):竖屏是头部下面独立一行、左对齐,
+   横屏单独成中栏(见下面横屏档);页面不给 #stats 就整块不渲染。 */
+.page.game-shell > .gs-stats {
+  flex: 0 0 auto;
+  padding-bottom: var(--gs-gap);
+}
 .gs-actions {
   display: flex;
   align-items: center;
@@ -706,12 +712,9 @@ html.theme-warm .page.game-shell {
   gap: var(--gs-gap);
   min-width: 0;
 }
-/* 控件行里的右半区(芯片 + 按钮):头部那份 .gs-end 是 flex:0 0 auto(图标组不许被挤),
-   搬进控件行后它按「最大内容宽」撑开(手机竖屏实测 440px > 370px 容器),
-   把「新游戏」顶到右边界之外。这里允许它收缩到容器宽、内部再换行,宽屏下仍是一行靠右 */
-.gs-controls .gs-end {
-  flex: 1 1 auto;
-  justify-content: flex-end;
+/* 控件行里只剩按钮时也靠右(原先右半区是 .gs-end 撑开的,.gs-end 只留在头部) */
+.gs-controls > .gs-actions {
+  margin-inline-start: auto;
 }
 .gs-controls .el-button {
   height: var(--gs-control-h);
@@ -927,23 +930,27 @@ html.game-shell .mobile-game-chrome {
   display: none !important;
 }
 
-/* --- 横屏矮屏(手机横屏):信息栏挪到左列,游戏区独占右侧 ---
+/* --- 横屏矮屏(手机横屏):三栏 —— 左公共按钮 / 中积分时间 / 右游戏本体 ---
  * 竖排时头部与控件各占一行,横屏一行只剩一两百像素给棋盘,左右大片宽度空着。
- * 改成两栏后:左列 = 返回/标题/图标 + 规则 + 选择框 + 数据芯片 + 按钮(竖排靠左),
- * 右列 = 游戏区按高度铺满。门槛与上面的矮屏档一致(横屏 + max-height:520px),
- * 平板横屏(高 820)、电脑横屏(高 900)仍是上下一行式布局。 */
+ * 横屏改成三栏:左栏 = 返回 + 游戏名 + 模式选择,第二行 新游戏 + 规则,
+ * 第三行只放棋盘左侧放不下的按钮(设置/操作);中栏 = 数据芯片纵向堆叠、紧贴棋盘;
+ * 右栏 = 游戏区(棋盘、数独数字盘等)按高度铺满。没有 #stats 的页面中栏宽度自动收到 0。
+ * 门槛与上面的矮屏档一致(横屏 + max-height:520px),平板横屏(高 820)、
+ * 电脑横屏(高 900)仍是上下一行式布局。 */
 @media (orientation: landscape) and (max-height: 520px) {
   .page.game-shell {
-    --gs-rail-w: min(38%, 240px);
+    /* 左栏 150~200:844 宽下要给右栏留下数独棋盘 368 + 数字盘 ≥132 的宽度,
+       窄屏(667 宽)也有 150 兜底,不成一条挤不下的细缝 */
+    --gs-rail-w: clamp(150px, 22%, 200px);
     /* 底边少留一点:棋盘底边更贴近页面底边(页面自身内边距 8 → 6),
        手机沉浸态会在下面那条规则里再叠加 env(安全区),iPhone 小白条不贴边 */
     --gs-pad-b: 6px;
     display: grid;
-    grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
+    grid-template-columns: var(--gs-rail-w) auto minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
     grid-template-areas:
-      'rail body'
-      'rail footer';
+      'rail stats body'
+      'rail stats footer';
     column-gap: var(--gs-gap);
     align-items: stretch;
   }
@@ -951,6 +958,26 @@ html.game-shell .mobile-game-chrome {
     grid-area: rail;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+  /* 中栏:只放积分/时间,纵向从上往下排;芯片改「标签在上、值在下」,宽度压到 50px 上下 */
+  .page.game-shell > .gs-stats {
+    grid-area: stats;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    max-width: 96px;
+    padding-bottom: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .page.game-shell > .gs-stats .gh-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    height: auto;
+    padding: 4px 6px;
   }
   .gs-body {
     grid-area: body;
@@ -967,8 +994,25 @@ html.game-shell .mobile-game-chrome {
   .gs-head .gs-title {
     flex: 0 1 auto;
   }
+  /* 模式选择跟在游戏名后面:左栏窄时独占一行、内部再换行,
+     不许横向撑破左栏(溢出会把整栏滚出可视区) */
+  .gs-head .gs-title-extra {
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  /* 模式选择独占一行:el-select 在窄栏里会被 flex 压到只剩箭头(文字区宽 0),
+     给足整栏宽度后文字才看得见;多个选择器逐行排列 */
+  .gs-head .gs-title-extra > * {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  /* 第二行固定成「新游戏 + 规则」:图标组占满一整行,第一行只留 返回 + 游戏名 + 模式选择 */
   .gs-head .gs-end {
+    flex: 1 0 100%;
     margin-left: 0;
+    justify-content: flex-start;
   }
   /* 按钮间距只走 flex gap:EP 默认给相邻按钮 margin-left:12,和 gap 一叠就是 18
      (左栏两根图标键实测 6 → 18),换行落行首时还会让规则键比返回缩进 12 */
@@ -980,24 +1024,21 @@ html.game-shell .mobile-game-chrome {
     flex-wrap: wrap;
     align-content: flex-start;
   }
-  /* 控件竖排:选择框一行、数据芯片一行、按钮一行,统一靠左 */
+  /* 控件竖排:第三行只放棋盘左侧放不下的按钮,统一靠左 */
   .gs-controls {
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
   }
-  .gs-controls .gs-settings,
-  .gs-controls .gs-end {
+  .gs-controls .gs-settings {
     width: 100%;
-  }
-  .gs-controls .gs-end {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    margin-left: 0;
   }
   .gs-actions {
     justify-content: flex-start;
+  }
+  /* 控件竖排后不再「按钮靠右」:取消控件行里那条 auto 外边距,第三行与上两行左对齐 */
+  .gs-controls > .gs-actions {
+    margin-inline-start: 0;
   }
 }
 

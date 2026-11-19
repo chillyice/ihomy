@@ -5,7 +5,9 @@
     :title="$t('games.sudoku.title')"
     :rules-pages="[rulesPagePlay, rulesPageControls, rulesPageVariants, rulesPageTech]"
     body-align="stretch"
+    new-game
     @back="goBack"
+    @new-game="startNew"
   >
     <!-- 模式与难度跟在游戏名后面(不再占控件行);改了就按新设置开局 -->
     <template #titleExtra>
@@ -16,14 +18,15 @@
         <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
       </el-select>
     </template>
-    <!-- 用时与撤销/新游戏的第二份摆放:竖屏/平板用棋盘上方那条(.sd-meta),
-         手机横屏时那条隐去、这一行撑出来(返回/规则/模式下面的空白),见样式里的媒体查询 -->
+    <!-- 用时芯片的第二份摆放:竖屏/平板用棋盘上方那条(.sd-meta)里的用时,
+         手机横屏时芯片进外壳中栏,见样式里的媒体查询 -->
     <template #stats>
       <span class="gh-chip">
         <span>{{ $t('games.sudoku.time') }}</span
         ><b>{{ timeText }}</b>
       </span>
     </template>
+    <!-- 撤销:棋盘右侧放不下,手机横屏时落在外壳左栏第三行 -->
     <template #actions>
       <el-button
         size="small"
@@ -34,15 +37,6 @@
         @click="undo"
       >
         <el-icon><RefreshLeft /></el-icon>
-      </el-button>
-      <el-button
-        size="small"
-        class="gs-icon-btn"
-        :title="$t('games.sudoku.newGame')"
-        :aria-label="$t('games.sudoku.newGame')"
-        @click="startNew"
-      >
-        <el-icon><Plus /></el-icon>
       </el-button>
     </template>
     <template #rules="{ page }">
@@ -142,8 +136,8 @@
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
            冲突直接画在格子上,提示次数只在通关结果里报。
-           撤销/新游戏放在这条的右端(棋盘右上角)。手机横屏时外壳左栏有空白,
-           这条整条隐去,改由外壳控件行(#stats/#actions)里的同一份控件顶替(见样式末尾的媒体查询) -->
+           撤销放在这条的右端(棋盘右上角),新游戏在头部规则键左侧。
+           手机横屏时这条整条隐去,改由外壳中栏(用时)与左栏第三行(撤销)里的同一份控件顶替 -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
@@ -159,15 +153,6 @@
             @click="undo"
           >
             <el-icon><RefreshLeft /></el-icon>
-          </el-button>
-          <el-button
-            size="small"
-            class="gs-icon-btn"
-            :title="$t('games.sudoku.newGame')"
-            :aria-label="$t('games.sudoku.newGame')"
-            @click="startNew"
-          >
-            <el-icon><Plus /></el-icon>
           </el-button>
         </div>
       </div>
@@ -351,7 +336,7 @@ import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } fr
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Plus, RefreshLeft } from '@element-plus/icons-vue'
+import { RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
@@ -1595,25 +1580,19 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 外壳控件行里放着同一份用时/撤销/新游戏:竖屏与平板整行不占位(用棋盘上方那条),
-   只在手机横屏(左栏有空白)时撑出来顶替它,并把棋盘上方那条隐去,不会两份同时在场 */
+/* 外壳里的用时芯片与撤销键是同一份控件的第二摆放:竖屏与平板整行不占位(用棋盘上方那条 .sd-meta),
+   只在手机横屏时撑出来 —— 芯片进中栏(紧贴棋盘纵向排),撤销落左栏第三行,棋盘上方那条同时隐去 */
+.sd-shell :deep(.gs-stats),
 .sd-shell :deep(.gs-controls) {
   display: none;
 }
 @media (orientation: landscape) and (max-height: 520px) {
+  .sd-shell :deep(.gs-stats),
   .sd-shell :deep(.gs-controls) {
     display: flex;
   }
   .sd-meta {
     display: none;
-  }
-  /* 左栏这三个控件排成一行(时间芯片 + 撤销 + 新游戏):同一条基线、左边缘都跟返回/规则对齐。
-     分两行时按钮行比芯片窄一截(84 vs 74),右边缘错位看着发毛 */
-  .sd-shell :deep(.gs-controls .gs-end) {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--gs-gap);
-    width: auto;
   }
   .sd-shell :deep(.gs-actions) {
     justify-content: flex-start;
@@ -2439,7 +2418,10 @@ html.dark .sd-cell.conflict {
   .sd-layout {
     grid-template-rows: minmax(0, 1fr);
     grid-template-areas: 'board panel';
-    /* 右列不再按比例:按时用条让出来的那份宽度给足棋盘与数字键 */
+    /* 三栏外壳把数据栏挪走后右列只剩棋盘 + 数字盘:右列下限收到 132(3 列数字键仍够拇指),
+       间距压到 10,多出来的宽度全给棋盘 */
+    grid-template-columns: minmax(0, 1fr) clamp(132px, 26%, 232px);
+    gap: 10px;
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
   }
   /* 棋盘与数字盘底边贴齐、一起往页面底边压(margin 只留 4 缓冲) */

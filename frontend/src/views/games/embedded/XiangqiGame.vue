@@ -3,7 +3,15 @@
      走法生成/评估/搜索逐字保留原实现,本组件只换外壳与 i18n。
      规范见 docs/UI设计提示词.md §43;样式(木纹棋盘/选子高亮)为原版移植,配色收在 --xq-* -->
 <template>
-  <GameShell ref="shellEl" class="xq-shell" :title="$t('games.embedded.xiangqi.title')" body-align="center" @back="router.push('/games')">
+  <GameShell
+    ref="shellEl"
+    class="xq-shell"
+    :title="$t('games.embedded.xiangqi.title')"
+    body-align="center"
+    new-game
+    @back="router.push('/games')"
+    @new-game="newGame"
+  >
     <!-- 难度与 AI 先手跟游戏名走(和数独模式/难度同一处) -->
     <template #titleExtra>
       <el-select v-model="level" class="xq-level" :teleported="!isFullscreen" @change="onLevelChange">
@@ -18,12 +26,26 @@
       <p>{{ $t('games.embedded.xiangqi.tip') }}</p>
     </template>
 
+    <!-- 对局状态:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条状态条,这一份隐藏 -->
+    <template #stats>
+      <span class="gh-chip"
+        ><b>{{ statusText }}</b></span
+      >
+    </template>
+
+    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用状态条右端 -->
+    <template #actions>
+      <el-button size="small" round :disabled="aiThinking" @click="undoMove">
+        {{ $t('games.embedded.xiangqi.undo') }}
+      </el-button>
+      <el-button size="small" round @click="exportRecord">{{ $t('games.embedded.xiangqi.export') }}</el-button>
+    </template>
+
     <!-- 状态 + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏收成棋盘左侧一列 -->
     <div class="xq-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="xq-meta">
         <span class="xq-status">{{ statusText }}</span>
         <div class="xq-actions">
-          <el-button size="small" round @click="newGame">{{ $t('games.embedded.xiangqi.restart') }}</el-button>
           <el-button size="small" round :disabled="aiThinking" @click="undoMove">
             {{ $t('games.embedded.xiangqi.undo') }}
           </el-button>
@@ -1064,41 +1086,30 @@ html.dark .xq-status {
   }
 }
 
-/* 手机横屏:状态 + 按钮收成棋盘左侧一列(按钮贴棋盘一侧靠上,状态整条),棋盘独占右侧 */
+/* 外壳里的状态/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条状态条,
+   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+.xq-shell :deep(.gs-stats),
+.xq-shell :deep(.gs-controls) {
+  display: none;
+}
+
+/* 手机横屏:状态与撤销/导出搬进外壳(中栏 + 左栏第三行),状态条让位,棋盘独占游戏区 */
 @media (orientation: landscape) and (max-height: 520px) {
+  .xq-shell :deep(.gs-stats),
+  .xq-shell :deep(.gs-controls) {
+    display: flex;
+  }
   .xq-layout {
-    --xq-meta-w: 132px;
     --xq-cv-w: min(100%, 500px, calc((100cqh - 16px) * 0.9026));
-    display: grid;
-    grid-template-columns: var(--xq-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta board';
-    column-gap: 10px;
-    width: min(100%, calc(var(--xq-meta-w) + 10px + var(--xq-cv-w) + 16px));
+    display: flex;
+    align-items: center;
+    width: 100%;
     max-height: 100%;
   }
   .xq-meta {
-    grid-area: meta;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
-  }
-  .xq-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
-  }
-  .xq-actions .el-button + .el-button {
-    margin-left: 0;
+    display: none;
   }
   .xq-board-wrap {
-    grid-area: board;
-    align-self: center;
     max-width: 100%;
   }
 }

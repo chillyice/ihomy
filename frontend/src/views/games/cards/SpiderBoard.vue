@@ -20,14 +20,10 @@
         </div>
       </div>
       <div class="sol-actions">
-        <el-select v-model="difficulty" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
-          <el-option v-for="d in DIFFICULTIES" :key="d" :value="d" :label="difficultyLabel(d)" />
-        </el-select>
         <el-button size="small" round @click="showHint">{{ $t('games.spider.hint') }}</el-button>
         <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
           $t('games.spider.undo')
         }}</el-button>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.spider.newGame') }}</el-button>
       </div>
     </div>
 
@@ -124,7 +120,7 @@
 // 蜘蛛纸牌:规则/发牌/叠牌/自动收组/提示/无路可走判定全在 utils/games/spider.js(纯函数,单测覆盖)。
 // 本组件负责点选与拖动移动、双击自动移动、撤销快照、计时与最高分;牌宽与叠牌步进来自 cardLayout.js。
 // 难度 1/2/4 色分别记录最高分与存档,通关按积分规则发奖励(后端 POST /game/spider/reward)。
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
@@ -138,7 +134,6 @@ import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
 import {
   COLUMNS,
   COMPLETE_TARGET,
-  DIFFICULTIES,
   STATUS,
   autoMove,
   canDealStock,
@@ -158,15 +153,14 @@ const MAX_HISTORY = 80
 const DOUBLE_TAP_MS = 320
 
 const { t } = useI18n()
-// 牌桌全屏时下拉要留在全屏元素内部(挂 body 会被全屏层遮住)
-const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })
 const play = useGameRoomPlay()
 /** 房间模式的同种子发牌 */
 let rng = null
-const difficulty = ref(1)
+/** 难度:筛选控件在外壳头部(游戏名旁),竖屏/横屏共用这一份状态 */
+const difficulty = defineModel('difficulty', { type: Number, default: 1 })
 const game = ref(deal(1))
 const elapsed = ref(0)
 const bestMap = ref({})
@@ -184,9 +178,6 @@ const dealHint = computed(() => {
   if (!game.value.stock.length) return ''
   return canDealNow.value ? t('games.spider.dealsLeft', { n: dealsLeft.value }) : t('games.spider.cannotDeal')
 })
-
-const difficultyLabel = (d) =>
-  ({ 1: t('games.spider.oneSuit'), 2: t('games.spider.twoSuits'), 4: t('games.spider.fourSuits') })[d] || String(d)
 
 const cardClass = (card) => ({ red: card.faceUp && (card.suit === 'H' || card.suit === 'D'), back: !card.faceUp })
 const isSelected = (pile, index) => !!selected.value && selected.value.pile === pile && index >= selected.value.index
@@ -468,8 +459,21 @@ const onVisibility = () => {
 }
 const onResize = () => measureFelt()
 
+// ---------- 外壳对接 ----------
+/** 数据芯片(手机横屏进外壳中栏):得分/最高/步数/用时 */
+const stats = computed(() => [
+  { label: t('games.spider.score'), value: game.value.score },
+  { label: t('games.spider.best'), value: best.value },
+  { label: t('games.spider.moves'), value: game.value.moves },
+  { label: t('games.spider.time'), value: formatClock(elapsed.value) },
+])
+const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
+
+// 头部/中栏那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
+defineExpose({ startNew, stats, canUndo, showHint, undo })
+
 watch(difficulty, (value) => {
-  if (game.value.difficulty === value) return
+  if (play.active || game.value.difficulty === value) return
   startNew()
 })
 

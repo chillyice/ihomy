@@ -3,7 +3,16 @@
      本页只做盘面绘制、逐格动画、骰子与回合驱动。房间局由房主权威跑引擎并把 state 广播给全房,
      其他人只发操作意图(掷骰/选子),所以两端画面永远一致。 -->
 <template>
-  <GameShell ref="shellEl" class="ld-shell" :title="$t('games.ludo.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="ld-shell"
+    :title="$t('games.ludo.title')"
+    body-align="stretch"
+    readable
+    :new-game="!play.active && state?.phase === 'playing'"
+    @back="goBack"
+    @new-game="restart"
+  >
     <template #extras>
       <GameRoomBar
         v-if="play.active"

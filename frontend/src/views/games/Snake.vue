@@ -1,7 +1,37 @@
 <template>
-  <GameShell ref="shellEl" class="sn-shell" :title="title" body-align="center" @back="goBack">
+  <GameShell ref="shellEl" class="sn-shell" :title="title" body-align="center" :new-game="!play.active" @back="goBack" @new-game="startNew">
     <template #rules>
       <p>{{ $t('games.snake.tip') }}</p>
+    </template>
+
+    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条数据条,这一份隐藏 -->
+    <template #stats>
+      <span class="gh-chip"
+        ><span>{{ $t('games.snake.score') }}</span
+        ><b>{{ game.score }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.snake.best') }}</span
+        ><b>{{ best }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.snake.length') }}</span
+        ><b>{{ game.snake.length }}</b></span
+      >
+    </template>
+
+    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用数据条右端 -->
+    <template #actions>
+      <el-button
+        size="small"
+        class="gs-icon-btn"
+        :disabled="game.status !== 'PLAYING'"
+        :title="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
+        :aria-label="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
+        @click="togglePause"
+      >
+        <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+      </el-button>
     </template>
 
     <template #extras>
@@ -46,15 +76,6 @@
             @click="togglePause"
           >
             <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
-          </el-button>
-          <el-button
-            size="small"
-            class="gs-icon-btn"
-            :title="$t('games.snake.newGame')"
-            :aria-label="$t('games.snake.newGame')"
-            @click="startNew"
-          >
-            <el-icon><Plus /></el-icon>
           </el-button>
         </div>
       </div>
@@ -105,7 +126,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Plus, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
@@ -532,51 +553,36 @@ html.dark .sn-overlay {
   background: rgba(20, 20, 20, 0.72);
 }
 
-/* 手机横屏:数据条与方向键收成棋盘左侧一列(和 2048/数独/扫雷同一配方),
-   按钮行贴棋盘一侧靠上、芯片整列,方向键落列底(拇指区);棋盘独占右侧吃满高度 */
+/* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
+   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+.sn-shell :deep(.gs-stats),
+.sn-shell :deep(.gs-controls) {
+  display: none;
+}
+
+/* 手机横屏:数据与暂停搬进外壳(中栏 + 左栏第三行),数据条整条让位;
+   方向键留在游戏区(棋盘右侧,右手拇指区),棋盘边长 = 宽高最小值,高度优先吃满 */
 @media (orientation: landscape) and (max-height: 520px) {
+  .sn-shell :deep(.gs-stats),
+  .sn-shell :deep(.gs-controls) {
+    display: flex;
+  }
   .sn-layout {
-    --sn-meta-w: 132px;
-    --sn-board: min(calc(100cqh - 16px), calc(100cqw - var(--sn-meta-w) - 26px));
+    /* 150 = 方向键三列(3×46+2×6),12 = 与棋盘间距,16 = 上下各让 8 */
+    --sn-board: min(calc(100cqh - 16px), calc(100cqw - 178px), 420px);
     display: grid;
-    grid-template-columns: var(--sn-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta stage';
-    column-gap: 10px;
-    /* 装得下时整块按实际宽度收缩(数据列紧贴棋盘,由外壳居中) */
-    width: min(100%, calc(var(--sn-meta-w) + 10px + var(--sn-board) + 16px));
+    grid-template-columns: auto auto;
+    align-items: center;
+    justify-content: center;
+    column-gap: 12px;
+    width: 100%;
     max-height: 100%;
   }
   .sn-meta {
-    grid-area: meta;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
-  }
-  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
-  .sn-meta .gh-chip {
-    justify-content: space-between;
-  }
-  /* 按钮并排贴棋盘一侧,不和棋盘之间空一截 */
-  .sn-meta-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
+    display: none;
   }
   .sn-stage {
-    grid-area: stage;
     min-height: 0;
-  }
-  /* 方向键与数据条同格:数据条靠上、方向键贴列底(拇指区),高度够就不重叠 */
-  .sn-pad {
-    grid-area: meta;
-    align-self: end;
-    margin-left: 0;
   }
   .sn-board {
     width: var(--sn-board);

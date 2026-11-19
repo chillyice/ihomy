@@ -1,7 +1,41 @@
 <template>
-  <GameShell ref="shellEl" class="tt-shell" :title="title" body-align="center" @back="goBack">
+  <GameShell ref="shellEl" class="tt-shell" :title="title" body-align="center" :new-game="!play.active" @back="goBack" @new-game="startNew">
     <template #rules>
       <p>{{ $t('games.tetris.tip') }}</p>
+    </template>
+
+    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条数据条,这一份隐藏 -->
+    <template #stats>
+      <span class="gh-chip"
+        ><span>{{ $t('games.tetris.score') }}</span
+        ><b>{{ game.score }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.tetris.best') }}</span
+        ><b>{{ best }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.tetris.lines') }}</span
+        ><b>{{ game.lines }}</b></span
+      >
+      <span class="gh-chip"
+        ><span>{{ $t('games.tetris.level') }}</span
+        ><b>{{ game.level }}</b></span
+      >
+    </template>
+
+    <!-- 棋盘左侧放不下的操作按钮:手机横屏进外壳左栏第三行;竖屏用数据条右端 -->
+    <template #actions>
+      <el-button
+        size="small"
+        class="gs-icon-btn"
+        :disabled="game.status !== 'PLAYING'"
+        :title="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
+        :aria-label="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
+        @click="togglePause"
+      >
+        <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+      </el-button>
     </template>
 
     <template #extras>
@@ -50,15 +84,6 @@
             @click="togglePause"
           >
             <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
-          </el-button>
-          <el-button
-            size="small"
-            class="gs-icon-btn"
-            :title="$t('games.tetris.newGame')"
-            :aria-label="$t('games.tetris.newGame')"
-            @click="startNew"
-          >
-            <el-icon><Plus /></el-icon>
           </el-button>
         </div>
       </div>
@@ -136,7 +161,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, Plus, RefreshRight, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
@@ -613,50 +638,51 @@ html.dark .tt-overlay {
   background: rgba(20, 20, 20, 0.72);
 }
 
-/* 手机横屏:数据条与按键条收成棋盘左侧一列(和贪吃蛇同一配方),
-   按钮行贴棋盘一侧靠上、芯片整列,按键落列底;棋盘+侧栏独占右侧吃满高度 */
+/* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
+   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+.tt-shell :deep(.gs-stats),
+.tt-shell :deep(.gs-controls) {
+  display: none;
+}
+
+/* 手机横屏:数据条与暂停搬进外壳(中栏 + 左栏第三行),数据条整条让位;
+   按键条留在游戏区(竖排在棋盘右侧,右手拇指区),棋盘+暂存/预告侧栏吃满高度 */
 @media (orientation: landscape) and (max-height: 520px) {
+  .tt-shell :deep(.gs-stats),
+  .tt-shell :deep(.gs-controls) {
+    display: flex;
+  }
   .tt-layout {
-    --tt-meta-w: 132px;
-    --tt-board-w: min(calc((100cqh - 16px) / 2), calc(100cqw - var(--tt-meta-w) - var(--tt-side-w) - 36px));
+    /* 90 = 按键条那一列(按钮按文字宽 ~78 + 12),36 = 与棋盘间距与内边距 */
+    --tt-board-w: min(calc((100cqh - 16px) / 2), calc(100cqw - 90px - var(--tt-side-w) - 36px), 300px);
     display: grid;
-    grid-template-columns: var(--tt-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta stage';
-    column-gap: 10px;
-    width: min(100%, calc(var(--tt-meta-w) + 10px + var(--tt-board-w) + var(--tt-side-w) + 46px));
+    grid-template-columns: auto auto;
+    align-items: center;
+    justify-content: center;
+    column-gap: 12px;
+    width: 100%;
     max-height: 100%;
   }
   .tt-meta {
-    grid-area: meta;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
-  }
-  /* 芯片撑满这一列宽,标签靠左、数值靠右,和扫雷左列同一读法 */
-  .tt-meta .gh-chip {
-    justify-content: space-between;
-  }
-  /* 按钮并排贴棋盘一侧,不和棋盘之间空一截 */
-  .tt-meta-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
+    display: none;
   }
   .tt-stage {
-    grid-area: stage;
     align-self: center;
+    width: auto;
+    min-height: 0;
+  }
+  /* 按键条竖排成棋盘右侧一列,六个键各占一行,拇指从外侧够得到 */
+  .tt-pad {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-self: center;
+    width: auto;
+    margin-left: 0;
+  }
+  .tt-pad-btn {
     width: 100%;
   }
-  /* 按键条与数据条同格:数据条靠上、按键贴列底,高度够就不重叠 */
-  .tt-pad {
-    grid-area: meta;
-    align-self: end;
+  .tt-pad .el-button + .el-button {
     margin-left: 0;
   }
 }

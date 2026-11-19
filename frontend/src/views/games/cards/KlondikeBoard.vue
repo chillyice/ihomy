@@ -20,16 +20,11 @@
         </div>
       </div>
       <div class="sol-actions">
-        <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
-          <el-option :value="1" :label="$t('games.solitaire.draw1')" />
-          <el-option :value="3" :label="$t('games.solitaire.draw3')" />
-        </el-select>
         <el-button size="small" round @click="showHint">{{ $t('games.solitaire.hint') }}</el-button>
         <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
           $t('games.solitaire.undo')
         }}</el-button>
         <el-button size="small" round @click="autoFinishAll">{{ $t('games.solitaire.autoFinish') }}</el-button>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
       </div>
     </div>
 
@@ -170,7 +165,7 @@
 // 纸牌接龙(Klondike):发牌/翻牌/叠牌规则/自动收牌/提示/无路可走判定全在 utils/games/solitaire.js(纯函数,单测覆盖)。
 // 本组件负责点选与拖动移动、双击自动收纳、撤销快照、计时与最高分;牌宽与叠牌步进来自 utils/games/cardLayout.js,
 // 拖拽落点由 useCardDrag 通过 [data-drop] 容器识别,牌面图案统一交给 PlayingCard 渲染。
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
@@ -205,8 +200,6 @@ const DOUBLE_TAP_MS = 320
 const COLUMNS = 7
 
 const { t } = useI18n()
-// 牌桌全屏时下拉要留在全屏元素内部(挂 body 会被全屏层遮住)
-const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })
@@ -219,7 +212,8 @@ const best = ref(0)
 const rewardMsg = ref('')
 const selected = ref(null)
 const history = ref([])
-const drawCount = ref(1)
+/** 一次翻几张:筛选控件在外壳头部(游戏名旁),竖屏/横屏共用这一份状态 */
+const drawCount = defineModel('drawCount', { type: Number, default: 1 })
 const hint = ref(null)
 
 const isWon = computed(() => game.value.status === STATUS.WON)
@@ -553,8 +547,22 @@ const onVisibility = () => {
 }
 const onResize = () => measureFelt()
 
+// ---------- 外壳对接 ----------
+/** 数据芯片(手机横屏进外壳中栏):得分/最高/步数/用时,值仍是本组件算好的那一份 */
+const stats = computed(() => [
+  { label: t('games.solitaire.score'), value: game.value.score },
+  { label: t('games.solitaire.best'), value: best.value },
+  { label: t('games.solitaire.moves'), value: game.value.moves },
+  { label: t('games.solitaire.time'), value: formatClock(elapsed.value) },
+])
+/** 撤销键能不能按(空栈/结算后禁掉) */
+const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
+
+// 头部/中栏那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
+defineExpose({ startNew, stats, canUndo, showHint, undo, autoFinishAll })
+
 watch(drawCount, (value) => {
-  if (game.value.drawCount === value) return
+  if (play.active || game.value.drawCount === value) return
   game.value = { ...game.value, drawCount: value }
   selected.value = null
   clearHint()
