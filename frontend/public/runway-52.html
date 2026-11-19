@@ -113,17 +113,22 @@ const TEAMS = [
 const N = 52, GOAL = 57, HANGAR = -1, CIRCUIT_LAST = 50, R0 = 51;
 const STORE = 'runway52.table.v1';
 const mod = (i,n=N) => (i%n+n)%n;
+/* 主环格位:整环相对停机坪逆时针转过 6 格(41.5°)——第一步(进环 D1)连同其外侧的起飞区
+   从停机坪顺时针侧翻到逆时针侧,二者依旧径向相邻(起飞区贴第一步外侧的相对关系不变);
+   归航跑道口 A1 随环离开停机坪角,四条跑道线整体跟着转。引擎索引/时序不受影响,
+   只有「格心画在哪」变了。 */
 const point = (i,r=244) => {
- const a = (-135+mod(i)*360/N)*Math.PI/180;
+ const a = (-135+mod(i-6)*360/N)*Math.PI/180;
  return [350+r*Math.cos(a),350+r*Math.sin(a)];
 };
 /* 进环格序(格名 A1B1C1D1 四色循环×13 组):进度 1..50 依次落在 13C+3 .. 13C——
-   起飞走一步到上一家色的 D1,自家角格 A1(红/本色)是归航跑道口;进度 51 起转入归航跑道 */
+   起飞走一步到上一家色的 D1,自家色 A1(本色)是归航跑道口;进度 51 起转入归航跑道
+   (整环逆时针转 6 格后,A1 不再压在停机坪角上,四条跑道口随环前移) */
 const publicIndex = (color,progress) => mod(13*color+2+progress);
 const isPublic = p => p>=1&&p<=CIRCUIT_LAST;
-/* 起飞区:不在主环上,压在自家角格 A1 逆时针方向第 3 格(即 D1 的镜像位)的正外侧(环外 275 半径),
-   紧贴停机坪逆时针侧——相当于主环整体逆时针转过六格后,起飞区从进环格外侧落到停机坪另一侧 */
-const takeoffSpot = color => point(color*13-3,275);
+/* 起飞区:不在主环上,压在进环第一格 D1 的正外侧(环外 275 半径),与第一步只隔一圈间距;
+   整环逆时针转 6 格后,D1 连同本起飞区落在停机坪的逆时针侧 */
+const takeoffSpot = color => point(color*13+3,275);
 const stand = (color,p) => {
  const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
 };
