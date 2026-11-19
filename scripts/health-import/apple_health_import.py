@@ -250,18 +250,22 @@ def build_samples(c):
     }
     daily = {m: best_source_day(c, m) for m in day_metrics}
 
+    # 活动消耗的日子取「日求和」与「圆环」的并集:有的日子只有第三方 App 写了圆环、没有原始样本
+    active_days = set(daily["ACTIVE_ENERGY"]) | {d for d, r in c.rings.items() if "ACTIVE_ENERGY" in r}
     for metric in ("STEPS", "DISTANCE", "FLIGHTS", "ACTIVE_ENERGY"):
-        for day, value in sorted(daily[metric].items()):
+        days = sorted(active_days) if metric == "ACTIVE_ENERGY" else sorted(daily[metric])
+        for day in days:
             ring = c.rings.get(day, {}).get(metric)
             # 活动消耗优先用圆环(Apple 已按来源优先级去重),其余用日求和
-            use = ring if metric == "ACTIVE_ENERGY" and ring is not None else value
+            use = ring if metric == "ACTIVE_ENERGY" and ring is not None else daily[metric].get(day)
+            if use is None:
+                continue
             samples.append({"metric": metric, "period": "DAY", "date": day,
                             "value": round(use, 2), "source": "APPLE", "sourceApp": "APPLE_HEALTH"})
             stats[metric] += 1
 
     # 总消耗 = 活动 + 基础(Apple 导出没有 total,只能相加;两项都按天取单一来源,不叠加重叠设备)
     basal = daily["BASAL_ENERGY"]
-    active_days = set(daily["ACTIVE_ENERGY"]) | {d for d, r in c.rings.items() if "ACTIVE_ENERGY" in r}
     for day in sorted(active_days):
         active = c.rings.get(day, {}).get("ACTIVE_ENERGY")
         if active is None:

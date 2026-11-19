@@ -231,19 +231,6 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="clearVisible" :title="$t('settings.health.clearTitle')" class="dialog-sm" append-to-body>
-      <p class="dialog-hint">{{ $t('settings.health.clearHint') }}</p>
-      <el-select v-model="clearSource" class="clear-select">
-        <el-option :label="$t('settings.health.sourceShortcut')" value="SHORTCUT" />
-        <el-option :label="$t('settings.health.sourceHealthConnect')" value="HEALTH_CONNECT" />
-        <el-option :label="$t('settings.health.sourceNative')" value="IOS_NATIVE" />
-      </el-select>
-      <template #footer>
-        <el-button @click="clearVisible = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="danger" :loading="clearing" @click="doClear">{{ $t('settings.health.clear') }}</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 报表卡片自定义:勾选即保存(本机 + 账号偏好);顺序按目录顺序,与分享弹窗同口径 -->
     <el-dialog v-model="cardDialog" :title="$t('health.report.customizeTitle')" class="dialog-sm" append-to-body>
       <el-checkbox-group v-model="cardDraft" class="card-picks">
@@ -271,11 +258,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
-import { Refresh, Download, Setting, Share } from '@element-plus/icons-vue'
+import { Refresh, Setting, Share } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { saveBlobResponse } from '@/utils/download'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
 import HealthTrendChart from './HealthTrendChart.vue'
 import HealthSleepNight from './HealthSleepNight.vue'
@@ -313,13 +298,10 @@ const SLEEP_RANGES = ['DAY', 'WEEK', 'MONTH', 'HALF', 'YEAR']
 const DENSE_POINT = ['HEART_RATE', 'SPO2', 'BODY_TEMP', 'BLOOD_GLUCOSE', 'BP_SYSTOLIC', 'BP_DIASTOLIC']
 const RANGE_DAYS = 14
 const SLEEP_DAYS = 14
-// 导出范围默认近 90 天(与服务端默认一致);更长的区间不在界面上选,直接用接口参数
-const EXPORT_DAYS = 90
 
 const initialTab = LEGACY_TABS[String(route.query.tab || '')] || String(route.query.tab || '')
 const tab = ref(TABS.includes(initialTab) ? initialTab : 'report')
 const loading = ref(false)
-const exporting = ref(false)
 const reportData = ref(null)
 const reportCards = ref([...DEFAULT_CARDS])
 const cardDraft = ref([...DEFAULT_CARDS])
@@ -334,9 +316,6 @@ const detailLoading = ref(false)
 const sleepRange = ref('DAY')
 const statsBuckets = ref({})
 const statsLoading = ref(false)
-const clearVisible = ref(false)
-const clearSource = ref('SHORTCUT')
-const clearing = ref(false)
 const selected = reactive({ vitals: 'HEART_RATE', activity: 'STEPS', body: 'WEIGHT' })
 
 const metricPanes = [
@@ -653,37 +632,6 @@ async function pickNight(index) {
   await loadStages(night)
 }
 
-async function doClear() {
-  clearing.value = true
-  try {
-    const data = await healthApi.clearData(clearSource.value)
-    ElMessage.success(t('settings.health.cleared', { count: (data?.samples || 0) + (data?.sleeps || 0) }))
-    clearVisible.value = false
-    await reloadAll()
-  } catch (e) {
-    ElMessage.error(e?.message || t('common.failed'))
-  } finally {
-    clearing.value = false
-  }
-}
-
-/** 导出当前成员近 90 天的长表 CSV:成功直接落盘;失败时服务端仍回 JSON,由 saveBlobResponse 抛出可读文案 */
-async function exportCsv() {
-  if (!userStore.isLoggedIn) return
-  const from = shiftDay(-(EXPORT_DAYS - 1))
-  const to = shiftDay(0)
-  exporting.value = true
-  try {
-    const blob = await healthApi.exportCsv({ from, to })
-    await saveBlobResponse(blob, `health-${from}_${to}.csv`)
-    ElMessage.success(t('health.exportDone', { from, to }))
-  } catch (e) {
-    ElMessage.error(e?.message || t('common.failed'))
-  } finally {
-    exporting.value = false
-  }
-}
-
 /** 卡片自定义:先与账号对齐一次偏好(服务端优先),再用本机兜底 */
 async function loadCardPref() {
   const remote = await syncPref(CARD_PREF_LOCAL, CARD_PREF_SERVER)
@@ -871,8 +819,5 @@ onMounted(async () => {
   margin: 0 0 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
-}
-.clear-select {
-  width: 100%;
 }
 </style>
