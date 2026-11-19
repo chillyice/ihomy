@@ -273,14 +273,31 @@
 </div>
 
 <script>
-  // 主画面与记分板拆开:引擎把整张机台(含底部记分带)画进同一张 WebGL 画布,
-  // 没有分数接口可读——所以就按位图比例裁:主画面直接用画布本身(靠 overflow 裁掉
-  // 底部记分带,零拷贝),记分带每帧拷一份到独立的小 canvas。
+  // 主画面与记分板拆开:引擎把整幅画面(顶部菜单 + 左侧机台 + 右侧信息板)画进同一张
+  // WebGL 画布,没有分数接口可读——只能按实测像素矩形裁:主画面直接用画布本身
+  // (靠负偏移 + overflow 只露机台,零拷贝),记分板每帧把有用内容拷到独立小 canvas。
   // 拷贝要求画布在合成后仍保留像素,所以创建 WebGL 上下文时打开 preserveDrawingBuffer。
   // 引擎脚本是 async 加载的,这段必须先执行,补丁才能生效。
-  const TABLE_W = 642 // table.bmp 尺寸,底部 467..524(58 行)是记分带
+  // 下面所有数值都以引擎画面 642×525 为基准(由实测画布 829×678 换算)。
+  const TABLE_W = 642 // 引擎整幅画面(含菜单栏与右侧信息板),不是机台本身
   const TABLE_H = 525
-  const BAR_TOP = 467
+  // 机台矩形(含灰色机箱边框):主画面只露这一块
+  const FIELD_X = 3.1
+  const FIELD_Y = 39.5
+  const FIELD_W = 385.7
+  const FIELD_H = 446
+  // 记分板两块有用内容:左「BALL 数字」(带 BALL 字样与红框)、右「玩家号 + 分数条」
+  const BALL_X = 525.1
+  const BALL_Y = 199
+  const BALL_W = 93
+  const BALL_H = 34.1
+  const SCORE_X = 424.4
+  const SCORE_Y = 245.5
+  const SCORE_W = 193.6
+  const SCORE_H = 34.1
+  const HUD_GAP = 4.6 // 两块之间留一条黑缝
+  const HUD_W = BALL_W + HUD_GAP + SCORE_W
+  const HUD_H = Math.max(BALL_H, SCORE_H)
   ;(function patchCanvasContext() {
     const raw = HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.getContext = function (type, attrs) {
@@ -355,9 +372,8 @@
   const padEl = document.getElementById('pad')
   const STAGE_PAD = 16 // 与 #stage 的 padding 8px 一致(左右/上下各 8)
   const RIG_GAP = 6 // 与 #rig 的 gap 一致
-  // 裁切线(BAR_TOP)还没按引擎实际渲染定界,先关掉拆分:整张机台照原样显示。
-  // 等看图把 BAR_TOP 定准,把这里改回 true 即可(拆分/拷贝/兜底代码都留着)。
-  const SPLIT_ENABLED = false
+  // 裁切参数已按引擎实际渲染定准,默认拆分;取不到画面时仍会退回整张机台。
+  const SPLIT_ENABLED = true
   let splitOn = SPLIT_ENABLED
   let fieldW = 0
   let hudH = 0
@@ -375,22 +391,29 @@
     // 竖着放「记分板 + 主画面 + 手柄」,三段加起来不出屏:宽度靠可用高反推,再与可用宽取小。
     const padH = padHeight()
     const reserved = RIG_GAP + (padH ? padH + RIG_GAP : 0)
-    fieldW = Math.max(80, Math.floor(Math.min(availW, ((availH - reserved) * TABLE_W) / TABLE_H)))
-    const cutY = splitOn ? BAR_TOP : TABLE_H
-    const fieldH = Math.floor((fieldW * cutY) / TABLE_W)
-    hudH = splitOn ? Math.floor((fieldW * (TABLE_H - cutY)) / TABLE_W) : 0
+    // 拆分后主画面只占机台矩形,记分板另有自己的宽高比,两者一起参与高度预算。
+    const cropW = splitOn ? FIELD_W : TABLE_W
+    const cropH = splitOn ? FIELD_H : TABLE_H
+    const hudRatio = splitOn ? HUD_H / HUD_W : 0
+    const perWidth = cropH / cropW + hudRatio
+    fieldW = Math.max(80, Math.floor(Math.min(availW, (availH - reserved) / perWidth)))
+    const fieldH = Math.floor((fieldW * cropH) / cropW)
+    hudH = splitOn ? Math.floor((fieldW * HUD_H) / HUD_W) : 0
     const dpr = window.devicePixelRatio || 1
+    // 画布 CSS 尺寸永远按整幅 642×525,靠负偏移 + #field 的 overflow 只露出机台
+    const scale = fieldW / cropW
 
     fieldEl.style.width = fieldW + 'px'
     fieldEl.style.height = fieldH + 'px'
-    // 画布永远是整张机台,底部记分带被 #field 的 overflow 裁掉
-    canvasEl.style.width = fieldW + 'px'
-    canvasEl.style.height = Math.round((fieldW * TABLE_H) / TABLE_W) + 'px'
+    canvasEl.style.width = Math.round(TABLE_W * scale) + 'px'
+    canvasEl.style.height = Math.round(TABLE_H * scale) + 'px'
+    canvasEl.style.left = splitOn ? -FIELD_X * scale + 'px' : '0px'
+    canvasEl.style.top = splitOn ? -FIELD_Y * scale + 'px' : '0px'
 
     if (splitOn) {
       hudEl.style.height = hudH + 'px'
       hudEl.width = Math.max(1, Math.round(fieldW * dpr))
-      hudEl.height = Math.max(1, Math.round((hudH * dpr)))
+      hudEl.height = Math.max(1, Math.round(hudH * dpr))
       hudCtx.imageSmoothingEnabled = false
     }
   }
@@ -454,10 +477,37 @@
     const cw = canvasEl.width
     const ch = canvasEl.height
     if (!splitOn || !cw || !ch || !hudEl.width) return
-    const sy = Math.round((ch * BAR_TOP) / TABLE_H)
-    const sh = ch - sy
-    if (sh <= 0) return
-    hudCtx.drawImage(canvasEl, 0, sy, cw, sh, 0, 0, hudEl.width, hudEl.height)
+    const kx = cw / TABLE_W
+    const ky = ch / TABLE_H
+    const hudW = hudEl.width
+    const hudHpx = hudEl.height
+    // 左:BALL 数字(含 BALL 字样),右:玩家号 + 分数条;两块拼成一条贴在顶部
+    const ballW = Math.max(1, Math.round((BALL_W / HUD_W) * hudW))
+    const scoreX = Math.max(1, Math.round(((BALL_W + HUD_GAP) / HUD_W) * hudW))
+    hudCtx.fillStyle = '#000'
+    hudCtx.fillRect(0, 0, hudW, hudHpx)
+    hudCtx.drawImage(
+      canvasEl,
+      Math.round(BALL_X * kx),
+      Math.round(BALL_Y * ky),
+      Math.max(1, Math.round(BALL_W * kx)),
+      Math.max(1, Math.round(BALL_H * ky)),
+      0,
+      0,
+      ballW,
+      hudHpx,
+    )
+    hudCtx.drawImage(
+      canvasEl,
+      Math.round(SCORE_X * kx),
+      Math.round(SCORE_Y * ky),
+      Math.max(1, Math.round(SCORE_W * kx)),
+      Math.max(1, Math.round(SCORE_H * ky)),
+      scoreX,
+      0,
+      hudW - scoreX,
+      hudHpx,
+    )
 
     // 兜底:引擎已经出画面,记分带却迟迟全黑 —— 多半是上下文没保留像素,
     // 退回整张机台(记分带仍留在主画面底部),别让记分板一直空着。
