@@ -6,9 +6,20 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- 系统相机:Android 11+ 不声明 ACTION_IMAGE_CAPTURE 的包可见性,
+             resolveActivity 在部分机型(华为/鸿蒙)返回 null,拍照键误报「没有可用相机」 -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <!-- Android 13 及以下健康连接是独立 APK:不声明包可见性会误判「本机不可用」 -->
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
+
+    <!-- HMS Health Kit(华为运动健康):AGC 配好应用后把 <string name="hms_health_appid"> 里的
+         appid 换成 AGC 应用的数字 id;没配置时华为健康链自动视为不可用,回落 Health Connect -->
+    <meta-data
+        android:name="com.huawei.hms.client.appid"
+        android:value="@string/hms_health_appid" />
 
     <!-- allowBackup=false:令牌密文在 EncryptedSharedPreferences,其密钥不参与备份,
          换机恢复后解不开等于死数据;关闭云备份也避免密文随 adb backup 落地。

@@ -64,9 +64,10 @@ public class HealthSyncWorker extends Worker {
         try {
             if (!HealthPrefs.autoSync(ctx)) return Result.success();
             if (HealthPrefs.token(ctx).isEmpty()) return Result.success();
-            if (!HealthConnectReader.isAvailable(ctx)) return Result.success();
+            String provider = HealthDataPlugin.providerOf(ctx);
+            if (provider == null) return Result.success();
             // 增量为主:窗口内多取 2 天,作息跨零点时昨晚的会话不会漏
-            HealthSyncer.run(ctx, HealthPrefs.token(ctx), HealthPrefs.groups(ctx), 2);
+            HealthSyncer.run(ctx, HealthPrefs.token(ctx), HealthPrefs.groups(ctx), 2, provider);
             return Result.success();
         } catch (Exception e) {
             // 没授权后台读取/网络失败都走这里;不 retry(第二天还有一次),只留痕给设置页

@@ -53,6 +53,7 @@ export async function healthNativeStatus() {
   return {
     supported: true,
     available: true,
+    provider: (status && status.provider) || '',
     groups: (status && status.groups) || {},
     granted: (status && status.granted) || [],
     last: last || null,

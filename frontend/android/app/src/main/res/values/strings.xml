@@ -1,6 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">ihomy</string>
+    <!-- HMS Health Kit 的 AGC 应用 id(格式 appid=数字);AGC 配好后改这里 -->
+    <string name="hms_health_appid" translatable="false">appid=</string>
     <string name="title_activity_main">ihomy</string>
     <string name="package_name">top.ihomy.app</string>
     <string name="custom_url_scheme">top.ihomy.app</string>

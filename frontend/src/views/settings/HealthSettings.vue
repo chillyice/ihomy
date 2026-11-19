@@ -97,6 +97,13 @@
     <div v-if="nativeSupported" class="card settings-card health-android">
       <div class="section-label">{{ $t('settings.health.androidTitle') }}</div>
       <div class="share-tip">{{ $t('settings.health.androidHint') }}</div>
+      <div v-if="native.provider" class="share-tip">
+        {{
+          $t('settings.health.androidSource', {
+            source: native.provider === 'HUAWEI_HEALTH' ? $t('settings.health.sourceHuawei') : $t('settings.health.sourceHc'),
+          })
+        }}
+      </div>
 
       <template v-if="native.available">
         <div class="android-row">

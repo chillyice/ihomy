@@ -19,10 +19,12 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 健康数据桥(Android):Health Connect 授权、读增量、上报本站。
+ * 健康数据桥(Android):Health Connect / HMS Health Kit 授权、读增量、上报本站。
  *
  * 与 iOS 快捷指令共用一条写入口 `POST /health/ingest`;本插件只做「读 + 交」,
  * 指纹/聚合/可见性全在服务端(避免两端算出不同口径)。
+ * 数据源自动选择:有 Health Connect(谷歌系)走 HealthConnectReader,
+ * 没有的华为/鸿蒙机在 AGC 配好后走 HuaweiHealthReader(华为运动健康),都没有才不可用。
  * 方法:isAvailable / groupStatus / requestPermissions / sync / lastSync / setAutoSync / clearAutoSync。
  */
 @CapacitorPlugin(name = "HealthData")
@@ -33,12 +35,25 @@ public class HealthDataPlugin extends Plugin {
     /** 授权弹窗回来时要 resolve 的那次调用(桥不对外暴露 last plugin call) */
     private PluginCall pendingPermissionCall;
 
+    /** 当前机型用哪条数据链;null = 两条都不可用 */
+    static String providerOf(Context ctx) {
+        if (HealthConnectReader.isAvailable(ctx)) return HealthConnectReader.PROVIDER;
+        if (HuaweiHealthReader.isAvailable(ctx)) return HuaweiHealthReader.PROVIDER;
+        return null;
+    }
+
+    private static boolean huaweiActive(Context ctx) {
+        return HuaweiHealthReader.PROVIDER.equals(providerOf(ctx));
+    }
+
     @PluginMethod
     public void isAvailable(PluginCall call) {
         Context ctx = getContext();
+        String provider = providerOf(ctx);
         JSObject ret = new JSObject();
-        ret.put("available", HealthConnectReader.isAvailable(ctx));
-        ret.put("status", HealthConnectReader.sdkStatus(ctx));
+        ret.put("available", provider != null);
+        ret.put("provider", provider == null ? "" : provider);
+        ret.put("status", huaweiActive(ctx) ? HuaweiHealthReader.sdkStatus(ctx) : HealthConnectReader.sdkStatus(ctx));
         call.resolve(ret);
     }
 
@@ -47,9 +62,12 @@ public class HealthDataPlugin extends Plugin {
     public void groupStatus(PluginCall call) {
         List<String> groups = groupsOf(call);
         Context ctx = getContext();
+        boolean huawei = huaweiActive(ctx);
         io.execute(() -> {
             try {
-                Map<String, Boolean> status = HealthConnectReader.groupStatusBlocking(ctx, groups);
+                Map<String, Boolean> status = huawei
+                        ? HuaweiHealthReader.groupStatusBlocking(ctx, groups)
+                        : HealthConnectReader.groupStatusBlocking(ctx, groups);
                 List<String> granted = new ArrayList<>();
                 JSObject map = new JSObject();
                 for (Map.Entry<String, Boolean> e : status.entrySet()) {
@@ -58,7 +76,8 @@ public class HealthDataPlugin extends Plugin {
                 }
                 HealthPrefs.setGroups(ctx, granted);
                 JSObject ret = new JSObject();
-                ret.put("available", HealthConnectReader.isAvailable(ctx));
+                ret.put("available", true);
+                ret.put("provider", huawei ? HuaweiHealthReader.PROVIDER : HealthConnectReader.PROVIDER);
                 ret.put("groups", map);
                 ret.put("granted", new JSArray(granted));
                 call.resolve(ret);
@@ -68,10 +87,33 @@ public class HealthDataPlugin extends Plugin {
         });
     }
 
-    /** 拉起 Health Connect 授权弹窗;返回结果时按组重新核对(部分授权按未授权算) */
+    /**
+     * 拉起授权:Health Connect 用系统弹窗 Intent;华为走 HMS 扩展授权(HMS 自己管理界面)。
+     * 返回结果时按组重新核对(部分授权按未授权算)。
+     */
     @PluginMethod
     public void requestPermissions(PluginCall call) {
         Context ctx = getContext();
+        if (huaweiActive(ctx)) {
+            List<String> groups = groupsOf(call);
+            HuaweiHealthReader.requestAuthorization(getActivity(), groups,
+                    granted -> {
+                        HealthPrefs.setGroups(ctx, granted);
+                        JSObject ret = new JSObject();
+                        ret.put("granted", new JSArray(granted));
+                        List<String> missing = new ArrayList<>(groups);
+                        missing.removeAll(granted);
+                        ret.put("missing", new JSArray(missing));
+                        ret.put("provider", HuaweiHealthReader.PROVIDER);
+                        call.resolve(ret);
+                        return kotlin.Unit.INSTANCE;
+                    },
+                    err -> {
+                        call.reject("request_failed", err == null ? "授权失败" : err);
+                        return kotlin.Unit.INSTANCE;
+                    });
+            return;
+        }
         if (!HealthConnectReader.isAvailable(ctx)) {
             call.reject("unavailable", "本机没有可用的健康数据服务");
             return;
@@ -121,21 +163,26 @@ public class HealthDataPlugin extends Plugin {
         int days = call.getInt("days", 90);
         List<String> groups = groupsOf(call);
         Context ctx = getContext();
+        String provider = providerOf(ctx);
+        boolean huawei = HuaweiHealthReader.PROVIDER.equals(provider);
         io.execute(() -> {
             try {
-                if (!HealthConnectReader.isAvailable(ctx)) {
+                if (provider == null) {
                     call.reject("unavailable", "本机没有可用的健康数据服务");
                     return;
                 }
-                List<String> granted = HealthConnectReader.grantedGroupsBlocking(ctx, groups);
+                List<String> granted = huawei
+                        ? HuaweiHealthReader.grantedGroupsBlocking(ctx, groups)
+                        : HealthConnectReader.grantedGroupsBlocking(ctx, groups);
                 if (granted.isEmpty()) {
                     call.reject("no_permission", "还没有授权任何健康数据分组");
                     return;
                 }
                 HealthPrefs.setGroups(ctx, granted);
-                JSONObject result = HealthSyncer.run(ctx, token, granted, days);
+                JSONObject result = HealthSyncer.run(ctx, token, granted, days, provider);
                 JSObject ret = new JSObject(result.toString());
                 ret.put("groups", new JSArray(granted));
+                ret.put("provider", provider);
                 call.resolve(ret);
             } catch (Exception e) {
                 HealthPrefs.markSync(ctx, false, e.getMessage() == null ? "同步失败" : e.getMessage());

@@ -64,7 +64,7 @@ class HealthMetricTest {
     @Test
     void providerAndStageWhitelists() {
         assertThat(HealthMetric.PROVIDERS).containsExactlyInAnyOrder(
-                "SHORTCUT", "HEALTH_CONNECT", "IOS_NATIVE");
+                "SHORTCUT", "HEALTH_CONNECT", "HUAWEI_HEALTH", "IOS_NATIVE");
         assertThat(HealthMetric.SLEEP_STAGES).contains("DEEP", "LIGHT", "REM", "AWAKE", "INBED", "UNKNOWN");
     }
 

@@ -27,7 +27,7 @@ public final class HealthMetric {
     public static final String SLEEP = "SLEEP";
     public static final String MENSTRUAL_FLOW = "MENSTRUAL_FLOW";
 
-    public static final Set<String> PROVIDERS = Set.of("SHORTCUT", "HEALTH_CONNECT", "IOS_NATIVE");
+    public static final Set<String> PROVIDERS = Set.of("SHORTCUT", "HEALTH_CONNECT", "HUAWEI_HEALTH", "IOS_NATIVE");
 
     public static final Set<String> SLEEP_STAGES = Set.of("AWAKE", "LIGHT", "DEEP", "REM", "INBED", "UNKNOWN");
 

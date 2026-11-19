@@ -77,6 +77,8 @@ dependencies {
     implementation "androidx.work:work-runtime:$androidxWorkVersion"
     // 健康数据:读 Health Connect(只读权限,按组申请)+ Kotlin 协程做阻塞桥接
     implementation "androidx.health.connect:connect-client:$androidxHealthConnectVersion"
+    // 健康数据:华为运动健康(HMS Health Kit)——无 Health Connect 的华为/鸿蒙机走这条链
+    implementation "com.huawei.hms:health:6.11.0.300"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinxCoroutinesVersion"
     // connect-client 的 guava 只在运行期传递进来,而 WorkManager 的 ListenableFuture 在编译期要可见
     implementation "com.google.guava:guava:31.1-android"

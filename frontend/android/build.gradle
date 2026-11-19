@@ -23,6 +23,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // HMS Health Kit(华为运动健康数据读取):SDK 只发布在华为 maven 仓
+        maven { url 'https://developer.huawei.com/repo/' }
     }
 }
 

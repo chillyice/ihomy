@@ -1136,11 +1136,7 @@ export default {
         win: 'You Win!',
         lose: 'Out of Moves',
         resultSub: 'Score {score} · Target {target} · Best {best}',
-        readyHint: 'Choose a difficulty, then press Start.',
-        play: 'Swap two neighbours to line up 3+ of a colour.',
-        noMatch: 'No match there — pick another swap.',
-        shuffling: 'No moves left — reshuffling the board…',
-        reshuffled: 'Board reshuffled!',
+        autoShuffle: 'When no move is left, the board reshuffles itself.',
       },
       bubble: {
         title: 'Bubble Shooter',
@@ -3402,6 +3398,9 @@ export default {
       androidTitle: 'Phone sync (Android)',
       androidHint:
         'After you grant access on the phone, the app syncs watch sleep, activity and vitals here every day; groups you do not grant are never read.',
+      androidSource: 'Data source: {source}',
+      sourceHuawei: 'Huawei Health (HMS Health Kit)',
+      sourceHc: 'Health Connect',
       androidUnavailable: 'Health Connect is not available on this phone yet; install it and let your band write data first.',
       androidGroups: 'Granted scopes',
       androidGroupSleep: 'Sleep',
