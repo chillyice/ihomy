@@ -6,6 +6,7 @@
   <GameShell
     ref="shellEl"
     class="mj-shell"
+    :class="{ 'mj-room': play.active }"
     :title="$t('games.mahjong.title')"
     body-align="stretch"
     readable
@@ -89,10 +90,10 @@
         <div v-else-if="waitingHost" class="table-waiting">{{ $t('games.mahjong.waitingHost') }}</div>
         <template v-else>
           <!-- 平面牌桌(窗口不透视):对家在上 / 上家在左 / 下家在右 / 我在下;
-               手牌、牌墙、牌河和操作各有独立位置,再按可用区等比缩放;
-               中央 = 四方牌河(弃牌朝向出牌人) + 东南西北风位 + 双骰 + 实时牌墙 -->
+               手牌、副露、牌河和操作各有独立位置,整块牌桌再按可用区等比缩放;
+               中央 = 四方牌河(弃牌朝向出牌人) + 东南西北风位 + 双骰 + 余牌数 -->
           <div ref="stageEl" class="mj-stage">
-            <div ref="tableEl" class="mj-table" :style="{ '--mj-scale': tableScale }">
+            <div ref="tableEl" class="mj-table" :style="{ '--mj-scale': tableScale, '--mj-w': tableW + 'px', '--mj-h': tableH + 'px' }">
               <!-- 对家(上):牌背横排 + 副露横排 -->
               <div v-if="topSeat" class="mj-edge mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
@@ -120,7 +121,7 @@
                 </div>
               </div>
 
-              <!-- 上家(左):侧向平躺手牌 + 纵向副露并列 -->
+              <!-- 上家(左):侧向平躺手牌,副露横排在手的上方(同一窄栏竖排,不并排) -->
               <div v-if="leftSeat" class="mj-edge mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
                   <span class="seat-wind">{{ windName(leftSeat.seat) }}</span>
@@ -129,10 +130,7 @@
                   <span v-if="leftSeat.auto" class="auto-badge">{{ $t('games.mahjong.autoBadge') }}</span>
                 </div>
                 <div class="side-hand">
-                  <span class="mj-backs-col">
-                    <span v-for="n in seatTileCount(leftSeat.seat)" :key="n" class="tile back side" aria-hidden="true" />
-                  </span>
-                  <div v-if="meldGroups(leftSeat.seat).length" class="meld-row meld-col">
+                  <div v-if="meldGroups(leftSeat.seat).length" class="meld-row meld-block">
                     <span v-for="(group, i) in meldGroups(leftSeat.seat)" :key="i" class="meld-group">
                       <template v-if="group.dark">
                         <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
@@ -144,19 +142,14 @@
                       </template>
                     </span>
                   </div>
+                  <span class="mj-backs-col">
+                    <span v-for="n in seatTileCount(leftSeat.seat)" :key="n" class="tile back side" aria-hidden="true" />
+                  </span>
                 </div>
               </div>
 
-              <!-- 中央:实时牌墙贴边,四方牌河围着中央信息 -->
+              <!-- 中央:四方牌河围着中央信息(余牌数只在中央信息里读,桌上不再摆牌墙) -->
               <div class="mj-center">
-                <div class="mj-walls" aria-hidden="true">
-                  <div v-for="g in wallGroupView" :key="g.pos" class="wall-group" :class="'wall-' + g.pos">
-                    <span v-for="(s, i) in g.stacks" :key="i" class="wall-stack" :class="{ half: !s.top }">
-                      <i class="wall-tile" />
-                      <i v-if="s.top" class="wall-tile" />
-                    </span>
-                  </div>
-                </div>
                 <div class="mj-pool">
                   <div
                     v-for="river in poolRivers"
@@ -202,7 +195,7 @@
                 </div>
               </div>
 
-              <!-- 下家(右):侧向平躺手牌 + 纵向副露并列 -->
+              <!-- 下家(右):侧向平躺手牌,副露横排在手的上方(同一窄栏竖排,不并排) -->
               <div v-if="rightSeat" class="mj-edge mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
                   <span class="seat-wind">{{ windName(rightSeat.seat) }}</span>
@@ -211,7 +204,7 @@
                   <span v-if="rightSeat.auto" class="auto-badge">{{ $t('games.mahjong.autoBadge') }}</span>
                 </div>
                 <div class="side-hand">
-                  <div v-if="meldGroups(rightSeat.seat).length" class="meld-row meld-col">
+                  <div v-if="meldGroups(rightSeat.seat).length" class="meld-row meld-block">
                     <span v-for="(group, i) in meldGroups(rightSeat.seat)" :key="i" class="meld-group">
                       <template v-if="group.dark">
                         <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
@@ -229,7 +222,7 @@
                 </div>
               </div>
 
-              <!-- 我方(下):副露与手牌同排,吃碰杠胡等操作共用下方动作行 -->
+              <!-- 我方(下):副露与手牌同排;吃碰杠胡操作条浮在手牌上方,不占布局高度 -->
               <div class="mj-edge mj-bottom" :class="{ active: myTurn }">
                 <div v-if="!play.isSpectator" class="my-row">
                   <div v-if="meldGroups(mySeat).length" class="meld-row my-melds">
@@ -261,7 +254,7 @@
                     <span v-for="n in handBackFill" :key="'ph' + n" class="tile back hand" aria-hidden="true" />
                   </div>
                 </div>
-                <div v-if="!play.isSpectator" class="my-actions" aria-live="polite">
+                <div v-if="!play.isSpectator && (claimPrompt || canSelfWin || myGangOptions.length)" class="my-actions" aria-live="polite">
                   <template v-if="claimPrompt">
                     <el-button
                       v-for="(pair, i) in activeChiOptions"
@@ -444,14 +437,29 @@ const shellEl = ref(null)
 // 只缩放盘面,顶栏和房间横幅按内容页尺寸排版。offsetWidth/Height 不受 transform 影响。
 const stageEl = ref(null)
 const tableEl = ref(null)
+// 牌桌设计画布:高按下限取、宽跟随游戏区宽高比 —— 整块游戏区铺成一张麻将桌(手机横屏尤其明显),
+// 内部全按设计尺寸画,再统一缩放到刚好铺满。桌面大屏封顶 1.2 倍,牌不至于放成巨无霸。
+// 下限是内容撑出来的:14 张手牌一行(46px)+ 两侧副露栏 + 两侧牌河 + 中央信息(宽)、四家牌行 + 一条牌河(高)。
+const MJ_MIN_W = 1000
+const MJ_MIN_H = 500
+const MJ_MAX_W = 1500
+const MJ_MAX_SCALE = 1.2
+const tableW = ref(MJ_MIN_W)
+const tableH = ref(MJ_MIN_H)
 const tableScale = ref(1)
 watch(
-  [stageEl, tableEl],
-  ([stage, table], _, onCleanup) => {
-    if (!stage || !table) return
+  stageEl,
+  (stage, _, onCleanup) => {
+    if (!stage) return
     const fitTable = () => {
       const { width, height } = stage.getBoundingClientRect()
-      tableScale.value = Math.min(width / table.offsetWidth, height / table.offsetHeight)
+      if (!width || !height) return
+      const aspect = width / height
+      const w = Math.min(MJ_MAX_W, Math.max(MJ_MIN_W, MJ_MIN_H * aspect))
+      const h = Math.max(MJ_MIN_H, w / aspect)
+      tableW.value = Math.round(w)
+      tableH.value = Math.round(h)
+      tableScale.value = Math.min(width / w, height / h, MJ_MAX_SCALE)
     }
     fitTable()
     const observer = new ResizeObserver(fitTable)
@@ -656,19 +664,6 @@ const windName = (seat) => t(`games.mahjong.honor.${WIND_KEYS[((seat % 4) + 4) %
 
 /** 罗盘上各方位的风:relPos(0=我/下,1=右,2=对家/上,3=左)→ 该座位的风 */
 const windOfRel = (rel) => windName((viewSeat.value + rel) % 4)
-
-/** 牌墙视图:四组两层,随剩余牌数实时缩减(余数从上、右、下、左依次补 1 张) */
-const wallGroupView = computed(() => {
-  const left = wallLeft.value
-  const base = Math.floor(left / 4)
-  const rem = left % 4
-  return ['top', 'right', 'bottom', 'left'].map((pos, idx) => {
-    const count = base + (idx < rem ? 1 : 0)
-    const stacks = []
-    for (let s = 0; s < Math.ceil(count / 2); s++) stacks.push({ top: s * 2 + 1 < count })
-    return { pos, count, stacks }
-  })
-})
 
 /** 骰子点阵(3×3 布局的坐标,r/c ∈ 0..2) */
 const DIE_PIPS = {
@@ -1740,20 +1735,20 @@ onBeforeUnmount(() => {
   color: #2471a3;
 }
 
-/* 小牌(河里/副露) */
+/* 小牌(河里/副露):默认取牌河档,各处的副露再按自己的档位覆盖 */
 .tile.mini {
-  width: 30px;
-  height: 42px;
+  width: var(--mj-river-w, 32px);
+  height: var(--mj-river-h, 44px);
   cursor: default;
 }
 .tile.mini .tile-num {
-  font-size: 14px;
+  font-size: 15px;
 }
 .tile.mini .tile-suit {
   font-size: 9px;
 }
 .tile.mini.honor {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* 牌背:深色底 + 中央回形纹(纯 CSS,不引素材);平面牌背,靠描边分张 */
@@ -1768,10 +1763,10 @@ onBeforeUnmount(() => {
     0 1px 2px rgba(0, 0, 0, 0.26);
   cursor: default;
 }
-/* 侧向牌背(左右家):牌横躺,长宽比按牌面 60:44 横置(41×30),不再压成细长条 */
+/* 侧向牌背(左右家):牌横躺,长宽比按牌面 60:44 横置,不再压成细长条 */
 .tile.back.side {
-  width: 41px;
-  height: 30px;
+  width: var(--mj-side-back-w, 41px);
+  height: var(--mj-side-back-h, 30px);
   border-radius: 4px;
 }
 
@@ -1782,13 +1777,14 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
 }
-/* 平面牌桌:用固定布局分出四家席位与中央牌池,保持牌形和相对位置。 */
+/* 平面牌桌:用固定布局分出四家席位与中央牌池,保持牌形和相对位置。
+   宽高由脚本按游戏区宽高比写进 --mj-w / --mj-h(整块游戏区铺成一张牌桌),再统一缩放。 */
 .mj-table {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 960px;
-  height: 720px;
+  width: var(--mj-w);
+  height: var(--mj-h);
   transform: translate(-50%, -50%) scale(var(--mj-scale));
   transform-origin: center center;
   display: grid;
@@ -1796,10 +1792,10 @@ onBeforeUnmount(() => {
     'top top top'
     'left center right'
     'bottom bottom bottom';
-  grid-template-columns: 104px minmax(0, 1fr) 104px;
+  grid-template-columns: 148px minmax(0, 1fr) 148px;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 6px 8px;
-  padding: 16px;
+  padding: 12px;
   border-radius: 22px;
   background:
     radial-gradient(ellipse at 50% 32%, rgba(255, 255, 255, 0.16) 0%, transparent 58%),
@@ -1814,8 +1810,24 @@ onBeforeUnmount(() => {
   --mj-felt-a: #3f7d5c;
   --mj-felt-b: #28553f;
   --mj-scale: 1;
-  --mj-river-w: 30px;
-  --mj-river-h: 42px;
+  /* 设计画布宽高:脚本按游戏区宽高比实时覆盖(见 MJ_MIN_W/H);这里的默认值与脚本下限同值 */
+  --mj-w: 1000px;
+  --mj-h: 500px;
+  /* 牌面尺寸一整套:手牌最大,其余按「看得清、又不抢手牌」分档;左右家横躺的牌身/牌面互换宽高 */
+  --mj-hand-w: 46px;
+  --mj-hand-h: 62px;
+  --mj-river-w: 32px;
+  --mj-river-h: 44px;
+  --mj-meld-w: 26px;
+  --mj-meld-h: 36px;
+  --mj-my-meld-w: 38px;
+  --mj-my-meld-h: 50px;
+  --mj-side-meld-w: 32px;
+  --mj-side-meld-h: 22px;
+  --mj-back-w: 30px;
+  --mj-back-h: 41px;
+  --mj-side-back-w: 41px;
+  --mj-side-back-h: 30px;
 }
 html.dark .mj-table {
   --mj-felt-a: #294f3f;
@@ -1855,13 +1867,15 @@ html.dark .mj-table {
   align-items: center;
   gap: 4px;
 }
-/* 左右家:名牌在上,平躺的两列手牌和副露在下。 */
+/* 左右家:名牌在上,副露紧随其下,两列平躺手牌在最下;整栏在中央行里纵向居中 */
 .mj-left,
 .mj-right {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  min-height: 0;
 }
 .mj-left {
   grid-area: left;
@@ -1938,13 +1952,15 @@ html.dark .mj-table {
   max-width: 100%;
   flex-wrap: wrap;
 }
-/* 左右家:侧向牌背竖排,紧挨成一条;两列(手牌 + 副露)并排贴边 */
+/* 左右家:副露横排在上、牌背竖排在下,都收在同一个窄栏里(不再左牌右副露并排) */
 .side-hand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
 }
 /* 庄家角标:金色呼应最新弃牌的高亮描边 */
@@ -1966,8 +1982,8 @@ html.dark .mj-table {
   gap: 0;
 }
 .mj-backs .tile.back.sm {
-  width: 30px;
-  height: 41px;
+  width: var(--mj-back-w, 30px);
+  height: var(--mj-back-h, 41px);
   flex: none;
   border-radius: 4px;
 }
@@ -1975,16 +1991,17 @@ html.dark .mj-table {
 .mj-backs .tile.back + .tile.back {
   margin-left: -1px;
 }
-/* 左右家:侧向牌背竖排,紧挨成一条 */
+/* 左右家:侧向牌背摊成三列(5 + 5 + 3),行高比牌身矮 1px 让相邻牌共用描边;
+   三列压到五张高,把窄栏剩下的竖直空间全留给上方的副露 */
 .mj-backs-col {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(5, calc(var(--mj-side-back-h, 30px) - 1px));
+  gap: 0 2px;
+  justify-content: center;
+  align-content: center;
 }
-.mj-backs-col .tile.back + .tile.back {
-  margin-top: -1px;
-}
-/* 中央:实时牌墙贴边,牌河和中央信息分格。 */
+/* 中央:牌河和中央信息分格。 */
 .mj-center {
   grid-area: center;
   position: relative;
@@ -1993,81 +2010,19 @@ html.dark .mj-table {
   min-width: 0;
   min-height: 0;
 }
-.mj-walls {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.wall-group {
-  position: absolute;
-  display: flex;
-  gap: 1px;
-}
-.wall-top {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.wall-bottom {
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.wall-left {
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  flex-direction: column;
-}
-.wall-right {
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  flex-direction: column;
-}
-.wall-stack {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0;
-}
-.wall-left .wall-stack,
-.wall-right .wall-stack {
-  flex-direction: row;
-}
-/* 牌墙单张:象牙色小方砖,两层叠出牌堆感 */
-.wall-tile {
-  display: block;
-  width: 20px;
-  height: 10px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #fdfcf3 0%, #e6dfc8 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 1px 1px rgba(0, 0, 0, 0.35);
-}
-.wall-left .wall-tile,
-.wall-right .wall-tile {
-  width: 10px;
-  height: 20px;
-  background: linear-gradient(90deg, #fdfcf3 0%, #e6dfc8 100%);
-}
-/* 半摞(单层)压暗一点,读出「这摞只剩一张」 */
-.wall-stack.half .wall-tile {
-  opacity: 0.85;
-}
-/* 侧牌河占各自整列,顶/底牌河和状态共用中列。弃牌再多也只在自己的格子里滚动。 */
+/* 侧牌河占各自整列,顶/底牌河和中央信息共用中列。弃牌再多也只在自己的格子里滚动。 */
 .mj-pool {
   --side-river-width: calc(4 * var(--mj-river-h) + 3px);
-  --end-river-height: calc(3 * var(--mj-river-h) + 4px);
   position: absolute;
-  inset: 26px;
+  inset: 10px;
   display: grid;
   grid-template-areas:
     'rl rt rr'
     'rl mid rr'
     'rl rb rr';
   grid-template-columns: var(--side-river-width) minmax(0, 1fr) var(--side-river-width);
-  grid-template-rows: var(--end-river-height) minmax(0, 1fr) var(--end-river-height);
+  /* 顶/底牌河各吃一半剩余高度(能放几行就放几行,多了自己滚),中央信息按内容取高 */
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px;
   place-items: center;
 }
@@ -2132,11 +2087,11 @@ html.dark .mj-table {
   height: var(--mj-river-h);
 }
 .river-left :is(.tile-img, .tile-face),
-.mj-left .meld-col :is(.tile-img, .tile-face) {
+.mj-left .meld-block :is(.tile-img, .tile-face) {
   transform: rotate(90deg);
 }
 .river-right :is(.tile-img, .tile-face),
-.mj-right .meld-col :is(.tile-img, .tile-face) {
+.mj-right .meld-block :is(.tile-img, .tile-face) {
   transform: rotate(-90deg);
 }
 .mj-river .tile.latest {
@@ -2281,46 +2236,52 @@ html.dark .rules-chip {
   margin-left: -1px;
 }
 .meld-row .tile.mini {
-  width: 24px;
-  height: 33px;
+  width: var(--mj-meld-w, 26px);
+  height: var(--mj-meld-h, 36px);
   border-radius: 3px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
-/* 两侧副露:纵向排列并与侧向手牌并列(两列贴在一起,和两侧手牌同一套平躺牌形);
+/* 两侧副露:横躺牌身一列一列并排,整块落在家手牌的上方(不吃手牌左右的空间);
    牌身横躺、牌面按长方形给尺寸再转 90° 朝向该家,旋转后正好落满牌身 */
-.meld-col {
-  flex-direction: column;
+.meld-block {
   flex-wrap: nowrap;
   gap: 2px;
-  padding: 4px 3px;
+  padding: 3px 4px;
 }
-.meld-col .meld-group {
+.meld-block .meld-group {
   flex-direction: column;
+  flex: none;
 }
-.meld-col .meld-group .tile.mini + .tile.mini {
+.meld-block .meld-group .tile.mini + .tile.mini {
   margin-left: 0;
   margin-top: -1px;
 }
-.meld-col .tile.mini {
-  width: 33px;
-  height: 24px;
+.meld-block .tile.mini {
+  width: var(--mj-side-meld-w, 32px);
+  height: var(--mj-side-meld-h, 22px);
 }
-.meld-col .tile.mini :is(.tile-img, .tile-face) {
-  width: 24px;
-  height: 33px;
+.meld-block .tile.mini :is(.tile-img, .tile-face) {
+  width: var(--mj-side-meld-h, 22px);
+  height: var(--mj-side-meld-w, 32px);
 }
 /* 我方:副露与手牌同排,上方留出摸牌/悬停抬起的空间。 */
 .my-row {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
   flex-wrap: nowrap;
-  padding-top: 8px;
+  padding-top: 10px;
 }
 .my-melds {
   align-self: flex-end;
+}
+/* 我的副露比对家/左右家都大一号(就在自己眼皮底下,要和手牌一起读) */
+.my-melds .tile.mini {
+  width: var(--mj-my-meld-w, 38px);
+  height: var(--mj-my-meld-h, 50px);
+  border-radius: 4px;
 }
 .hand-row {
   display: flex;
@@ -2330,40 +2291,54 @@ html.dark .rules-chip {
   align-items: flex-end;
   max-width: 100%;
 }
-/* 手牌固定设计尺寸(42×57,与牌面同比例),整桌靠统一缩放适配窗口 */
+/* 手牌固定设计尺寸(46×62,与牌面同比例),整桌靠统一缩放适配窗口 */
 .tile.hand {
-  width: 42px;
-  height: 57px;
+  width: var(--mj-hand-w, 46px);
+  height: var(--mj-hand-h, 62px);
   padding: 0;
 }
 .tile.hand + .tile.hand {
   margin-left: -1px;
 }
 .tile.hand.drawn {
-  transform: translateY(-8px);
+  transform: translateY(-9px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
 }
 .tile.hand:not(:disabled):hover {
-  transform: translateY(-5px);
+  transform: translateY(-6px);
 }
 .tile.hand.dim {
   opacity: 0.6;
 }
+/* 操作条浮在手牌正上方:出现时不占布局高度,手牌下面不会再留一块空地 */
+.mj-bottom {
+  position: relative;
+}
 .my-actions {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
-  margin-top: 6px;
-  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(10, 30, 24, 0.44);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+  z-index: 2;
+  max-width: 100%;
+  white-space: nowrap;
 }
 .my-actions :deep(.el-button + .el-button) {
   margin-left: 0;
 }
 /* 吃按钮里内嵌的两张候选小牌 */
 .my-actions .tile.mini {
-  width: 22px;
-  height: 30px;
+  width: 24px;
+  height: 32px;
   margin-left: 4px;
   box-shadow: none;
   border-radius: 4px;
@@ -2515,6 +2490,53 @@ html.dark .rules-chip {
   .rules-panel {
     min-width: 0;
     width: min(100%, 420px);
+  }
+}
+
+/* ===== 手机横屏:整块游戏区就是一张麻将桌 =====
+ * 矮屏横屏最缺的正是高度,而外壳默认会在左边留一栏放头部,白白从毯面身边切走 150~200px。
+ * 单机局改成盘面独占整页,返回/游戏名/新游戏/规则压成一块玻璃条浮在桌面左上角
+ * (左上角那块毯面本来就不摆牌)。
+ * 「一起玩」房间条一出现就有六七个按钮,浮在桌面上必然压住上家的副露,所以房间局仍走
+ * 外壳的两栏横屏档(左栏放头与房间条),只把牌桌按同一套设计画布铺满右栏。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .page.game-shell.mj-shell:not(.mj-room) {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: 0;
+    row-gap: 0;
+  }
+  /* 浮层高度跟着内容走:桌面全被盘面占满,浮层只在左上角压住一小块 */
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: var(--z-float);
+    max-width: min(72vw, 520px);
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px 6px 6px;
+    border-radius: 12px;
+    color: #f6f2e4;
+    background: rgba(10, 32, 25, 0.5);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+      0 8px 18px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(10px) saturate(1.1);
+  }
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-head) {
+    min-height: 0;
+    padding-bottom: 2px;
+  }
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-title) {
+    color: #f6f2e4;
+  }
+  /* 盘面独占整块游戏区(本页没有计分栏/页脚,一行一列就够) */
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-body) {
+    grid-row: 1;
+    grid-column: 1;
   }
 }
 </style>
