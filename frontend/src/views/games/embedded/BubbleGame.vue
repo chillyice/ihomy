@@ -28,7 +28,8 @@
     <div class="bb-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="bb-meta gs-on-dark-surface">
         <div class="bb-actions">
-          <el-button size="small" round :disabled="newDisabled" @click="restart">
+          <!-- 本页的「新游戏」走自己的操作行(外壳头部那颗在泡泡龙不挂),配色跟全站一致走主按钮 -->
+          <el-button type="primary" size="small" round :disabled="newDisabled" @click="restart">
             {{ $t('games.embedded.bubble.newGame') }}
           </el-button>
         </div>

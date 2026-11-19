@@ -29,8 +29,8 @@
           <el-tag v-if="gamepadConnected" size="small" type="success" effect="plain" class="gamepad-tag">
             {{ $t('games.gamepadReady') }}
           </el-tag>
-          <!-- 新游戏:文字键、固定在规则键左侧(桌面排在图标组之前,手机横屏与规则同处第二行) -->
-          <el-button v-if="newGame" class="gs-new-game" size="small" round :disabled="newGameDisabled" @click="onNewGame">
+          <!-- 新游戏:主按钮配色(每局的主操作,和全屏/宽屏/规则那排玻璃键区分开),固定在规则键左侧 -->
+          <el-button v-if="newGame" class="gs-new-game" type="primary" size="small" round :disabled="newGameDisabled" @click="onNewGame">
             {{ $t('games.newGame') }}
           </el-button>
           <el-button
