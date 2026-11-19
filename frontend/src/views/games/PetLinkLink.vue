@@ -44,7 +44,7 @@
       />
     </template>
 
-    <div class="pl-layout" @contextmenu.prevent @dblclick.prevent>
+    <div class="pl-layout" :style="{ '--pl-pad': padPx + 'px' }" @contextmenu.prevent @dblclick.prevent>
       <!-- 封面(复刻原版标题屏):开始/继续 + 版权;玩法说明在规则弹窗 -->
       <div v-if="screen === 'cover'" class="cover">
         <button class="start-btn" type="button" @click="continueGame">
@@ -241,6 +241,10 @@ const CELL_H = 40
 const GAP_X = 2
 const GAP_Y = 0
 const PAD = 44 // 外圈占位(供连线 SVG 绕外圈绘制)
+// 手机横屏(矮屏 + 左侧信息栏)优先把高度让给棋盘:外圈收到连线本身的极限宽度
+// ——列环中心线离边 CELL_W/2+2、行环离边 CELL_H/2,26 还能留出 3~6px,
+// 上下共省 36px,牌面按高度等比放大一圈(844×390 实测牌面 26.5 → 30.8px,板面 443×308 → 489×332)。
+const PAD_COMPACT = 26
 const LEVEL_TIME = PETLINK_LEVEL_TIME
 const MAX_LEVEL = PETLINK_MAX_LEVEL
 const TIME_BONUS = 3 // 每消除一对补充 3 秒(原件 36 帧)
@@ -445,8 +449,13 @@ const debugOddText = computed(() => debugOdd.value.map((d) => `#${d.type}×${d.c
 
 const boardW = COLS * CELL_W + (COLS - 1) * GAP_X
 const boardH = ROWS * CELL_H + (ROWS - 1) * GAP_Y
-const svgW = boardW + PAD * 2
-const svgH = boardH + PAD * 2
+// 手机横屏(与外壳 §43 横屏档同一门槛)换紧凑外圈:连线坐标与 SVG 盒子一起变,
+// 所以 pad 必须是从同一个值派生的,页面别处不许再写死 44。
+const compactLandscape = ref(false)
+let landscapeQuery = null
+const padPx = computed(() => (compactLandscape.value ? PAD_COMPACT : PAD))
+const svgW = computed(() => boardW + padPx.value * 2)
+const svgH = computed(() => boardH + padPx.value * 2)
 
 const cells = computed(() => board.value.map((t, idx) => ({ idx, value: t ? t.type : 0, tid: t ? t.id : 0 })))
 
@@ -462,8 +471,8 @@ const peerAnchorAt = (idx) => peerAnchorList.value.find((p) => p.idx === idx)
 const boardScrollRef = ref(null)
 const boardEl = ref(null)
 const boardScale = ref(1)
-const scaledW = computed(() => Math.round(svgW * boardScale.value))
-const scaledH = computed(() => Math.round(svgH * boardScale.value))
+const scaledW = computed(() => Math.round(svgW.value * boardScale.value))
+const scaledH = computed(() => Math.round(svgH.value * boardScale.value))
 // 观战成员整体冻结:只看盘面,不参与任何交互(计时也由玩家端推进)
 const frozen = computed(() => animating.value || paused.value || won.value || lost.value || play.ended || play.isSpectator)
 const levelName = computed(() => t(`games.petlink.levelNames.${level.value}`) || '')
@@ -491,39 +500,87 @@ function onFullscreenChange() {
   // 全屏/退出后可用宽高变化,重新计算缩放
   nextTick(() => updateBoardScale())
 }
+/** 横屏档切换(含键盘/折叠屏改视口):换完外圈宽窄,按新 SVG 尺寸重算缩放 */
+function onLandscapeQueryChange(e) {
+  compactLandscape.value = !!e.matches
+  nextTick(() => updateBoardScale())
+}
 
 // ---------- 音频(点击/消除/胜利音效,无背景音乐;可静音) ----------
-
+// 走 Web Audio 预解码样本:HTMLAudioElement 每次都要 seek 回 0 再起播,手机上一来一回
+// 拖到一两百毫秒;点击音本身只有 21ms,听感就是「点了慢半拍」。BufferSource 一点即响,
+// 连点还能叠着响而不互相打断。首次点击时上下文在用户手势里 resume,不会静默失声。
 const muted = ref(localStorage.getItem('ihomy:game:petlink:muted') === '1')
-const audioClick = new Audio(clickUrl)
-const audioMatch = new Audio(matchUrl)
-const audioWin = new Audio(winUrl)
+const SOUND_URLS = { click: clickUrl, match: matchUrl, win: winUrl }
+let audioCtx = null
+const soundBuffers = new Map()
+let htmlAudios = null
+
+/** 建上下文并把三段音效拉下来解码(解码不要求用户激活,进页面就能先备好) */
+function ensureAudioContext() {
+  if (audioCtx) return audioCtx
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  try {
+    audioCtx = new Ctx()
+  } catch (e) {
+    audioCtx = null
+    return null
+  }
+  for (const [key, url] of Object.entries(SOUND_URLS)) {
+    fetch(url)
+      .then((res) => res.arrayBuffer())
+      .then((raw) => {
+        // 回调式写法:老 Safari/WKWebView 的 decodeAudioData 不返回 Promise
+        audioCtx?.decodeAudioData(
+          raw,
+          (buffer) => soundBuffers.set(key, buffer),
+          () => {},
+        )
+      })
+      .catch(() => {})
+  }
+  return audioCtx
+}
+
+/** 没有 Web Audio 的老环境(极少):退回 <audio> 元素,慢一点但有声 */
+function playHtmlAudio(key) {
+  if (!htmlAudios) {
+    htmlAudios = {}
+    for (const [k, url] of Object.entries(SOUND_URLS)) htmlAudios[k] = new Audio(url)
+  }
+  const el = htmlAudios[key]
+  if (!el) return
+  try {
+    el.currentTime = 0
+    el.play().catch(() => {})
+  } catch (e) {}
+}
+
+function playSound(key) {
+  if (muted.value) return
+  const ctx = ensureAudioContext()
+  if (!ctx) {
+    playHtmlAudio(key)
+    return
+  }
+  // 移动端上下文默认 suspended;在点击手势里 resume 当帧就生效
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  const buffer = soundBuffers.get(key)
+  if (!buffer) return
+  const source = ctx.createBufferSource()
+  source.buffer = buffer
+  source.connect(ctx.destination)
+  source.start()
+}
 
 function toggleMute() {
   muted.value = !muted.value
   localStorage.setItem('ihomy:game:petlink:muted', muted.value ? '1' : '0')
 }
-function playClick() {
-  if (muted.value) return
-  try {
-    audioClick.currentTime = 0
-    audioClick.play()
-  } catch (e) {}
-}
-function playMatch() {
-  if (muted.value) return
-  try {
-    audioMatch.currentTime = 0
-    audioMatch.play()
-  } catch (e) {}
-}
-function playWin() {
-  if (muted.value) return
-  try {
-    audioWin.currentTime = 0
-    audioWin.play()
-  } catch (e) {}
-}
+const playClick = () => playSound('click')
+const playMatch = () => playSound('match')
+const playWin = () => playSound('win')
 
 // ---------- 进度存档 ----------
 // 只在对局进行中写档;通关/失败/重新开始即清档,封面按存档显示「继续游戏」。
@@ -948,16 +1005,19 @@ function updateBoardScale() {
   const el = boardScrollRef.value
   if (!el) return
   const availW = el.clientWidth
-  let scale = availW > 0 ? availW / svgW : 1
+  let scale = availW > 0 ? availW / svgW.value : 1
   // 按外壳游戏区实测高取较小者,棋盘铺满可用区(不封顶,大屏不累眼)
   const bodyEl = shellEl.value?.bodyEl
   if (bodyEl) {
-    const hud = bodyEl.querySelector('.game-hud')
-    const bar = bodyEl.querySelector('.game-bottombar')
-    const hudH = hud ? hud.offsetHeight + 12 : 0 // .game-hud margin-bottom 12px
-    const barH = bar ? bar.offsetHeight + 12 : 0 // .game-bottombar margin-top 12px
-    const availH = bodyEl.clientHeight - 16 - hudH - barH
-    if (availH > 0) scale = Math.min(scale, availH / svgH)
+    // 顶部信息栏与底部操作条占掉的高度从实测样式读:手机横屏信息栏压扁、间距变小,
+    // 写死 12 会白扣一截;手机横屏的操作条是 display:none(四个键搬去左栏),整条都不能扣
+    const outerH = (node) => {
+      if (!node || !node.offsetHeight) return 0
+      const cs = getComputedStyle(node)
+      return node.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0)
+    }
+    const availH = bodyEl.clientHeight - outerH(bodyEl.querySelector('.game-hud')) - outerH(bodyEl.querySelector('.game-bottombar')) - 4
+    if (availH > 0) scale = Math.min(scale, availH / svgH.value)
     scale = Math.max(0.5, scale)
   } else {
     scale = Math.min(1.6, Math.max(0.5, scale))
@@ -1006,10 +1066,10 @@ function restart() {
 }
 
 function centerX(c) {
-  return PAD + c * (CELL_W + GAP_X) + CELL_W / 2
+  return padPx.value + c * (CELL_W + GAP_X) + CELL_W / 2
 }
 function centerY(r) {
-  return PAD + r * (CELL_H + GAP_Y) + CELL_H / 2
+  return padPx.value + r * (CELL_H + GAP_Y) + CELL_H / 2
 }
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms))
@@ -1080,6 +1140,13 @@ onMounted(async () => {
   window.addEventListener('resize', updateBoardScale)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  // 进页面就把三段音效解码备好,第一次点击不必等加载
+  ensureAudioContext()
+  // 外圈宽窄跟着横屏档走:切成紧凑外圈后 SVG 盒子变小,按新尺寸重算缩放
+  landscapeQuery = window.matchMedia?.('(orientation: landscape) and (max-height: 520px)') || null
+  compactLandscape.value = !!landscapeQuery?.matches
+  if (landscapeQuery?.addEventListener) landscapeQuery.addEventListener('change', onLandscapeQueryChange)
+  else landscapeQuery?.addListener?.(onLandscapeQueryChange)
   // 进入游戏即关闭全局光影特效(与图片/视频/看书一致),离开时恢复
   sunLight?.suspendEffects()
   resizeObserver = new ResizeObserver(() => updateBoardScale())
@@ -1113,9 +1180,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateBoardScale)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (landscapeQuery?.removeEventListener) landscapeQuery.removeEventListener('change', onLandscapeQueryChange)
+  else landscapeQuery?.removeListener?.(onLandscapeQueryChange)
+  landscapeQuery = null
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
+  }
+  // 关掉音频线程:手机对同时存在的 AudioContext 有上限,退出游戏就把这个还回去
+  if (audioCtx) {
+    audioCtx.close().catch(() => {})
+    audioCtx = null
+    soundBuffers.clear()
   }
   sunLight?.restoreEffects()
 })
@@ -1177,6 +1253,8 @@ html.dark .pl-shell {
   .pl-shell :deep(.gs-actions) {
     justify-content: flex-start;
     margin-inline-start: 0;
+    /* 撑满左栏:下面那组按钮按 100% 拉伸才有参照宽度 */
+    width: 100%;
   }
   /* 「左栏的下面」:这组按钮贴着左栏底边(doc 顺序在房间条之后,
      用 order 把房间条留在头部下面,按钮自己吃走剩下的空间落到最下) */
@@ -1192,6 +1270,47 @@ html.dark .pl-shell {
   .pl-shell .game-bottombar {
     display: none;
   }
+  /* 四个操作键纵向排列:左栏窄,横着只能挤成两行两列还被压成半截 */
+  .pl-rail-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+  }
+  .pl-rail-actions .el-button {
+    width: 100%;
+    margin-left: 0;
+  }
+  /* 顶部信息栏压成一条:省下的高度全给棋盘(牌面小看不清时,这十几像素很值)。
+     带 .pl-layout 前缀提权:这一堆基础样式写在本段之后(1389 行起),同权时后者赢,
+     不加前缀整段都是空转(实测 HUD 仍是 24 高 + 12 下边距) */
+  .pl-layout .game-hud {
+    gap: 10px;
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+  .pl-layout .hud-level-no {
+    font-size: 13px;
+  }
+  .pl-layout .hud-level-name {
+    font-size: 12px;
+  }
+  .pl-layout .hud-life .life-num {
+    font-size: 13px;
+  }
+  .pl-layout .hud-life .life-label {
+    font-size: 11px;
+  }
+  .pl-layout .hud-score b {
+    font-size: 14px;
+  }
+  .pl-layout .timer-bar {
+    height: 10px;
+  }
+  .pl-layout .timer-text {
+    font-size: 11px;
+    min-width: 30px;
+  }
 }
 .pl-layout {
   position: relative;
@@ -1202,6 +1321,9 @@ html.dark .pl-shell {
   height: 100%;
   min-width: 0;
   min-height: 0;
+  /* 外圈留白:桌面/竖屏 44px;手机横屏由脚本按档改写成 26px(内联覆盖)。
+     这里给默认值不只是兜底 —— 只在脚本里注入的变量会被 themeTokens 守门判为未定义 */
+  --pl-pad: 44px;
   color: #fff;
 }
 
@@ -1392,7 +1514,8 @@ html.dark .pl-shell {
 .board-wrap {
   position: relative;
   width: fit-content;
-  padding: 44px;
+  /* 外圈留白:桌面/竖屏 44px,手机横屏由页面按档换成 26px(--pl-pad 内联注入) */
+  padding: var(--pl-pad, 44px);
   transform-origin: top left;
 }
 .board {
@@ -1407,7 +1530,8 @@ html.dark .pl-shell {
 .board::after {
   content: '';
   position: absolute;
-  inset: -44px;
+  /* 压暗层要连外圈一起盖住,留白多少跟着 --pl-pad 走 */
+  inset: calc(var(--pl-pad, 44px) * -1);
   z-index: 2;
   background: rgba(0, 0, 0, 0.66);
   opacity: 0;
