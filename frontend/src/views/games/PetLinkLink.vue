@@ -510,16 +510,18 @@ function onLandscapeQueryChange(e) {
 // ---------- 音频(点击/消除/胜利音效,无背景音乐;可静音) ----------
 // 走 Web Audio 预解码样本:HTMLAudioElement 每次都要 seek 回 0 再起播,手机上一来一回
 // 拖到一两百毫秒;点击音本身只有 21ms,听感就是「点了慢半拍」。BufferSource 一点即响,
-// 连点还能叠着响而不互相打断。首次点击时上下文在用户手势里 resume,不会静默失声。
+// 连点还能叠着响而不互相打断。样本没备好(解码失败或还没解完)或上下文拉不起来时一律退回
+// <audio>:多一两百毫秒可以接受,没声音不行 —— 所以这里没有「拿到空缓冲就 return」的静音路径。
 const muted = ref(localStorage.getItem('ihomy:game:petlink:muted') === '1')
 const SOUND_URLS = { click: clickUrl, match: matchUrl, win: winUrl }
 let audioCtx = null
 const soundBuffers = new Map()
+const htmlOnlyKeys = new Set() // 解码失败的样本:以后直接走 <audio>,不再等一个永远不会来的缓冲
 let htmlAudios = null
 
 /** 建上下文并把三段音效拉下来解码(解码不要求用户激活,进页面就能先备好) */
 function ensureAudioContext() {
-  if (audioCtx) return audioCtx
+  if (audioCtx && audioCtx.state !== 'closed') return audioCtx
   const Ctx = window.AudioContext || window.webkitAudioContext
   if (!Ctx) return null
   try {
@@ -536,15 +538,21 @@ function ensureAudioContext() {
         audioCtx?.decodeAudioData(
           raw,
           (buffer) => soundBuffers.set(key, buffer),
-          () => {},
+          () => htmlOnlyKeys.add(key),
         )
       })
-      .catch(() => {})
+      // 个别 WebView 会拒解短样本或 mp3:记下来,这个音改为全程走 <audio>
+      .catch(() => htmlOnlyKeys.add(key))
   }
   return audioCtx
 }
 
-/** 没有 Web Audio 的老环境(极少):退回 <audio> 元素,慢一点但有声 */
+/** 手势解锁:菜单里点「开始游戏」那一下就把上下文拉起来,进局第一次点牌不必再等 resume */
+function unlockAudio() {
+  if (audioCtx && audioCtx.state !== 'running' && audioCtx.state !== 'closed') audioCtx.resume().catch(() => {})
+}
+
+/** 没有 Web Audio 的老环境、或样本没备好:退回 <audio> 元素,慢一点但有声 */
 function playHtmlAudio(key) {
   if (!htmlAudios) {
     htmlAudios = {}
@@ -558,21 +566,52 @@ function playHtmlAudio(key) {
   } catch (e) {}
 }
 
+/** 起一个一次性缓冲源;同一段可以叠着响,互不打断 */
+function startBuffer(ctx, key, buffer) {
+  try {
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start()
+  } catch (e) {
+    playHtmlAudio(key)
+  }
+}
+
 function playSound(key) {
   if (muted.value) return
   const ctx = ensureAudioContext()
-  if (!ctx) {
+  const buffer = ctx && !htmlOnlyKeys.has(key) ? soundBuffers.get(key) : null
+  // 没上下文 / 该样本解码失败 / 还没解完(刚进页就点):退回 <audio>,不许没声音
+  if (!ctx || !buffer) {
     playHtmlAudio(key)
     return
   }
-  // 移动端上下文默认 suspended;在点击手势里 resume 当帧就生效
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
-  const buffer = soundBuffers.get(key)
-  if (!buffer) return
-  const source = ctx.createBufferSource()
-  source.buffer = buffer
-  source.connect(ctx.destination)
-  source.start()
+  if (ctx.state === 'running') {
+    startBuffer(ctx, key, buffer)
+    return
+  }
+  // suspended(还没在手势里 resume 过)/ interrupted(iOS 来电、切后台回来):必须等 resume
+  // 落地再起播 —— 悬挂态里 start() 会被引擎直接吞掉,那一声就是「点了没声音」。
+  // resume 迟迟不落地(手势没被认)也退回 <audio>,别把对局变成哑的。
+  let settled = false
+  let timer = null
+  const fire = (ok) => {
+    if (settled) return
+    settled = true
+    clearTimeout(timer)
+    if (ok && ctx.state === 'running') startBuffer(ctx, key, buffer)
+    else playHtmlAudio(key)
+  }
+  timer = setTimeout(() => fire(false), 300)
+  try {
+    ctx.resume().then(
+      () => fire(true),
+      () => fire(false),
+    )
+  } catch (e) {
+    fire(false)
+  }
 }
 
 function toggleMute() {
@@ -1143,6 +1182,10 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   // 进页面就把三段音效解码备好,第一次点击不必等加载
   ensureAudioContext()
+  // 任何一次按下都顺手把上下文拉起来(手机 Safari / WebView 要求 resume 在真手势里),
+  // 这样进局后第一次点牌时它已经是 running,不用再走「等 resume」那条路
+  document.addEventListener('pointerdown', unlockAudio, true)
+  window.addEventListener('keydown', unlockAudio, true)
   // 外圈宽窄跟着横屏档走:切成紧凑外圈后 SVG 盒子变小,按新尺寸重算缩放
   landscapeQuery = window.matchMedia?.('(orientation: landscape) and (max-height: 520px)') || null
   compactLandscape.value = !!landscapeQuery?.matches
@@ -1179,6 +1222,8 @@ onBeforeUnmount(() => {
   clearHint()
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', updateBoardScale)
+  document.removeEventListener('pointerdown', unlockAudio, true)
+  window.removeEventListener('keydown', unlockAudio, true)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   if (landscapeQuery?.removeEventListener) landscapeQuery.removeEventListener('change', onLandscapeQueryChange)
