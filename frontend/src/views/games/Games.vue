@@ -322,7 +322,7 @@ watch(activeCategory, (v) => {
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
 
-/** 开源小游戏整包(public/mini-games/*):只在这里挂图标与站内路由,元数据见 utils/games/embeddedGames.js */
+/** 开源小游戏卡片的图标(玩法已本地化,元数据仍见 utils/games/embeddedGames.js) */
 const EMBEDDED_ICONS = {
   xiangqi: Flag,
   reversi: GoldMedal,

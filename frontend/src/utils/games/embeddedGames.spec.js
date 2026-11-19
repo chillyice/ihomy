@@ -15,7 +15,7 @@ describe('embeddedGames', () => {
   })
 
   it('builds a same-origin static path instead of an external url', () => {
-    expect(embeddedGameSrc('bubble')).toBe('/mini-games/bubble/index.html')
+    expect(embeddedGameSrc('space-cadet')).toBe('/mini-games/space-cadet/index.html')
   })
 
   it('returns null for an unknown slug so a hand-typed route does not crash', () => {

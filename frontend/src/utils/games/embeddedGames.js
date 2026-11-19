@@ -1,5 +1,8 @@
-// 站内 iframe 直跑的开源小游戏:整包放在 frontend/public/mini-games/<slug>/
-// 只登记元数据,不引 npm 依赖、不进首屏 bundle;新增一款 = 放目录 + 这里加一行 + i18n 两条文案。
+// 站内开源小游戏的卡片元数据(slug/标题/描述/分类):新增一款 = 这里加一行 + i18n 两条文案。
+// 玩法分两种:中国象棋/黑白棋/消消乐/泡泡龙/小恐龙已本地化为 Vue 组件(`views/games/embedded/`,
+// 引擎在 utils/games/,精灵与音效在 src/assets/games/),走统一游戏外壳;
+// 只保留三维弹球·太空军校生为整包静态页(`public/mini-games/space-cadet/`)站内 iframe 直跑——
+// 它的引擎是 Emscripten 编译的 C++/wasm,无法自研重写。
 // 出处与协议见 frontend/public/mini-games/THIRD-PARTY.md。
 export const EMBEDDED_GAMES = [
   { slug: 'xiangqi', titleKey: 'games.embedded.xiangqi.title', descKey: 'games.embedded.xiangqi.desc', category: 'BOARD' },
@@ -18,5 +21,5 @@ export const EMBEDDED_GAMES = [
 /** 按 slug 找元数据;不存在返回 null(路由手输地址时不炸) */
 export const findEmbeddedGame = (slug) => EMBEDDED_GAMES.find((g) => g.slug === slug) || null
 
-/** iframe 地址:静态目录由 Nginx / dev server 直接托管,不经过后端 */
+/** iframe 地址:只剩 space-cadet 这类整包静态游戏用,静态目录由 Nginx / dev server 直接托管 */
 export const embeddedGameSrc = (slug) => `/mini-games/${slug}/index.html`
