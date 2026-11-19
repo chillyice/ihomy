@@ -19,6 +19,7 @@
         <li>{{ $t('games.baohuang.rules2') }}</li>
         <li>{{ $t('games.baohuang.rules3') }}</li>
         <li>{{ $t('games.baohuang.rules4') }}</li>
+        <li>{{ $t('games.fight.gestures') }}</li>
       </ul>
     </template>
 
@@ -346,10 +347,12 @@ function toggleCard(card) {
 
 // ---------- 扩选与自动出牌 ----------
 // 左键拖选:拖过的牌并入选择(随时可选,不限于自己回合);右键拖选:标记的牌
-// 在轮到自己时自动打出(能大过桌面就出),打不出则保留选中退回手动。
+// 在轮到自己时自动打出(能大过桌面就出),打不出则整体收回(清空选中,牌落回去)。
 const pendingAuto = ref([])
 function extendSelect(ids) {
-  selected.value = [...new Set([...selected.value, ...ids])]
+  // 拖选途中若电脑换手重排,扫过的旧 id 会失效,过滤到当前手牌防残留点亮别的牌
+  const handIds = new Set(myHand.value.map((card) => card.id))
+  selected.value = [...new Set([...selected.value, ...ids])].filter((id) => handIds.has(id))
 }
 function markAuto(ids) {
   const handIds = new Set(myHand.value.map((card) => card.id))
@@ -365,6 +368,9 @@ function tryAutoPlay() {
   if (canPlay.value) {
     playSelected()
     pendingAuto.value = []
+  } else {
+    pendingAuto.value = []
+    selected.value = []
   }
 }
 watch(myTurn, (turn) => {

@@ -1379,6 +1379,8 @@ export default {
       multiplier: 'Multiplier',
       badCards: 'That combination cannot be played',
       notBigEnough: 'Does not beat the last play',
+      gestures:
+        'Tap a card to raise it and tap again to put it back; press and slide to pick several at once; on desktop, right-drag across cards to preselect — they play automatically on your turn, or drop back if they cannot beat the table',
     },
     typeLink: 'Web',
     typeDesktop: 'Desktop',

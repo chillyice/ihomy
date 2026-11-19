@@ -1372,6 +1372,7 @@ export default {
       multiplier: '倍数',
       badCards: '这些牌不能这样出',
       notBigEnough: '压不过上一手',
+      gestures: '点牌弹起选中、再点收回；按住滑动可一次选多张；电脑上按住右键滑过一组牌可预选，轮到你时会自动打出，打不出就自动收回',
     },
     typeLink: '网页',
     typeDesktop: '桌面',

@@ -109,15 +109,25 @@ const props = defineProps({
 
 const emit = defineEmits(['select', 'extend-select', 'auto-select'])
 
-// ---------- 手牌拖选(仅鼠标;触摸仍走点选,拖动手势留给手牌横向滚动) ----------
-// 左键按住扫过多张 = 扩选(逐张并入选择);右键按住扫过多张 = 标记自动出牌,
-// 松开右键整体交给页面,轮到自己时自动打出、打不出保留选中退回手动。
+// ---------- 手牌拖选(鼠标左/右键 + 触摸/笔) ----------
+// 左键或手指按住扫过多张 = 扩选(逐张并入选择);鼠标右键按住扫过多张 = 标记自动出牌,
+// 松开右键整体交给页面,轮到自己时自动打出、打不出由页面清空选中让牌落回去。
 // 按下时不接管指针(要靠 pointer 落点找新牌),真拖起来才挂 window 监听,松手即摘。
-const DRAG_THRESHOLD = 6
+// 触摸阈值放宽:手抖一旦过阈值,起点牌就会被并入选择,与「点选取消」方向相反,宁小勿误。
+const MOUSE_THRESHOLD = 6
+const TOUCH_THRESHOLD = 10
 let dragState = null
 let justDragged = false
 
-const cardIdAt = (x, y) => document.elementFromPoint(x, y)?.closest('.ft-card')?.dataset.id ?? null
+// 落点取「最上层且本次未扫过」的牌:已选中的牌会弹起抬层,可能盖住未选的右邻条,
+// 只看 elementFromPoint 会命中已扫过的牌而漏掉它下面那张(elementsFromPoint 自上而下找)
+const cardIdAt = (x, y, exclude) => {
+  for (const el of document.elementsFromPoint(x, y)) {
+    const id = el.closest?.('.ft-card')?.dataset.id
+    if (id && !exclude?.has(id)) return id
+  }
+  return null
+}
 
 function onCardClick(card) {
   if (justDragged) {
@@ -128,27 +138,44 @@ function onCardClick(card) {
 }
 
 function onCardDown(card, e) {
-  if (e.pointerType !== 'mouse' || (e.button !== 0 && e.button !== 2)) return
-  dragState = { button: e.button, active: false, startX: e.clientX, startY: e.clientY, ids: new Set([card.id]) }
+  if (dragState) return
+  let mode = ''
+  if (e.pointerType === 'mouse') {
+    if (e.button === 0) mode = 'extend'
+    else if (e.button === 2) mode = 'auto'
+  } else if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+    mode = 'extend'
+  }
+  if (!mode) return
+  dragState = {
+    mode,
+    pointerId: e.pointerId,
+    threshold: e.pointerType === 'mouse' ? MOUSE_THRESHOLD : TOUCH_THRESHOLD,
+    active: false,
+    startX: e.clientX,
+    startY: e.clientY,
+    ids: new Set([card.id]),
+  }
   window.addEventListener('pointermove', onDragMove)
   window.addEventListener('pointerup', onDragUp)
   window.addEventListener('pointercancel', onDragUp)
 }
 
 function onDragMove(e) {
-  if (!dragState) return
+  if (!dragState || e.pointerId !== dragState.pointerId) return
   if (!dragState.active) {
-    if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < DRAG_THRESHOLD) return
+    if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < dragState.threshold) return
     dragState.active = true
-    if (dragState.button === 0) emit('extend-select', [...dragState.ids])
+    if (dragState.mode === 'extend') emit('extend-select', [...dragState.ids])
   }
-  const id = cardIdAt(e.clientX, e.clientY)
+  const id = cardIdAt(e.clientX, e.clientY, dragState.ids)
   if (!id || dragState.ids.has(id)) return
   dragState.ids.add(id)
-  if (dragState.button === 0) emit('extend-select', [id])
+  if (dragState.mode === 'extend') emit('extend-select', [id])
 }
 
-function onDragUp() {
+function onDragUp(e) {
+  if (dragState && e.pointerId !== dragState.pointerId) return
   window.removeEventListener('pointermove', onDragMove)
   window.removeEventListener('pointerup', onDragUp)
   window.removeEventListener('pointercancel', onDragUp)
@@ -156,7 +183,7 @@ function onDragUp() {
   const state = dragState
   dragState = null
   if (!state.active) return
-  if (state.button === 0) {
+  if (state.mode === 'extend') {
     // 拖选落点的那张牌会再收到合成 click,吞掉避免把刚选中的牌又反选回去
     justDragged = true
     setTimeout(() => {
@@ -462,6 +489,8 @@ const cardLabel = (card) => {
 }
 
 .ft-my-area {
+  /* 容器查询锚点:手牌步长按这里的实际宽度收敛(横屏左栏/全屏下 100vw 都会算错) */
+  container-type: inline-size;
   display: flex;
   flex: 0 0 auto;
   min-height: 0;
@@ -499,8 +528,11 @@ const cardLabel = (card) => {
   overflow-y: hidden;
   scrollbar-width: none;
   --fc-hand-n: 20;
-  --fc-step: clamp(13px, calc((100vw - 72px) / var(--fc-hand-n, 20)), 30px);
-  --fc-card-w: clamp(30px, calc(var(--fc-step) * 2.1), 56px);
+  /* 步长按容器宽收敛到刚好放得下(除数补上整牌宽度开销),任何手牌数都不再横向滚动,
+     滑动拖选才不会被滚动手势抢走;7px 下限兜底极端窄屏(有横向滚动垫底) */
+  --fc-pop: 14px;
+  --fc-step: clamp(7px, calc((100cqw - 12px) / (var(--fc-hand-n, 20) + 1.15)), 30px);
+  --fc-card-w: clamp(16px, calc(var(--fc-step) * 2.1), 56px);
 }
 .ft-hand::-webkit-scrollbar {
   display: none;
@@ -521,12 +553,16 @@ const cardLabel = (card) => {
   transition:
     transform 0.14s ease,
     box-shadow 0.14s ease;
-  touch-action: manipulation;
+  /* 拖选(含触摸滑动)不被浏览器接管为滚动,牌面必须自禁触摸手势 */
+  touch-action: none;
 }
 .ft-card:first-child {
   margin-left: 0;
 }
 .ft-card.sel {
+  /* 选中=向上探出一块;z-index 抬层让描边不被右邻叠牌盖住 */
+  z-index: 2;
+  transform: translateY(calc(var(--fc-pop, 14px) * -1));
   outline: 2px solid #ffd166;
   outline-offset: -2px;
   box-shadow:
@@ -614,6 +650,7 @@ const cardLabel = (card) => {
     font-size: 11px;
   }
   .ft-hand {
+    --fc-pop: 9px;
     min-height: calc(var(--fc-card-w, 40px) * 1.15 + 10px);
     padding: 10px 6px 0;
   }
@@ -626,6 +663,19 @@ const cardLabel = (card) => {
   }
   .ft-seat {
     padding: 2px 5px;
+  }
+}
+
+/* 大屏:手牌放宽一档——每张露出 46px(拇指点得准、不会点到邻居),整牌 84px 看清点数花色。
+   窄屏/矮屏仍按上面的 30px / 56px 收敛,保证一屏放得下 */
+@media (min-width: 900px) and (min-height: 620px) {
+  .ft-hand {
+    --fc-step: clamp(7px, calc((100cqw - 12px) / (var(--fc-hand-n, 20) + 1.15)), 46px);
+    --fc-card-w: clamp(16px, calc(var(--fc-step) * 1.9), 84px);
+    min-height: calc(var(--fc-card-w, 54px) * 1.4 + 20px);
+  }
+  .ft-mini {
+    width: clamp(34px, 4.6vw, 72px);
   }
 }
 </style>
