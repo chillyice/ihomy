@@ -1591,6 +1591,17 @@ onBeforeUnmount(() => {
   .sd-tool-undo {
     display: block;
   }
+  /* 模式与难度并排一行:左栏只有 180 上下,main.css 的横屏档为了让下拉文字区不被压成 0
+     把每个选择器都撑成整行,两个就吃掉两行;这里提权改回同一行各占一半(抬到 0,4,0,
+     不用靠书写顺序)。两个都是 2~3 个字的中文,88px 仍读得全 */
+  .sd-shell :deep(.gs-head .gs-title-extra) {
+    flex-wrap: nowrap;
+  }
+  .sd-shell :deep(.gs-head .gs-title-extra > .el-select) {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
 }
 .sd-panel {
   grid-area: panel;
@@ -2418,8 +2429,11 @@ html.dark .sd-cell.conflict {
     gap: 10px;
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
   }
-  /* 棋盘与数字盘底边贴齐、一起往页面底边压(margin 只留 4 缓冲) */
-  .sd-frame,
+  /* 棋盘按可用高铺满并垂直居中:上、下到游戏区的距离相等(窄屏被宽度卡住时
+     不再「贴底、上面空一截」);数字盘底边仍与棋盘底边贴齐 */
+  .sd-frame {
+    align-self: center;
+  }
   .sd-panel {
     align-self: end;
     margin-bottom: 4px;
