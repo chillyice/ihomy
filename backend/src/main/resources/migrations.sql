@@ -3779,3 +3779,39 @@ WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'andro
 SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_health_sample' AND index_name = 'idx_period_start');
 SET @sql := IF(@has = 0, 'ALTER TABLE `family_health_sample` ADD INDEX `idx_period_start` (`period`, `start_time`)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- 2026-11-19(V13.26):健康报表自定义与临时分享
+--   ① 新表 family_health_share:报表快照(冻结 JSON)+ 32 位随机令牌,默认 7 天到期;
+--      到期与手动删除都物理删行,快照里的数据随之消失(分享出去的只是当时那一份报告)。
+--   ② family_health_view_log.viewer_id 改为可空:分享链接允许匿名访问,匿名访问记 NULL 仍留 IP;
+--      scope 追加 SHARE。
+--   ③ 退休 health:view:健康数据改为本人独占,跨成员只能看本人生成的分享快照。
+--   幂等:CREATE TABLE IF NOT EXISTS / MODIFY 重跑等价 / DELETE 幂等。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_health_share` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT,
+  `family_id`         BIGINT       DEFAULT NULL COMMENT '生成时快照',
+  `owner_user_id`     BIGINT       NOT NULL COMMENT '数据本人(报表归属)',
+  `token`             VARCHAR(32)  NOT NULL COMMENT '分享令牌(32 位随机串,持有即可查看)',
+  `cards`             VARCHAR(255) NOT NULL COMMENT 'JSON 数组:本报告包含的卡片 id',
+  `snapshot`          MEDIUMTEXT   NOT NULL COMMENT '冻结的报表数据(JSON);删除或到期后不可恢复',
+  `include_sensitive` TINYINT      NOT NULL DEFAULT 0 COMMENT '是否包含敏感指标(月经类)',
+  `anchor_date`       DATE         DEFAULT NULL COMMENT '报表锚定日期(默认最近一天)',
+  `expire_at`         DATETIME     NOT NULL COMMENT '到期即删(默认生成后 7 天)',
+  `view_count`        INT          NOT NULL DEFAULT 0,
+  `last_viewed_at`    DATETIME     DEFAULT NULL,
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_token` (`token`),
+  KEY `idx_owner` (`owner_user_id`),
+  KEY `idx_expire` (`expire_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康报表临时分享(快照,7 天自动删除)';
+
+ALTER TABLE `family_health_view_log`
+  MODIFY COLUMN `viewer_id` BIGINT DEFAULT NULL COMMENT '查看者;分享链接匿名访问为 NULL',
+  MODIFY COLUMN `scope` VARCHAR(20) NOT NULL COMMENT 'SLEEP/OVERVIEW/METRIC/SUMMARY/EXPORT/SHARE';
+
+DELETE FROM `sys_role_auth`
+WHERE `auth_id` IN (SELECT `id` FROM `sys_auth` WHERE `auth_code` = 'health:view');
+DELETE FROM `sys_auth` WHERE `auth_code` = 'health:view';

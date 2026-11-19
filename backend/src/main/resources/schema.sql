@@ -3194,9 +3194,9 @@ DROP TABLE IF EXISTS `family_health_view_log`;
 CREATE TABLE `family_health_view_log` (
   `id`             BIGINT      NOT NULL AUTO_INCREMENT,
   `family_id`      BIGINT      NOT NULL,
-  `viewer_id`      BIGINT      NOT NULL COMMENT '查看者',
+  `viewer_id`      BIGINT      DEFAULT NULL COMMENT '查看者;分享链接匿名访问为 NULL',
   `target_user_id` BIGINT      NOT NULL COMMENT '被查看的成员',
-  `scope`          VARCHAR(20) NOT NULL COMMENT 'SLEEP/OVERVIEW/METRIC/SUMMARY',
+  `scope`          VARCHAR(20) NOT NULL COMMENT 'SLEEP/OVERVIEW/METRIC/SUMMARY/EXPORT/SHARE',
   `metric`         VARCHAR(40) DEFAULT NULL COMMENT 'scope=METRIC 时的指标码',
   `from_date`      DATE        DEFAULT NULL COMMENT '查询区间起(排障/纠纷时定位范围用)',
   `to_date`        DATE        DEFAULT NULL,
@@ -3207,6 +3207,26 @@ CREATE TABLE `family_health_view_log` (
   KEY `idx_family_time` (`family_id`, `created_at`),
   KEY `idx_viewer_time` (`viewer_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康数据查看审计(90 天保留)';
+
+DROP TABLE IF EXISTS `family_health_share`;
+CREATE TABLE `family_health_share` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT,
+  `family_id`         BIGINT       DEFAULT NULL COMMENT '生成时快照',
+  `owner_user_id`     BIGINT       NOT NULL COMMENT '数据本人(报表归属)',
+  `token`             VARCHAR(32)  NOT NULL COMMENT '分享令牌(32 位随机串,持有即可查看)',
+  `cards`             VARCHAR(255) NOT NULL COMMENT 'JSON 数组:本报告包含的卡片 id',
+  `snapshot`          MEDIUMTEXT   NOT NULL COMMENT '冻结的报表数据(JSON);删除或到期后不可恢复',
+  `include_sensitive` TINYINT      NOT NULL DEFAULT 0 COMMENT '是否包含敏感指标(月经类)',
+  `anchor_date`       DATE         DEFAULT NULL COMMENT '报表锚定日期(默认最近一天)',
+  `expire_at`         DATETIME     NOT NULL COMMENT '到期即删(默认生成后 7 天)',
+  `view_count`        INT          NOT NULL DEFAULT 0,
+  `last_viewed_at`    DATETIME     DEFAULT NULL,
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_token` (`token`),
+  KEY `idx_owner` (`owner_user_id`),
+  KEY `idx_expire` (`expire_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康报表临时分享(快照,7 天自动删除)';
 
 DROP TABLE IF EXISTS `sys_health_token`;
 CREATE TABLE `sys_health_token` (
@@ -3226,21 +3246,11 @@ CREATE TABLE `sys_health_token` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康数据上报令牌';
 
 -- ------------------------------------------------------------
--- 87. 健康数据权限与指标字典(V12.88)
---     health:view:查看家庭成员健康数据;本人读自己恒可读,OWNER 恒可读全家。
---     MENSTRUAL_FLOW(月经流量)属敏感组:默认不采,成员在设置页自开后仅本人可见。
+-- 87. 健康指标字典(V12.88;V13.26 起健康数据本人独占,不再有跨成员查看权限)
+--     读侧只允许本人:他人要看得由本人生成临时分享链接(快照,7 天自动删除)。
+--     MENSTRUAL_FLOW(月经流量)属敏感组:默认不采,成员在设置页自开后仅本人可见,
+--     分享时是否包含由本人逐次决定。
 -- ------------------------------------------------------------
-INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
-('health:view', '查看健康数据', 'HEALTH', '查看家庭成员健康数据(本人恒可读自己)');
-
-INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
-SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
-WHERE r.role_code = 'OWNER' AND a.auth_code = 'health:view';
-
-INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
-SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
-WHERE r.role_code = 'MEMBER' AND a.auth_code = 'health:view';
-
 INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('health_metric', 'SLEEP',           '睡眠'),
 ('health_metric', 'STEPS',           '步数'),

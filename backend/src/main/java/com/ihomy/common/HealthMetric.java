@@ -127,6 +127,12 @@ public final class HealthMetric {
         return d != null && d.sensitive();
     }
 
+    /**
+     * 长期趋势指标:虽然也存 POINT,但一条就是一次测量、量极少,保留策略不清它们
+     * (体重/体脂/身高/腰围是多年的趋势底稿,清掉就再也补不回来;心率那种小时级 POINT 才需要限期清理)。
+     */
+    public static final Set<String> LONG_TERM_POINT = Set.of("WEIGHT", "BODY_FAT", "HEIGHT", "WAIST");
+
     /** 来源归一到有限集合,未知记 OTHER(展示层按 source 标注「来自哪个 App」) */
     public static String normalizeSource(String source) {
         if (source == null) return "OTHER";

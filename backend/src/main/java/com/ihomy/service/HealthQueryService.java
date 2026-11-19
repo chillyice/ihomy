@@ -29,9 +29,9 @@ import java.util.Objects;
 
 /**
  * 健康数据读侧:概览 / 睡眠 / 分段 / 单指标趋势 / 首页摘要。
- * 可见性梯度:本人恒可读自己;OWNER 恒可读全家;其他成员需 health:view。
- * 敏感组(月经流量)一律仅本人可见——OWNER 也不返回他人的敏感指标行。
- * 跨人读取写查看审计(轻量表),本人读自己不记。不缓存(敏感数据)。
+ * 可见性:本人独占——只有自己能读自己的健康数据,传别人的 userId 一律 NOT_FOUND;
+ * 给别人看只有一条路:生成报表快照链接(HealthShareService,7 天有效)。
+ * 不缓存(敏感数据)。
  */
 @Slf4j
 @Service
@@ -49,19 +49,15 @@ public class HealthQueryService {
     private final FamilyHealthSleepStageMapper stageMapper;
     private final HealthPrivacyService privacyService;
 
-    /** 查看者上下文:由控制器从登录态/权限缓存拼出 */
-    public record Viewer(Long id, Long familyId, String role, boolean canView, String ip) {
-        public boolean owner() {
-            return "OWNER".equals(role);
-        }
+    /** 查看者上下文:健康数据本人独占,只需要身份与审计用的 IP */
+    public record Viewer(Long id, Long familyId, String ip) {
     }
 
     // ==================== 单日概况 ====================
 
     public Map<String, Object> overview(Viewer viewer, Long targetUserId, LocalDate date) {
-        SysUser target = requireTarget(viewer, targetUserId);
+        SysUser target = requireSelf(viewer, targetUserId);
         LocalDate d = date == null ? LocalDate.now() : date;
-        boolean self = Objects.equals(viewer.id(), target.getId());
 
         List<FamilyHealthSample> rows = sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
                 .eq(FamilyHealthSample::getUserId, target.getId())
@@ -71,7 +67,6 @@ public class HealthQueryService {
         // 一天内同指标取最新一条(DAY 行 start_time 固定 00:00,POINT 取最近)
         Map<String, FamilyHealthSample> picked = new LinkedHashMap<>();
         for (FamilyHealthSample r : rows) {
-            if (HealthMetric.isSensitive(r.getMetric()) && !self) continue;
             picked.putIfAbsent(r.getMetric(), r);
         }
         List<Map<String, Object>> metrics = new ArrayList<>();
@@ -101,7 +96,7 @@ public class HealthQueryService {
     // ==================== 睡眠列表 ====================
 
     public Map<String, Object> sleep(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to) {
-        SysUser target = requireTarget(viewer, targetUserId);
+        SysUser target = requireSelf(viewer, targetUserId);
         LocalDate end = to == null ? LocalDate.now() : to;
         LocalDate begin = from == null ? end.minusDays(29) : from;
         if (begin.isAfter(end)) {
@@ -139,7 +134,7 @@ public class HealthQueryService {
      */
     public Map<String, Object> sleepStats(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to,
                                           String bucket) {
-        SysUser target = requireTarget(viewer, targetUserId);
+        SysUser target = requireSelf(viewer, targetUserId);
         LocalDate end = to == null ? LocalDate.now() : to;
         LocalDate begin = from == null ? end.minusDays(29) : from;
         if (begin.isAfter(end)) {
@@ -202,7 +197,7 @@ public class HealthQueryService {
         if (row == null || !Objects.equals(row.getFamilyId(), viewer.familyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        requireTarget(viewer, row.getUserId());
+        requireSelf(viewer, row.getUserId());
         List<FamilyHealthSleepStage> stages = stageMapper.selectList(
                 new LambdaQueryWrapper<FamilyHealthSleepStage>()
                         .eq(FamilyHealthSleepStage::getSleepId, sleepId)
@@ -234,7 +229,7 @@ public class HealthQueryService {
         if (def == null || HealthMetric.PERIOD_SESSION.equals(def.period())) {
             throw new BizException(ResultCode.NOT_FOUND, "指标不存在");
         }
-        SysUser target = requireTarget(viewer, targetUserId);
+        SysUser target = requireSelf(viewer, targetUserId);
         LocalDate end = to == null ? LocalDate.now() : to;
         LocalDate begin = from == null ? end.minusDays(29) : from;
         if (begin.isAfter(end)) {
@@ -245,10 +240,7 @@ public class HealthQueryService {
         if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
             throw new BizException(ResultCode.BAD_REQUEST, "单次最多查看 366 天数据");
         }
-        boolean self = Objects.equals(viewer.id(), target.getId());
-        // 敏感组仅本人可见:对他人返回空列表(不报 403,避免探测「某人是否开了这个开关」)
-        List<FamilyHealthSample> rows = (def.sensitive() && !self) ? List.of()
-                : sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
+        List<FamilyHealthSample> rows = sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
                 .eq(FamilyHealthSample::getUserId, target.getId())
                 .eq(FamilyHealthSample::getMetric, def.code())
                 .ge(FamilyHealthSample::getStartTime, begin.atStartOfDay())
@@ -360,12 +352,11 @@ public class HealthQueryService {
     }
 
     /**
-     * 导出某成员一段时间的健康数据长表:先睡眠会话、再睡眠分期、最后其余样本(每类内按时间升序)。
-     * 可见性与读侧完全一致(本人恒可读自己 / OWNER 恒可读全家 / 其他成员需 health:view),
-     * 敏感指标对他人照旧剔除;跨人导出写一条 scope=EXPORT 的查看审计。
+     * 导出本人一段时间的健康数据长表:先睡眠会话、再睡眠分期、最后其余样本(每类内按时间升序)。
+     * 与读侧同一口径,只导出本人数据;传别人的 userId 直接 NOT_FOUND。
      */
     public CsvFile exportCsv(Viewer viewer, Long targetUserId, LocalDate from, LocalDate to) {
-        SysUser target = requireTarget(viewer, targetUserId);
+        SysUser target = requireSelf(viewer, targetUserId);
         LocalDate end = to == null ? LocalDate.now() : to;
         LocalDate begin = from == null ? end.minusDays(89) : from;
         if (begin.isAfter(end)) {
@@ -376,7 +367,6 @@ public class HealthQueryService {
         if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
             throw new BizException(ResultCode.BAD_REQUEST, "单次最多导出 366 天数据");
         }
-        boolean self = Objects.equals(viewer.id(), target.getId());
 
         List<FamilyHealthSleep> sleeps = sleepMapper.selectList(new LambdaQueryWrapper<FamilyHealthSleep>()
                 .eq(FamilyHealthSleep::getUserId, target.getId())
@@ -420,9 +410,6 @@ public class HealthQueryService {
                     parent == null ? "" : parent.getProvider()));
         }
         for (FamilyHealthSample r : samples) {
-            if (HealthMetric.isSensitive(r.getMetric()) && !self) {
-                continue;
-            }
             rows.add(HealthCsv.line("SAMPLE", r.getMetric(), r.getPeriod(),
                     HealthCsv.num(r.getValueNum()), HealthCsv.num(r.getValueMin()), HealthCsv.num(r.getValueMax()),
                     HealthCsv.num(r.getSampleCount()), r.getUnit(),
@@ -440,20 +427,18 @@ public class HealthQueryService {
     // ==================== 可见性 ====================
 
     /**
-     * 目标成员校验:必须是本家庭成员(跨家庭一律 NOT_FOUND,避免探测别人家庭);
-     * 看别人还需要 health:view(OWNER 恒真)。本人读自己不需要权限。
+     * 健康数据本人独占:传别人的 userId 一律 NOT_FOUND(不泄露存在性);
+     * 家庭成员之间互相看不到,要给别人看只能生成一份报表快照链接。
      */
-    private SysUser requireTarget(Viewer viewer, Long targetUserId) {
-        Long id = targetUserId == null ? viewer.id() : targetUserId;
-        SysUser target = userMapper.selectById(id);
-        if (target == null || Integer.valueOf(1).equals(target.getDeleted())
-                || !Objects.equals(target.getFamilyId(), viewer.familyId())) {
+    private SysUser requireSelf(Viewer viewer, Long targetUserId) {
+        if (targetUserId != null && !Objects.equals(targetUserId, viewer.id())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        if (!Objects.equals(id, viewer.id()) && !viewer.owner() && !viewer.canView()) {
-            throw new BizException(ResultCode.FORBIDDEN, "没有查看家人健康数据的权限");
+        SysUser self = userMapper.selectById(viewer.id());
+        if (self == null || Integer.valueOf(1).equals(self.getDeleted())) {
+            throw new BizException(ResultCode.NOT_FOUND);
         }
-        return target;
+        return self;
     }
 
     private Map<String, Object> sleepMap(FamilyHealthSleep r) {

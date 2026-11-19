@@ -15,6 +15,8 @@ export const publicApi = {
   searchWeatherLocations: (keyword) => request.get('/public/weather/locations', { params: { keyword } }),
   // 月历基础数据(农历/节气/传统节日/法定节假日与调休):month=YYYY-MM,缺省当月;免登录
   calendar: (month) => request.get('/public/calendar', { params: month ? { month } : {} }),
+  // 健康报表分享快照:免登录,凭令牌只看那一份冻结报告(失效即 404)
+  healthShared: (token) => request.get(`/public/health/share/${encodeURIComponent(token)}`),
 }
 
 // 每日内容:必应每日一图(后端代理)+ 每日知识(公开接口,游客可用)
@@ -790,6 +792,13 @@ export const healthApi = {
   sleepStats: (params) => request.get('/health/sleep/stats', { params }),
   metric: (params) => request.get('/health/metric', { params }),
   summary: (days) => request.get('/health/summary', { params: days ? { days } : {} }),
+  // 报表:卡片可自定义;默认锚定最近一天(默认五卡:最近一晚睡眠 + 近 7 天步数/活动消耗 + 最近一天心率 + 异常提醒)
+  report: (cards, date) =>
+    request.get('/health/report', { params: { ...(cards?.length ? { cards: cards.join(',') } : {}), ...(date ? { date } : {}) } }),
+  // 分享:生成的是一份冻结快照,7 天自动删除;手动删除立刻失效
+  shares: () => request.get('/health/share'),
+  createShare: (data) => request.post('/health/share', data),
+  deleteShare: (id) => request.delete(`/health/share/${id}`),
   // 导出:长表 CSV(睡眠/分期/样本),直接回文件流;失败时后端仍回 JSON,由 saveBlobResponse 识别
   exportCsv: (params) => request.get('/health/export', { params, responseType: 'blob', timeout: 0 }),
 }

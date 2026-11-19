@@ -98,12 +98,14 @@ public class HealthPrivacyService {
     }
 
     /**
-     * 写一条查看审计:只在跨人读取时调用(本人读自己不记)。
+     * 写一条查看审计:现在只在「有人打开分享快照链接」时调用。
+     * 本人读自己不记(自读刷屏没意义);分享链接匿名访问 viewerId 传 null,只留 IP 与 scope=SHARE。
      * 审计失败只记 WARN——不能因为记不上日志就把读接口拖死。
      */
     public void logView(Long viewerId, String viewerIp, Long targetUserId, Long familyId,
                         String scope, String metric, java.time.LocalDate from, java.time.LocalDate to) {
-        if (viewerId == null || targetUserId == null || Objects.equals(viewerId, targetUserId)) return;
+        if (targetUserId == null) return;
+        if (viewerId != null && Objects.equals(viewerId, targetUserId)) return;
         try {
             FamilyHealthViewLog row = new FamilyHealthViewLog();
             row.setFamilyId(familyId);
@@ -121,27 +123,26 @@ public class HealthPrivacyService {
     }
 
     /**
-     * 「谁看过我的数据」:本人看自己的被查看记录;OWNER 可看全家的。
-     * 只展示查看者、范围、时间,不展示具体数值。
+     * 「谁看过我分享的健康报表」:只看自己被访问的记录(健康数据本人独占,没有家长视角)。
+     * 只展示访问者/范围/时间/IP,不展示快照里的具体数值。
      */
-    public List<Map<String, Object>> viewLogs(Long viewerId, Long familyId, boolean owner, int days) {
+    public List<Map<String, Object>> viewLogs(Long userId, int days) {
         int window = Math.max(1, Math.min(days, 365));
-        LambdaQueryWrapper<FamilyHealthViewLog> w = new LambdaQueryWrapper<FamilyHealthViewLog>()
-                .eq(FamilyHealthViewLog::getFamilyId, familyId)
-                .ge(FamilyHealthViewLog::getCreatedAt, LocalDateTime.now().minusDays(window))
-                .orderByDesc(FamilyHealthViewLog::getCreatedAt)
-                .last("LIMIT 200");
-        if (!owner) w.eq(FamilyHealthViewLog::getTargetUserId, viewerId);
-        List<FamilyHealthViewLog> rows = viewLogMapper.selectList(w);
-        Map<Long, String> names = userNames(rows.stream().flatMap(r -> List.of(r.getViewerId(), r.getTargetUserId()).stream()).toList());
+        List<FamilyHealthViewLog> rows = viewLogMapper.selectList(
+                new LambdaQueryWrapper<FamilyHealthViewLog>()
+                        .eq(FamilyHealthViewLog::getTargetUserId, userId)
+                        .ge(FamilyHealthViewLog::getCreatedAt, LocalDateTime.now().minusDays(window))
+                        .orderByDesc(FamilyHealthViewLog::getCreatedAt)
+                        .last("LIMIT 200"));
+        Map<Long, String> names = userNames(rows.stream().map(FamilyHealthViewLog::getViewerId).toList());
         List<Map<String, Object>> out = new ArrayList<>();
         for (FamilyHealthViewLog r : rows) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", r.getId());
             item.put("viewerId", r.getViewerId());
             item.put("viewerName", names.get(r.getViewerId()));
-            item.put("targetUserId", r.getTargetUserId());
-            item.put("targetName", names.get(r.getTargetUserId()));
+            item.put("anonymous", r.getViewerId() == null);
+            item.put("viewerIp", r.getViewerIp());
             item.put("scope", r.getScope());
             item.put("metric", r.getMetric());
             item.put("fromDate", r.getFromDate());

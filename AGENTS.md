@@ -70,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`。**业务运行用 `ihomy` 账号**(仅 DML on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序 踩坑速查 §2.7。
-- **108 张表**:`sys_` 31、`report_` 5、`family_` 49、`content_` 22、`game_` 1(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
+- **109 张表**:`sys_` 31、`report_` 5、`family_` 50、`content_` 22、`game_` 1(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量 `common/DictConst.java`,前端 `utils/dict.js`;**禁止 0/1/2 判断**。
 - **可见范围四档** `PUBLIC > CIRCLE > FAMILY > PRIVATE`(顺序即界面顺序):`content_blog/diary/photo/video/wish/book`、`content_photo_album`、`game_info`、`family_item` 四档;`family_vault_item`、`sys_iot_device` 只两档(PRIVATE/FAMILY)。清单 需求 §6.4。
@@ -100,7 +100,7 @@ cd backend;  .\mvnw.cmd -B clean package -DskipTests   # 只求编译
 cd frontend; npm run dev                      # 5173,代理 /api → 8080
 cd frontend; npm run lint; npx vitest run; npm run build
 ```
-- **基线**:后端 392 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1345 passed / 116 文件** + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **48 chunk / 1616.60KB**(V12.69 实测,gzip 看 vite 输出,旧 42/1489.83KB 废弃);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
+- **基线**:后端 479 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1406 passed / 122 文件** + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **48 chunk / 1648.63KB**(V13.26 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
 - **冒烟**:`GET /api/auth/captcha` 取 id → `POST /api/auth/login {email,password,captchaId,captchaCode:'qwer'}`,code=0 即有 token。**健康检查** `/api/public/health`(UP→200 / DEGRADED→503)、`/api/ops/health`(OPS,含依赖耗时)。
 - **闸门(CI 最先跑)**:`doc-drift-check.sh` + `gen-code-map.sh --check` + `doc-index.sh --check`;随后前后端构建、起库导 schema、登录冒烟。
 - 本机 JDK 21、Node 24 LTS(最低 22.12)、MySQL 8;没装 mvn 用 `C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`,`JAVA_HOME=C:\Program Files\Java\jdk-21`;clean 被锁改跑 `-B test`。
@@ -124,6 +124,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **日程**:写侧分类唯一来源 `utils/scheduleType.classify({hasDate,repeat,remind})`(**后端不推断**,五类 需求 §4.3.6);循环完成按 (提醒,日期) 落 `family_reminder_check`,`toggle-done?date=` 带日期切换;判定统一 `RepeatSchedule.dueToday`;聚合只读 `GET /schedule/events?from=&to=`(≤62 天)/`upcoming`,新来源只加 `ScheduleSourceProvider`。月历全来自 `/public/calendar`,前端禁引农历库;**分享来的提醒只读且不进原生闹钟**。改日程先读 踩坑速查 §3.39–§3.42。
 - **工具箱**:元数据唯一源 `tools/registry.js`;12 个开发者工具只在 `/bit-pouch/tools/<id>` 维护(`toolbox:false` + 旧路由重定向);在线目录 24 项另含 7 项只在线页维护(需求 §4.12)。
 - **天文**:`SolarUtil` 唯一来源(`/public/sun-info`),前端只渲染,**禁再移植 NOAA/Meeus**;直射点**西移** 0.25°/min;`useSunLight` 30 分钟换新,**长开页面禁止把启动时那份当此刻**(§4.5)。
+- **健康数据**:本人独占——读接口传别人 `userId` 一律 404,要给别人看只能本人 `POST /health/share` 生成 7 天只读快照(读链接只回冻结 payload,不查业务表,到期/手动删即物理删);报表锚**最新数据日** `asOf`,卡片目录 `common/HealthReportCard` + `views/health/reportCards.js` 同口径,告警口径 `common/HealthAlerts`(参考区间 WARN + 个人基线 ±2σ INFO),卡片偏好 `health.report.v1`;敏感指标入快照要本人同意且本次勾选(需求 §4.20)。
 - **独立产品页**:`/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 必须 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色接管 `html`);**回站内页要补初始化**,否则首页全空(§3.32/§3.8)。
 - **产品统计**:落 `report_product_stat` 日表(落地页打点 + `/public/product/download` 计数后 302),**禁止按 access 日志统计下载**;下载文件名必须纯文件名(`uploads/kada/` 平铺)。
 - **计划提醒单向托管**:时间只存 `family_reminder`(`plan_id`),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务;重复判定共用 `RepeatSchedule.dueToday`。

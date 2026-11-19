@@ -67,6 +67,9 @@
       </div>
     </div>
 
+    <!-- 导入(手机导出包一次性导入)/ 导出 CSV:报表页只看报表,这些动作都收在设置里 -->
+    <HealthImport />
+
     <div class="card settings-card health-shortcut">
       <div class="section-label">{{ $t('settings.health.tplTitle') }}</div>
       <div class="share-tip">
@@ -162,7 +165,9 @@
 
       <el-table v-if="viewLogs.length" :data="viewLogs" border stripe size="small">
         <el-table-column :label="$t('settings.health.viewlogViewer')" min-width="110">
-          <template #default="{ row }">{{ row.viewerName || row.viewerId }}</template>
+          <template #default="{ row }">
+            {{ row.anonymous ? $t('settings.health.viewlogAnonymous') : row.viewerName || row.viewerId }}
+          </template>
         </el-table-column>
         <el-table-column :label="$t('settings.health.viewlogScope')" min-width="120">
           <template #default="{ row }">{{ scopeText(row) }}</template>
@@ -186,6 +191,7 @@ import { formatDateTime } from '@/utils/datetime'
 import { isAndroidApp } from '@/utils/platform'
 import { copyText as copyToClipboard } from '@/utils/clipboard'
 import { SHORTCUT_BODY } from '@/utils/healthShortcut'
+import HealthImport from './HealthImport.vue'
 
 const { t } = useI18n()
 
@@ -321,6 +327,7 @@ const rejectedDetail = computed(() => {
 
 const scopeText = (row) => {
   const key = {
+    SHARE: 'viewlogScopeShare',
     OVERVIEW: 'viewlogScopeOverview',
     SLEEP: 'viewlogScopeSleep',
     METRIC: 'viewlogScopeMetric',

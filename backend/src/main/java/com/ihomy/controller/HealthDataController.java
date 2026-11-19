@@ -8,6 +8,7 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.HealthConsentDTO;
 import com.ihomy.dto.HealthIngestDTO;
+import com.ihomy.dto.HealthShareDTO;
 import com.ihomy.dto.HealthTokenDTO;
 import com.ihomy.entity.SysHealthToken;
 import com.ihomy.security.HealthTokenFilter;
@@ -16,6 +17,8 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.HealthIngestService;
 import com.ihomy.service.HealthPrivacyService;
 import com.ihomy.service.HealthQueryService;
+import com.ihomy.service.HealthReportService;
+import com.ihomy.service.HealthShareService;
 import com.ihomy.service.HealthTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,10 +43,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 家庭成员健康数据接口:统一上报(令牌或本人登录态)、读侧(概览/睡眠/趋势/摘要)、
- * 令牌管理、敏感指标同意开关、查看审计。
- * 读权限:本人恒可读自己,OWNER 恒可读全家,其他成员需 health:view(在 Service 层判定,
- * 因为同一个端点要支持「本人豁免」,@RequirePermission 表达不了这层豁免)。
+ * 家庭成员健康数据接口:统一上报(令牌或本人登录态)、读侧(报表/概览/睡眠/趋势/摘要)、
+ * 报表分享快照、令牌管理、敏感指标同意开关、分享访问审计。
+ * 可见性:健康数据本人独占——只有自己能读自己的数据,传别人的 userId 一律 404;
+ * 给别人看只有一条路:生成一份报表快照链接(HealthShareService,7 天有效)。
  */
 @Tag(name = "健康数据")
 @RestController
@@ -54,6 +57,8 @@ public class HealthDataController {
     private final HealthIngestService ingestService;
     private final HealthTokenService tokenService;
     private final HealthQueryService queryService;
+    private final HealthReportService reportService;
+    private final HealthShareService shareService;
     private final HealthPrivacyService privacyService;
     private final SecurityHelper securityHelper;
     private final tools.jackson.databind.ObjectMapper objectMapper;
@@ -130,12 +135,11 @@ public class HealthDataController {
         return Result.success(privacyService.saveConsent(user.getUserId(), dto));
     }
 
-    @Operation(summary = "谁看过我的数据(本人只看自己;家长可看全家)")
+    @Operation(summary = "谁看过我分享的健康报表(只看自己被访问的记录)")
     @GetMapping("/view-log")
     public Result<List<Map<String, Object>>> viewLog(@RequestParam(required = false) Integer days) {
-        HealthQueryService.Viewer viewer = viewer();
-        return Result.success(privacyService.viewLogs(viewer.id(), viewer.familyId(), viewer.owner(),
-                days == null ? 30 : days));
+        LoginUser user = requireLogin();
+        return Result.success(privacyService.viewLogs(user.getUserId(), days == null ? 30 : days));
     }
 
     @Operation(summary = "清除自己某来源的全部健康数据(换设备/误配)")
@@ -144,6 +148,43 @@ public class HealthDataController {
     public Result<Map<String, Object>> clearData(@RequestParam String source) {
         LoginUser user = requireLogin();
         return Result.success(privacyService.clearSource(user.getUserId(), source));
+    }
+
+    // ==================== 报表与分享 ====================
+
+    @Operation(summary = "健康报表(默认锚定最近一天;卡片可自定义)")
+    @GetMapping("/report")
+    public Result<Map<String, Object>> report(
+            @RequestParam(required = false) List<String> cards,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        LoginUser user = requireLogin();
+        // 敏感卡片(月经类)只在本人已开同意时才能进报表
+        return Result.success(reportService.build(user.getUserId(), cards,
+                privacyService.reproductiveConsent(user.getUserId()), date));
+    }
+
+    @Operation(summary = "生成健康报表分享快照(7 天有效,可随时删除)")
+    @OperationLog(module = "HEALTH", operationType = "CREATE", description = "生成健康报表分享链接", saveArgs = false)
+    @PostMapping("/share")
+    public Result<Map<String, Object>> createShare(@RequestBody(required = false) HealthShareDTO dto) {
+        LoginUser user = requireLogin();
+        return Result.success(shareService.create(user.getUserId(), user.getFamilyId(), dto));
+    }
+
+    @Operation(summary = "我生成过的健康报表分享链接(只列未过期的)")
+    @GetMapping("/share")
+    public Result<List<Map<String, Object>>> shares() {
+        LoginUser user = requireLogin();
+        return Result.success(shareService.list(user.getUserId()));
+    }
+
+    @Operation(summary = "删除健康报表分享链接(立即失效)")
+    @OperationLog(module = "HEALTH", operationType = "DELETE", description = "删除健康报表分享链接")
+    @DeleteMapping("/share/{id}")
+    public Result<Void> deleteShare(@PathVariable Long id) {
+        LoginUser user = requireLogin();
+        shareService.delete(user.getUserId(), id);
+        return Result.success();
     }
 
     // ==================== 读侧 ====================
@@ -223,8 +264,7 @@ public class HealthDataController {
 
     private HealthQueryService.Viewer viewer() {
         LoginUser user = requireLogin();
-        return new HealthQueryService.Viewer(user.getUserId(), user.getFamilyId(), user.getRole(),
-                securityHelper.hasPermission("health:view"), Ips.realIp(currentRequest()));
+        return new HealthQueryService.Viewer(user.getUserId(), user.getFamilyId(), Ips.realIp(currentRequest()));
     }
 
     private HttpServletRequest currentRequest() {

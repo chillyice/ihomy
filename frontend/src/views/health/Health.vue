@@ -1,33 +1,30 @@
-<!-- 健康数据页(/health):概览 / 睡眠 / 体征 / 活动 / 身体。
-     读侧接口:overview(单日)、sleep(会话)、sleep/{id}/stages(某晚分期)、metric(单指标趋势)。
-     图表几何在 healthChart.js(纯函数 + 内联 SVG,不引图表库);指标名与单位只从 utils/healthMetrics.js 取。 -->
+<!-- 健康数据页(/health):报表 / 睡眠 / 体征 / 活动 / 身体。
+     健康数据本人独占(服务端只认登录者本人,传别人的 userId 一律 404),页面没有成员切换;
+     要给别人看只能「分享报表」:生成一份冻结快照链接,7 天后自动失效。
+     报表卡片与告警口径由后端 HealthReportService / HealthAlerts 决定,这里只渲染。 -->
 <template>
   <div class="page health-page">
     <div class="page-toolbar card">
       <div class="tb-left">
-        <el-select v-if="canViewOthers && memberOptions.length > 1" v-model="targetUserId" class="member-select" @change="onMemberChange">
-          <el-option v-for="m in memberOptions" :key="m.value" :label="m.label" :value="m.value" />
-        </el-select>
-        <span v-else class="tb-note">{{ $t('health.selfOnly') }}</span>
+        <span class="tb-note">{{ $t('health.selfOnly') }}</span>
       </div>
       <div class="tb-right">
-        <el-button :loading="exporting" @click="exportCsv">
-          <el-icon><Download /></el-icon>
-          <span class="btn-text">{{ $t('health.exportCsv') }}</span>
+        <el-button :disabled="!reportData" @click="shareVisible = true">
+          <el-icon><Share /></el-icon>
+          <span class="btn-text">{{ $t('health.share.entry') }}</span>
         </el-button>
         <el-button :loading="loading" @click="reloadAll">
           <el-icon><Refresh /></el-icon>
           <span class="btn-text">{{ $t('health.refresh') }}</span>
         </el-button>
         <router-link to="/settings?tab=health" class="tb-link">{{ $t('health.settings') }}</router-link>
-        <el-button v-if="viewingSelf" text type="danger" @click="clearVisible = true">{{ $t('health.clearEntry') }}</el-button>
       </div>
     </div>
 
     <el-tabs v-model="tab" class="health-tabs" @tab-change="onTabChange">
-      <!-- 概览:今日四卡 + 近 7 天迷你趋势 -->
-      <el-tab-pane :label="$t('health.tabs.overview')" name="overview">
-        <div v-if="!hasAny" class="card empty-card">
+      <!-- 报表:默认显示最新一天的数据,卡片可自定义;分享走工具栏「分享」 -->
+      <el-tab-pane :label="$t('health.tabs.report')" name="report">
+        <div v-if="!reportHasData" class="card empty-card">
           <el-empty :image-size="88" :description="$t('health.noData')">
             <router-link to="/settings?tab=health">
               <el-button type="primary">{{ $t('health.setup') }}</el-button>
@@ -35,52 +32,13 @@
           </el-empty>
         </div>
         <div v-else class="tab-body">
-          <div class="stat-grid">
-            <div class="card stat-card">
-              <div class="stat-label">{{ metricName($t, 'SLEEP') }}</div>
-              <div class="stat-val">{{ sleepText($t, daySleep ? daySleep.totalMin : null) }}</div>
-              <div class="stat-sub">{{ overviewDate }}</div>
-            </div>
-            <div class="card stat-card">
-              <div class="stat-label">{{ metricName($t, 'STEPS') }}</div>
-              <div class="stat-val">{{ withUnit('STEPS', formatMetric('STEPS', dayValue('STEPS'))) }}</div>
-              <div class="stat-sub">{{ overviewDate }}</div>
-            </div>
-            <div class="card stat-card">
-              <div class="stat-label">{{ metricName($t, 'RESTING_HR') }}</div>
-              <div class="stat-val">{{ withUnit('RESTING_HR', formatMetric('RESTING_HR', dayValue('RESTING_HR'))) }}</div>
-              <div class="stat-sub">{{ overviewDate }}</div>
-            </div>
-            <div class="card stat-card">
-              <div class="stat-label">{{ metricName($t, 'SPO2') }}</div>
-              <div class="stat-val">{{ withUnit('SPO2', formatMetric('SPO2', dayValue('SPO2'))) }}</div>
-              <div class="stat-sub">{{ overviewDate }}</div>
-            </div>
+          <div class="report-actions">
+            <el-button text @click="openCardDialog">
+              <el-icon><Setting /></el-icon>
+              <span class="btn-text">{{ $t('health.report.customize') }}</span>
+            </el-button>
           </div>
-
-          <div class="card chart-card">
-            <div class="section-label">{{ $t('health.overview.sleep7') }}</div>
-            <HealthTrendChart
-              v-if="sleep7.values.length"
-              mode="bar"
-              :values="sleep7.values"
-              :labels="sleep7.labels"
-              :label="metricName($t, 'SLEEP')"
-            />
-            <div v-else class="empty-hint">{{ $t('health.noDataShort') }}</div>
-          </div>
-
-          <div class="card chart-card">
-            <div class="section-label">{{ $t('health.overview.steps7') }}</div>
-            <HealthTrendChart
-              v-if="steps7.values.length"
-              mode="bar"
-              :values="steps7.values"
-              :labels="steps7.labels"
-              :label="metricName($t, 'STEPS')"
-            />
-            <div v-else class="empty-hint">{{ $t('health.noDataShort') }}</div>
-          </div>
+          <HealthReport :report="reportData" />
         </div>
       </el-tab-pane>
 
@@ -285,6 +243,27 @@
         <el-button type="danger" :loading="clearing" @click="doClear">{{ $t('settings.health.clear') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 报表卡片自定义:勾选即保存(本机 + 账号偏好);顺序按目录顺序,与分享弹窗同口径 -->
+    <el-dialog v-model="cardDialog" :title="$t('health.report.customizeTitle')" class="dialog-sm" append-to-body>
+      <el-checkbox-group v-model="cardDraft" class="card-picks">
+        <el-checkbox
+          v-for="c in pickableCards"
+          :key="c.id"
+          :value="c.id"
+          :disabled="c.sensitive && !consentOn"
+          :label="cardTitle($t, c.id)"
+        />
+      </el-checkbox-group>
+      <p v-if="!consentOn" class="dialog-hint">{{ $t('health.share.sensitiveDisabled') }}</p>
+      <template #footer>
+        <el-button text @click="restoreCards">{{ $t('health.report.restore') }}</el-button>
+        <el-button @click="cardDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!cardDraft.length" @click="saveCards">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <HealthShareDialog v-model="shareVisible" :report="reportData" />
   </div>
 </template>
 
@@ -293,12 +272,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Refresh, Download } from '@element-plus/icons-vue'
-import { healthApi, memberApi } from '@/api'
+import { Refresh, Download, Setting, Share } from '@element-plus/icons-vue'
+import { healthApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { saveBlobResponse } from '@/utils/download'
+import { readPref, syncPref, writePref } from '@/utils/userPref'
 import HealthTrendChart from './HealthTrendChart.vue'
 import HealthSleepNight from './HealthSleepNight.vue'
+import HealthReport from './HealthReport.vue'
+import HealthShareDialog from './HealthShareDialog.vue'
+import { DEFAULT_CARDS, HEALTH_REPORT_CARDS, cardTitle, parseCardsPref, sanitizeCards } from './reportCards'
 import { stackBar, timelineSegments } from './healthChart'
 import {
   SLEEP_STAGES,
@@ -317,7 +300,13 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 
-const TABS = ['overview', 'sleep', 'vitals', 'activity', 'body']
+// 报表卡片偏好:本机 localStorage + sys_user_pref(键 health.report.v1),与首页布局同款同步规则
+const CARD_PREF_LOCAL = 'ihomy:health:report:v1'
+const CARD_PREF_SERVER = 'health.report.v1'
+
+// 旧书签 /health?tab=overview 映射到「报表」
+const LEGACY_TABS = { overview: 'report' }
+const TABS = ['report', 'sleep', 'vitals', 'activity', 'body']
 // 睡眠页范围:日=某一晚的进度轴,周/月=当期每天睡了多久,半年/年=每月平均每晚
 const SLEEP_RANGES = ['DAY', 'WEEK', 'MONTH', 'HALF', 'YEAR']
 // 一天多次采样的点指标只画今天,不然几百个点在 360px 上糊成一条带
@@ -327,12 +316,16 @@ const SLEEP_DAYS = 14
 // 导出范围默认近 90 天(与服务端默认一致);更长的区间不在界面上选,直接用接口参数
 const EXPORT_DAYS = 90
 
-const tab = ref(TABS.includes(String(route.query.tab || '')) ? String(route.query.tab) : 'overview')
+const initialTab = LEGACY_TABS[String(route.query.tab || '')] || String(route.query.tab || '')
+const tab = ref(TABS.includes(initialTab) ? initialTab : 'report')
 const loading = ref(false)
 const exporting = ref(false)
-const members = ref([])
-const targetUserId = ref(userStore.userInfo?.id ?? null)
-const overviewDay = ref(null)
+const reportData = ref(null)
+const reportCards = ref([...DEFAULT_CARDS])
+const cardDraft = ref([...DEFAULT_CARDS])
+const cardDialog = ref(false)
+const shareVisible = ref(false)
+const consentOn = ref(false)
 const nights = ref([])
 const series = ref({})
 const pickedId = ref(null)
@@ -353,29 +346,9 @@ const metricPanes = [
 ]
 
 const legend = computed(() => SLEEP_STAGES.slice(0, 4))
-const selfId = computed(() => userStore.userInfo?.id ?? null)
-const viewingId = computed(() => targetUserId.value || selfId.value)
-const viewingSelf = computed(() => !selfId.value || viewingId.value === selfId.value)
-// 家长恒可看全家;其他成员要 health:view 才给切人(服务端也会再校验一次)
-const canViewOthers = computed(() => userStore.isOwner || userStore.hasPerm('health:view'))
-
-const memberOptions = computed(() => {
-  const list = []
-  const me = userStore.userInfo
-  if (me?.id) list.push({ value: me.id, label: me.nickname || me.username || `#${me.id}` })
-  members.value.forEach((m) => {
-    if (m.id && m.id !== me?.id) list.push({ value: m.id, label: m.nickname || m.username || `#${m.id}` })
-  })
-  return list
-})
-
-const hasAny = computed(() => !!(daySleep.value || (overviewDay.value?.metrics || []).length || nights.value.length))
-const overviewDate = computed(() => overviewDay.value?.date || isoDay(new Date()))
-const daySleep = computed(() => overviewDay.value?.sleep || null)
-const dayValue = (code) => {
-  const row = (overviewDay.value?.metrics || []).find((m) => m.metric === code)
-  return row ? row.value : null
-}
+// 未开采集同意时敏感卡片不可选(后端也会再丢一次,这里只负责别让用户白勾)
+const pickableCards = computed(() => HEALTH_REPORT_CARDS.filter((c) => !c.sensitive || consentOn.value))
+const reportHasData = computed(() => (reportData.value?.cards || []).some((c) => c.hasData))
 
 const nightLabels = computed(() => nights.value.map((n) => dayLabel(n.sleepDate)))
 const nightValues = computed(() => nights.value.map((n) => (n.totalMin == null ? null : Number(n.totalMin))))
@@ -403,8 +376,7 @@ const sleepWindow = computed(() => {
   if (sleepRange.value === 'YEAR') return { from: monthsAgoStart(11), to, bucket: 'MONTH' }
   return null
 })
-const statsKey = computed(() => `${viewingId.value}:${sleepRange.value}`)
-const statsRows = computed(() => statsBuckets.value[statsKey.value] || [])
+const statsRows = computed(() => statsBuckets.value[sleepRange.value] || [])
 
 /** 补齐网格:没数据的那天/那个月留 null(不画柱子,不伪造 0) */
 const statsSeries = computed(() => {
@@ -457,15 +429,8 @@ const sleepSpanText = computed(() => {
   return t(`health.sleep.span.${sleepRange.value.toLowerCase()}`)
 })
 
-const sleep7 = computed(() => ({
-  labels: nightLabels.value.slice(-7),
-  values: nightValues.value.slice(-7),
-}))
-const steps7 = computed(() => tail(seriesFor('STEPS'), 7))
-
 const EMPTY_SERIES = { labels: [], values: [], points: [] }
-const seriesKey = (metric) => `${viewingId.value}:${metric}`
-const seriesFor = (metric) => series.value[seriesKey(metric)] || EMPTY_SERIES
+const seriesFor = (metric) => series.value[metric] || EMPTY_SERIES
 const paneSeries = (name) => seriesFor(selected[name])
 
 const paneLatest = (name) => {
@@ -536,7 +501,6 @@ function monthLabel(ym) {
   return new Intl.DateTimeFormat(locale.value, { month: 'short' }).format(new Date(y, m - 1, 1))
 }
 const rangeDays = (code) => (DENSE_POINT.includes(code) ? 1 : RANGE_DAYS)
-const tail = (obj, n) => ({ labels: obj.labels.slice(-n), values: obj.values.slice(-n), points: obj.points.slice(-n) })
 
 /** 按天指标:补齐日期网格,那天没数据就是 null(不画,不补 0) */
 function daySeries(points, days) {
@@ -578,12 +542,18 @@ const stackOf = (n) =>
     { code: 'AWAKE', minutes: Number(n.awakeMin) || 0 },
   ])
 
-async function loadOverview() {
-  overviewDay.value = (await healthApi.overview({ userId: viewingId.value }).catch(() => null)) || null
+/** 报表:锚定日与窗口后端算(默认最近一天),前端只传卡片清单 */
+async function loadReport() {
+  reportData.value = await healthApi.report(reportCards.value).catch(() => null)
+}
+
+async function loadConsent() {
+  const data = await healthApi.consent().catch(() => null)
+  consentOn.value = !!data?.reproductive
 }
 
 async function loadNights() {
-  const data = await healthApi.sleep({ userId: viewingId.value, from: shiftDay(-(SLEEP_DAYS - 1)), to: shiftDay(0) }).catch(() => null)
+  const data = await healthApi.sleep({ from: shiftDay(-(SLEEP_DAYS - 1)), to: shiftDay(0) }).catch(() => null)
   const items = Array.isArray(data?.items) ? data.items.slice() : []
   items.sort((a, b) => String(a.sleepDate).localeCompare(String(b.sleepDate)))
   nights.value = items
@@ -591,13 +561,12 @@ async function loadNights() {
 
 async function loadSeries(metric) {
   if (!metric) return EMPTY_SERIES
-  const key = seriesKey(metric)
-  if (series.value[key]) return series.value[key]
+  if (series.value[metric]) return series.value[metric]
   const days = rangeDays(metric)
-  const data = await healthApi.metric({ userId: viewingId.value, metric, from: shiftDay(-(days - 1)), to: shiftDay(0) }).catch(() => null)
+  const data = await healthApi.metric({ metric, from: shiftDay(-(days - 1)), to: shiftDay(0) }).catch(() => null)
   const points = Array.isArray(data?.points) ? data.points : []
   const built = periodOf(metric) === 'DAY' ? daySeries(points, days) : pointSeries(points, days)
-  series.value = { ...series.value, [key]: built }
+  series.value = { ...series.value, [metric]: built }
   return built
 }
 
@@ -609,12 +578,12 @@ function resetDetail() {
 /** 周/月/半年/年:统计接口按 DAY / MONTH 分桶返回,前端只负责补网格 */
 async function loadStats() {
   const win = sleepWindow.value
-  if (!win || !userStore.isLoggedIn || !viewingId.value) return
-  const key = statsKey.value
+  if (!win || !userStore.isLoggedIn) return
+  const key = sleepRange.value
   if (statsBuckets.value[key]) return
   statsLoading.value = true
   try {
-    const data = await healthApi.sleepStats({ userId: viewingId.value, from: win.from, to: win.to, bucket: win.bucket }).catch(() => null)
+    const data = await healthApi.sleepStats({ from: win.from, to: win.to, bucket: win.bucket }).catch(() => null)
     statsBuckets.value = { ...statsBuckets.value, [key]: Array.isArray(data?.buckets) ? data.buckets : [] }
   } finally {
     statsLoading.value = false
@@ -651,24 +620,19 @@ async function selectSleepRange(key) {
 }
 
 async function reloadAll() {
-  if (!userStore.isLoggedIn || !viewingId.value) return
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     series.value = {}
     statsBuckets.value = {}
     resetDetail()
-    await Promise.all([loadOverview(), loadNights(), loadSeries('STEPS')])
+    await Promise.all([loadReport(), loadNights(), loadSeries('STEPS')])
     if (['vitals', 'activity', 'body'].includes(tab.value)) await loadSeries(selected[tab.value])
     // 睡眠页才需要分期/统计,其它 tab 不必多发这一轮请求
     if (tab.value === 'sleep') await ensureSleepView()
   } finally {
     loading.value = false
   }
-}
-
-async function onMemberChange() {
-  resetDetail()
-  await reloadAll()
 }
 
 async function onTabChange(name) {
@@ -705,12 +669,12 @@ async function doClear() {
 
 /** 导出当前成员近 90 天的长表 CSV:成功直接落盘;失败时服务端仍回 JSON,由 saveBlobResponse 抛出可读文案 */
 async function exportCsv() {
-  if (!userStore.isLoggedIn || !viewingId.value) return
+  if (!userStore.isLoggedIn) return
   const from = shiftDay(-(EXPORT_DAYS - 1))
   const to = shiftDay(0)
   exporting.value = true
   try {
-    const blob = await healthApi.exportCsv({ userId: viewingId.value, from, to })
+    const blob = await healthApi.exportCsv({ from, to })
     await saveBlobResponse(blob, `health-${from}_${to}.csv`)
     ElMessage.success(t('health.exportDone', { from, to }))
   } catch (e) {
@@ -720,19 +684,38 @@ async function exportCsv() {
   }
 }
 
+/** 卡片自定义:先与账号对齐一次偏好(服务端优先),再用本机兜底 */
+async function loadCardPref() {
+  const remote = await syncPref(CARD_PREF_LOCAL, CARD_PREF_SERVER)
+  reportCards.value = parseCardsPref(remote ?? readPref(CARD_PREF_LOCAL))
+}
+
+function saveCards() {
+  const picked = sanitizeCards(cardDraft.value)
+  reportCards.value = picked
+  writePref(CARD_PREF_LOCAL, CARD_PREF_SERVER, JSON.stringify(picked))
+  cardDialog.value = false
+  loadReport()
+}
+
+function restoreCards() {
+  cardDraft.value = [...DEFAULT_CARDS]
+}
+
+/** 打开自定义弹窗时把当前清单带进去(取消不影响已保存的选择) */
+function openCardDialog() {
+  cardDraft.value = [...reportCards.value]
+}
+
 onMounted(async () => {
-  if (canViewOthers.value) {
-    const list = await memberApi.list().catch(() => [])
-    members.value = Array.isArray(list) ? list : []
-  }
+  cardDraft.value = [...reportCards.value]
+  await loadCardPref()
+  loadConsent()
   await reloadAll()
 })
 </script>
 
 <style scoped>
-.member-select {
-  width: 170px;
-}
 .tb-note {
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -759,27 +742,9 @@ onMounted(async () => {
 .empty-card {
   padding: 20px;
 }
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-.stat-card {
-  padding: 14px 16px;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-.stat-val {
-  margin: 6px 0 2px;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-.stat-sub {
-  font-size: 11px;
-  color: var(--color-text-secondary);
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 .chart-card {
   padding: 14px 16px;

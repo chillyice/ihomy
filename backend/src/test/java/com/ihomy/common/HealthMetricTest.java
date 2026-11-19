@@ -68,6 +68,18 @@ class HealthMetricTest {
         assertThat(HealthMetric.SLEEP_STAGES).contains("DEEP", "LIGHT", "REM", "AWAKE", "INBED", "UNKNOWN");
     }
 
+    @Test
+    void bodyCompositionIsPointButKeptLongTerm() {
+        // 长期趋势底稿:必须是 POINT(不按天聚合),同时在保留白名单里(清理任务不清)
+        for (String code : HealthMetric.LONG_TERM_POINT) {
+            HealthMetric.Def def = HealthMetric.find(code);
+            assertThat(def).as(code).isNotNull();
+            assertThat(def.period()).as(code).isEqualTo(HealthMetric.PERIOD_POINT);
+            assertThat(def.group()).as(code).isEqualTo("BODY");
+        }
+        assertThat(HealthMetric.LONG_TERM_POINT).doesNotContain("HEART_RATE", "SPO2", "BLOOD_GLUCOSE");
+    }
+
     /** 快捷指令把「查找健康样本」的「值」原样透传时,这里是唯一把中文/英文分期名换成枚举的地方 */
     @Test
     void normalizesSleepStageFromAppleLocalizedNames() {
