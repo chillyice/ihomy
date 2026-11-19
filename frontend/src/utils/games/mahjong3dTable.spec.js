@@ -1,15 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import {
+  RIVER_ROWS,
+  TABLE,
   TILE,
+  contentCorners,
   drawnTileTransform,
+  fitCameraDistance,
   handTileTransform,
+  maxNdc,
   meldTileTransform,
+  riverRowCols,
   riverTileTransform,
+  rowPlan,
   seatFrame,
   wallStackCounts,
   wallStackTransform,
   windPlateTransform,
 } from './mahjong3dTable'
+
+const CAMERA_MAIN = { pos: [0, 8.9, 10.6], look: [0, 0, 0.55] }
+const CAMERA_TOP = { pos: [0, 16.2, 0.02], look: [0, 0, 0] }
+
+/** 水平足迹 AABB:立放/卧放的牌水平投影都是 行向 W × 朝向 D */
+function tileBox(x, z, yaw) {
+  const c = Math.abs(Math.cos(yaw))
+  const s = Math.abs(Math.sin(yaw))
+  return {
+    minX: x - (c * TILE.W) / 2 - (s * TILE.D) / 2,
+    maxX: x + (c * TILE.W) / 2 + (s * TILE.D) / 2,
+    minZ: z - (s * TILE.W) / 2 - (c * TILE.D) / 2,
+    maxZ: z + (s * TILE.W) / 2 + (c * TILE.D) / 2,
+  }
+}
+function boxesOverlap(a, b) {
+  return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ
+}
+function riverBoxes(seat, count = 24) {
+  return Array.from({ length: count }, (_, i) => {
+    const t = riverTileTransform(seat, i)
+    return tileBox(t.x, t.z, t.yaw)
+  })
+}
 
 describe('seatFrame 座位坐标系', () => {
   it('seat0=我(南,+Z),对家在北,下家在屏幕右(+X),上家在屏幕左(−X)', () => {
@@ -29,6 +60,12 @@ describe('seatFrame 座位坐标系', () => {
   it('负数/超界座位取模不抛错', () => {
     expect(seatFrame(4).anchor.z).toBeCloseTo(seatFrame(0).anchor.z)
     expect(seatFrame(-1).anchor.x).toBeCloseTo(seatFrame(3).anchor.x)
+  })
+
+  it('手牌行贴桌沿(锚点 = 桌半宽 − edgeGap),墙圈在其内侧', () => {
+    expect(seatFrame(0).anchor.z).toBeCloseTo(TABLE.D / 2 - 0.95)
+    expect(wallStackTransform(0, 0, 11).z).toBeLessThan(seatFrame(0).anchor.z)
+    expect(wallStackTransform(0, 0, 11).z).toBeGreaterThan(riverTileTransform(0, 0).z) // 墙在河外圈
   })
 })
 
@@ -55,10 +92,20 @@ describe('handTileTransform 手牌排布', () => {
     expect(t.z).toBeGreaterThan(0)
     expect(t.x).toBeGreaterThan(0)
   })
+
+  it('带 plan 时整行平移/压缩,牌距不小于牌宽(不相交下限)', () => {
+    const plan = rowPlan(1, true, [4, 4, 4, 4])
+    expect(plan.pitch).toBeGreaterThanOrEqual(TILE.W)
+    const a = handTileTransform(0, 0, 1, plan)
+    const b = handTileTransform(0, 0, 1, plan)
+    expect(a.x).toBeCloseTo(b.x)
+    const drawn = drawnTileTransform(0, 1, plan)
+    expect(drawn.x).toBeGreaterThan(a.x)
+  })
 })
 
-describe('riverTileTransform 牌河', () => {
-  it('每行 6 张,行 0 最靠近本方(向中心逐行增长)', () => {
+describe('riverTileTransform 牌河(风车形)', () => {
+  it('行 0 最靠近本方墙,向中心逐行增长', () => {
     const first = riverTileTransform(0, 0)
     const seventh = riverTileTransform(0, 6)
     expect(first.z).toBeGreaterThan(seventh.z) // 我方牌河向 −Z(中心)增长
@@ -70,6 +117,85 @@ describe('riverTileTransform 牌河', () => {
     const theirs = riverTileTransform(2, 0)
     expect(mine.z).toBeGreaterThan(0)
     expect(theirs.z).toBeLessThan(0)
+  })
+
+  it('列数按行收敛 [6,6,6,4,2],容量 24 ≥ 最坏 21 张弃牌', () => {
+    expect([0, 1, 2, 3, 4].map(riverRowCols)).toEqual([6, 6, 6, 4, 2])
+    expect(RIVER_ROWS).toBe(5)
+    expect([0, 1, 2, 3, 4].map(riverRowCols).reduce((s, n) => s + n, 0)).toBeGreaterThanOrEqual(21)
+  })
+
+  it('守门:任意两席牌河都装满 24 张时互不相交(风车形不交叉)', () => {
+    const pairs = [
+      [0, 1],
+      [0, 3],
+      [1, 2],
+      [2, 3],
+    ]
+    for (const [a, b] of pairs) {
+      const boxesA = riverBoxes(a)
+      const boxesB = riverBoxes(b)
+      for (const ba of boxesA) {
+        for (const bb of boxesB) {
+          expect(boxesOverlap(ba, bb), `seat ${a} 与 seat ${b} 的牌河相交`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('守门:牌河不进中央区(风位牌圈外),也不压自家墙', () => {
+    for (const box of riverBoxes(0)) {
+      expect(box.minZ).toBeGreaterThan(0.93) // 风位牌最远 z ≈ 0.93
+      expect(box.maxZ).toBeLessThan(wallStackTransform(0, 0, 11).z - TILE.D / 2 + 0.01)
+    }
+  })
+})
+
+describe('rowPlan 整行排布(手牌+摸牌+副露同行)', () => {
+  it('常规局不位移:13 手/带摸牌/一组副露都直接放得下', () => {
+    expect(rowPlan(13, false, []).shift).toBe(0)
+    expect(rowPlan(13, true, []).shift).toBe(0)
+    expect(rowPlan(10, false, [3]).shift).toBe(0)
+  })
+
+  it('副露把手行推过预算时整行左移居中,两端仍在呢面内', () => {
+    const plan = rowPlan(7, false, [3, 3])
+    expect(plan.shift).toBeLessThan(0)
+    const rightEnd = plan.meldStart + 6 * plan.pitch + plan.meldGap + plan.shift
+    expect(rightEnd).toBeLessThanOrEqual(TABLE.W / 2)
+    expect(-plan.handHalf + plan.shift).toBeGreaterThanOrEqual(-TABLE.W / 2)
+  })
+
+  it('守门:最坏局面(1 手 + 摸牌 + 四暗杠)整行都在呢面内且牌互不相交', () => {
+    const plan = rowPlan(1, true, [4, 4, 4, 4])
+    const boxes = []
+    const hand = handTileTransform(0, 0, 1, plan)
+    boxes.push(tileBox(hand.x, hand.z, hand.yaw))
+    const drawn = drawnTileTransform(0, 1, plan)
+    boxes.push(tileBox(drawn.x, drawn.z, drawn.yaw))
+    let startU = plan.meldStart + plan.shift
+    for (const size of [4, 4, 4, 4]) {
+      for (let i = 0; i < size; i++) {
+        const t = meldTileTransform(0, startU, i, plan.pitch)
+        boxes.push(tileBox(t.x, t.z, t.yaw))
+      }
+      startU += size * plan.pitch + plan.meldGap
+    }
+    for (const box of boxes) {
+      expect(box.maxX).toBeLessThanOrEqual(TABLE.W / 2 + 0.01)
+      expect(box.minX).toBeGreaterThanOrEqual(-TABLE.W / 2 - 0.01)
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        expect(boxesOverlap(boxes[i], boxes[j]), `第 ${i}/${j} 张牌相交`).toBe(false)
+      }
+    }
+  })
+
+  it('守门:常规满配(13 手 + 摸牌 + 三组副露)整行不超呢面', () => {
+    const plan = rowPlan(4, true, [3, 3, 3])
+    const end = plan.meldStart + plan.shift + (9 * plan.pitch + 2 * plan.meldGap)
+    expect(end).toBeLessThanOrEqual(TABLE.W / 2)
   })
 })
 
@@ -94,23 +220,45 @@ describe('wallStackCounts 牌墙分配', () => {
 })
 
 describe('wallStackTransform / meld / wind', () => {
-  it('牌墙摞沿行方向居中分布', () => {
+  it('牌墙摞沿行方向居中分布,在呢面内', () => {
     const a = wallStackTransform(0, 0, 11)
     const b = wallStackTransform(0, 10, 11)
     expect(b.x - a.x).toBeCloseTo(10 * (TILE.W + 0.06))
     expect(a.z).toBeGreaterThan(0) // 我方墙在我与中心之间
+    expect(Math.abs(a.x)).toBeLessThan(TABLE.W / 2)
   })
 
-  it('副露排在手牌右侧更靠中心一行', () => {
-    const hand = handTileTransform(0, 0, 13)
-    const meld = meldTileTransform(0, 0, 0)
-    expect(meld.z).toBeLessThan(hand.z)
+  it('副露与手牌同行,排在其右侧', () => {
+    const plan = rowPlan(10, false, [3])
+    const hand = handTileTransform(0, 9, 10, plan) // 该 plan 下手牌末张
+    const meld = meldTileTransform(0, plan.meldStart + plan.shift, 0, plan.pitch)
+    expect(meld.z).toBeCloseTo(hand.z)
     expect(meld.x).toBeGreaterThan(hand.x)
+    expect(meld.x).toBeLessThan(TABLE.W / 2)
   })
 
   it('风位牌贴中央四边,朝向座位', () => {
     const w0 = windPlateTransform(0)
     expect(w0.z).toBeGreaterThan(0)
     expect(windPlateTransform(2).z).toBeLessThan(0)
+  })
+})
+
+describe('相机取景 fitCameraDistance', () => {
+  const corners = contentCorners()
+
+  it('竖屏拉得比横屏远,且都让内容完整入镜', () => {
+    const wide = fitCameraDistance(CAMERA_MAIN, 1.6, corners)
+    const tall = fitCameraDistance(CAMERA_MAIN, 0.46, corners)
+    expect(tall).toBeGreaterThan(wide)
+    expect(maxNdc(CAMERA_MAIN, wide, 1.6, corners)).toBeLessThanOrEqual(0.95)
+    expect(maxNdc(CAMERA_MAIN, tall, 0.46, corners)).toBeLessThanOrEqual(0.95)
+    expect(maxNdc(CAMERA_TOP, fitCameraDistance(CAMERA_TOP, 1.6, corners), 1.6, corners)).toBeLessThanOrEqual(0.95)
+  })
+
+  it('取景距离有限且为正', () => {
+    const d = fitCameraDistance(CAMERA_MAIN, 1.0, corners)
+    expect(d).toBeGreaterThan(4)
+    expect(d).toBeLessThan(160)
   })
 })

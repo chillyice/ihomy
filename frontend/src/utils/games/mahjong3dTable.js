@@ -6,8 +6,14 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mahjongTileSrc } from './mahjongTiles'
 
 // ---------- 尺寸常量(世界单位;牌立放:宽 X、高 Y、厚 Z) ----------
-export const TILE = { W: 0.92, H: 1.26, D: 0.6, PITCH: 1.0, LIE_PITCH: 1.3 }
-export const TABLE = { W: 13.6, D: 9.9 }
+// 桌面按「最坏局面也放得下」反推:手牌 13+摸牌+四组副露(暗杠 4 张)同排、
+// 牌河风车形(远行收列,四家互不相交)都对齐 15.5 的方桌;相机再按视口取景,见 fitCameraDistance。
+export const TILE = { W: 0.78, H: 1.07, D: 0.52, PITCH: 0.85, LIE_PITCH: 0.66 }
+export const TABLE = { W: 15.5, D: 15.5 }
+/** 派生布局:手牌行贴桌沿,墙圈在其内侧,中央区只留风位牌与骰子 */
+export const LAYOUT = { edgeGap: 0.95, wallV: 0.85, centerR: 0.72 }
+/** 整行(手牌+摸牌+副露)排布参数:EDGE=行端到桌沿留白,其余为各类间隙 */
+export const ROW = { EDGE: 0.4, DRAWN_GAP: 0.4, MELD_GAP: 0.5, MELD_GROUP_GAP: 0.22, GAP_MIN: 0.08 }
 
 /** 座位坐标系:seat0=我(南,+Z 屏幕下方)、1=下家(东 +X 屏幕右)、2=对家(北)、3=上家(西)。
  *  row = 手牌行方向,face = 该座位朝外方向(牌面朝牌主);anchor = 手牌行中心。 */
@@ -15,7 +21,7 @@ export function seatFrame(seat) {
   const yaw = [0, Math.PI / 2, Math.PI, -Math.PI / 2][((seat % 4) + 4) % 4]
   return {
     yaw,
-    anchor: { x: Math.sin(yaw) * 4.75, z: Math.cos(yaw) * 3.75 },
+    anchor: { x: Math.sin(yaw) * (TABLE.W / 2 - LAYOUT.edgeGap), z: Math.cos(yaw) * (TABLE.D / 2 - LAYOUT.edgeGap) },
     row: { x: Math.cos(yaw), z: -Math.sin(yaw) },
     face: { x: Math.sin(yaw), z: Math.cos(yaw) },
   }
@@ -27,38 +33,88 @@ function toWorld(seat, u, v) {
   return { x: f.anchor.x + f.row.x * u - f.face.x * v, z: f.anchor.z + f.row.z * u - f.face.z * v }
 }
 
-/** 手牌第 i 张(共 count)的行内偏移:按持有数居中;摸牌不占中轴,见 drawnTileU */
+/** 手牌第 i 张(共 count)的行内偏移:按持有数居中 */
 export function handTileU(i, count) {
   return (i - (count - 1) / 2) * TILE.PITCH
 }
 
-/** 摸牌行内偏移:整手牌右侧留一个明显间隙 */
+/** 手牌行右端(含牌宽) */
+function handEndU(count) {
+  return ((count - 1) / 2) * TILE.PITCH + TILE.W / 2
+}
+
+/** 摸牌行内偏移:手牌右端外留一个明显间隙 */
 export function drawnTileU(count) {
-  return ((count - 1) / 2 + 1.55) * TILE.PITCH
+  return handEndU(count) + ROW.DRAWN_GAP + TILE.W / 2
 }
 
-export function handTileTransform(seat, i, count) {
-  return { ...toWorld(seat, handTileU(i, count), 0), yaw: seatFrame(seat).yaw }
+/**
+ * 整行(手牌+摸牌+副露)排布计划。手牌居中,摸牌/副露向右排;
+ * 超预算先压组间 gap,还不够就整行居中并等比压牌距(下限 = 牌宽+0.01,牌永远不相交)。
+ * 副露越多手牌越少,常规局手牌行总宽守恒,不会触发压缩。
+ */
+export function rowPlan(handCount, drawnPresent, meldSizes = []) {
+  const handHalf = (Math.max(0, handCount - 1) * TILE.PITCH + TILE.W) / 2
+  const drawnEdge = drawnPresent ? handHalf + ROW.DRAWN_GAP + TILE.W : handHalf
+  const meldStart = meldSizes.length ? drawnEdge + ROW.MELD_GAP : drawnEdge
+  const tiles = meldSizes.reduce((sum, n) => sum + n, 0)
+  let gap = meldSizes.length > 1 ? ROW.MELD_GROUP_GAP : 0
+  let pitch = TILE.PITCH
+  let meldEnd = meldStart + tiles * pitch + Math.max(0, meldSizes.length - 1) * gap
+  const budget = TABLE.W / 2 - ROW.EDGE
+  if (meldEnd > budget) {
+    const groups = Math.max(1, meldSizes.length - 1)
+    const gapRoom = groups * (gap - ROW.GAP_MIN)
+    if (gapRoom > 0) {
+      const use = Math.min(gapRoom, meldEnd - budget)
+      gap -= use / groups
+      meldEnd -= use
+    }
+  }
+  if (meldEnd > budget) {
+    // 极端局(如四杠):整行必须压牌距才放得下
+    const fixed =
+      (drawnPresent ? ROW.DRAWN_GAP : 0) + (meldSizes.length ? ROW.MELD_GAP : 0) + Math.max(0, meldSizes.length - 1) * ROW.GAP_MIN
+    const n = handCount + (drawnPresent ? 1 : 0) + tiles
+    pitch = Math.max(TILE.W + 0.01, (TABLE.W - 0.3 - fixed) / Math.max(1, n))
+    gap = meldSizes.length > 1 ? ROW.GAP_MIN : 0
+    meldEnd = meldStart + tiles * pitch + Math.max(0, meldSizes.length - 1) * gap
+  }
+  // 常规局不位移;超预算时整行居中,两端贴桌沿(仍在呢面内)
+  const shift = meldEnd <= budget ? 0 : -(meldEnd - handHalf) / 2
+  return { shift, pitch, handHalf, drawnU: drawnTileU(handCount), meldStart, meldGap: gap }
 }
 
-export function drawnTileTransform(seat, count) {
-  return { ...toWorld(seat, drawnTileU(count), 0), yaw: seatFrame(seat).yaw }
+export function handTileTransform(seat, i, count, plan = null) {
+  const scale = plan ? plan.pitch / TILE.PITCH : 1
+  const u = handTileU(i, count) * scale + (plan?.shift || 0)
+  return { ...toWorld(seat, u, 0), yaw: seatFrame(seat).yaw }
 }
 
-/** 牌河:每行 6 张,行 0 最靠近本方牌墙,向中心增长;返回行内序号→位置 */
+export function drawnTileTransform(seat, count, plan = null) {
+  const u = drawnTileU(count) + (plan?.shift || 0)
+  return { ...toWorld(seat, u, 0), yaw: seatFrame(seat).yaw }
+}
+
+/** 牌河:行 0 紧贴本方墙内沿、向中心逐行生长;远端行收列,四家牌河互不相交(风车形) */
 export const RIVER_COLS = 6
+export const RIVER_ROWS = 5
+export function riverRowCols(row) {
+  return [6, 6, 6, 4, 2][row] || 2
+}
 export function riverTileTransform(seat, index) {
-  const row = Math.floor(index / RIVER_COLS)
-  const col = index % RIVER_COLS
-  const v = 2.33 + row * TILE.LIE_PITCH
-  const u = (col - (RIVER_COLS - 1) / 2) * TILE.PITCH
+  const row = Math.min(Math.floor(index / RIVER_COLS), RIVER_ROWS - 1)
+  const cols = riverRowCols(row)
+  const col = Math.min(index % RIVER_COLS, cols - 1)
+  const v = LAYOUT.wallV + TILE.D + 0.06 + row * TILE.LIE_PITCH
+  const u = (col - (cols - 1) / 2) * TILE.PITCH
   return { ...toWorld(seat, u, v), yaw: seatFrame(seat).yaw }
 }
 
-/** 副露平铺:行内第 tileIndex 张,整组排在手牌右侧(本方视角) */
-export function meldTileTransform(seat, meldStartTiles, tileIndex) {
-  const u = 2.15 + (meldStartTiles + tileIndex) * TILE.PITCH
-  return { ...toWorld(seat, u, 1.18), yaw: seatFrame(seat).yaw }
+/** 副露平铺:groupStartU 为该组首张的行内偏移(由 rowPlan 的 meldStart 累计),v 与手牌同行 */
+export function meldTileTransform(seat, groupStartU, tileIndex, pitch = TILE.PITCH) {
+  const u = groupStartU + tileIndex * pitch
+  return { ...toWorld(seat, u, 0), yaw: seatFrame(seat).yaw }
 }
 
 /** 牌墙:按剩余张数均分四边(余数从 seat0 起),每边两层堆叠 */
@@ -75,17 +131,17 @@ export function wallStackCounts(wallLeft) {
 /** 牌墙第 stackIndex 摞的位置(两层摞,行内居中) */
 export function wallStackTransform(seat, stackIndex, stackCount) {
   const u = (stackIndex - (stackCount - 1) / 2) * (TILE.W + 0.06)
-  return { ...toWorld(seat, u, 1.03), yaw: seatFrame(seat).yaw }
+  return { ...toWorld(seat, u, LAYOUT.wallV), yaw: seatFrame(seat).yaw }
 }
 
 /** 骰子与风位牌的桌面位置(中央区) */
 export function diceTransform(i) {
-  return { x: i === 0 ? -0.55 : 0.55, z: 0 }
+  return { x: i === 0 ? -0.45 : 0.45, z: 0 }
 }
 export const WIND_KINDS = [27, 28, 29, 30] // east/south/west/north 的 kind
 export function windPlateTransform(seat) {
   const f = seatFrame(seat)
-  return { x: f.face.x * 1.05, z: f.face.z * 1.05, yaw: f.yaw }
+  return { x: f.face.x * LAYOUT.centerR, z: f.face.z * LAYOUT.centerR, yaw: f.yaw }
 }
 
 // ---------- 场景(惰性创建;仅被 Mahjong3d.vue 懒加载引用) ----------
@@ -190,9 +246,75 @@ function dieCanvas(n) {
 }
 
 const IVORY = '#faf6ea'
+const CAM_FOV = 40
 const CAMERA_PRESETS = {
   main: { pos: [0, 8.9, 10.6], look: [0, 0, 0.55] },
   top: { pos: [0, 16.2, 0.02], look: [0, 0, 0] },
+}
+
+/** 场景内容包围盒 8 角点(木沿外沿 + 立牌高度):相机取景以它为准 */
+export function contentCorners() {
+  const hx = TABLE.W / 2 + 0.45
+  const hz = TABLE.D / 2 + 0.45
+  const corners = []
+  for (const y of [-0.4, TILE.H + 0.2]) {
+    for (const x of [-hx, hx]) {
+      for (const z of [-hz, hz]) corners.push([x, y, z])
+    }
+  }
+  return corners
+}
+
+/** 给定距离下内容盒角点的最大 |NDC|(解析投影,纯函数,供二分取景与单测) */
+export function maxNdc(preset, distance, aspect, corners, fov = CAM_FOV) {
+  const [lx, ly, lz] = preset.look
+  const dx = preset.pos[0] - lx
+  const dy = preset.pos[1] - ly
+  const dz = preset.pos[2] - lz
+  const len = Math.hypot(dx, dy, dz) || 1
+  const dir = [dx / len, dy / len, dz / len]
+  const eye = [lx + dir[0] * distance, ly + dir[1] * distance, lz + dir[2] * distance]
+  const fwd = [-dir[0], -dir[1], -dir[2]]
+  // right = normalize(cross(fwd, up));top 视角 forward 近似 -Y,叉积近零时兜底取 X 轴
+  let rx = -fwd[2]
+  const ry = 0
+  let rz = fwd[0]
+  const rl = Math.hypot(rx, ry, rz)
+  if (rl < 1e-5) {
+    rx = 1
+    rz = 0
+  } else {
+    rx /= rl
+    rz /= rl
+  }
+  const ux = ry * fwd[2] - rz * fwd[1]
+  const uy = rz * fwd[0] - rx * fwd[2]
+  const uz = rx * fwd[1] - ry * fwd[0]
+  const tanV = Math.tan(((fov / 2) * Math.PI) / 180)
+  let max = 0
+  for (const [px, py, pz] of corners) {
+    const wx = px - eye[0]
+    const wy = py - eye[1]
+    const wz = pz - eye[2]
+    const depth = wx * fwd[0] + wy * fwd[1] + wz * fwd[2]
+    if (depth < 0.1) return Infinity
+    const nx = (wx * rx + wy * ry + wz * rz) / (depth * tanV * aspect)
+    const ny = (wx * ux + wy * uy + wz * uz) / (depth * tanV)
+    max = Math.max(max, Math.abs(nx), Math.abs(ny))
+  }
+  return max
+}
+
+/** 相机取景:沿预设机位方向二分出「内容盒完整进入视锥」的距离(竖屏窄窗自动拉远) */
+export function fitCameraDistance(preset, aspect, corners, margin = 0.94) {
+  let lo = 4
+  let hi = 160
+  for (let i = 0; i < 24; i += 1) {
+    const mid = (lo + hi) / 2
+    if (maxNdc(preset, mid, aspect, corners) > margin) lo = mid
+    else hi = mid
+  }
+  return hi
 }
 
 export function createMahjong3dTable(container, opts = {}) {
@@ -209,10 +331,20 @@ export function createMahjong3dTable(container, opts = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#22343c')
-  const camera = new THREE.PerspectiveCamera(40, 16 / 10, 0.1, 80)
+  const camera = new THREE.PerspectiveCamera(CAM_FOV, (container.clientWidth || 640) / (container.clientHeight || 400), 0.1, 300)
+  let viewName = 'main'
   const lookTarget = new THREE.Vector3(...CAMERA_PRESETS.main.look)
-  camera.position.set(...CAMERA_PRESETS.main.pos)
-  camera.lookAt(lookTarget)
+  // 取景:沿当前预设机位方向,把内容盒完整放进视锥(竖屏/窄窗自动拉远)
+  const applyCamera = () => {
+    const preset = CAMERA_PRESETS[viewName] || CAMERA_PRESETS.main
+    const dist = fitCameraDistance(preset, camera.aspect, contentCorners())
+    const look = new THREE.Vector3(...preset.look)
+    const dir = new THREE.Vector3(...preset.pos).sub(look).normalize()
+    camera.position.copy(look).addScaledVector(dir, dist)
+    camera.lookAt(look)
+    lookTarget.copy(look)
+  }
+  applyCamera()
 
   // 光照:半球环境 + 主方向光(带柔阴影)
   scene.add(new THREE.HemisphereLight('#fff6e4', '#31473c', 1.05))
@@ -220,10 +352,10 @@ export function createMahjong3dTable(container, opts = {}) {
   sun.position.set(4.5, 12, 5)
   sun.castShadow = true
   sun.shadow.mapSize.set(1024, 1024)
-  sun.shadow.camera.left = -8
-  sun.shadow.camera.right = 8
-  sun.shadow.camera.top = 8
-  sun.shadow.camera.bottom = -8
+  sun.shadow.camera.left = -10
+  sun.shadow.camera.right = 10
+  sun.shadow.camera.top = 10
+  sun.shadow.camera.bottom = -10
   sun.shadow.radius = 3
   scene.add(sun)
 
@@ -289,7 +421,6 @@ export function createMahjong3dTable(container, opts = {}) {
   const handMeshes = new Map() // tileId -> mesh(拾取用)
   const tweens = []
   let disposed = false
-  let viewName = 'main'
 
   function addTile(parent, kind, { x, z, yaw }, mode /* stand | lieUp | lieDown */, tileId = null) {
     const mesh = new THREE.Mesh(tileGeo, null)
@@ -319,33 +450,68 @@ export function createMahjong3dTable(container, opts = {}) {
     }
   }
 
-  // ---------- 对外 API ----------
-  const api = {
-    /** 我方手牌:tiles [{id, kind}];drawnKind 摸牌单放右侧 */
-    setHand(tiles, drawnId = null, drawnKind = null) {
+  // 每席整行缓存:手牌/摸牌/副露必须一起排(rowPlan 要知道三者才算得出整行),改动任一即整行重排
+  const rowCache = [0, 1, 2, 3].map(() => ({ hand: [], drawn: null, melds: [] }))
+  function relayoutRow(seat) {
+    const cache = rowCache[seat]
+    const plan = rowPlan(
+      cache.hand.length,
+      !!cache.drawn,
+      cache.melds.map((m) => m.kinds.length),
+    )
+    if (seat === 0) {
       clearGroup(groups.hand)
       handMeshes.clear()
-      tiles.forEach((t, i) => {
-        const pos = handTileTransform(0, i, tiles.length)
+      cache.hand.forEach((t, i) => {
+        const pos = handTileTransform(0, i, cache.hand.length, plan)
         addTile(groups.hand, t.kind, pos, 'stand', t.id)
       })
-      if (drawnKind != null) {
-        const pos = drawnTileTransform(0, tiles.length)
-        addTile(groups.hand, drawnKind, pos, 'stand', drawnId ?? 'drawn')
+      if (cache.drawn) {
+        const pos = drawnTileTransform(0, cache.hand.length, plan)
+        addTile(groups.hand, cache.drawn.kind, pos, 'stand', cache.drawn.id)
       }
+    } else {
+      const key = 'opp' + seat
+      const old = groups.opponents.getObjectByName(key)
+      if (old) groups.opponents.remove(old)
+      const g = new THREE.Group()
+      g.name = key
+      cache.hand.forEach((t, i) => {
+        const pos = handTileTransform(seat, i, cache.hand.length, plan)
+        addTile(g, t.kind, pos, 'stand')
+      })
+      groups.opponents.add(g)
+    }
+    // 副露与手牌同行,随 plan 一起位移/压缩
+    const mkey = 'meld' + seat
+    const mold = groups.melds.getObjectByName(mkey)
+    if (mold) groups.melds.remove(mold)
+    const mg = new THREE.Group()
+    mg.name = mkey
+    let startU = plan.meldStart + plan.shift
+    for (const m of cache.melds) {
+      const kinds = m.dark ? [null, null, null, null] : m.kinds
+      kinds.forEach((kind, i) => {
+        const pos = meldTileTransform(seat, startU, i, plan.pitch)
+        addTile(mg, kind, pos, m.dark ? 'lieDown' : 'lieUp')
+      })
+      startU += kinds.length * plan.pitch + plan.meldGap
+    }
+    groups.melds.add(mg)
+  }
+
+  // ---------- 对外 API ----------
+  const api = {
+    /** 我方手牌:tiles [{id, kind}];drawnKind 摸牌单放右侧(与副露同一行,整行重排) */
+    setHand(tiles, drawnId = null, drawnKind = null) {
+      rowCache[0].hand = tiles.map((t) => ({ id: t.id, kind: t.kind }))
+      rowCache[0].drawn = drawnKind != null ? { id: drawnId ?? 'drawn', kind: drawnKind } : null
+      relayoutRow(0)
     },
     /** 他家手牌(只见牌背) */
     setOpponentHand(seat, count) {
-      const key = 'opp' + seat
-      let g = groups.opponents.getObjectByName(key)
-      if (g) groups.opponents.remove(g)
-      g = new THREE.Group()
-      g.name = key
-      for (let i = 0; i < count; i++) {
-        const pos = handTileTransform(seat, i, count)
-        addTile(g, null, pos, 'stand')
-      }
-      groups.opponents.add(g)
+      rowCache[seat].hand = Array.from({ length: count }, () => ({ id: null, kind: null }))
+      relayoutRow(seat)
     },
     /** 牌河:kinds 数组,latestIndex 高亮抬升 */
     setRiver(seat, kinds, latestIndex = -1) {
@@ -366,23 +532,13 @@ export function createMahjong3dTable(container, opts = {}) {
       if (latestIndex < 0 || !kinds.length) latestRing.visible = false
       groups.river.add(g)
     },
-    /** 副露:groups [{dark, kinds:[kind...]}] */
-    async setMelds(seat, meldGroups) {
-      const key = 'meld' + seat
-      let g = groups.melds.getObjectByName(key)
-      if (g) groups.melds.remove(g)
-      g = new THREE.Group()
-      g.name = key
-      let start = 0
-      for (const m of meldGroups || []) {
-        const kinds = m.dark ? [null, null, null, null] : m.kinds
-        for (let i = 0; i < kinds.length; i++) {
-          const pos = meldTileTransform(seat, start, i)
-          addTile(g, kinds[i], pos, m.dark ? 'lieDown' : 'lieUp')
-        }
-        start += kinds.length + 0.4 // 组间留半个空隙
-      }
-      groups.melds.add(g)
+    /** 副露:groups [{dark, kinds:[kind...]}];与手牌同行,整行重排 */
+    setMelds(seat, meldGroups) {
+      rowCache[seat].melds = (meldGroups || []).map((m) => ({
+        dark: !!m.dark,
+        kinds: m.dark ? [null, null, null, null] : [...m.kinds],
+      }))
+      relayoutRow(seat)
     },
     /** 牌墙:按剩余张数重建四边两层堆 */
     setWall(wallLeft) {
@@ -448,10 +604,10 @@ export function createMahjong3dTable(container, opts = {}) {
         const kind = WIND_KINDS[seat]
         const pos = windPlateTransform(seat)
         const holder = addTile(g, kind, pos, 'stand')
-        holder.scale.set(0.62, 0.62, 0.62)
+        holder.scale.set(0.55, 0.55, 0.55)
         if (seat === dealerSeat) {
           const ring = new THREE.Mesh(
-            new THREE.RingGeometry(0.5, 0.64, 32),
+            new THREE.RingGeometry(0.44, 0.56, 32),
             new THREE.MeshBasicMaterial({ color: '#efca83', side: THREE.DoubleSide }),
           )
           ring.rotation.x = -Math.PI / 2
@@ -482,21 +638,32 @@ export function createMahjong3dTable(container, opts = {}) {
     setView(name) {
       viewName = name
       const preset = CAMERA_PRESETS[name] || CAMERA_PRESETS.main
+      const dist = fitCameraDistance(preset, camera.aspect, contentCorners())
+      const look = new THREE.Vector3(...preset.look)
+      const dir = new THREE.Vector3(...preset.pos).sub(look).normalize()
+      const toPos = look.clone().addScaledVector(dir, dist)
       const fromPos = camera.position.clone()
       const fromLook = lookTarget.clone()
-      const toPos = new THREE.Vector3(...preset.pos)
-      const toLook = new THREE.Vector3(...preset.look)
       tweens.push({
         t: 0,
         dur: 450,
         tick(p) {
           camera.position.lerpVectors(fromPos, toPos, p)
-          lookTarget.lerpVectors(fromLook, toLook, p)
+          lookTarget.lerpVectors(fromLook, look, p)
           camera.lookAt(lookTarget)
         },
       })
     },
     getView: () => viewName,
+    /** 取景调试信息(冒烟/调试用) */
+    cameraInfo() {
+      return {
+        view: viewName,
+        aspect: Number(camera.aspect.toFixed(3)),
+        pos: camera.position.toArray().map((n) => Number(n.toFixed(2))),
+        dist: Number(camera.position.distanceTo(lookTarget).toFixed(2)),
+      }
+    },
     /** 渲染统计(冒烟/调试用:draw call 与三角数来自最近一帧) */
     stats() {
       return {
@@ -514,6 +681,7 @@ export function createMahjong3dTable(container, opts = {}) {
       renderer.setSize(w, h, false)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
+      applyCamera()
     },
     dispose() {
       disposed = true

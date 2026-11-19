@@ -8,6 +8,7 @@
     :title="$t('games.mahjong3d.title')"
     body-align="stretch"
     readable
+    default-wide
     :new-game="phase === 'playing'"
     :new-game-confirm="true"
     @back="goBack"

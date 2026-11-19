@@ -1480,6 +1480,13 @@ a {
 .page.web-game-page {
   max-width: none;
 }
+/* 立体麻将页(V13.55):默认宽屏(html.game-wide 已放开 gc-wrap)+ 3D 牌桌吃满主区 */
+.page.game-shell.m3-shell {
+  max-width: none;
+}
+html.theme-warm .gc-main:has(.m3-shell) {
+  padding: 0;
+}
 
 /* ========== 页面通用:标题栏 + 面包屑 ========== */
 .page-header {

@@ -156,6 +156,8 @@ const props = defineProps({
   newGameDisabled: { type: Boolean, default: false },
   /** 点「新游戏」前先确认(对局进行中会丢进度);页面按自己的进行中状态传 */
   newGameConfirm: { type: Boolean, default: false },
+  /** 进页默认开宽屏(隐藏侧栏、放开内容宽度);用户仍可用头部「宽屏」键切回 */
+  defaultWide: { type: Boolean, default: false },
 })
 const emit = defineEmits(['back', 'newGame'])
 
@@ -213,6 +215,7 @@ const onWindowResize = () => syncBodySize()
 onMounted(() => {
   // 让移动端的浮动返回键退场:本外壳自己提供返回
   document.documentElement.classList.add('game-shell')
+  if (props.defaultWide && !isWide.value) toggleWide()
   if (typeof ResizeObserver !== 'undefined' && bodyEl.value) {
     bodyObserver = new ResizeObserver(syncBodySize)
     bodyObserver.observe(bodyEl.value)
