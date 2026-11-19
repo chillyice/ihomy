@@ -33,13 +33,12 @@
     <template #actions>
       <el-button
         size="small"
-        class="gs-icon-btn"
         :disabled="game.status !== 'PLAYING'"
         :title="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
         :aria-label="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
         @click="togglePause"
       >
-        <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+        {{ paused ? '▶' : '⏸' }} {{ paused ? $t('games.snake.resume') : $t('games.snake.pause') }}
       </el-button>
     </template>
 
@@ -78,13 +77,12 @@
         <div class="sn-meta-actions">
           <el-button
             size="small"
-            class="gs-icon-btn"
             :disabled="game.status !== 'PLAYING'"
             :title="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
             :aria-label="paused ? $t('games.snake.resume') : $t('games.snake.pause')"
             @click="togglePause"
           >
-            <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+            {{ paused ? '▶' : '⏸' }} {{ paused ? $t('games.snake.resume') : $t('games.snake.pause') }}
           </el-button>
         </div>
       </div>
@@ -135,7 +133,6 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'

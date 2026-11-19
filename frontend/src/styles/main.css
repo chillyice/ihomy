@@ -1085,6 +1085,29 @@ html.game-shell .mobile-game-chrome {
   .gs-controls > .gs-actions {
     margin-inline-start: 0;
   }
+  /* 操作按钮组统一宠物连连看的排布:竖排撑满左栏、整组贴左栏底边(房间条留在头部下面);
+     按钮全宽、文字左对齐——各游戏横屏下的按钮都长一个样 */
+  .page.game-shell .gs-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 6px;
+  }
+  .page.game-shell .gs-actions .el-button {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .page.game-shell .gs-actions .el-button + .el-button {
+    margin-left: 0;
+  }
+  .page.game-shell .gs-controls {
+    order: 1;
+    margin-top: auto;
+  }
+  .page.game-shell .gs-extras {
+    order: 0;
+  }
 }
 
 /* ===== 手机游戏沉浸态(MobileLayout 在游戏路由挂 html.game-mobile-immersive)=====
@@ -2920,6 +2943,16 @@ html.dark .el-badge__content {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
+}
+/* 对抗牌局:出牌/叫分键双摆放——竖屏与桌面在牌桌下方(FightTable 的 .ft-actions),
+   手机横屏进外壳左栏底边(宠物连连看排布,样式见横屏档);两份按档互斥,不同显 */
+.page.game-shell:has(.ft-root) .gs-actions {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .page.game-shell:has(.ft-root) .gs-actions {
+    display: flex;
+  }
 }
 /* 对抗牌局(斗地主/够级/掼蛋/保皇共用 FightTable):手机横屏沉浸态牌桌毡面铺满整页——
    外壳底色同化为桌毡渐变,中央牌桌自身底色让位(只留中央高光与内阴影),整页连成一块毡面;

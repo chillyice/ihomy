@@ -688,4 +688,12 @@ const cardLabel = (card) => {
     --fc-last-cap: 72px;
   }
 }
+
+/* 手机横屏:出牌/叫分键搬到外壳左栏底边(宠物连连看排布),牌桌下方这份让位;
+   两份摆放的互斥开关在 main.css 对抗牌局段(外壳那份按档显隐) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ft-actions {
+    display: none;
+  }
+}
 </style>

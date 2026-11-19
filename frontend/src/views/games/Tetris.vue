@@ -37,13 +37,12 @@
     <template #actions>
       <el-button
         size="small"
-        class="gs-icon-btn"
         :disabled="game.status !== 'PLAYING'"
         :title="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
         :aria-label="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
         @click="togglePause"
       >
-        <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+        {{ paused ? '▶' : '⏸' }} {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
       </el-button>
     </template>
 
@@ -86,13 +85,12 @@
         <div class="tt-meta-actions">
           <el-button
             size="small"
-            class="gs-icon-btn"
             :disabled="game.status !== 'PLAYING'"
             :title="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
             :aria-label="paused ? $t('games.tetris.resume') : $t('games.tetris.pause')"
             @click="togglePause"
           >
-            <el-icon><VideoPlay v-if="paused" /><VideoPause v-else /></el-icon>
+            {{ paused ? '▶' : '⏸' }} {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
           </el-button>
         </div>
       </div>
@@ -170,7 +168,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'

@@ -95,6 +95,33 @@
         </template>
       </FightTable>
     </div>
+    <!-- 出牌/叫分键的第二摆放:手机横屏进外壳左栏底边(宠物连连看同款竖排),
+         竖屏与桌面用牌桌下方那颗(FightTable 的 #actions);两份按档互斥,见 main.css 对抗牌局段 -->
+    <template #actions>
+      <template v-if="phase === 'bid' && bidTurn === 0">
+        <el-button size="small" round @click="bid(0, 0)">{{ $t('games.doudizhu.bidPass') }}</el-button>
+        <el-button
+          v-for="v in [1, 2, 3]"
+          :key="v"
+          size="small"
+          round
+          :type="v === 3 ? 'primary' : 'default'"
+          :disabled="v <= highestBid"
+          @click="bid(0, v)"
+        >
+          {{ $t('games.doudizhu.bidN', { n: v }) }}
+        </el-button>
+      </template>
+      <template v-else-if="phase === 'playing'">
+        <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passTurn()">
+          {{ $t('games.fight.pass') }}
+        </el-button>
+        <el-button size="small" round :disabled="!myTurn" @click="hint">{{ $t('games.fight.hint') }}</el-button>
+        <el-button type="primary" size="small" round :disabled="!canPlay" @click="playSelected">
+          {{ $t('games.fight.play') }}
+        </el-button>
+      </template>
+    </template>
   </GameShell>
 </template>
 
