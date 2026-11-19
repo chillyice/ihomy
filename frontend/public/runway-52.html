@@ -42,6 +42,8 @@ dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border
 @media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 body.in-immersive .shell{padding-top:54px}
+/* 手机沉浸态:外壳左栏已提供规则/新游戏,页面顶部这组重复按钮撤掉(竖屏/横屏都撤,桌面不受影响) */
+body.in-immersive .top-actions{display:none}
 /* ===== 铺满游戏区 =====
  * 这页是嵌在小游戏外壳里的(iframe 高度就是外壳的游戏区),所以「整页」= iframe 视口:
  * 宽屏/横屏把页面锁成一屏高,棋盘在可用高宽里取最大的正方形,右侧回合栏自己滚动;
@@ -62,9 +64,11 @@ body.in-immersive .shell{padding-top:54px}
   .key{flex:0 0 auto;margin:6px 0 0;font-size:11px;gap:5px 14px}
   .console{min-height:0;overflow-y:auto;align-content:start;overscroll-behavior:contain}
 }
-/* 矮屏(手机横屏):页面头部让位给棋盘,图例收进规则弹窗,棋盘再大一圈 */
+/* 矮屏(手机横屏):页面头部让位给棋盘,图例收进规则弹窗,棋盘再大一圈;
+   沉浸态里规则/新对局在外壳左栏,整条页头(品牌+按钮)直接收掉 */
 @media (min-aspect-ratio:1/1) and (max-height:560px){
   body.in-immersive .shell{padding-top:0}
+  body.in-immersive .top{display:none}
   .top{min-height:44px}
   .brand{display:none}
   .intro{display:none}
@@ -94,6 +98,8 @@ body.in-immersive .shell{padding-top:54px}
 </div>
 </main>
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
+<!-- 规则正文与 Runway52.vue 的 #rules 槽(i18n games.runway52.rule*)是同一份文案,改这里要同步那边 -->
+
 <ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>连续六掷都没出 6 点，下一掷开出 1–5 点也能让一架飞机进起飞区；这次起飞后换下一家掷，不额外再掷。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
@@ -350,7 +356,7 @@ function sync(){
  $('turn-badge').textContent=won?'对局结束':'第 '+(game.round+(pick||spinning?0:1)||1)+' 掷';
  $('turn-name').textContent=TEAMS[won?done:c].name+'机队'+(won?'获胜':'');
  $('turn-name').style.color=TEAMS[won?done:c].paint;
- $('instruction').textContent=won?'四架飞机全部归航。':moving?'飞机滑行中…':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'+pityHint()):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。'+pityHint());
+ $('instruction').textContent=won?'四架飞机全部归航。':moving?'飞机滑行中…':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':pityHint()):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。'+pityHint());
  $('roll').textContent=won?'再开一局':cpu?'电脑回合':pick?'请选择飞机':'掷骰子';
  $('roll').disabled=blocked||moving||!won&&(cpu||pick||spinning);
  const face=$('die');face.classList.toggle('rolling',spinning);face.innerHTML=die(game.face);face.setAttribute('aria-label',spinning?'掷骰中':game.face?game.face+' 点':'尚未掷骰');
