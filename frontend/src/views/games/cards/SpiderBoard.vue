@@ -1,5 +1,5 @@
 <template>
-  <div class="sol-card game-surface" @contextmenu.prevent @dblclick.prevent>
+  <div class="sol-card game-surface" :class="{ 'sol-no-anim': !boardReady }" @contextmenu.prevent @dblclick.prevent>
     <div class="sol-toolbar">
       <div class="sol-stats">
         <div class="sol-stat">
@@ -80,12 +80,13 @@
             v-for="(card, ci) in pile"
             :key="card.id"
             class="sol-cardface"
+            :data-card-id="card.id"
             :class="[cardClass(card), { selected: isSelected(pi, ci), 'hint-source': isCardHint(pi, ci), 'is-dragged': isDragged(card) }]"
             :style="ci ? { marginTop: margins[pi][ci - 1] } : null"
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
           >
-            <PlayingCard v-if="card.faceUp" :card="card" />
+            <CardFlip :card="card" />
           </div>
         </div>
       </div>
@@ -118,19 +119,20 @@
 
 <script setup>
 // 蜘蛛纸牌:规则/发牌/叠牌/自动收组/提示/无路可走判定全在 utils/games/spider.js(纯函数,单测覆盖)。
-// 本组件负责点选与拖动移动、双击自动移动、撤销快照、计时与最高分;牌宽与叠牌步进来自 cardLayout.js。
+// 本组件负责点选与拖动移动、双击自动移动、撤销快照、计时与最高分;牌宽与叠牌步进来自 cardLayout.js,
+// 牌面统一交给 CardFlip 渲染(双面 3D 翻牌,正面内用 PlayingCard)。
 // 难度 1/2/4 色分别记录最高分与存档,通关按积分规则发奖励(后端 POST /game/spider/reward)。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
-import PlayingCard from '@/components/games/PlayingCard.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useCardDrag } from '@/composables/useCardDrag'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { formatClock } from '@/utils/games/gameClock'
 import { seededRng } from '@/utils/games/seededRng'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
+import { dealtIds, flyCardsFrom, pileRect } from '@/utils/games/cardAnimations'
 import {
   COLUMNS,
   COMPLETE_TARGET,
@@ -146,6 +148,7 @@ import {
   sourceCards,
 } from '@/utils/games/spider'
 import CardDragGhost from './CardDragGhost.vue'
+import CardFlip from './CardFlip.vue'
 
 const BEST_KEY = 'ihomy:games:spider:best:v1'
 const STATE_KEY = 'ihomy:games:spider:state:v1'
@@ -168,6 +171,8 @@ const rewardMsg = ref('')
 const selected = ref(null)
 const history = ref([])
 const hint = ref(null)
+/** 首帧占位牌局换存档/重开局时 faceUp 会整体重排,画稳之前禁掉翻牌过渡,避免凭空假翻转 */
+const boardReady = ref(false)
 
 const isWon = computed(() => game.value.status === STATUS.WON)
 const isLost = computed(() => game.value.status === STATUS.LOST)
@@ -310,7 +315,9 @@ const showHint = () => {
 }
 
 // ---------- 游戏流程 ----------
-const startNew = () => {
+const findCardEl = (id) => feltEl.value?.querySelector(`[data-card-id="${id}"]`) || null
+
+const startNew = async () => {
   stopTimer()
   clearHint()
   rng = play.active ? seededRng(play.seed) : null
@@ -322,6 +329,13 @@ const startNew = () => {
   clearState()
   startTimer()
   saveState()
+  // 开局发牌:整副桌面牌(54 张)从牌堆位置按次序飞到位(渲染后再量,避开首帧布局未定)
+  await nextTick()
+  const ids = game.value.tableau.flat().map((c) => c.id)
+  flyCardsFrom(pileRect(feltEl.value, '.sp-stock-wrap .sol-slot'), ids.map(findCardEl).filter(Boolean), {
+    duration: 260,
+    stagger: 14,
+  })
 }
 
 const grantReward = async () => {
@@ -380,11 +394,25 @@ const undo = () => {
   saveState()
 }
 
-const dealRow = () => {
+const dealRow = async () => {
   if (shouldIgnoreClick()) return
   if (!canDealNow.value) return
   selected.value = null
-  commit(dealStock(game.value))
+  const prevStockIds = game.value.stock.map((c) => c.id)
+  const next = dealStock(game.value)
+  if (!commit(next)) return
+  // 发一排:十张牌从牌堆位置按发牌次序飞进各列
+  await nextTick()
+  flyCardsFrom(
+    pileRect(feltEl.value, '.sp-stock-wrap .sol-slot'),
+    dealtIds(
+      prevStockIds,
+      next.stock.map((c) => c.id),
+    )
+      .map(findCardEl)
+      .filter(Boolean),
+    { duration: 300, stagger: 42 },
+  )
 }
 
 // ---------- 拖动 ----------
@@ -491,6 +519,10 @@ onMounted(async () => {
   else startTimer()
   measureFelt()
   setTimeout(measureFelt, 320)
+  await nextTick()
+  setTimeout(() => {
+    boardReady.value = true
+  }, 60)
 })
 
 onBeforeUnmount(() => {

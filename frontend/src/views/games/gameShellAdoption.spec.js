@@ -47,8 +47,8 @@ const PENDING = []
 /** 不是游戏舞台:大厅/房间/详情/播放器分发/桌面下载/模拟器 */
 const EXEMPT = ['DesktopGame.vue', 'EmulatorPlayer.vue', 'GamePlayer.vue', 'GameRoom.vue', 'Games.vue', 'MatchDetail.vue']
 
-/** 纸牌三桌由 Cards.vue 承载,随 Cards.vue 一起迁移 */
-const CARD_BOARD = ['FreeCellBoard.vue', 'KlondikeBoard.vue', 'SpiderBoard.vue']
+/** 纸牌三桌与其翻面子件由 Cards.vue 承载,随 Cards.vue 一起迁移(CardDragGhost 走下方显式例外) */
+const CARD_BOARD = ['CardFlip.vue', 'FreeCellBoard.vue', 'KlondikeBoard.vue', 'SpiderBoard.vue']
 
 const read = (file) => readFileSync(file, 'utf8')
 const vueFiles = (dir) => readdirSync(dir).filter((n) => n.endsWith('.vue'))
