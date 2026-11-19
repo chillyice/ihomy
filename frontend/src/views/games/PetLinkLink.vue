@@ -5,6 +5,7 @@
     :title="$t('games.petlink.title')"
     body-align="start"
     :new-game="screen === 'game' && !play.active"
+    :new-game-confirm="screen === 'game' && !won && !lost"
     @back="goBack"
     @new-game="onRestartClick"
   >

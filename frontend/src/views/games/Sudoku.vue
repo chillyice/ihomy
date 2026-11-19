@@ -6,8 +6,9 @@
     :rules-pages="[rulesPagePlay, rulesPageControls, rulesPageVariants, rulesPageTech]"
     body-align="stretch"
     new-game
+    :new-game-confirm="gameInProgress"
     @back="goBack"
-    @new-game="startNew"
+    @new-game="onNewGame"
   >
     <!-- 模式与难度跟在游戏名后面(不再占控件行);改了就按新设置开局 -->
     <template #titleExtra>
@@ -72,52 +73,26 @@
       />
     </template>
 
-    <!-- 开局选择:进页面先定模式与难度(上一局没下完时也可以直接接着下)。
+    <!-- 开局选择:进页面先定模式与难度(上一局没下完时也能接着下);
+         点「新游戏」时外壳先确认(会丢进度),确认后同样走这个弹窗。
          页面级弹窗挂 #overlay,全屏时留在整页里 -->
     <template #overlay>
-      <el-dialog
+      <GameSetupDialog
         v-model="chooserOpen"
-        class="dialog-sm sd-chooser"
+        :title="chooserClosable ? $t('games.setup.title') : $t('games.sudoku.chooser.title')"
+        :fields="chooserFields"
+        :note="chooserNote"
+        :closable="chooserClosable"
+        :show-cancel="chooserClosable"
+        :confirm-text="$t('games.sudoku.chooser.start')"
         :append-to-body="!isFullscreen"
-        :title="$t('games.sudoku.chooser.title')"
-        :show-close="false"
-        :close-on-click-modal="false"
-        :close-on-press-escape="false"
+        @confirm="startFromChooser"
       >
-        <p class="sd-chooser-tip">{{ $t('games.sudoku.chooser.tip') }}</p>
-        <div class="sd-chooser-fields">
-          <label class="sd-chooser-field">
-            <span>{{ $t('games.sudoku.chooser.variant') }}</span>
-            <el-select v-model="chooserVariant" :teleported="!isFullscreen">
-              <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
-            </el-select>
-          </label>
-          <label class="sd-chooser-field">
-            <span>{{ $t('games.sudoku.chooser.difficulty') }}</span>
-            <el-select v-model="chooserDifficulty" :teleported="!isFullscreen">
-              <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
-            </el-select>
-          </label>
-        </div>
-        <p v-if="savedGame" class="sd-chooser-saved">
-          {{
-            $t('games.sudoku.chooser.saved', {
-              variant: $t('games.sudoku.variant.' + savedGame.variant),
-              difficulty: $t('games.sudoku.difficulty.' + savedGame.difficulty),
-              time: formatTime(savedGame.elapsed || 0),
-            })
-          }}
-        </p>
-        <template #footer>
-          <div class="sd-chooser-actions">
-            <el-button @click="goBack">{{ $t('games.sudoku.chooser.back') }}</el-button>
-            <el-button v-if="savedGame" type="primary" @click="resumeSaved">{{ $t('games.sudoku.chooser.resume') }}</el-button>
-            <el-button :type="savedGame ? 'default' : 'primary'" @click="startFromChooser">{{
-              $t('games.sudoku.chooser.start')
-            }}</el-button>
-          </div>
+        <template v-if="!chooserClosable" #extra>
+          <el-button @click="leaveChooser">{{ $t('games.sudoku.chooser.back') }}</el-button>
+          <el-button v-if="savedGame" @click="resumeSaved">{{ $t('games.sudoku.chooser.resume') }}</el-button>
         </template>
-      </el-dialog>
+      </GameSetupDialog>
     </template>
 
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
@@ -333,6 +308,7 @@ import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
 import {
@@ -449,20 +425,71 @@ const chooserVariant = ref('CLASSIC')
 const chooserDifficulty = ref('MEDIUM')
 /** 上一局没下完的进度(有就多给一个「继续上一局」) */
 const savedGame = ref(null)
+/** 首次进入必须选(不能关);点「新游戏」进来时可以取消,取消就回到当前局 */
+const chooserClosable = ref(false)
+/** 已开局且没通关 = 对局进行中;外壳据此先弹确认 */
+const gameInProgress = computed(() => !won.value && puzzle.value.some((v) => v > 0))
 
-const openChooser = () => {
-  const saved = loadState()
+const chooserFields = computed(() => [
+  {
+    key: 'variant',
+    label: t('games.sudoku.chooser.variant'),
+    value: chooserVariant.value,
+    options: VARIANT_KEYS.map((key) => ({ value: key, label: t('games.sudoku.variant.' + key) })),
+  },
+  {
+    key: 'difficulty',
+    label: t('games.sudoku.chooser.difficulty'),
+    value: chooserDifficulty.value,
+    options: DIFFICULTY_KEYS.map((key) => ({ value: key, label: t('games.sudoku.difficulty.' + key) })),
+  },
+])
+
+const chooserNote = computed(() => {
+  if (chooserClosable.value) return ''
+  const parts = [t('games.sudoku.chooser.tip')]
+  const saved = savedGame.value
+  if (saved) {
+    parts.push(
+      t('games.sudoku.chooser.saved', {
+        variant: t('games.sudoku.variant.' + saved.variant),
+        difficulty: t('games.sudoku.difficulty.' + saved.difficulty),
+        time: formatTime(saved.elapsed || 0),
+      }),
+    )
+  }
+  return parts.join('\n')
+})
+
+const openChooser = (closable = false) => {
+  // 点「新游戏」进来不带存档提示:对局进行中时「继续上一局」就是当前局,没有意义
+  const saved = closable ? null : loadState()
   savedGame.value = saved
-  chooserVariant.value = saved?.variant || variant.value
-  chooserDifficulty.value = saved?.difficulty || difficulty.value
+  chooserVariant.value = closable ? variant.value : saved?.variant || variant.value
+  chooserDifficulty.value = closable ? difficulty.value : saved?.difficulty || difficulty.value
+  chooserClosable.value = closable
   chooserOpen.value = true
 }
 
-const startFromChooser = () => {
+/** 外壳「新游戏」确认后:单机先选模式与难度;房间局沿用当前设置直接重开 */
+const onNewGame = () => {
+  if (play.active) {
+    startNew()
+    return
+  }
+  openChooser(true)
+}
+
+const startFromChooser = (values) => {
   chooserOpen.value = false
-  variant.value = chooserVariant.value
-  difficulty.value = chooserDifficulty.value
+  variant.value = values.variant
+  difficulty.value = values.difficulty
   return startNew()
+}
+
+const leaveChooser = () => {
+  chooserOpen.value = false
+  goBack()
 }
 
 const resumeSaved = () => {
@@ -2302,42 +2329,6 @@ html.dark .sd-shell {
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
-}
-
-/* 开局选择弹窗:两个字段竖排,标签在上、下拉占满整行 */
-.sd-chooser-tip {
-  margin: 0 0 12px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-chooser-fields {
-  display: grid;
-  gap: 10px;
-}
-.sd-chooser-field {
-  display: grid;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-chooser-field .el-select {
-  width: 100%;
-}
-.sd-chooser-saved {
-  margin: 12px 0 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px dashed var(--sd-line-strong);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-}
-.sd-chooser-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 /* 窄窗(手机竖):数字盘与工具键压一档,棋盘仍是通栏最大尺寸 */

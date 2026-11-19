@@ -9,11 +9,17 @@
     body-align="stretch"
     readable
     :new-game="phase === 'playing'"
+    :new-game-confirm="true"
     @back="goBack"
-    @new-game="startGame"
+    @new-game="onNewGame"
   >
     <template #rules>
       <p>{{ $t('games.mahjong.coverHint') }}</p>
+    </template>
+
+    <!-- 新游戏:外壳确认后选规则(封面规则区之外,进行中也能换) -->
+    <template #overlay>
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
     <div class="mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
@@ -142,6 +148,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import GameShell from '@/components/games/GameShell.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
 import { createMahjong3dTable } from '@/utils/games/mahjong3dTable'
 import {
@@ -175,6 +182,8 @@ const windName = (seat) => t(`games.mahjong.honor.${WIND_KEYS[((seat % 4) + 4) %
 
 const shellEl = ref(null)
 const stageEl = ref(null)
+/** 全屏/宽屏由外壳持有;设置弹窗按它决定是否 teleport */
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended
@@ -197,6 +206,23 @@ const aiWins = ref(0)
 const rounds = ref(0)
 const rules = ref(normalizeMahjongRules(null))
 const rulesDraftKey = ref('puTong') // 默认普通规则(与平面麻将同序)
+// 新游戏设置弹窗:对局进行中点「新游戏」,外壳确认后在这里选规则
+const setupOpen = ref(false)
+const setupFields = computed(() => [
+  {
+    key: 'rules',
+    label: t('games.mahjong.rulesTitle'),
+    value: rulesDraftKey.value,
+    options: Object.keys(MAHJONG_RULE_PRESETS).map((key) => ({ value: key, label: t(`games.mahjong.presets.${key}`) })),
+  },
+])
+const onNewGame = () => {
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => {
+  rulesDraftKey.value = values.rules
+  startGame()
+}
 const view = ref('main')
 const hoverTileId = ref(null)
 

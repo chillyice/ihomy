@@ -7,6 +7,7 @@
     :rules-pages="[$t('games.minesweeper.rules.pagePlay'), $t('games.minesweeper.rules.pageControl')]"
     body-align="center"
     :new-game="!play.active"
+    :new-game-confirm="board.status === 'PLAYING'"
     @back="goBack"
     @new-game="onNewGameClick"
   >
@@ -76,6 +77,10 @@
         @submit="submitRoomScore"
         @leave="play.leave"
       />
+    </template>
+
+    <template #overlay>
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
     <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
@@ -161,6 +166,7 @@ import { useI18n } from 'vue-i18n'
 import { Flag } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { gameApi } from '@/api'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -484,7 +490,24 @@ const onLevelChange = (key) => {
   }
   startNew(key)
 }
-const onNewGameClick = () => onLevelChange(level.value)
+// 新游戏:对局进行中先由外壳确认,确认后再选难度;房间局沿用现状(发信令给全房)
+const setupOpen = ref(false)
+const setupFields = computed(() => [
+  {
+    key: 'level',
+    label: t('games.setup.difficulty'),
+    value: level.value,
+    options: LEVEL_KEYS.map((key) => ({ value: key, label: t(`games.minesweeper.level.${key}`) })),
+  },
+])
+const onNewGameClick = () => {
+  if (play.active) {
+    onLevelChange(level.value)
+    return
+  }
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => startNew(values.level)
 
 const cellClass = (cell) => ({
   open: cell.revealed,

@@ -1017,6 +1017,15 @@ export default {
     rulesAck: 'Got it',
     /* Text "new game" button in the shell header, left of the rules button */
     newGame: 'New game',
+    /* Confirmation before restarting while a round is still in progress */
+    newGameConfirm: 'This round is still in progress. Starting a new game will discard the current progress.',
+    setup: {
+      title: 'New game setup',
+      confirm: 'Start new game',
+      boardSize: 'Board size',
+      difficulty: 'Difficulty',
+      drawCount: 'Cards per draw',
+    },
     share: {
       dialogTitle: 'Share your score',
       hint: 'Send this card to the family, or keep it as a keepsake',

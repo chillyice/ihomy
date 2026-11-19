@@ -6,8 +6,9 @@
     :rules-pages="[$t('games.g2048.rules.pagePlay'), $t('games.g2048.rules.pageControl')]"
     body-align="center"
     :new-game="!matchId && !play.active"
+    :new-game-confirm="!gameOver && !won && history.length > 0"
     @back="goBack"
-    @new-game="startNew"
+    @new-game="onNewGame"
   >
     <!-- 棋盘规格跟游戏名走:和数独的模式/难度同一处,控件行只留数据与按钮 -->
     <template #titleExtra>
@@ -91,6 +92,7 @@
         :append-to-body="!isFullscreen"
         file-base="ihomy-2048"
       />
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
     <!-- 分数贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;点一下出分享图。
@@ -176,6 +178,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameScoreShare from '@/components/games/GameScoreShare.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
 import { seededRng } from '@/utils/games/seededRng'
@@ -381,6 +384,25 @@ const startNew = () => {
   newIds.value = new Set()
   mergedIds.value = new Set()
   clearState()
+}
+
+// ---------- 新游戏:进行中先由外壳确认,确认后再选棋盘规格 ----------
+const setupOpen = ref(false)
+const setupFields = computed(() => [
+  {
+    key: 'size',
+    label: t('games.setup.boardSize'),
+    value: size.value,
+    options: BOARD_SIZES.map((s) => ({ value: s, label: `${s}×${s}` })),
+  },
+])
+const onNewGame = () => {
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => {
+  size.value = values.size
+  loadBest()
+  startNew()
 }
 
 // 切换列宽 = 切到另一份独立存档:当前局面已随每次移动落盘,这里装载新尺寸的档(没有就开新局)

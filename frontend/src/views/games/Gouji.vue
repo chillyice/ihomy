@@ -2,7 +2,17 @@
      憋三与名次积分都在 utils/games/gouji.js(纯函数,单测覆盖);本页只做发牌、回合驱动与结算展示。
      我方积分领先走统一 H5 奖励通道(按天限次)。 -->
 <template>
-  <GameShell ref="shellEl" class="gj-shell" :title="$t('games.gouji.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="gj-shell"
+    :title="$t('games.gouji.title')"
+    body-align="stretch"
+    readable
+    :new-game="phase === 'playing'"
+    :new-game-confirm="true"
+    @back="goBack"
+    @new-game="startGame"
+  >
     <template #rules>
       <ul>
         <li>{{ $t('games.gouji.rules1') }}</li>

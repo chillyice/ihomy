@@ -470,7 +470,7 @@ const stats = computed(() => [
 const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
 
 // 头部/控件行那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
-defineExpose({ startNew, stats, canUndo, showHint, undo })
+defineExpose({ startNew, stats, canUndo, showHint, undo, status: computed(() => game.value.status) })
 
 watch(difficulty, (value) => {
   if (play.active || game.value.difficulty === value) return

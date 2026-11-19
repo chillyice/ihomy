@@ -1011,6 +1011,15 @@ export default {
     rulesAck: '知道了',
     /* 外壳头部的文字「新游戏」键(规则键左侧),各游戏自有的 newGame/restart 只留给结算遮罩 */
     newGame: '新游戏',
+    /* 对局未结束时点「新游戏」的确认文案;确认后才进开局设置 */
+    newGameConfirm: '当前这局还没结束，开始新游戏会丢掉这一局的进度。',
+    setup: {
+      title: '新游戏设置',
+      confirm: '开始新局',
+      boardSize: '棋盘规格',
+      difficulty: '难度',
+      drawCount: '翻牌数',
+    },
     share: {
       dialogTitle: '分享战绩',
       hint: '这张图可以直接发给家人，也可以存下来留念',

@@ -30,7 +30,7 @@
             {{ $t('games.gamepadReady') }}
           </el-tag>
           <!-- 新游戏:文字键、固定在规则键左侧(桌面排在图标组之前,手机横屏与规则同处第二行) -->
-          <el-button v-if="newGame" class="gs-new-game" size="small" round :disabled="newGameDisabled" @click="$emit('newGame')">
+          <el-button v-if="newGame" class="gs-new-game" size="small" round :disabled="newGameDisabled" @click="onNewGame">
             {{ $t('games.newGame') }}
           </el-button>
           <el-button
@@ -130,6 +130,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessageBox } from 'element-plus'
 import { ArrowLeft, FullScreen, Monitor, Reading } from '@element-plus/icons-vue'
 import { useGameView } from '@/composables/useGameView'
 
@@ -153,8 +154,10 @@ const props = defineProps({
   newGame: { type: Boolean, default: false },
   /** 「新游戏」键是否禁用(例如撤销栈为空、对局进行中) */
   newGameDisabled: { type: Boolean, default: false },
+  /** 点「新游戏」前先确认(对局进行中会丢进度);页面按自己的进行中状态传 */
+  newGameConfirm: { type: Boolean, default: false },
 })
-defineEmits(['back', 'newGame'])
+const emit = defineEmits(['back', 'newGame'])
 
 const { t } = useI18n()
 
@@ -166,6 +169,21 @@ const rulesTitle = computed(() => (props.title ? `${props.title} · ${t('games.r
 const openRules = () => {
   rulesPage.value = 0
   rulesOpen.value = true
+}
+
+// 新游戏:对局进行中先确认(取消则原局不动),确认后才交给页面
+const onNewGame = async () => {
+  if (props.newGameConfirm) {
+    try {
+      await ElMessageBox.confirm(t('games.newGameConfirm'), t('games.newGame'), {
+        type: 'warning',
+        closeOnClickModal: true,
+      })
+    } catch (e) {
+      return
+    }
+  }
+  emit('newGame')
 }
 const pageEl = ref(null)
 const bodyEl = ref(null)

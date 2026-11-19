@@ -5,8 +5,9 @@
     :title="$t(modes[currentGame])"
     body-align="stretch"
     :new-game="!inRoom"
+    :new-game-confirm="board?.status === 'PLAYING'"
     @back="router.push('/games')"
-    @new-game="board?.startNew?.()"
+    @new-game="onNewGame"
   >
     <template #rules>
       <p>{{ $t(modeRules[currentGame]) }}</p>
@@ -49,6 +50,11 @@
       <SpiderBoard v-else-if="currentGame === 'spider'" ref="board" v-model:difficulty="difficulty" />
       <FreeCellBoard v-else ref="board" />
     </div>
+
+    <!-- 新游戏:外壳确认后选翻牌数/花色;空当接龙没有开局选项,确认后直接发牌 -->
+    <template #overlay>
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
+    </template>
   </GameShell>
 </template>
 
@@ -57,6 +63,7 @@ import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } fro
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import GameShell from '@/components/games/GameShell.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { DIFFICULTIES } from '@/utils/games/spider'
 import KlondikeBoard from './cards/KlondikeBoard.vue'
@@ -119,6 +126,52 @@ const labels = computed(() => modeLabels[currentGame.value])
 const boardStats = computed(() => board.value?.stats || [])
 const difficultyLabel = (d) =>
   ({ 1: t('games.spider.oneSuit'), 2: t('games.spider.twoSuits'), 4: t('games.spider.fourSuits') })[d] || String(d)
+
+// ---------- 新游戏:外壳确认后选模式(翻牌数/花色) ----------
+const setupOpen = ref(false)
+const setupFields = computed(() => {
+  if (currentGame.value === 'klondike') {
+    return [
+      {
+        key: 'drawCount',
+        label: t('games.setup.drawCount'),
+        value: drawCount.value,
+        options: [
+          { value: 1, label: t('games.solitaire.draw1') },
+          { value: 3, label: t('games.solitaire.draw3') },
+        ],
+      },
+    ]
+  }
+  if (currentGame.value === 'spider') {
+    return [
+      {
+        key: 'difficulty',
+        label: t('games.setup.difficulty'),
+        value: difficulty.value,
+        options: DIFFICULTIES.map((d) => ({ value: d, label: difficultyLabel(d) })),
+      },
+    ]
+  }
+  return []
+})
+const onNewGame = () => {
+  if (!setupFields.value.length) {
+    board.value?.startNew?.()
+    return
+  }
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => {
+  if (currentGame.value === 'klondike') {
+    drawCount.value = values.drawCount
+    board.value?.startNew?.()
+    return
+  }
+  // 蜘蛛牌换花色由棋盘自己的 watch 开新局;花色没变就手动开
+  if (difficulty.value === values.difficulty) board.value?.startNew?.()
+  else difficulty.value = values.difficulty
+}
 
 watch(
   currentGame,

@@ -2,7 +2,17 @@
      utils/games/doudizhu.js(纯函数,单测覆盖);本页只做发牌、叫分、回合驱动与结算展示。
      赢下对局走统一 H5 奖励通道(按天限次)。 -->
 <template>
-  <GameShell ref="shellEl" class="dz-shell" :title="$t('games.doudizhu.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="dz-shell"
+    :title="$t('games.doudizhu.title')"
+    body-align="stretch"
+    readable
+    :new-game="phase === 'playing' || phase === 'bid'"
+    :new-game-confirm="true"
+    @back="goBack"
+    @new-game="startGame"
+  >
     <template #rules>
       <ul>
         <li>{{ $t('games.doudizhu.rules1') }}</li>

@@ -11,8 +11,9 @@
     body-align="stretch"
     readable
     :new-game="!play.active && phase === 'playing'"
+    :new-game-confirm="true"
     @back="goBack"
-    @new-game="startGame"
+    @new-game="onNewGame"
   >
     <template #rules>
       <p>{{ $t('games.mahjong.coverHint') }}</p>
@@ -32,6 +33,11 @@
         @leave="play.leave"
         @auto="onAutoToggle"
       />
+    </template>
+
+    <!-- 新游戏:外壳确认后选规则(封面与房主规则面板之外,进行中也能换) -->
+    <template #overlay>
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
     <div class="mahjong-card" @contextmenu.prevent @dblclick.prevent>
@@ -372,6 +378,7 @@ import { gameApi, roomApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -435,6 +442,8 @@ const TileFace = (props) => {
 TileFace.props = { kind: { type: Number, required: true } }
 
 const shellEl = ref(null)
+/** 全屏/宽屏由外壳持有;弹窗按它决定是否 teleport */
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 // 盘面自管尺寸(设计画布 + 等比缩放),外壳已把页面锁成一屏高
 
 // 只缩放盘面,顶栏和房间横幅按内容页尺寸排版。offsetWidth/Height 不受 transform 影响。
@@ -508,6 +517,23 @@ const rounds = ref(0)
 const rules = ref(normalizeMahjongRules(null))
 const rulesDraftKey = ref('puTong') // 开局草稿:所选规则名(默认普通规则)
 const rulesPickerOpen = ref(false) // 房间局:房主开牌前先选规则
+// 新游戏设置弹窗:对局进行中点「新游戏」,外壳确认后在这里选规则
+const setupOpen = ref(false)
+const setupFields = computed(() => [
+  {
+    key: 'rules',
+    label: t('games.mahjong.rulesTitle'),
+    value: rulesDraftKey.value,
+    options: Object.keys(MAHJONG_RULE_PRESETS).map((key) => ({ value: key, label: t(`games.mahjong.presets.${key}`) })),
+  },
+])
+const onNewGame = () => {
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => {
+  rulesDraftKey.value = values.rules
+  startGame()
+}
 const claimChiOptions = ref([]) // 本机收到的吃组合候选
 const selfGangKinds = ref([]) // 本机回合内可杠(暗杠/补杠)[{ kind, type }]
 

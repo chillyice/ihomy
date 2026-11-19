@@ -83,6 +83,15 @@ describe('统一游戏外壳守门', () => {
     }
   })
 
+  it('带「新游戏」键的页面必须声明进行中确认', () => {
+    // 外壳在 new-game-confirm 为真时先弹确认框;不声明就会一键清掉进行中的对局
+    for (const name of MIGRATED) {
+      const src = read(pagePath(name))
+      if (!src.includes(':new-game=')) continue
+      expect(src, `${name} 的「新游戏」要配 :new-game-confirm,否则进行中的对局会被直接重开`).toMatch(/:new-game-confirm="/)
+    }
+  })
+
   it('外壳样式唯一来源是 main.css 的统一游戏外壳段', () => {
     const css = read(join(SRC, 'styles/main.css'))
     for (const sel of ['.page.game-shell', '.gs-head', '.gs-controls', '.gs-body']) {

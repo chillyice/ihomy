@@ -10,8 +10,9 @@
     body-align="stretch"
     readable
     :new-game="!play.active && state?.phase === 'playing'"
+    :new-game-confirm="true"
     @back="goBack"
-    @new-game="restart"
+    @new-game="onNewGame"
   >
     <template #extras>
       <GameRoomBar
@@ -28,6 +29,11 @@
         @leave="play.leave"
         @auto="onAutoToggle"
       />
+    </template>
+
+    <!-- 新游戏:外壳确认后选人数(封面之外,进行中也能重开) -->
+    <template #overlay>
+      <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
     <div class="ludo-card" @contextmenu.prevent>
@@ -261,6 +267,7 @@ import { useI18n } from 'vue-i18n'
 import { roomApi } from '@/api'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -333,6 +340,8 @@ const { t } = useI18n()
 const chatStore = useChatStore()
 
 const shellEl = ref(null)
+/** 全屏/宽屏由外壳持有;设置弹窗按它决定是否 teleport */
+const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 
 /** 还没开局时给盘面一份「四色飞机都在停机坪」的预览态,封面背后就是完整盘面 */
 const previewState = createLudoState([0, 1, 2, 3].map((color) => ({ color, userId: null, name: '', ai: false })))
@@ -340,6 +349,23 @@ const previewState = createLudoState([0, 1, 2, 3].map((color) => ({ color, userI
 // ---------- 对局状态 ----------
 const state = ref(null) // 权威状态(引擎产物)
 const seatCount = ref(4) // 单机人数
+// 新游戏设置弹窗:对局进行中点「新游戏」,外壳确认后在这里选人数
+const setupOpen = ref(false)
+const setupFields = computed(() => [
+  {
+    key: 'seats',
+    label: t('games.ludo.playersLabel'),
+    value: seatCount.value,
+    options: [2, 3, 4].map((n) => ({ value: n, label: t('games.ludo.playersCount', { n }) })),
+  },
+])
+const onNewGame = () => {
+  setupOpen.value = true
+}
+const onSetupConfirm = (values) => {
+  seatCount.value = values.seats
+  startSolo()
+}
 const lastFace = ref(6) // 骰子面(交棒后仍显示最近点数)
 const animSteps = ref({}) // 动画中的临时刻度 `${color}:${piece}` → step
 const movingKey = ref('')

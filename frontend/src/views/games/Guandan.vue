@@ -2,7 +2,17 @@
      都在 utils/games/guandan.js(纯函数,单测覆盖);本页只做发牌、回合驱动与结算展示。
      我方拿下这一局走统一 H5 奖励通道(按天限次)。 -->
 <template>
-  <GameShell ref="shellEl" class="gu-shell" :title="$t('games.guandan.title')" body-align="stretch" readable @back="goBack">
+  <GameShell
+    ref="shellEl"
+    class="gu-shell"
+    :title="$t('games.guandan.title')"
+    body-align="stretch"
+    readable
+    :new-game="phase === 'playing'"
+    :new-game-confirm="true"
+    @back="goBack"
+    @new-game="startMatch"
+  >
     <template #rules>
       <ul>
         <li>{{ $t('games.guandan.rules1') }}</li>

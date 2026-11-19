@@ -1,5 +1,14 @@
 <template>
-  <GameShell ref="shellEl" class="sn-shell" :title="title" body-align="center" :new-game="!play.active" @back="goBack" @new-game="startNew">
+  <GameShell
+    ref="shellEl"
+    class="sn-shell"
+    :title="title"
+    body-align="center"
+    :new-game="!play.active"
+    :new-game-confirm="game.status === 'PLAYING'"
+    @back="goBack"
+    @new-game="startNew"
+  >
     <template #rules>
       <p>{{ $t('games.snake.tip') }}</p>
     </template>
