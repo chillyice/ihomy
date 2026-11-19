@@ -12,6 +12,18 @@ export function clampFloatRect(rect, viewport, options = {}) {
   const vw = Number(viewport?.width) || 0
   const vh = Number(viewport?.height) || 0
 
+  // 视口尺寸还没量出来(0×0:隐藏标签页、窗口最小化、旋屏 / 进出全屏的中间帧、WebView 首帧):
+  // 夹紧会把它压成左上角 1×1,浮球被被动跳到屏幕左上角,正好压住页面自己的返回键 / 左上角按钮。
+  // 这时原样返回(只保证数值合法),等真正的 resize 到达再夹。
+  if (!(vw > 0) || !(vh > 0)) {
+    return {
+      x: Number(rect?.x) || 0,
+      y: Number(rect?.y) || 0,
+      w: Number(rect?.w) || minW,
+      h: Number(rect?.h) || minH,
+    }
+  }
+
   // 边距只在「放下最小可用尺寸」时才生效:窗口窄到连最小尺寸都挤不下时,可见性优先
   const leftBound = vw - marginLeft < minW ? Math.max(0, vw - minW) : marginLeft
   const topBound = vh - minY < minH ? Math.max(0, vh - minH) : minY

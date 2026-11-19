@@ -888,9 +888,9 @@ watch(
 
 async function goBack() {
   if (!play.active || !play.room?.id) {
-    // 手机沉浸态的浮动返回键也走这里:优先回到进入游戏前的页面
-    if (window.history.state && window.history.state.back != null) router.back()
-    else router.push('/games')
+    // 单机:固定回上一级(小游戏列表),不按浏览历史回到上一页
+    // (手机沉浸态的浮动返回键也走这里)
+    router.push('/games')
     return
   }
   const roomId = play.room.id

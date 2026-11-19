@@ -240,7 +240,7 @@ function applyGameMode(on) {
   }
 }
 
-/** 左上角浮动返回:优先页面注册的退出逻辑,否则回到访问前的页面(直达深链回游戏列表) */
+/** 左上角浮动返回:优先页面注册的退出逻辑,否则回上一级(工具里的播放器 → 工具箱,其余 → 小游戏列表) */
 async function exitGame() {
   if (document.fullscreenElement) {
     try {
@@ -253,8 +253,8 @@ async function exitGame() {
     gameExit.run()
     return
   }
-  if (window.history.state && window.history.state.back != null) router.back()
-  else router.push('/games')
+  // 上一级而不是上一页:从首页卡片 / 分享链接直达时也回所属列表,不按浏览历史倒回去
+  router.push(route.path.startsWith('/tools/') ? '/tools' : '/games')
 }
 
 watch(isGameRoute, applyGameMode, { immediate: true })

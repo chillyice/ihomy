@@ -661,6 +661,15 @@ html.theme-warm .page.game-shell {
   border-radius: var(--gs-radius);
   font-size: 13px;
 }
+/* 返回是整页唯一的逃生口:聊天浮球等常驻浮层可能被拖到(或异常跳到)左上角压在上面,
+   圆形浮球只挡掉一部分时表现为「返回键只有下半截能点」。这里把返回键抬到浮层之上
+   (仍低于遮罩/弹窗,弹窗打开时照旧被盖住)。移动端外壳没有中间层叠上下文,抬层即生效;
+   桌面暖居外壳的 .gc-wrap 自带 z-index:10 层叠上下文,页面内的抬层出不去 ——
+   桌面端浮球只能靠用户自己拖走(浮球异常跳到 (0,0) 的根因已在 clampFloatRect 修掉)。 */
+.page.game-shell .gs-back {
+  position: relative;
+  z-index: calc(var(--z-float) + 1);
+}
 /* 图标按钮(全屏/宽屏/撤销/新游戏):正方形、不吃左右内边距,功能靠 title + aria-label 说明。
    撤销/新游戏可以落在游戏区(贴棋盘那条)里,所以 .gs-body 也算;
    选择器压过下面那条 `.el-button:not(.is-link)`(0,5,0)的 `padding: 0 12px` */

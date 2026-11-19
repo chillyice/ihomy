@@ -20,9 +20,9 @@ const tableUrl = `${import.meta.env.BASE_URL}runway-52.html`
 
 const shellEl = ref(null)
 
+// 返回固定回上一级(小游戏列表):从首页卡片 / 分享链接直达时也回列表,不按浏览历史回到上一页
 const goBack = () => {
-  if (window.history.state && window.history.state.back != null) router.back()
-  else router.push('/games')
+  router.push('/games')
 }
 </script>
 

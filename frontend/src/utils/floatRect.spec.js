@@ -59,7 +59,9 @@ describe('clampFloatRect', () => {
     ).toEqual({ x: 300, y: 60, w: 200, h: 200 })
   })
 
-  it('视口非法值按 0 处理,不产生 NaN', () => {
-    expect(clampFloatRect({ x: 10, y: 10, w: 48, h: 48 }, null)).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+  it('视口尺寸未知(0×0)时原样返回,不把人拖到左上角', () => {
+    // 隐藏标签页 / 旋屏中间帧 / WebView 首帧:此时夹紧会压成 1×1,浮球会跳到左上角挡住返回键
+    expect(clampFloatRect({ x: 326, y: 728, w: 48, h: 48 }, { width: 0, height: 0 })).toEqual({ x: 326, y: 728, w: 48, h: 48 })
+    expect(clampFloatRect({ x: 10, y: 10, w: 48, h: 48 }, null)).toEqual({ x: 10, y: 10, w: 48, h: 48 })
   })
 })
