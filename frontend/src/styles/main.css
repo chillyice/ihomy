@@ -952,16 +952,18 @@ html.game-shell .mobile-game-chrome {
     /* 左栏 150~200:844 宽下要给右栏留下数独棋盘 368 + 数字盘 ≥132 的宽度,
        窄屏(667 宽)也有 150 兜底,不成一条挤不下的细缝 */
     --gs-rail-w: clamp(150px, 22%, 200px);
-    /* 底边少留一点:棋盘底边更贴近页面底边(页面自身内边距 8 → 6),
-       手机沉浸态会在下面那条规则里再叠加 env(安全区),iPhone 小白条不贴边 */
-    --gs-pad-b: 6px;
+    /* 底边与顶边同档(iOS 横屏的 21px 小白条安全区由 --gs-safe-b 归零,否则棋盘底下
+       会比顶边多出一大截空白;竖屏仍走 env,横屏刘海一侧的左右安全区也照旧保留) */
+    --gs-safe-b: 0px;
     display: grid;
     /* 两栏:左栏 = 公共按钮 + 底边的计分芯片,右栏 = 游戏区吃满剩余宽度。
        计分芯片不再单独成中栏 —— 中栏会从棋盘身边切走 50~96px,芯片还只能
        竖着摞成一列;挪到左栏底边后每个芯片恢复「标签 + 数值」一行,
        游戏区也少让一条栏间距 */
     grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto auto;
+    /* 只声明两行(游戏区 + 计分芯片):第三行留给 .gs-footer,没有它就不该占行——
+       显式多声明一行 auto,行间距 4px 会留在游戏区下方,棋盘上下留白就不等了 */
+    grid-template-rows: minmax(0, 1fr) auto;
     column-gap: var(--gs-gap);
     row-gap: 4px;
     align-items: stretch;
@@ -1112,10 +1114,13 @@ html.game-mobile-immersive .mobile-sub-content .page {
 }
 /* 统一外壳页自己带内边距:上面那条把内边距压成只剩安全区,棋盘/按钮会贴到屏幕边缘,
    这里把外壳的 --gs-pad 叠在安全区之外(安全区本身仍保留,横屏刘海不被盖住);
-   底边走 --gs-pad-b(横屏矮屏档压近到 6px,iPhone 小白条由 env 兜住) */
+   底边走 --gs-pad-b,底边安全区单独一档 --gs-safe-b(横屏矮屏档把它归零)。
+   归零而不是改 padding 本身:麻将这类整页铺满的页面自己写了 env 内边距,
+   在这里按 !important 压 padding-bottom 会连带把桌布压回一截。 */
 html.game-mobile-immersive .mobile-sub-content .page.game-shell {
   padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--gs-pad))
-    calc(env(safe-area-inset-right, 0px) + var(--gs-pad)) calc(env(safe-area-inset-bottom, 0px) + var(--gs-pad-b, var(--gs-pad)))
+    calc(env(safe-area-inset-right, 0px) + var(--gs-pad))
+    calc(var(--gs-safe-b, env(safe-area-inset-bottom, 0px)) + var(--gs-pad-b, var(--gs-pad)))
     calc(env(safe-area-inset-left, 0px) + var(--gs-pad)) !important;
 }
 html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
