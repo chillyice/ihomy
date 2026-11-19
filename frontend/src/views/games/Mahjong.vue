@@ -121,7 +121,7 @@
                 </div>
               </div>
 
-              <!-- 上家(左):侧向平躺手牌,副露横排在手的上方(同一窄栏竖排,不并排) -->
+              <!-- 上家(左):侧向手牌是自上而下的一条,副露横排在手的上方(同一窄栏,不并排) -->
               <div v-if="leftSeat" class="mj-edge mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
                   <span class="seat-wind">{{ windName(leftSeat.seat) }}</span>
@@ -195,7 +195,7 @@
                 </div>
               </div>
 
-              <!-- 下家(右):侧向平躺手牌,副露横排在手的上方(同一窄栏竖排,不并排) -->
+              <!-- 下家(右):侧向手牌是自上而下的一条,副露横排在手的上方(同一窄栏,不并排) -->
               <div v-if="rightSeat" class="mj-edge mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
                   <span class="seat-wind">{{ windName(rightSeat.seat) }}</span>
@@ -1763,7 +1763,7 @@ onBeforeUnmount(() => {
     0 1px 2px rgba(0, 0, 0, 0.26);
   cursor: default;
 }
-/* 侧向牌背(左右家):牌横躺,长宽比按牌面 60:44 横置,不再压成细长条 */
+/* 侧向牌背(左右家):进深固定,列内高度由 .mj-backs-col 的 flex 平分(最多长到 --mj-side-back-h) */
 .tile.back.side {
   width: var(--mj-side-back-w, 41px);
   height: var(--mj-side-back-h, 30px);
@@ -1867,7 +1867,7 @@ html.dark .mj-table {
   align-items: center;
   gap: 4px;
 }
-/* 左右家:名牌在上,副露紧随其下,两列平躺手牌在最下;整栏在中央行里纵向居中 */
+/* 左右家:名牌在上,副露紧随其下,手牌一列在最下;整栏在中央行里纵向居中 */
 .mj-left,
 .mj-right {
   display: flex;
@@ -1952,8 +1952,9 @@ html.dark .mj-table {
   max-width: 100%;
   flex-wrap: wrap;
 }
-/* 左右家:副露横排在上、牌背竖排在下,都收在同一个窄栏里(不再左牌右副露并排) */
+/* 左右家:副露横排在上、手牌一列在下,都收在同一个窄栏里;整块吃掉名牌下面剩下的高度 */
 .side-hand {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1991,15 +1992,28 @@ html.dark .mj-table {
 .mj-backs .tile.back + .tile.back {
   margin-left: -1px;
 }
-/* 左右家:侧向牌背摊成三列(5 + 5 + 3),行高比牌身矮 1px 让相邻牌共用描边;
-   三列压到五张高,把窄栏剩下的竖直空间全留给上方的副露 */
+/* 左右家:手牌和另外三家一样是「一条」——侧看就是自上而下的一列牌背,一张压一张共用描边。
+   单张进深固定(--mj-side-back-w),列高交给 flex 平分:横屏矮屏里每张压扁到十几像素也还是
+   一条整列,竖屏/iPad 里最多长到 --mj-side-back-h 就封顶居中,不会为了凑高度撑破中间行。 */
 .mj-backs-col {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(5, calc(var(--mj-side-back-h, 30px) - 1px));
-  gap: 0 2px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-content: center;
+  min-height: 0;
+}
+/* 单张进深固定(--mj-side-back-w),列高交给 flex 平分:横屏矮屏里每张压扁到十几像素也还是
+   一条整列,竖屏/iPad 里最多长到 --mj-side-back-h 就封顶居中,不会为了凑高度撑破中间行。
+   注意只能缩不能长(flex-grow 0):一旦允许长,max-height 会把多出来的空间变成牌与牌之间的
+   缝,整列被拉开成一条虚线。 */
+.mj-backs-col .tile.back.side {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: var(--mj-side-back-h, 30px);
+}
+.mj-backs-col .tile.back.side + .tile.back.side {
+  margin-top: -1px;
 }
 /* 中央:牌河和中央信息分格。 */
 .mj-center {
