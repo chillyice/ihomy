@@ -4,7 +4,7 @@
       <p>{{ $t('games.tetris.tip') }}</p>
     </template>
 
-    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条数据条,这一份隐藏 -->
+    <!-- 积分/时间:手机横屏进外壳左栏底边(芯片一行);竖屏用棋盘上方那条数据条,这一份隐藏 -->
     <template #stats>
       <span class="gh-chip"
         ><span>{{ $t('games.tetris.score') }}</span
@@ -639,13 +639,13 @@ html.dark .tt-overlay {
 }
 
 /* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
-   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+   外壳左栏底边那行芯片与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
 .tt-shell :deep(.gs-stats),
 .tt-shell :deep(.gs-controls) {
   display: none;
 }
 
-/* 手机横屏:数据条与暂停搬进外壳(中栏 + 左栏第三行),数据条整条让位;
+/* 手机横屏:数据条与暂停搬进外壳(左栏底边 + 第三行),数据条整条让位;
    按键条留在游戏区(竖排在棋盘右侧,右手拇指区),棋盘+暂存/预告侧栏吃满高度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .tt-shell :deep(.gs-stats),

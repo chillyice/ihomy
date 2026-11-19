@@ -2,7 +2,16 @@
      消消乐:交换相邻宝石连成 3+,连锁倍率计分,三档难度(色数/步数/目标)、提示/重排;
      匹配/重力/补位/洗牌/难度种子逐字保留原实现,DOM 网格渲染与 rAF 状态机零改动,只换外壳与 i18n。 -->
 <template>
-  <GameShell ref="shellEl" class="m3-shell" :title="$t('games.embedded.match3.title')" body-align="center" @back="router.push('/games')">
+  <GameShell
+    ref="shellEl"
+    class="m3-shell"
+    :title="$t('games.embedded.match3.title')"
+    body-align="center"
+    new-game
+    :new-game-disabled="newDisabled"
+    @new-game="restart"
+    @back="router.push('/games')"
+  >
     <!-- 难度跟游戏名走(和象棋/黑白棋同一处),开局后锁住 -->
     <template #titleExtra>
       <el-select
@@ -24,7 +33,8 @@
       <p>{{ $t('games.embedded.match3.aim') }}</p>
     </template>
 
-    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏收成棋盘左侧一列 -->
+    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏记分收成棋盘左侧一列,
+         提示/重排挪到棋盘右侧(竖排两键),新游戏在外壳头部「规则」左边 -->
     <div class="m3-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="m3-meta">
         <div class="m3-stats">
@@ -39,9 +49,6 @@
           </el-button>
           <el-button size="small" round :disabled="shuffleDisabled" @click="doShuffle">
             {{ $t('games.embedded.match3.shuffle') }}
-          </el-button>
-          <el-button size="small" round :disabled="newDisabled" @click="restart">
-            {{ $t('games.embedded.match3.newgame') }}
           </el-button>
         </div>
         <p class="m3-notice">{{ noticeText }}</p>
@@ -1341,8 +1348,8 @@ html.dark .m3-shell {
 .m3-stat {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
+  gap: 4px;
+  padding: 3px 8px;
   border: 1px solid var(--color-border, #d7deee);
   border-radius: 9px;
   background: var(--color-card, #f5f7fd);
@@ -1353,14 +1360,14 @@ html.dark .m3-shell {
   white-space: nowrap;
 }
 .m3-stat small {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 400;
   opacity: 0.75;
 }
 .m3-stat b {
   color: var(--el-color-primary, #6366f1);
 }
-/* 按钮靠这条的右端;横屏时挪到棋盘左上 */
+/* 按钮靠这条的右端(竖屏/桌面在棋盘上方那条的右端);手机横屏竖排成棋盘右侧一列 */
 .m3-actions {
   display: flex;
   align-items: center;
@@ -1471,6 +1478,37 @@ html.dark .m3-board :deep(.cell.empty) {
 }
 .m3-board :deep(.cell.c6) {
   background: radial-gradient(circle at 32% 28%, #f9a8d4, #ec4899 72%);
+}
+/* 深色档换一组宝石色:深底上原来那组会被压暗,红/粉(c0/c6)与蓝/紫(c3/c4)
+   两两糊在一起(OKLab 最小色差 8),七色棋盘根本分不出来。
+   这组按色相铺开、明度错开、整体提亮(c6 由粉换成冰银,躲开与 c0 红的冲突),
+   两两最小色差 15、与棋盘底最浅也有 40 以上;再给每颗宝石补一圈亮边,
+   边界落在深底上更利落。发光粒子走 PALETTE,不受这里影响 */
+html.dark .m3-board :deep(.cell:not(.empty):not(.sel)) {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+html.dark .m3-board :deep(.cell.c0) {
+  background: radial-gradient(circle at 32% 28%, #ffb4bd, #ff5c6c 72%);
+}
+html.dark .m3-board :deep(.cell.c1) {
+  background: radial-gradient(circle at 32% 28%, #ffe19a, #ffbe2e 72%);
+}
+html.dark .m3-board :deep(.cell.c2) {
+  background: radial-gradient(circle at 32% 28%, #a8f5c6, #2fd672 72%);
+}
+html.dark .m3-board :deep(.cell.c3) {
+  background: radial-gradient(circle at 32% 28%, #b6f2fb, #37c9e0 72%);
+}
+html.dark .m3-board :deep(.cell.c4) {
+  background: radial-gradient(circle at 32% 28%, #a9c3ff, #3a6dff 72%);
+}
+html.dark .m3-board :deep(.cell.c5) {
+  background: radial-gradient(circle at 32% 28%, #e4c8ff, #c48bff 72%);
+}
+html.dark .m3-board :deep(.cell.c6) {
+  background: radial-gradient(circle at 32% 28%, #ffffff, #cfd8e3 72%);
 }
 
 /* Transient phase animations. Each class only names the animation; the distance
@@ -1851,50 +1889,64 @@ html.dark .m3-board :deep(.cell.empty) {
   }
 }
 
-/* 手机横屏:按钮 + 芯片收成棋盘左侧一列(按钮贴棋盘一侧靠上),棋盘独占右侧 */
+/* 手机横屏:三列 —— 左列记分 + 提示行,中列棋盘,右列 提示 重排 两键(贴棋盘右侧);
+   记分与提示行本来住在 .m3-meta 里,这里 display:contents 把这一层拆掉,
+   二者的盒子直接当网格项用,竖屏那套 DOM 不动 */
 @media (orientation: landscape) and (max-height: 520px) {
   .m3-layout {
-    --m3-meta-w: 132px;
+    --m3-meta-w: 122px;
+    --m3-action-w: 54px;
     --m3-board-w: min(100%, 560px, calc(100cqh - 16px));
     display: grid;
-    grid-template-columns: var(--m3-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta board';
+    grid-template-columns: var(--m3-meta-w) minmax(0, 1fr) var(--m3-action-w);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'stats board actions'
+      'notice board actions';
     column-gap: 10px;
-    width: min(100%, calc(var(--m3-meta-w) + 10px + var(--m3-board-w) + 16px));
+    row-gap: 4px;
+    width: min(100%, calc(var(--m3-meta-w) + 20px + var(--m3-action-w) + var(--m3-board-w) + 16px));
     max-height: 100%;
   }
   .m3-meta {
-    grid-area: meta;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
-  }
-  .m3-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
-  }
-  .m3-actions .el-button + .el-button {
-    margin-left: 0;
+    display: contents;
   }
   .m3-stats {
+    grid-area: stats;
+    align-self: start;
     flex: 0 0 auto;
     flex-direction: column;
     flex-wrap: nowrap;
-    align-items: stretch;
+    /* 芯片只包自身内容:左列不再整栏拉满,读起来紧凑 */
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
   }
-  /* 横屏列里芯片压成一行:标签靠左、数值靠右(和黑白棋左列同一读法) */
+  /* 横屏列里芯片压成一行:标签与数值相邻,内边距/字号跟外壳芯片同一紧凑档 */
   .m3-stat {
-    justify-content: space-between;
+    justify-content: flex-start;
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+  .m3-stat b {
+    font-size: 12px;
   }
   .m3-notice {
+    grid-area: notice;
+    align-self: start;
     text-align: left;
+  }
+  /* 提示/重排:棋盘右侧竖排一列,整列贴着棋盘垂直居中 */
+  .m3-actions {
+    grid-area: actions;
+    flex-direction: column;
+    align-self: center;
+    margin-left: 0;
+    gap: 6px;
+  }
+  .m3-actions .el-button {
+    width: 100%;
+    margin-left: 0;
   }
   .m3-board-wrap {
     grid-area: board;

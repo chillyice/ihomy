@@ -15,7 +15,7 @@
         <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
       </el-select>
     </template>
-    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条分数条,这一份隐藏 -->
+    <!-- 积分/时间:手机横屏进外壳左栏底边(芯片一行);竖屏用棋盘上方那条分数条,这一份隐藏 -->
     <template #stats>
       <span v-a11y-click class="gh-chip is-shareable" :title="$t('games.share.chipHint')" @click="shareOpen = true"
         ><span>{{ $t('games.g2048.score') }}</span
@@ -597,7 +597,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 手机横屏:分数条整条让位,分数与撤销搬进外壳(中栏积分时间 + 左栏第三行),
+/* 手机横屏:分数条整条让位,分数与撤销搬进外壳(左栏底边芯片 + 第三行按钮),
    棋盘独占游戏区:边长 = 游戏区宽 / 高 / 上限三者最小值,各让 8px */
 .bf-shell :deep(.gs-stats),
 .bf-shell :deep(.gs-controls) {

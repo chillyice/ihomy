@@ -699,7 +699,7 @@ html.theme-warm .page.game-shell {
   min-width: 0;
 }
 /* 数据栏是页面直属块(不再挂在控件行):竖屏是头部下面独立一行、左对齐,
-   横屏单独成中栏(见下面横屏档);页面不给 #stats 就整块不渲染。 */
+   横屏压成一行贴左栏底边(见下面横屏档);页面不给 #stats 就整块不渲染。 */
 .page.game-shell > .gs-stats {
   flex: 0 0 auto;
   padding-bottom: var(--gs-gap);
@@ -930,11 +930,12 @@ html.game-shell .mobile-game-chrome {
   display: none !important;
 }
 
-/* --- 横屏矮屏(手机横屏):三栏 —— 左公共按钮 / 中积分时间 / 右游戏本体 ---
+/* --- 横屏矮屏(手机横屏):两栏 —— 左公共按钮 + 底边计分 / 右游戏本体 ---
  * 竖排时头部与控件各占一行,横屏一行只剩一两百像素给棋盘,左右大片宽度空着。
- * 横屏改成三栏:左栏 = 返回 + 游戏名 + 模式选择,第二行 新游戏 + 规则,
- * 第三行只放棋盘左侧放不下的按钮(设置/操作);中栏 = 数据芯片纵向堆叠、紧贴棋盘;
- * 右栏 = 游戏区(棋盘、数独数字盘等)按高度铺满。没有 #stats 的页面中栏宽度自动收到 0。
+ * 横屏改成两栏:左栏 = 返回 + 游戏名 + 模式选择,第二行 新游戏 + 规则,
+ * 再往下只放棋盘左侧放不下的按钮(设置/操作),最底下一行是计分/时间芯片;
+ * 右栏 = 游戏区(棋盘、数独数字盘等)按高度铺满。计分芯片原先单独成中栏,
+ * 现在压成一行贴左栏底边,不再从棋盘身边切走一条宽度。
  * 门槛与上面的矮屏档一致(横屏 + max-height:520px),平板横屏(高 820)、
  * 电脑横屏(高 900)仍是上下一行式布局。 */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -946,51 +947,61 @@ html.game-shell .mobile-game-chrome {
        手机沉浸态会在下面那条规则里再叠加 env(安全区),iPhone 小白条不贴边 */
     --gs-pad-b: 6px;
     display: grid;
-    grid-template-columns: var(--gs-rail-w) auto minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'rail stats body'
-      'rail stats footer';
+    /* 两栏:左栏 = 公共按钮 + 底边的计分芯片,右栏 = 游戏区吃满剩余宽度。
+       计分芯片不再单独成中栏 —— 中栏会从棋盘身边切走 50~96px,芯片还只能
+       竖着摞成一列;挪到左栏底边后每个芯片恢复「标签 + 数值」一行,
+       游戏区也少让一条栏间距 */
+    grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
     column-gap: var(--gs-gap);
+    row-gap: 4px;
     align-items: stretch;
   }
   .gs-rail {
-    grid-area: rail;
+    grid-row: 1;
+    grid-column: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  /* 中栏:只放积分/时间,纵向从上往下排;芯片改「标签在上、值在下」,宽度压到 50px 上下 */
+  /* 计分芯片:左栏最下面一行,芯片内「标签 + 数值」并排(和消消乐记分条同一读法),
+     放不下就换行;紧凑档压掉内边距与字号,窄左栏里也读得清 */
   .page.game-shell > .gs-stats {
-    grid-area: stats;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
+    grid-row: 2;
+    grid-column: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-start;
-    gap: 6px;
-    max-width: 96px;
-    padding-bottom: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    align-content: flex-end;
+    gap: 4px;
+    max-width: none;
+    padding: 0;
+    overflow: visible;
   }
   .page.game-shell > .gs-stats .gh-chip {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
     height: auto;
-    padding: 4px 6px;
+    padding: 2px 7px;
+    gap: 4px;
+    font-size: 11px;
   }
+  .page.game-shell > .gs-stats .gh-chip b {
+    font-size: 12px;
+  }
+  /* 游戏区跨左栏的两行:芯片只在左栏底边占位,不从棋盘高度里扣 */
   .gs-body {
-    grid-area: body;
+    grid-row: 1 / span 2;
+    grid-column: 2;
   }
-  /* 游戏区内容贴中栏:居中的棋盘(2048/扫雷/象棋这类定尺寸棋盘)会在中栏与棋盘之间
-     留出一条 100px 上下的白带,看着像中栏被甩到了左边。横屏只把横向对齐改靠左,
+  /* 游戏区内容贴左栏:居中的棋盘(2048/扫雷/象棋这类定尺寸棋盘)若照原样居中,
+     会在左栏与棋盘之间甩出一大片白;横屏只把横向对齐改靠左,
      纵向仍按页面原本的 center/start 排。is-stretch 的页面(纸牌、数独)本来满宽,不动 */
   .page.game-shell > .gs-body.is-center,
   .page.game-shell > .gs-body.is-start {
     align-items: flex-start;
   }
   .gs-footer {
-    grid-area: footer;
+    grid-row: 3;
+    grid-column: 1 / -1;
   }
   /* 手机横屏同样没有全屏/宽屏(与 ≤768px 档同一口径) */
   .gs-head .gs-fullscreen,

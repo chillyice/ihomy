@@ -29,7 +29,7 @@
       </el-select>
     </template>
 
-    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条工具条,这一份隐藏 -->
+    <!-- 积分/时间:手机横屏进外壳左栏底边(芯片一行);竖屏用棋盘上方那条工具条,这一份隐藏 -->
     <template #stats>
       <span v-for="item in boardStats" :key="item.label" class="gh-chip">
         <span>{{ item.label }}</span
@@ -78,7 +78,7 @@ const modeRules = {
   freecell: 'games.freecell.tip',
 }
 
-/** 各玩法在外壳头部/中栏用的按钮文案(棋盘只交动作,文案留在页面) */
+/** 各玩法在外壳头部/控件行用的按钮文案(棋盘只交动作,文案留在页面) */
 const modeLabels = {
   klondike: { hint: 'games.solitaire.hint', undo: 'games.solitaire.undo', autoFinish: 'games.solitaire.autoFinish' },
   spider: { hint: 'games.spider.hint', undo: 'games.spider.undo', autoFinish: '' },

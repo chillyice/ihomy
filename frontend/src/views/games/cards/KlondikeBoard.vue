@@ -548,7 +548,7 @@ const onVisibility = () => {
 const onResize = () => measureFelt()
 
 // ---------- 外壳对接 ----------
-/** 数据芯片(手机横屏进外壳中栏):得分/最高/步数/用时,值仍是本组件算好的那一份 */
+/** 数据芯片(手机横屏进外壳左栏底边):得分/最高/步数/用时,值仍是本组件算好的那一份 */
 const stats = computed(() => [
   { label: t('games.solitaire.score'), value: game.value.score },
   { label: t('games.solitaire.best'), value: best.value },
@@ -558,7 +558,7 @@ const stats = computed(() => [
 /** 撤销键能不能按(空栈/结算后禁掉) */
 const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
 
-// 头部/中栏那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
+// 头部/控件行那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
 defineExpose({ startNew, stats, canUndo, showHint, undo, autoFinishAll })
 
 watch(drawCount, (value) => {

@@ -488,13 +488,13 @@ html.dark .sol-overlay {
 }
 
 /* 外壳里的数据/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条工具条(.sol-toolbar),
-   外壳的中栏与左栏第三行只在手机横屏出现,避免同一组控件出双份(样式在 main.css 横屏档)。 */
+   外壳左栏底边那行芯片与左栏第三行只在手机横屏出现,避免同一组控件出双份(样式在 main.css 横屏档)。 */
 .cards-shell .gs-stats,
 .cards-shell .gs-controls {
   display: none;
 }
 
-/* 手机横屏:数据与操作搬进外壳(中栏积分时间 + 左栏第三行按钮),
+/* 手机横屏:数据与操作搬进外壳(左栏底边芯片 + 第三行按钮),
    棋盘上那条工具条让位,牌桌独占游戏区整块高度 */
 @media (orientation: landscape) and (max-height: 520px) {
   .cards-shell .gs-stats,

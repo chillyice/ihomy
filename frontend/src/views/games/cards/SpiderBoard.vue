@@ -460,7 +460,7 @@ const onVisibility = () => {
 const onResize = () => measureFelt()
 
 // ---------- 外壳对接 ----------
-/** 数据芯片(手机横屏进外壳中栏):得分/最高/步数/用时 */
+/** 数据芯片(手机横屏进外壳左栏底边):得分/最高/步数/用时 */
 const stats = computed(() => [
   { label: t('games.spider.score'), value: game.value.score },
   { label: t('games.spider.best'), value: best.value },
@@ -469,7 +469,7 @@ const stats = computed(() => [
 ])
 const canUndo = computed(() => game.value.status === STATUS.PLAYING && history.value.length > 0)
 
-// 头部/中栏那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
+// 头部/控件行那份控件由 Cards.vue 渲染,棋盘只交出动作与数据
 defineExpose({ startNew, stats, canUndo, showHint, undo })
 
 watch(difficulty, (value) => {

@@ -36,7 +36,7 @@
       </ul>
     </template>
 
-    <!-- 积分/时间:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条数据条,这一份隐藏 -->
+    <!-- 积分/时间:手机横屏进外壳左栏底边(芯片一行);竖屏用棋盘上方那条数据条,这一份隐藏 -->
     <template #stats>
       <span class="gh-chip"
         ><span>{{ $t('games.minesweeper.flags') }}</span
@@ -80,7 +80,7 @@
 
     <!-- 数据条贴棋盘:与棋盘同宽的细条,左对齐排在棋盘上方;
          旗标模式放在这条的右端(棋盘右上角);手机横屏时整条隐去,
-         数据与旗标键都进外壳中栏,把高度全留给棋盘 -->
+         数据与旗标键都进外壳左栏底边,把高度全留给棋盘 -->
     <div class="ms-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="ms-meta">
         <span class="gh-chip"
@@ -570,7 +570,7 @@ onBeforeUnmount(() => {
   height: var(--gs-control-h);
   min-width: 0;
 }
-/* 旗标模式靠这条的右端(竖屏/桌面);手机横屏时整条隐去,按钮进外壳中栏 */
+/* 旗标模式靠这条的右端(竖屏/桌面);手机横屏时整条隐去,按钮进外壳左栏底部 */
 .ms-meta-actions {
   display: flex;
   align-items: center;
@@ -583,22 +583,23 @@ onBeforeUnmount(() => {
   margin-left: 0;
 }
 /* 外壳里的数据是「第二份摆放」:竖屏与桌面用棋盘上方那条数据条,
-   外壳的中栏只在手机横屏出现(样式在 main.css 横屏档)。 */
+   外壳左栏底边那行芯片只在手机横屏出现(样式在 main.css 横屏档)。 */
 .ms-shell :deep(.gs-stats) {
   display: none;
 }
 
-/* 手机横屏:数据整条搬进外壳中栏,旗标键跟在数据下面(同一竖栏,数据在上按钮在下);
+/* 手机横屏:数据整条搬进外壳左栏底边,旗标键跟在芯片后面(放不下就换行);
    数据条整条让位,棋盘独占游戏区;
    纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区) */
 @media (orientation: landscape) and (max-height: 520px) {
   .ms-shell :deep(.gs-stats) {
     display: flex;
   }
-  /* 中栏只有芯片宽(50px 上下),旗标键取通栏:图标居中、高与芯片齐,不吃左右内边距 */
+  /* 旗标键与芯片同排:高度齐控件规格、按正方形触控面给足宽度(只留图标会被压成 12px) */
   .ms-shell :deep(.gs-stats) .ms-flag-btn {
     align-self: stretch;
     width: auto;
+    min-width: var(--gs-control-h);
     height: var(--gs-control-h);
     padding: 0;
   }

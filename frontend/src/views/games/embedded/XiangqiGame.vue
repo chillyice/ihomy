@@ -26,7 +26,7 @@
       <p>{{ $t('games.embedded.xiangqi.tip') }}</p>
     </template>
 
-    <!-- 对局状态:手机横屏进外壳中栏(棋盘左侧那条竖栏);竖屏用棋盘上方那条状态条,这一份隐藏 -->
+    <!-- 对局状态:手机横屏进外壳左栏底边(芯片一行);竖屏用棋盘上方那条状态条,这一份隐藏 -->
     <template #stats>
       <span class="gh-chip"
         ><b>{{ statusText }}</b></span
@@ -1087,13 +1087,13 @@ html.dark .xq-status {
 }
 
 /* 外壳里的状态/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条状态条,
-   外壳的中栏与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
+   外壳左栏底边那行芯片与左栏第三行只在手机横屏出现(样式在 main.css 横屏档)。 */
 .xq-shell :deep(.gs-stats),
 .xq-shell :deep(.gs-controls) {
   display: none;
 }
 
-/* 手机横屏:状态与撤销/导出搬进外壳(中栏 + 左栏第三行),状态条让位,棋盘独占游戏区 */
+/* 手机横屏:状态与撤销/导出搬进外壳(左栏底边 + 第三行),状态条让位,棋盘独占游戏区 */
 @media (orientation: landscape) and (max-height: 520px) {
   .xq-shell :deep(.gs-stats),
   .xq-shell :deep(.gs-controls) {
