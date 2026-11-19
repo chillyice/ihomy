@@ -18,7 +18,7 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 .kicker,.label,.tag{font:700 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .top-actions{display:flex;gap:8px}.quiet{border:1px solid var(--edge);background:transparent;color:var(--text);padding:7px 13px;border-radius:7px}.quiet:hover{background:#30433a}
 .intro{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:17px 0 10px}.intro h2{margin:0;font-size:15px}.tag{margin:0}.intro .tag{text-align:right}
-.table{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,330px);gap:18px;align-items:start}
+.table{display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,290px);gap:18px;align-items:start}
 .chart-frame{background:#40534a;padding:6px;box-shadow:0 16px 38px #09130e66;border-radius:14px}
 .chart{position:relative;aspect-ratio:1;background:var(--chart);border-radius:9px;overflow:hidden;isolation:isolate}
 .chart>svg{width:100%;height:100%;display:block}
@@ -36,27 +36,25 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 .controls{display:grid;grid-template-columns:48px 1fr;gap:9px;align-items:stretch}
 .die{height:48px;background:var(--chart);color:#1b2b22;border-radius:8px;display:grid;place-items:center;box-shadow:inset 0 -3px 0 #0002}.die svg{width:33px;height:33px}.die.rolling svg{animation:shake .24s ease both}@keyframes shake{30%{transform:rotate(-20deg)}70%{transform:rotate(18deg)}}
 .roll{border-radius:8px;background:var(--signal);color:#1a2722;border:1px solid transparent;font-weight:850;min-height:48px}.roll:not(:disabled):hover{background:#f3ffaf}.roll:disabled{background:#34483d;color:#afc1b1;border-color:#4b6054}
-.routes{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
-.route{display:grid;grid-template-columns:10px 1fr max-content;gap:8px;align-items:center;padding:6px 8px;background:#1a2a24;border:1px solid transparent;border-radius:6px}.route.active{border-color:var(--team);background:#2c3e33}.route .chip{width:8px;height:8px;border-radius:50%;background:var(--team)}.route strong{font-size:13px}.route small{color:var(--muted);margin-left:5px}.marks{display:flex;align-items:center;gap:3px}.marks i{width:7px;height:7px;border:1px solid var(--team);border-radius:50%}.marks i.filled{background:var(--team)}.marks span{margin-left:4px;font:700 11px var(--mono);color:var(--muted)}
-.log{margin:8px 0 0;padding:0;list-style:none;min-height:57px;color:var(--muted);font-size:12px}.log li{margin-top:4px}.log li:first-child{color:var(--text)}.log li::before{content:'›';color:var(--signal);margin-right:6px}
 dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border-radius:13px;padding:22px;width:min(450px,calc(100vw - 28px))}dialog::backdrop{background:#0a1510bd}dialog h2{margin:2px 0 8px}dialog p,dialog ol{color:#d4dfd4}dialog ol{padding-left:22px}dialog li{margin:7px 0}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.dialog-actions .roll{padding:8px 17px;min-height:39px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fields label{display:grid;gap:4px}.fields select{background:#182922;color:var(--text);border:1px solid #718777;border-radius:6px;padding:8px;min-width:0}
-@media(max-width:780px){.table{grid-template-columns:1fr}.console{grid-template-columns:1fr 1fr}.console .history{grid-column:1/-1}.top{min-height:64px}.intro{margin:12px 0 8px}.key{margin-bottom:2px}}
-.choices{display:flex;gap:6px;margin-top:9px}.choices[hidden]{display:none}.choice{flex:1;border:1px solid #839688;border-radius:6px;background:#273e33;color:var(--text);padding:6px;font:700 12px var(--body)}.choice:hover{background:#405b4b}.choice:disabled{opacity:.6}
-@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.console{grid-template-columns:1fr}.console .history{grid-column:auto}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
+@media(max-width:780px){.table{grid-template-columns:1fr}.top{min-height:64px}.intro{margin:12px 0 8px}.key{margin-bottom:2px}}
+.choices{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.choices[hidden]{display:none}.choice{flex:1;border:1px solid #839688;border-radius:6px;background:#273e33;color:var(--text);padding:6px;font:700 12px var(--body)}.choice:hover{background:#405b4b}.choice:disabled{opacity:.6}
+@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 body.in-immersive .shell{padding-top:54px}
 /* ===== 铺满游戏区 =====
  * 这页是嵌在小游戏外壳里的(iframe 高度就是外壳的游戏区),所以「整页」= iframe 视口:
  * 宽屏/横屏把页面锁成一屏高,棋盘在可用高宽里取最大的正方形,右侧回合栏自己滚动;
  * 不再出现「棋盘比屏幕还高、要滚动才能看全」的纵向滚动。
- * 手机竖屏/窄窗仍是上下堆叠的内容流(竖屏滚一屏,好过把棋盘缩成小方块)。 */
+ * 手机竖屏/窄窗仍是上下堆叠的内容流(竖屏滚一屏,好过把棋盘缩成小方块)。
+ * 侧栏只剩回合卡一张(机队归航/飞行记录两卡已删),列宽收窄一档,把宽度让给棋盘。 */
 @media (min-width:781px),(min-aspect-ratio:5/4){
   html,body{height:100%}
   body{display:flex;flex-direction:column}
   .shell{flex:1 1 auto;min-height:0;width:100%;max-width:1400px;display:flex;flex-direction:column;padding:0 clamp(12px,2.2vw,32px) 8px}
   .top{flex:0 0 auto;min-height:54px}
   .intro{flex:0 0 auto;margin:8px 0}
-  .table{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1fr) clamp(230px,27%,320px);gap:14px;align-items:stretch}
+  .table{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1fr) clamp(210px,25%,300px);gap:14px;align-items:stretch}
   .table>section{display:flex;flex-direction:column;min-height:0;min-width:0}
   .chart-fit{flex:1 1 auto;min-height:0;display:grid;place-items:center;container-type:size}
   .chart-frame{width:min(100%,100cqh);aspect-ratio:1;padding:6px}
@@ -92,13 +90,11 @@ body.in-immersive .shell{padding-top:54px}
 <div class="turn-live" role="status" aria-live="polite"><h3 class="now" id="turn-name"></h3><p class="instruction" id="instruction"></p></div>
 <div class="controls"><div class="die" id="die" role="img" aria-label="尚未掷骰"></div><button type="button" id="roll" class="roll">掷骰子</button></div><div id="choices" class="choices" aria-label="可走的飞机" hidden></div>
 </section>
-<section class="card" aria-labelledby="fleet-label"><div class="meta"><h2 id="fleet-label">机队归航</h2><span class="label">Arrivals</span></div><ul class="routes" id="routes"></ul></section>
-<section class="card history" aria-labelledby="log-label"><div class="meta"><h2 id="log-label">飞行记录</h2><span class="label">Flight log</span></div><ul class="log" id="log"></ul></section>
 </aside>
 </div>
 </main>
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
-<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>连续六掷都没出 6 点，下一掷开出 1–5 点也能让一架飞机进起飞区；这次起飞后换下一家掷，不额外再掷。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
 <div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
@@ -125,8 +121,9 @@ const point = (i,r=244) => {
    起飞走一步到上一家色的 D1,自家角格 A1(红/本色)是归航跑道口;进度 51 起转入归航跑道 */
 const publicIndex = (color,progress) => mod(13*color+2+progress);
 const isPublic = p => p>=1&&p<=CIRCUIT_LAST;
-/* 起飞区:不在主环上,压在进环第一格 D1 的正外侧(环外 275 半径),与第一步只隔一圈间距 */
-const takeoffSpot = color => point(color*13+3,275);
+/* 起飞区:不在主环上,压在自家角格 A1 逆时针方向第 3 格(即 D1 的镜像位)的正外侧(环外 275 半径),
+   紧贴停机坪逆时针侧——相当于主环整体逆时针转过六格后,起飞区从进环格外侧落到停机坪另一侧 */
+const takeoffSpot = color => point(color*13-3,275);
 const stand = (color,p) => {
  const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
 };
@@ -161,7 +158,7 @@ const arrivals = (state,c) => state.planes[c].filter(p=>p===GOAL).length;
 function fresh(size,mode) {
  const order = size===2?[0,2]:Array.from({length:size},(_,i)=>i);
  return {order,mode,turn:0,planes:Array.from({length:4},()=>Array(4).fill(HANGAR)),
-  phase:'roll',face:0,winner:null,round:0,log:['塔台就绪，珊瑚机队先掷。']};
+  phase:'roll',face:0,winner:null,round:0,misses:[0,0,0,0],log:['塔台就绪，珊瑚机队先掷。']};
 }
 /**
  * 逐格帧:普通前进按格推进;同色跳格是一次跳过去;跨场飞跃沿曲线取样飞过去;
@@ -190,8 +187,11 @@ function walkFrames(c,from,land,to,kind){
 }
 function movesFor(g,face=g.face) {
  const c=last(g);
+ /* 豁免起飞:连续六掷未出 6 点,掷出 1-5 点也能让一架飞机进起飞区(与掷 6 的起飞同款,
+    只是起飞后换下一家,不额外再掷);六连中之后每一掷都保留这份资格,直到掷出 6 归零 */
+ const pity=face!==6&&(g.misses?.[c]||0)>=6;
  return g.planes[c].flatMap((from,piece)=>{
-  if (from===GOAL || (from===HANGAR&&face!==6)) return [];
+  if (from===GOAL || (from===HANGAR&&face!==6&&!pity)) return [];
   let to=from===HANGAR?0:from+face, kind=from===HANGAR?'起飞':'前进', captures=[];
   // 归航跑道:点数大于到圆心的距离时照样能动——先走到圆心,剩下的点数再从圆心往回折返
   if(from>=R0&&to>GOAL){to=GOAL*2-to;kind='折返';}
@@ -213,10 +213,14 @@ function movesFor(g,face=g.face) {
  });
 }
 function note(g, line) {g.log.unshift(line);g.log=g.log.slice(0,4);}
+/* 豁免起飞提示:连续六掷未出 6 点,再掷出 1-5 点也能起飞一架(起飞后换人,不再额外掷骰) */
+const pityHint = () => (game.misses?.[last(game)]||0)>=6?'连续六掷未出 6 点，这次掷出 1-5 点也能起飞一架。':'';
 function advance(g){g.turn=(g.turn+1)%g.order.length;g.phase='roll';}
 function cast(g,face) {
  if(g.phase!=='roll') return;
+ const c=last(g);
  g.face=face;g.round++;
+ if(face===6)g.misses[c]=0;else g.misses[c]=(g.misses[c]||0)+1;
  if(movesFor(g).length){g.phase='move';note(g,TEAMS[last(g)].name+'掷出 '+face+' 点。');}
  else {note(g,TEAMS[last(g)].name+'掷出 '+face+' 点，无棋可走。');advance(g);}
 }
@@ -244,7 +248,8 @@ function load(){
    && Number.isInteger(s.turn)&&s.turn>=0&&s.turn<s.order.length&&['roll','move','won'].includes(s.phase)
    && Number.isInteger(s.face)&&s.face>=0&&s.face<=6&&(s.phase!=='move'||s.face>0&&movesFor(s).length>0)
    && (s.phase!=='won'||s.order.includes(s.winner)&&arrivals(s,s.winner)===4)
-   && Number.isInteger(s.round)&&s.round>=0&&Array.isArray(s.log)&&s.log.every(l=>typeof l==='string')) return s;
+   && (!s.misses||(Array.isArray(s.misses)&&s.misses.length===4&&s.misses.every(n=>Number.isInteger(n)&&n>=0)))
+   && Number.isInteger(s.round)&&s.round>=0&&Array.isArray(s.log)&&s.log.every(l=>typeof l==='string')){s.misses=s.misses||[0,0,0,0];return s;}
  }catch{}
  return fresh(4,'cpu');
 }
@@ -340,15 +345,10 @@ function sync(){
  $('turn-badge').textContent=won?'对局结束':'第 '+(game.round+(pick||spinning?0:1)||1)+' 掷';
  $('turn-name').textContent=TEAMS[won?done:c].name+'机队'+(won?'获胜':'');
  $('turn-name').style.color=TEAMS[won?done:c].paint;
- $('instruction').textContent=won?'四架飞机全部归航。':moving?'飞机滑行中…':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。');
+ $('instruction').textContent=won?'四架飞机全部归航。':moving?'飞机滑行中…':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'+pityHint()):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。'+pityHint());
  $('roll').textContent=won?'再开一局':cpu?'电脑回合':pick?'请选择飞机':'掷骰子';
  $('roll').disabled=blocked||moving||!won&&(cpu||pick||spinning);
  const face=$('die');face.classList.toggle('rolling',spinning);face.innerHTML=die(game.face);face.setAttribute('aria-label',spinning?'掷骰中':game.face?game.face+' 点':'尚未掷骰');
- $('routes').innerHTML=game.order.map(k=>{
-  const t=TEAMS[k], n=arrivals(game,k);
-  return '<li class="route'+(!won&&k===c?' active':'')+'" style="--team:'+t.paint+'"'+(!won&&k===c?' aria-current="true"':'')+'><i class="chip" aria-hidden="true"></i><div><strong>'+t.name+'</strong><small>'+(game.mode==='cpu'?(k===0?'你':'电脑'):'玩家 '+(game.order.indexOf(k)+1))+'</small></div><div class="marks" aria-label="归航 '+n+' 架">'+Array.from({length:4},(_,i)=>'<i aria-hidden="true" class="'+(i<n?'filled':'')+'"></i>').join('')+'<span aria-hidden="true">'+n+'/4</span></div></li>';
- }).join('');
- $('log').replaceChildren(...game.log.slice(0,3).map(line=>{const li=document.createElement('li');li.textContent=line;return li;}));
  const legal=new Set(!won&&pick&&!cpu&&!blocked&&!moving?movesFor(game).map(m=>m.piece):[]), stacks=new Map();
  const choices=$('choices');choices.hidden=!legal.size;
  choices.replaceChildren(...[...legal].map(i=>{const b=document.createElement('button');b.className='choice';b.type='button';b.textContent=(i+1)+' 号飞机';b.onclick=()=>act(i,true);return b;}));
