@@ -30,6 +30,29 @@
       </div>
     </template>
 
+    <!-- 手机横屏:顶部信息栏(关卡/重排/时间/得分)搬进外壳左栏底边的芯片行,
+         把棋盘上方那 19px 整条还给棋盘;竖屏/桌面这块不渲染,仍用上方信息栏 -->
+    <template #stats>
+      <template v-if="screen === 'game'">
+        <span class="gh-chip"
+          ><span>{{ levelLabel }}</span
+          ><b>{{ levelName }}</b></span
+        >
+        <span class="gh-chip" :title="$t('games.petlink.shufflesLeft', { n: shufflesLeft })"
+          ><span>{{ $t('games.petlink.life') }}</span
+          ><b>{{ shufflesLeft }}</b></span
+        >
+        <span class="gh-chip" :class="{ 'is-warn': timeLeft <= 20 }"
+          ><span>{{ $t('games.petlink.time') }}</span
+          ><b>{{ timeText }}</b></span
+        >
+        <span class="gh-chip"
+          ><span>{{ $t('games.petlink.score') }}</span
+          ><b>{{ score }}</b></span
+        >
+      </template>
+    </template>
+
     <template #extras>
       <GameRoomBar
         v-if="screen === 'game'"
@@ -242,10 +265,11 @@ const CELL_H = 40
 const GAP_X = 2
 const GAP_Y = 0
 const PAD = 44 // 外圈占位(供连线 SVG 绕外圈绘制)
-// 手机横屏(矮屏 + 左侧信息栏)优先把高度让给棋盘:外圈收到连线本身的极限宽度
-// ——列环中心线离边 CELL_W/2+2、行环离边 CELL_H/2,26 还能留出 3~6px,
-// 上下共省 36px,牌面按高度等比放大一圈(844×390 实测牌面 26.5 → 30.8px,板面 443×308 → 489×332)。
-const PAD_COMPACT = 26
+// 环线离棋盘边的距离:桌面/竖屏沿用原版「一整格」(列 42/2+2=23、行 40/2=20)。
+// 手机横屏棋盘高度是唯一天花板,而环线又是唯一白占高度的地方 —— 收到 12px,
+// 外圈留白 = 环线 + 半个描边(2.5)向上取 3 = 15,844×390 下棋盘高从 347 长到 372。
+const RING_OUT_COMPACT = 12
+const PAD_COMPACT = RING_OUT_COMPACT + 3
 const LEVEL_TIME = PETLINK_LEVEL_TIME
 const MAX_LEVEL = PETLINK_MAX_LEVEL
 const TIME_BONUS = 3 // 每消除一对补充 3 秒(原件 36 帧)
@@ -450,11 +474,16 @@ const debugOddText = computed(() => debugOdd.value.map((d) => `#${d.type}×${d.c
 
 const boardW = COLS * CELL_W + (COLS - 1) * GAP_X
 const boardH = ROWS * CELL_H + (ROWS - 1) * GAP_Y
-// 手机横屏(与外壳 §43 横屏档同一门槛)换紧凑外圈:连线坐标与 SVG 盒子一起变,
-// 所以 pad 必须是从同一个值派生的,页面别处不许再写死 44。
-const compactLandscape = ref(false)
-let landscapeQuery = null
-const padPx = computed(() => (compactLandscape.value ? PAD_COMPACT : PAD))
+// 小屏换紧凑外圈:横屏档(与外壳 §43 同一门槛)棋盘吃高度、竖屏窄机棋盘吃宽度,
+// 两种局面下外圈都是纯浪费 —— 连线坐标与 SVG 盒子一起变,所以 pad 必须从同一个值派生,
+// 页面别处不许再写死 44。
+const compactPad = ref(false)
+let padQuery = null
+const padPx = computed(() => (compactPad.value ? PAD_COMPACT : PAD))
+// 环线距棋盘边:紧凑档两轴都用 12,其余按原版一整格(列 23 / 行 20)。
+// 它只影响 c<0 / c>=COLS(环线)那几个坐标,棋盘内仍是格中心。
+const ringOutX = computed(() => (compactPad.value ? RING_OUT_COMPACT : CELL_W + GAP_X - CELL_W / 2))
+const ringOutY = computed(() => (compactPad.value ? RING_OUT_COMPACT : CELL_H + GAP_Y - CELL_H / 2))
 const svgW = computed(() => boardW + padPx.value * 2)
 const svgH = computed(() => boardH + padPx.value * 2)
 
@@ -501,9 +530,9 @@ function onFullscreenChange() {
   // 全屏/退出后可用宽高变化,重新计算缩放
   nextTick(() => updateBoardScale())
 }
-/** 横屏档切换(含键盘/折叠屏改视口):换完外圈宽窄,按新 SVG 尺寸重算缩放 */
-function onLandscapeQueryChange(e) {
-  compactLandscape.value = !!e.matches
+/** 紧凑外圈档切换(手机横屏 / 窄屏竖屏,含折叠屏改视口):换完外圈宽窄,按新 SVG 尺寸重算缩放 */
+function onPadQueryChange(e) {
+  compactPad.value = !!e.matches
   nextTick(() => updateBoardScale())
 }
 
@@ -1042,6 +1071,9 @@ function togglePause() {
 // ---------- 流程 ----------
 
 function updateBoardScale() {
+  // 紧凑外圈档在每次重算前再核一遍:分屏/折叠屏/部分 WebView 改视口不发 MQL change,
+  // 只在挂载时判一次会一直用错档(pad 与 SVG 尺寸一起偏)
+  if (padQuery) compactPad.value = !!padQuery.matches
   const el = boardScrollRef.value
   if (!el) return
   const availW = el.clientWidth
@@ -1105,10 +1137,16 @@ function restart() {
   saveState()
 }
 
+// c/r 取 -1 或 ROWS/COLS 时落在环绕棋盘的那一圈线上(距离由 ringOut 决定),
+// 其余是棋盘格中心 —— 连线算法只认这两类坐标。
 function centerX(c) {
+  if (c < 0) return padPx.value - ringOutX.value
+  if (c >= COLS) return padPx.value + boardW + ringOutX.value
   return padPx.value + c * (CELL_W + GAP_X) + CELL_W / 2
 }
 function centerY(r) {
+  if (r < 0) return padPx.value - ringOutY.value
+  if (r >= ROWS) return padPx.value + boardH + ringOutY.value
   return padPx.value + r * (CELL_H + GAP_Y) + CELL_H / 2
 }
 function sleep(ms) {
@@ -1186,14 +1224,18 @@ onMounted(async () => {
   // 这样进局后第一次点牌时它已经是 running,不用再走「等 resume」那条路
   document.addEventListener('pointerdown', unlockAudio, true)
   window.addEventListener('keydown', unlockAudio, true)
-  // 外圈宽窄跟着横屏档走:切成紧凑外圈后 SVG 盒子变小,按新尺寸重算缩放
-  landscapeQuery = window.matchMedia?.('(orientation: landscape) and (max-height: 520px)') || null
-  compactLandscape.value = !!landscapeQuery?.matches
-  if (landscapeQuery?.addEventListener) landscapeQuery.addEventListener('change', onLandscapeQueryChange)
-  else landscapeQuery?.addListener?.(onLandscapeQueryChange)
+  // 外圈宽窄跟着小屏档走:手机横屏(棋盘顶到高度)与窄屏竖屏(棋盘顶到宽度)
+  // 都换成紧凑外圈,SVG 盒子随之变小,按新尺寸重算缩放
+  padQuery = window.matchMedia?.('(orientation: landscape) and (max-height: 520px), (max-width: 520px)') || null
+  compactPad.value = !!padQuery?.matches
+  if (padQuery?.addEventListener) padQuery.addEventListener('change', onPadQueryChange)
+  else padQuery?.addListener?.(onPadQueryChange)
   // 进入游戏即关闭全局光影特效(与图片/视频/看书一致),离开时恢复
   sunLight?.suspendEffects()
   resizeObserver = new ResizeObserver(() => updateBoardScale())
+  // 只盯棋盘容器不够:封面 → 对局时外壳游戏区高度会变高,而棋盘容器宽度没变
+  // (仍是 100%),RO 不响 → 沿用的还是封面那一档小比例。游戏区一起盯
+  if (shellEl.value?.bodyEl) resizeObserver.observe(shellEl.value.bodyEl)
 
   if (play.active) {
     // 房间:跳过封面直接进局。COOP 由房主发牌并广播快照,访客等房主同步。
@@ -1226,9 +1268,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', unlockAudio, true)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
-  if (landscapeQuery?.removeEventListener) landscapeQuery.removeEventListener('change', onLandscapeQueryChange)
-  else landscapeQuery?.removeListener?.(onLandscapeQueryChange)
-  landscapeQuery = null
+  if (padQuery?.removeEventListener) padQuery.removeEventListener('change', onPadQueryChange)
+  else padQuery?.removeListener?.(onPadQueryChange)
+  padQuery = null
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -1291,6 +1333,16 @@ html.dark .pl-shell {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 芯片行(信息栏的手机横屏形态)默认不渲染:竖屏/桌面数据在上方 HUD,
+   两处同时出会重复读同一批数;横屏档在下面那段里把它打开。封面上没有对局,
+   插槽为空(只剩 v-if 的占位注释)→ 整行不占位,否则会多出一条 4px 行距。
+   位置必须在横屏档之前:同权(0,4,0)时后写的赢,放到后面会把横屏的 flex 压回 none */
+.pl-shell :deep(.gs-stats.gs-stats) {
+  display: none;
+}
+.pl-shell :deep(.gs-stats:empty) {
+  display: none;
+}
 /* 手机横屏:提示/重排/暂停/静音搬进左栏(头部以下),横幅那条整条让位 */
 @media (orientation: landscape) and (max-height: 520px) {
   .pl-shell :deep(.gs-controls) {
@@ -1327,37 +1379,24 @@ html.dark .pl-shell {
     width: 100%;
     margin-left: 0;
   }
-  /* 顶部信息栏压成一条:省下的高度全给棋盘(牌面小看不清时,这十几像素很值)。
-     带 .pl-layout 前缀提权:这一堆基础样式写在本段之后(1389 行起),同权时后者赢,
-     不加前缀整段都是空转(实测 HUD 仍是 24 高 + 12 下边距) */
-  .pl-layout .game-hud {
-    gap: 10px;
-    margin-bottom: 4px;
-    font-size: 11px;
+  /* 信息栏整条交给左栏底边的芯片行:棋盘上方那 19px(压扁后仍要占的高度)
+     正是手机横屏最值钱的像素;竖屏/桌面仍用棋盘上方这条。
+     带 .pl-shell 前缀提权:基础样式写在本段之后,同权时后者赢,不加前缀是空转 */
+  .pl-shell .game-hud {
+    display: none;
   }
-  .pl-layout .hud-level-no {
-    font-size: 13px;
+  /* 芯片行只在这个档露头:不加 .gs-stats.gs-stats 提权会被 main.css 的
+     `.page.game-shell > .gs-stats`(0,3,0)压回它自己的 flex。
+     上面那条默认 none 已挪到横屏档之前,这里同权靠后手赢 */
+  .pl-shell :deep(.gs-stats.gs-stats) {
+    display: flex;
   }
-  .pl-layout .hud-level-name {
-    font-size: 12px;
-  }
-  .pl-layout .hud-life .life-num {
-    font-size: 13px;
-  }
-  .pl-layout .hud-life .life-label {
-    font-size: 11px;
-  }
-  .pl-layout .hud-score b {
-    font-size: 14px;
-  }
-  .pl-layout .timer-bar {
-    height: 10px;
-  }
-  .pl-layout .timer-text {
-    font-size: 11px;
-    min-width: 30px;
+  /* 时间见底时芯片文字转红,与棋盘上方那条计时读数同一口径 */
+  .gh-chip.is-warn b {
+    color: #ff5a5a;
   }
 }
+
 .pl-layout {
   position: relative;
   display: flex;
@@ -1367,7 +1406,7 @@ html.dark .pl-shell {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  /* 外圈留白:桌面/竖屏 44px;手机横屏由脚本按档改写成 26px(内联覆盖)。
+  /* 外圈留白:桌面宽屏 44px;手机(横屏或窄屏竖屏)由脚本按档改写成 15px(内联覆盖)。
      这里给默认值不只是兜底 —— 只在脚本里注入的变量会被 themeTokens 守门判为未定义 */
   --pl-pad: 44px;
   color: #fff;
@@ -1560,7 +1599,7 @@ html.dark .pl-shell {
 .board-wrap {
   position: relative;
   width: fit-content;
-  /* 外圈留白:桌面/竖屏 44px,手机横屏由页面按档换成 26px(--pl-pad 内联注入) */
+  /* 外圈留白:桌面宽屏 44px,手机由页面按档换成 15px(--pl-pad 内联注入) */
   padding: var(--pl-pad, 44px);
   transform-origin: top left;
 }
