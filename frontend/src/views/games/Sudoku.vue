@@ -16,6 +16,35 @@
         <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
       </el-select>
     </template>
+    <!-- 用时与撤销/新游戏的第二份摆放:竖屏/平板用棋盘上方那条(.sd-meta),
+         手机横屏时那条隐去、这一行撑出来(返回/规则/模式下面的空白),见样式里的媒体查询 -->
+    <template #stats>
+      <span class="gh-chip">
+        <span>{{ $t('games.sudoku.time') }}</span
+        ><b>{{ timeText }}</b>
+      </span>
+    </template>
+    <template #actions>
+      <el-button
+        size="small"
+        class="gs-icon-btn"
+        :disabled="!history.length"
+        :title="$t('games.sudoku.undo')"
+        :aria-label="$t('games.sudoku.undo')"
+        @click="undo"
+      >
+        <el-icon><RefreshLeft /></el-icon>
+      </el-button>
+      <el-button
+        size="small"
+        class="gs-icon-btn"
+        :title="$t('games.sudoku.newGame')"
+        :aria-label="$t('games.sudoku.newGame')"
+        @click="startNew"
+      >
+        <el-icon><Plus /></el-icon>
+      </el-button>
+    </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
         <p>{{ $t('games.sudoku.tip') }}</p>
@@ -113,7 +142,8 @@
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
            冲突直接画在格子上,提示次数只在通关结果里报。
-           撤销/新游戏放在这条的右端(棋盘右上角);横屏时这条在棋盘左侧一列,按钮并排贴棋盘一侧 -->
+           撤销/新游戏放在这条的右端(棋盘右上角)。手机横屏时外壳左栏有空白,
+           这条整条隐去,改由外壳控件行(#stats/#actions)里的同一份控件顶替(见样式末尾的媒体查询) -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
@@ -1565,6 +1595,30 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
+/* 外壳控件行里放着同一份用时/撤销/新游戏:竖屏与平板整行不占位(用棋盘上方那条),
+   只在手机横屏(左栏有空白)时撑出来顶替它,并把棋盘上方那条隐去,不会两份同时在场 */
+.sd-shell :deep(.gs-controls) {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .sd-shell :deep(.gs-controls) {
+    display: flex;
+  }
+  .sd-meta {
+    display: none;
+  }
+  /* 左栏这三个控件排成一行(时间芯片 + 撤销 + 新游戏):同一条基线、左边缘都跟返回/规则对齐。
+     分两行时按钮行比芯片窄一截(84 vs 74),右边缘错位看着发毛 */
+  .sd-shell :deep(.gs-controls .gs-end) {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--gs-gap);
+    width: auto;
+  }
+  .sd-shell :deep(.gs-actions) {
+    justify-content: flex-start;
+  }
+}
 .sd-panel {
   grid-area: panel;
   display: grid;
@@ -2378,55 +2432,38 @@ html.dark .sd-cell.conflict {
   }
 }
 
-/* 手机横屏(游戏区高 ≤ 520):用时/撤销/新游戏收成棋盘左侧一列,靠上排,
-   按钮并排贴棋盘一侧(和扫雷一致),下面是时间;棋盘吃满中间一列的高度,
-   底边压到离页面底边只剩「外壳底边距(6,手机上叠安全区) + 4」 */
+/* 手机横屏(游戏区高 ≤ 520):用时条已经隐去(外壳左栏里的控件行顶替它),
+   这里只留棋盘 + 右列两条:棋盘按高度铺满,数字盘与工具键在右一列
+   (数字盘在上、笔记/快填等工具在下),键位放大到触控尺寸,两者底边与棋盘贴齐 */
 @container (min-aspect-ratio: 6/5) and (max-height: 520px) {
   .sd-layout {
-    /* 左列 116(按钮 62、芯片 ~100 都装得下),间隙固定 8,宽度全让给棋盘;
-       右列按比例收窄(手机横屏让棋盘吃满高度),上限 200 保持平板手感 */
-    --sd-meta-w: 116px;
-    --sd-side-w: clamp(118px, 22%, 200px);
-    --sd-gap: 8px;
-    grid-template-columns: var(--sd-meta-w) minmax(0, 1fr) var(--sd-side-w);
     grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta board panel';
-    gap: var(--sd-gap);
-    /* 棋盘边长:横向扣掉左右两列,纵向不扣用时条(它已在左列,不占棋盘高度) */
-    --sd-frame-size: min(calc(100cqw - var(--sd-meta-w) - var(--sd-side-w) - 2 * var(--sd-gap) - 8px), calc(100cqh - 8px), 560px);
+    grid-template-areas: 'board panel';
+    /* 右列不再按比例:按时用条让出来的那份宽度给足棋盘与数字键 */
+    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
   }
-  /* 棋盘与数字盘底边贴齐、一起往页面底边压(margin 只留 4 缓冲);
-     用时/按钮列仍靠上 */
+  /* 棋盘与数字盘底边贴齐、一起往页面底边压(margin 只留 4 缓冲) */
   .sd-frame,
   .sd-panel {
     align-self: end;
     margin-bottom: 4px;
   }
-  .sd-meta {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
+  .sd-panel {
+    align-content: start;
+    max-height: 100%;
+    overflow-y: auto;
   }
-  .sd-meta > .gh-chip {
-    order: 2;
-    justify-content: space-between;
-    min-height: var(--gs-control-h);
+  /* 右列宽裕出来了:数字键与工具键放大到接近触控下限,别再是 38px 的小方块 */
+  .sd-num {
+    padding: 12px 0;
+    font-size: 16px;
   }
-  /* 撤销/新游戏并排贴棋盘一侧,不和棋盘之间空一截 */
-  .sd-meta-actions {
+  .sd-tool {
+    padding: 8px 8px;
+  }
+  /* 提示条排到右列最上面:一屏放不下时先露要点的那条,滚动只留给工具键 */
+  .sd-hint-note {
     order: -1;
-    justify-content: flex-end;
-    flex: 0 0 auto;
-    margin-left: 0;
-  }
-  /* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
-  .sd-meta-actions .el-button + .el-button {
-    margin-left: 0;
   }
 }
 </style>

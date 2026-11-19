@@ -970,6 +970,11 @@ html.game-shell .mobile-game-chrome {
   .gs-head .gs-end {
     margin-left: 0;
   }
+  /* 按钮间距只走 flex gap:EP 默认给相邻按钮 margin-left:12,和 gap 一叠就是 18
+     (左栏两根图标键实测 6 → 18),换行落行首时还会让规则键比返回缩进 12 */
+  .page.game-shell :is(.gs-head, .gs-controls) .el-button + .el-button {
+    margin-left: 0;
+  }
   /* 头一行放不下时,后面的图标/规则落到第二行而不是把标题挤没 */
   .gs-head {
     flex-wrap: wrap;
