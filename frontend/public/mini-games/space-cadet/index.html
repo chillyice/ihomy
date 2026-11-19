@@ -17,24 +17,49 @@
     user-select: none;
   }
 
-  /* 舞台:canvas 用 object-fit 等比塞满,留黑边而不是拉伸变形 */
+  /* 舞台:机台按 642:525 原比例居中,上方主画面、下方记分板,尺寸由脚本按可用空间算 */
   #stage {
     position: fixed;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 8px;
+  }
+  #rig {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  /* 主画面:画布是整张机台,靠 overflow 把底部记分带裁掉 */
+  #field {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.07);
   }
   #canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
     outline: none;
     background: #000;
     touch-action: manipulation;
   }
-  #canvas:fullscreen { width: 100vw; height: 100vh; }
+  /* 记分板:每帧从画布底部记分带拷一张过来 */
+  #hud {
+    display: block;
+    width: 100%;
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  }
+  /* 取不到画面时退回整张机台(记分带留在主画面底部) */
+  body.no-split #hud { display: none; }
 
   /* 载入/报错状态 */
   #status {
@@ -178,16 +203,21 @@
 </head>
 <body>
 <div id="stage">
-  <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
-  <div id="status">载入中…</div>
-  <div id="touch">
-    <button class="tk" data-key="90" aria-label="左挡板">◀</button>
-    <div class="tk-center">
-      <button class="tk tk-sm" data-key="113" aria-label="开新局">新局</button>
-      <button class="tk tk-wide" data-key="32" aria-label="发球">发球</button>
+  <div id="rig">
+    <div id="field">
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="touch">
+        <button class="tk" data-key="90" aria-label="左挡板">◀</button>
+        <div class="tk-center">
+          <button class="tk tk-sm" data-key="113" aria-label="开新局">新局</button>
+          <button class="tk tk-wide" data-key="32" aria-label="发球">发球</button>
+        </div>
+        <button class="tk" data-key="88" aria-label="右挡板">▶</button>
+      </div>
     </div>
-    <button class="tk" data-key="88" aria-label="右挡板">▶</button>
+    <canvas id="hud" aria-label="记分板"></canvas>
   </div>
+  <div id="status">载入中…</div>
   <button id="gear" aria-label="按键设置">⚙</button>
   <div id="kbPanel" role="dialog" aria-label="按键设置">
     <h3>按键设置 <button id="kbClose" aria-label="关闭">✕</button></h3>
@@ -203,6 +233,24 @@
 </div>
 
 <script>
+  // 主画面与记分板拆开:引擎把整张机台(含底部记分带)画进同一张 WebGL 画布,
+  // 没有分数接口可读——所以就按位图比例裁:主画面直接用画布本身(靠 overflow 裁掉
+  // 底部记分带,零拷贝),记分带每帧拷一份到独立的小 canvas。
+  // 拷贝要求画布在合成后仍保留像素,所以创建 WebGL 上下文时打开 preserveDrawingBuffer。
+  // 引擎脚本是 async 加载的,这段必须先执行,补丁才能生效。
+  const TABLE_W = 642 // table.bmp 尺寸,底部 467..524(58 行)是记分带
+  const TABLE_H = 525
+  const BAR_TOP = 467
+  ;(function patchCanvasContext() {
+    const raw = HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+      if (typeof type === 'string' && type.indexOf('webgl') !== -1) {
+        attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true })
+      }
+      return raw.call(this, type, attrs)
+    }
+  })()
+
   // 记录 SDL 把键盘监听挂在了哪个目标上(document / window / canvas 都可能有),
   // 触屏按钮才能把合成按键事件投递到真正收得到的地方。
   const keyTargets = new Set()
@@ -257,6 +305,136 @@
   window.addEventListener('error', function (e) {
     if (!statusDone) showStatus('载入失败:' + (e.message || '未知错误'), false)
   })
+
+  // —— 主画面 / 记分板布局 ——
+  const stageEl = document.getElementById('stage')
+  const fieldEl = document.getElementById('field')
+  const canvasEl = document.getElementById('canvas')
+  const hudEl = document.getElementById('hud')
+  const hudCtx = hudEl.getContext('2d')
+  const STAGE_PAD = 16 // 与 #stage 的 padding 8px 一致(左右/上下各 8)
+  const RIG_GAP = 6 // 与 #rig 的 gap 一致
+  let splitOn = true // 取不到画面时置 false,退回整张机台
+  let fieldW = 0
+  let hudH = 0
+
+  function layout() {
+    const availW = Math.max(80, stageEl.clientWidth - STAGE_PAD)
+    const availH = Math.max(80, stageEl.clientHeight - STAGE_PAD)
+    // 竖着放「主画面 + 记分板」,两段加起来正好是整张机台的高度:
+    // 宽度靠可用高反推,再与可用宽取小。
+    fieldW = Math.max(80, Math.floor(Math.min(availW, ((availH - RIG_GAP) * TABLE_W) / TABLE_H)))
+    const cutY = splitOn ? BAR_TOP : TABLE_H
+    const fieldH = Math.floor((fieldW * cutY) / TABLE_W)
+    hudH = splitOn ? Math.floor((fieldW * (TABLE_H - cutY)) / TABLE_W) : 0
+    const dpr = window.devicePixelRatio || 1
+
+    fieldEl.style.width = fieldW + 'px'
+    fieldEl.style.height = fieldH + 'px'
+    // 画布永远是整张机台,底部记分带被 #field 的 overflow 裁掉
+    canvasEl.style.width = fieldW + 'px'
+    canvasEl.style.height = Math.round((fieldW * TABLE_H) / TABLE_W) + 'px'
+
+    if (splitOn) {
+      hudEl.style.height = hudH + 'px'
+      hudEl.width = Math.max(1, Math.round(fieldW * dpr))
+      hudEl.height = Math.max(1, Math.round((hudH * dpr)))
+      hudCtx.imageSmoothingEnabled = false
+    }
+  }
+
+  // 画布 CSS 尺寸变了要让引擎重算窗口(它自己监听 resize 同步画布分辨率)
+  let selfResize = false
+  function syncEngine() {
+    selfResize = true
+    try {
+      window.dispatchEvent(new Event('resize'))
+    } finally {
+      selfResize = false
+    }
+  }
+
+  let resizeTimer = 0
+  window.addEventListener('resize', function () {
+    if (selfResize) return
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(function () {
+      layout()
+      syncEngine()
+    }, 60)
+  })
+
+  // 外框(站内 GameShell)可能在我们脚本跑完之后才定好 iframe 尺寸,
+  // 那次变化不一定落成 resize 事件 —— 盯着舞台自身尺寸再排一次。
+  if (typeof ResizeObserver === 'function') {
+    let lastW = 0
+    let lastH = 0
+    new ResizeObserver(function () {
+      const w = stageEl.clientWidth
+      const h = stageEl.clientHeight
+      if (w === lastW && h === lastH) return
+      lastW = w
+      lastH = h
+      layout()
+      syncEngine()
+    }).observe(stageEl)
+  }
+
+  // —— 每帧把记分带拷到记分板 ——
+  const PROBE_GAP = 900 // 探针间隔
+  const PROBE_MISS_LIMIT = 6 // 载入完成后再空等这么多轮才判定取不到画面
+  let probeAt = 0
+  let probeMiss = 0
+  let splitSettled = false
+  function pump() {
+    requestAnimationFrame(pump)
+    const cw = canvasEl.width
+    const ch = canvasEl.height
+    if (!splitOn || !cw || !ch || !hudEl.width) return
+    const sy = Math.round((ch * BAR_TOP) / TABLE_H)
+    const sh = ch - sy
+    if (sh <= 0) return
+    hudCtx.drawImage(canvasEl, 0, sy, cw, sh, 0, 0, hudEl.width, hudEl.height)
+
+    // 兜底:引擎已经出画面,记分带却迟迟全黑 —— 多半是上下文没保留像素,
+    // 退回整张机台(记分带仍留在主画面底部),别让记分板一直空着。
+    if (splitSettled || !engineReady()) return
+    const now = Date.now()
+    if (now < probeAt) return
+    probeAt = now + PROBE_GAP
+    if (bandHasInk()) {
+      splitSettled = true
+      return
+    }
+    probeMiss++
+    if (probeMiss >= PROBE_MISS_LIMIT) fallbackToFullTable()
+  }
+
+  function engineReady() {
+    return typeof window.Module !== 'undefined' && window.Module.calledRun === true && canvasEl.width > 0
+  }
+
+  function bandHasInk() {
+    try {
+      const w = hudEl.width
+      const h = hudEl.height
+      const data = hudCtx.getImageData(0, 0, w, h).data
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] + data[i + 1] + data[i + 2] > 24) return true
+      }
+    } catch (_) {
+      return true // 读不到就当正常,别误降级
+    }
+    return false
+  }
+
+  function fallbackToFullTable() {
+    splitOn = false
+    splitSettled = true
+    document.body.classList.add('no-split')
+    layout()
+    syncEngine()
+  }
 
   // —— 触屏 → 键盘 ——
   function pressKey(code, down) {
@@ -432,10 +610,13 @@
   })
 
   // 点一下画面把焦点交给 canvas,否则外框里按键可能被父页面吃掉
-  document.getElementById('stage').addEventListener('pointerdown', function () {
-    const c = document.getElementById('canvas')
-    if (c && c.focus) c.focus()
+  stageEl.addEventListener('pointerdown', function () {
+    if (canvasEl && canvasEl.focus) canvasEl.focus()
   })
+
+  layout()
+  syncEngine()
+  requestAnimationFrame(pump)
 </script>
 <script async src="SpaceCadetPinball.js"></script>
 </body>

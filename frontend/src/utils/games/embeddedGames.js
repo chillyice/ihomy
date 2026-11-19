@@ -22,4 +22,7 @@ export const EMBEDDED_GAMES = [
 export const findEmbeddedGame = (slug) => EMBEDDED_GAMES.find((g) => g.slug === slug) || null
 
 /** iframe 地址:只剩 space-cadet 这类整包静态游戏用,静态目录由 Nginx / dev server 直接托管 */
-export const embeddedGameSrc = (slug) => `/mini-games/${slug}/index.html`
+// 带 `?v=` 破缓存:这类页面没有内容哈希,而 Nginx 给静态文件长缓存,
+// 版本号不变的话改了外壳页面客户端也拿不到新的(同 /ruffle/ruffle.js 的口径)。
+const ASSET_VERSION = typeof __APP_VERSION__ === 'undefined' ? '' : __APP_VERSION__
+export const embeddedGameSrc = (slug) => `/mini-games/${slug}/index.html${ASSET_VERSION ? `?v=${ASSET_VERSION}` : ''}`

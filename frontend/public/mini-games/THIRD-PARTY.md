@@ -24,7 +24,13 @@ Emscripten 编译的 C++/wasm,没法用 Vue 重写。卡片元数据与站内路
 
 ## 本地改动记录(space-cadet)
 
-- `space-cadet/index.html`:重写外壳(去掉 Win95 假窗口与状态条),canvas 等比铺满、深色底;补触屏操作条(左/右挡板、发球、开新局)把合成按键事件投递到 SDL 注册的监听目标;引擎三件套 `SpaceCadetPinball.js` / `.wasm` / `.data` 原样未改。
+- `space-cadet/index.html`:重写外壳(去掉 Win95 假窗口与状态条),深色底;补触屏操作条(左/右挡板、发球、开新局)把合成按键事件投递到 SDL 注册的监听目标;引擎三件套 `SpaceCadetPinball.js` / `.wasm` / `.data` 原样未改。
+  - **主画面与记分板拆成两块**:引擎只往一张 canvas 上画整张机台(`table.bmp` 642×525,底部 467–524 共 58 行是记分带),wasm 没有分数接口、拿不到 DOM 级记分控件,所以拆分是像素级的——
+    - 给 canvas 固定的 642:525 比例(引擎铺满窗口,比例对上后画布坐标与位图坐标 1:1),`#field` 用 `overflow:hidden` 只露出上面 467 行,主画面零拷贝;
+    - 下方 `#hud` 每帧把底带 `drawImage` 过来(尺寸按可用宽算,`imageSmoothingEnabled=false` 保持点阵字清晰);
+    - 布局按可用空间反推:`fieldW = min(availW, (availH-gap)*642/525)`,`fieldH = fieldW*467/642`,`hudH = fieldW*58/642`;
+    - 捕获需要 `preserveDrawingBuffer:true`,在引擎脚本之前包一层 `HTMLCanvasElement.prototype.getContext` 补上(否则读到的整帧全黑);
+    - 兜底:引擎跑起来后探针发现底带一直全黑,就 `no-split` 退回整张机台,不至于只剩黑块。
   - 触屏合成按键**优先派发到 `document`**:该构建 SDL 的键盘监听实测挂在 document 上,`keyTargets` 里先注册的 window 收不到(事件不向下传),派发到 window 挡板不动。
   - 右挡板键码用 **X(88)**:该构建不认 `/`(191,按下无响应),`.`(190)与 X 同样有效,取与 Z 同排的 X;桌面文案同口径。
   - `.data`(2.18MB)是 Emscripten 文件包,内含 67 个原始素材:`PINBALL.DAT`(928KB,`PARTOUT(4.0)RESOURCE` 格式)、`table.bmp`、`PINBALL.MID`/`PINBALL2.MID`、60 个 `SOUND*.WAV`;解包脚本见下。

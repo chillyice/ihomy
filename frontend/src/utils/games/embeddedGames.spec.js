@@ -15,7 +15,8 @@ describe('embeddedGames', () => {
   })
 
   it('builds a same-origin static path instead of an external url', () => {
-    expect(embeddedGameSrc('space-cadet')).toBe('/mini-games/space-cadet/index.html')
+    // 末尾带不带 `?v=` 都算对:版本号由构建注入,测试环境里可能为空
+    expect(embeddedGameSrc('space-cadet')).toMatch(/^\/mini-games\/space-cadet\/index\.html(\?v=.+)?$/)
   })
 
   it('returns null for an unknown slug so a hand-typed route does not crash', () => {
