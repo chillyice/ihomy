@@ -2921,6 +2921,23 @@ html.dark .el-badge__content {
   flex: 1 1 auto;
   min-height: 0;
 }
+/* 对抗牌局(斗地主/够级/掼蛋/保皇共用 FightTable):手机横屏沉浸态牌桌毡面铺满整页——
+   外壳底色同化为桌毡渐变,中央牌桌自身底色让位(只留中央高光与内阴影),整页连成一块毡面;
+   手牌区文字换浅色(原先跟主题走,深色文字会压在绿毡上看不清) */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) {
+    --gs-bg: linear-gradient(160deg, #1f5c39, #123c26 62%, #0d2f1e);
+  }
+  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-table {
+    background: radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1), transparent 62%);
+  }
+  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-my-head {
+    color: rgba(226, 240, 228, 0.78);
+  }
+  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-my-name {
+    color: #f2fff2;
+  }
+}
 .fight-overlay {
   position: absolute;
   inset: 0;
