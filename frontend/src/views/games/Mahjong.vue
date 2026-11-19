@@ -91,8 +91,10 @@
         <template v-else>
           <!-- 平面牌桌(窗口不透视):对家在上 / 上家在左 / 下家在右 / 我在下;
                手牌、副露、牌河和操作各有独立位置,整块牌桌再按可用区等比缩放;
-               中央 = 四方牌河(弃牌朝向出牌人) + 东南西北风位 + 双骰 + 余牌数 -->
+               中央 = 四方牌河(弃牌朝向出牌人) + 东南西北风位(双骰落在正中);
+               余牌数不进牌桌,浮在整个画面的右上角 -->
           <div ref="stageEl" class="mj-stage">
+            <div v-if="phase === 'playing'" class="mj-wall-chip">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</div>
             <div ref="tableEl" class="mj-table" :style="{ '--mj-scale': tableScale, '--mj-w': tableW + 'px', '--mj-h': tableH + 'px' }">
               <!-- 对家(上):牌背横排 + 副露横排 -->
               <div v-if="topSeat" class="mj-edge mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
@@ -173,24 +175,25 @@
                       <TileFace :kind="kind" />
                     </span>
                   </div>
-                  <!-- 中央信息有独立格,不会压住任何一家牌河 -->
+                  <!-- 中央信息横排:规则 | 风位罗盘(双骰在正中) | 回合 -->
                   <div class="mj-hub">
+                    <span class="rules-chip">{{ $t(`games.mahjong.presets.${rulesLabel}`) }}</span>
                     <div class="hub-compass" aria-hidden="true">
                       <span class="compass-wind pos-top">{{ windOfRel(2) }}</span>
                       <span class="compass-wind pos-right">{{ windOfRel(1) }}</span>
                       <span class="compass-wind pos-bottom">{{ windOfRel(0) }}</span>
                       <span class="compass-wind pos-left">{{ windOfRel(3) }}</span>
+                      <div v-if="dice" class="hub-dice">
+                        <span class="die"
+                          ><i v-for="(p, i) in diePips(dice[0])" :key="'a' + i" class="die-pip" :style="pipStyle(p)"
+                        /></span>
+                        <span class="die"
+                          ><i v-for="(p, i) in diePips(dice[1])" :key="'b' + i" class="die-pip" :style="pipStyle(p)"
+                        /></span>
+                        <span class="die-sum">{{ dice[0] + dice[1] }}</span>
+                      </div>
                     </div>
-                    <div v-if="dice" class="hub-dice">
-                      <span class="die"><i v-for="(p, i) in diePips(dice[0])" :key="'a' + i" class="die-pip" :style="pipStyle(p)" /></span>
-                      <span class="die"><i v-for="(p, i) in diePips(dice[1])" :key="'b' + i" class="die-pip" :style="pipStyle(p)" /></span>
-                      <span class="die-sum">{{ dice[0] + dice[1] }}</span>
-                    </div>
-                    <div class="hub-meta">
-                      <span class="wall-count">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</span>
-                      <span class="rules-chip">{{ $t(`games.mahjong.presets.${rulesLabel}`) }}</span>
-                      <span class="turn-label" :title="turnLabel">{{ turnLabel }}</span>
-                    </div>
+                    <span class="turn-label" :title="turnLabel">{{ turnLabel }}</span>
                   </div>
                 </div>
               </div>
@@ -1796,16 +1799,13 @@ onBeforeUnmount(() => {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 6px 8px;
   padding: 12px;
-  border-radius: 22px;
+  border-radius: 0;
+  /* 纯绿桌布铺满整块牌桌:没有棕色包边、没有外投影、没有圆角,
+     牌桌的边界就是画面边界(设计画布宽高按游戏区宽高比算,天然盖满) */
   background:
     radial-gradient(ellipse at 50% 32%, rgba(255, 255, 255, 0.16) 0%, transparent 58%),
     linear-gradient(158deg, var(--mj-felt-a) 0%, var(--mj-felt-b) 100%);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 246, 224, 0.14),
-    inset 0 0 0 6px #8a5a30,
-    inset 0 0 0 9px #5a3a1f,
-    inset 0 0 46px rgba(0, 0, 0, 0.3),
-    0 12px 26px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 46px rgba(0, 0, 0, 0.28);
   color: #f4f4e9;
   --mj-felt-a: #3f7d5c;
   --mj-felt-b: #28553f;
@@ -2113,27 +2113,34 @@ html.dark .mj-table {
   outline-offset: -2px;
   background: #fff4d7;
 }
-/* 中央信息:风位罗盘 + 双骰 + 余牌/规则/回合 */
+/* 中央信息:横排一条 —— 规则 | 风位罗盘(双骰在正中) | 回合,
+   不再竖着摞成一小坨,把中间那条横向铺开 */
 .mj-hub {
   grid-area: mid;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 5px;
-  padding: 9px 14px;
+  justify-content: center;
+  gap: 12px;
+  padding: 7px 16px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.24);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   text-align: center;
   max-width: 100%;
 }
+/* 风位十字:东南西北落在四个角,双骰嵌在正中那一格里 */
 .hub-compass {
-  position: relative;
-  width: 62px;
-  height: 54px;
+  display: grid;
+  grid-template-areas:
+    '. n .'
+    'w c e'
+    '. s .';
+  align-items: center;
+  justify-items: center;
+  gap: 2px 8px;
 }
 .compass-wind {
-  position: absolute;
   font-size: 12px;
   font-weight: 800;
   color: #f7f3e3;
@@ -2141,26 +2148,19 @@ html.dark .mj-table {
   line-height: 1;
 }
 .compass-wind.pos-top {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  grid-area: n;
 }
 .compass-wind.pos-bottom {
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  grid-area: s;
 }
 .compass-wind.pos-left {
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  grid-area: w;
 }
 .compass-wind.pos-right {
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  grid-area: e;
 }
 .hub-dice {
+  grid-area: c;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -2192,17 +2192,22 @@ html.dark .mj-table {
   color: #efca83;
   font-variant-numeric: tabular-nums;
 }
-.hub-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  max-width: 100%;
-}
-.wall-count {
-  font-size: 11px;
-  color: #d7e7dd;
+/* 余牌数:不进牌桌,浮在整个画面的右上角(不受设计画布缩放影响) */
+.mj-wall-chip {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f7f2;
+  background: rgba(8, 26, 20, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .rules-chip {
   padding: 1px 8px;
@@ -2507,45 +2512,71 @@ html.dark .rules-chip {
   }
 }
 
+/* 本页整页就是一张绿桌布:外壳内边距只留安全区(沉浸态那条带 !important,这里同权压回),
+   窄屏档给 game-surface 的 8px 边也去掉;头部自己留一点内边距,按钮不贴着屏幕边。
+   「一起玩」房间局不走这套(房间条与左栏仍按外壳常规排)。 */
+.page.game-shell.mj-shell:not(.mj-room) {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
+}
+.page.game-shell.mj-shell:not(.mj-room) > .gs-body {
+  margin-inline: 0;
+}
+.page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
+  padding: 6px 8px 0;
+}
+
 /* ===== 手机横屏:整块游戏区就是一张麻将桌 =====
  * 矮屏横屏最缺的正是高度,而外壳默认会在左边留一栏放头部,白白从毯面身边切走 150~200px。
- * 单机局改成盘面独占整页,返回/游戏名/新游戏/规则压成一块玻璃条浮在桌面左上角
- * (左上角那块毯面本来就不摆牌)。
+ * 单机局改成盘面独占整页、绿桌布一直铺到画面边缘(内边距只留安全区,刘海与小白条不被盖住),
+ * 返回/游戏名/新游戏/规则压成贴毯面的一行浮在左上角(那块毯面本来就不摆牌)。
  * 「一起玩」房间条一出现就有六七个按钮,浮在桌面上必然压住上家的副露,所以房间局仍走
  * 外壳的两栏横屏档(左栏放头与房间条),只把牌桌按同一套设计画布铺满右栏。 */
 @media (orientation: landscape) and (max-height: 520px) {
+  /* 沉浸态那条 padding 带 !important(叠安全区),这里同样要 !important 才盖得回;
+     只留安全区 → 桌布贴边 */
   .page.game-shell.mj-shell:not(.mj-room) {
     position: relative;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     column-gap: 0;
     row-gap: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
   }
-  /* 浮层高度跟着内容走:桌面全被盘面占满,浮层只在左上角压住一小块 */
+  /* 头部一整行直接贴在毯面上:没有玻璃底、没有描边,只有一层暗投影把字从绿底上托起来 */
   .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
     position: absolute;
     top: 0;
     left: 0;
     z-index: var(--z-float);
-    max-width: min(72vw, 520px);
+    max-width: calc(100% - 12px);
     max-height: 100%;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 4px 6px 6px;
-    border-radius: 12px;
+    overflow: visible;
+    padding: 2px 4px;
+    border-radius: 0;
     color: #f6f2e4;
-    background: rgba(10, 32, 25, 0.5);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-      0 8px 18px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(10px) saturate(1.1);
+    background: none;
+    box-shadow: none;
   }
   .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-head) {
+    flex-wrap: nowrap;
     min-height: 0;
-    padding-bottom: 2px;
+    padding-bottom: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+  /* 外壳横屏档把「新游戏 + 规则」掰到第二行;这里空间够,拉回第一行 */
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-head .gs-end) {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: 4px;
+    justify-content: flex-start;
   }
   .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-title) {
     color: #f6f2e4;
+  }
+  /* 横屏这一行横向空间充裕(整条才 200 出头),返回与规则恢复文字,「返回 · 麻将 · 新游戏 · 规则」读成一条 */
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-back-label),
+  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rules-label) {
+    display: inline;
   }
   /* 盘面独占整块游戏区(本页没有计分栏/页脚,一行一列就够) */
   .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-body) {
