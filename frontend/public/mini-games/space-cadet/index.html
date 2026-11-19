@@ -113,6 +113,8 @@
     #pad { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
     #pad .tk-flip { flex: 1 1 0; }
     #pad .tk-mid { flex: 0 0 92px; }
+    /* 退回整张机台时记分板不显示,靠自动外边距把机台垫在中间、手柄仍贴底 */
+    body.no-split #field { margin-block: auto; }
   }
   @media (pointer: coarse) and (orientation: landscape) {
     #rig { justify-content: center; }
@@ -353,7 +355,10 @@
   const padEl = document.getElementById('pad')
   const STAGE_PAD = 16 // 与 #stage 的 padding 8px 一致(左右/上下各 8)
   const RIG_GAP = 6 // 与 #rig 的 gap 一致
-  let splitOn = true // 取不到画面时置 false,退回整张机台
+  // 裁切线(BAR_TOP)还没按引擎实际渲染定界,先关掉拆分:整张机台照原样显示。
+  // 等看图把 BAR_TOP 定准,把这里改回 true 即可(拆分/拷贝/兜底代码都留着)。
+  const SPLIT_ENABLED = false
+  let splitOn = SPLIT_ENABLED
   let fieldW = 0
   let hudH = 0
 
@@ -683,6 +688,7 @@
     if (canvasEl && canvasEl.focus) canvasEl.focus()
   })
 
+  if (!SPLIT_ENABLED) document.body.classList.add('no-split')
   layout()
   syncEngine()
   requestAnimationFrame(pump)
