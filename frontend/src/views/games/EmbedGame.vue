@@ -1,7 +1,9 @@
-<!-- 开源小游戏:整包静态页放在 public/mini-games/<slug>/,站内 iframe 直跑(不引 npm 依赖)
-     触控守卫沿用 .game-surface;全屏口径与网页游戏一致(浏览器全屏 + 站内沉浸浮层) -->
+<!-- 开源小游戏分发器:象棋/黑白棋/消消乐/泡泡龙已本地化为 Vue 组件(embedded/),
+     三维弹球/小恐龙继续整包 iframe 直跑(public/mini-games/,引擎与贴图不改)。
+     iframe 壳保留触控守卫与站内沉浸浮层;全屏由外壳统一提供 -->
 <template>
-  <GameShell ref="shellEl" class="eg-shell" :title="title" body-align="stretch" @back="router.push('/games')">
+  <component :is="localGame" v-if="localGame" />
+  <GameShell v-else ref="shellEl" class="eg-shell" :title="title" body-align="stretch" @back="router.push('/games')">
     <template #head>
       <el-button size="small" round :title="$t('games.web.reload')" :aria-label="$t('games.web.reload')" @click="reloadFrame">
         <el-icon><Refresh /></el-icon>
@@ -65,6 +67,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Close, Expand, Fold, Refresh, TopRight } from '@element-plus/icons-vue'
+import { defineAsyncComponent } from 'vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { findEmbeddedGame, embeddedGameSrc } from '@/utils/games/embeddedGames'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -93,6 +96,12 @@ const onFrameLoad = () => {
 const game = computed(() => findEmbeddedGame(String(route.params.slug || '')))
 const title = computed(() => (game.value ? t(game.value.titleKey) : t('games.title')))
 const src = computed(() => (game.value ? embeddedGameSrc(game.value.slug) : ''))
+
+// 已本地化的开源游戏:直接渲染 Vue 组件(不再 iframe),名单随 P9/P10 迁移扩大
+const LOCAL_EMBEDDED = {
+  xiangqi: defineAsyncComponent(() => import('./embedded/XiangqiGame.vue')),
+}
+const localGame = computed(() => LOCAL_EMBEDDED[route.params.slug] || null)
 
 const reloadFrame = () => {
   frameLoaded.value = false
