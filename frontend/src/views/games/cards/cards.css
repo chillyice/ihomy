@@ -298,6 +298,10 @@ body.card-dragging {
 body.card-dragging .sol-cardface {
   cursor: grabbing;
 }
+/* 拖动中的牌在原位隐藏:ghost 已接管显示;visibility 不改布局(叠牌步进/牌堆高度不变),elementFromPoint 也命不中它 */
+.sol-cardface.is-dragged {
+  visibility: hidden;
+}
 
 /* 扑克牌正面:整张牌面由素材图铺满;缺图时才走下面的点数图案兜底 */
 .pc-face {

@@ -80,7 +80,7 @@
             v-for="(card, ci) in pile"
             :key="card.id"
             class="sol-cardface"
-            :class="[cardClass(card), { selected: isSelected(pi, ci), 'hint-source': isCardHint(pi, ci) }]"
+            :class="[cardClass(card), { selected: isSelected(pi, ci), 'hint-source': isCardHint(pi, ci), 'is-dragged': isDragged(card) }]"
             :style="ci ? { marginTop: margins[pi][ci - 1] } : null"
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
@@ -396,6 +396,8 @@ const { drag, startDrag, shouldIgnoreClick, cancelDrag } = useCardDrag({
     commit(move(game.value, from, { type: 'tableau', pile: to.pile }))
   },
 })
+// 拖动中的牌在原位隐藏(显示已由跟随指针的幽灵接管),避免同张牌出现在两处;sourceCards 返回的就是牌桌上的对象,可按引用比对
+const isDragged = (card) => drag.active && drag.cards.includes(card)
 
 // ---------- 点击与双击 ----------
 let lastTapKey = ''
