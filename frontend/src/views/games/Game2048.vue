@@ -33,13 +33,12 @@
       <el-button
         v-if="!matchId && !play.active"
         size="small"
-        class="gs-icon-btn"
         :disabled="!history.length"
         :title="$t('games.g2048.undo')"
         :aria-label="$t('games.g2048.undo')"
         @click="undo"
       >
-        <el-icon><RefreshLeft /></el-icon>
+        {{ $t('games.g2048.undo') }}
       </el-button>
     </template>
 
@@ -112,13 +111,12 @@
           <el-button
             v-if="!matchId && !play.active"
             size="small"
-            class="gs-icon-btn bf-undo"
             :disabled="!history.length"
             :title="$t('games.g2048.undo')"
             :aria-label="$t('games.g2048.undo')"
             @click="undo"
           >
-            <el-icon><RefreshLeft /></el-icon>
+            {{ $t('games.g2048.undo') }}
           </el-button>
         </div>
       </div>
@@ -171,7 +169,6 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi, matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
