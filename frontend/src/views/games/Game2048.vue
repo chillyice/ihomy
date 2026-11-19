@@ -639,6 +639,11 @@ onBeforeUnmount(() => {
   .bf-stage {
     width: 100%;
   }
+  /* 外壳横屏档默认把居中棋盘改成贴左栏,省得左栏与棋盘之间甩出一大片白;
+     2048 棋盘按高度定边长,右侧同样会甩白,这里恢复水平居中(纵向仍按 center 排) */
+  .page.game-shell.bf-shell :deep(.gs-body.is-center) {
+    align-items: center;
+  }
 }
 .bf-stage {
   position: relative;

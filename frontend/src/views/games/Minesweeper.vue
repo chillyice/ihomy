@@ -639,6 +639,11 @@ onBeforeUnmount(() => {
     min-width: 0;
     max-height: 100%;
   }
+  /* 外壳横屏档默认把居中棋盘改成贴左栏;扫雷格子边长按高度算,
+     盘面窄于游戏区时右侧会甩白,这里恢复水平居中(纵向仍按 center 排) */
+  .page.game-shell.ms-shell :deep(.gs-body.is-center) {
+    align-items: center;
+  }
 }
 
 .ms-level {
