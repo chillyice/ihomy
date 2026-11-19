@@ -26,19 +26,6 @@
         ><b>{{ timeText }}</b>
       </span>
     </template>
-    <!-- 撤销:棋盘右侧放不下,手机横屏时落在外壳左栏第三行 -->
-    <template #actions>
-      <el-button
-        size="small"
-        class="gs-icon-btn"
-        :disabled="!history.length"
-        :title="$t('games.sudoku.undo')"
-        :aria-label="$t('games.sudoku.undo')"
-        @click="undo"
-      >
-        <el-icon><RefreshLeft /></el-icon>
-      </el-button>
-    </template>
     <template #rules="{ page }">
       <template v-if="page === 0">
         <p>{{ $t('games.sudoku.tip') }}</p>
@@ -137,7 +124,7 @@
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
            冲突直接画在格子上,提示次数只在通关结果里报。
            撤销放在这条的右端(棋盘右上角),新游戏在头部规则键左侧。
-           手机横屏时这条整条隐去,改由外壳中栏(用时)与左栏第三行(撤销)里的同一份控件顶替 -->
+           手机横屏时这条整条隐去:用时进外壳中栏,撤销挪进右侧工具列(保存/加载旁边) -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
@@ -283,6 +270,11 @@
             {{ $t('games.sudoku.quickFill') }}
           </button>
           <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
+          <!-- 撤销的第二摆放:手机横屏时棋子右上角那条(用时 + 撤销)整条隐去,
+               撤销键挪到这里,排在保存/加载旁边 -->
+          <button type="button" class="sd-tool sd-tool-undo" :disabled="!history.length" @click="undo">
+            {{ $t('games.sudoku.undo') }}
+          </button>
           <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
             {{ $t('games.sudoku.snapshot.save') }}
           </button>
@@ -290,10 +282,10 @@
             type="button"
             class="sd-tool"
             :disabled="!snapAt || play.active || won"
-            :title="snapAt ? $t('games.sudoku.snapshot.revertTip', { time: snapTime }) : $t('games.sudoku.snapshot.none')"
+            :title="snapAt ? $t('games.sudoku.snapshot.loadTip', { time: snapTime }) : $t('games.sudoku.snapshot.none')"
             @click="restoreSnapshot"
           >
-            {{ $t('games.sudoku.snapshot.revert') }}
+            {{ $t('games.sudoku.snapshot.load') }}
           </button>
           <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
         </div>
@@ -997,7 +989,7 @@ const scheduleSave = () => {
   }, 800)
 }
 
-// ---------- 快照(一键存当前盘面,走投无路时一键回退) ----------
+// ---------- 快照(一键存当前盘面,走投无路时一键加载回来) ----------
 // 只留一份,且只对当前这道题有效:换题/换变体即作废,避免回退到别的题。
 const snapFits = (saved) =>
   Array.isArray(saved.puzzle) && puzzle.value.length === CELLS && saved.puzzle.join(',') === puzzle.value.join(',')
@@ -1050,11 +1042,11 @@ const restoreSnapshot = () => {
     ElMessage.warning(t('games.sudoku.snapshot.invalid'))
     return
   }
-  // 不做二次确认:回退本身进撤销栈,按错了「撤销」就能找回刚才的盘面
+  // 不做二次确认:加载本身进撤销栈,按错了「撤销」就能找回刚才的盘面
   const before = { board: board.value.slice(), notes: notes.value.slice() }
   applySavedState(saved)
   history.value = [before]
-  ElMessage.success(t('games.sudoku.snapshot.restored'))
+  ElMessage.success(t('games.sudoku.snapshot.loaded'))
 }
 
 /** 把一份校验过的进度铺到棋盘上(自动恢复与手动载入共用) */
@@ -1580,22 +1572,24 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   margin-left: auto;
 }
-/* 外壳里的用时芯片与撤销键是同一份控件的第二摆放:竖屏与平板整行不占位(用棋盘上方那条 .sd-meta),
-   只在手机横屏时撑出来 —— 芯片进中栏(紧贴棋盘纵向排),撤销落左栏第三行,棋盘上方那条同时隐去 */
-.sd-shell :deep(.gs-stats),
-.sd-shell :deep(.gs-controls) {
+/* 外壳里的用时芯片是棋盘上方那条(.sd-meta)的第二摆放:竖屏与平板整行不占位,
+   只在手机横屏时撑出来 —— 芯片进外壳中栏紧贴棋盘,同时 .sd-meta 整条隐去,
+   撤销键也从那条挪进右侧工具列(.sd-tool-undo) */
+.sd-shell :deep(.gs-stats) {
+  display: none;
+}
+.sd-tool-undo {
   display: none;
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  .sd-shell :deep(.gs-stats),
-  .sd-shell :deep(.gs-controls) {
+  .sd-shell :deep(.gs-stats) {
     display: flex;
   }
   .sd-meta {
     display: none;
   }
-  .sd-shell :deep(.gs-actions) {
-    justify-content: flex-start;
+  .sd-tool-undo {
+    display: block;
   }
 }
 .sd-panel {
