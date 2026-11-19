@@ -31,6 +31,7 @@
     <template #rules>
       <p>{{ $t('games.embedded.match3.tip') }}</p>
       <p>{{ $t('games.embedded.match3.aim') }}</p>
+      <p>{{ $t('games.embedded.match3.autoShuffle') }}</p>
     </template>
 
     <!-- 记分:手机横屏进外壳左栏底边(芯片一行,样式与 2048 的得分/最高分同一套 .gh-chip);
@@ -52,8 +53,8 @@
       </el-button>
     </template>
 
-    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏这一条让位,
-         棋盘独占游戏区、水平居中,状态行浮在游戏区底边 -->
+    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏这一条整条让位,
+         棋盘独占游戏区、水平居中 -->
     <div class="m3-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="m3-meta">
         <div class="m3-stats">
@@ -70,7 +71,6 @@
             {{ $t('games.embedded.match3.shuffle') }}
           </el-button>
         </div>
-        <p class="m3-notice">{{ noticeText }}</p>
       </div>
 
       <div class="m3-board-wrap">
@@ -135,7 +135,6 @@ const targetNum = ref(0)
 const bestNum = ref(0)
 const comboText = ref('-')
 const levelLabel = ref('')
-const noticeText = ref('')
 /** 引擎 status 的映像:开始遮罩显隐只能追踪 ref */
 const statusRef = ref('ready')
 const resultTitle = ref('')
@@ -201,8 +200,6 @@ var pendingClear = null // cells playing the 'clear' animation
 var revertCells = null // two cells playing the 'bad' (revert) animation
 var hintCells = null // two cells highlighted by the Hint button
 var hintTimer = 0 // ms left on the hint highlight
-var noticeKey = null // i18n key for the status line
-var noticeVars = null // interpolation values for the status line
 var endWin = false // result of the finished game
 var cascadeDepth = 0 // safety cap on refill->clear loops
 var dragFrom = null // [r, c] where a drag started
@@ -760,7 +757,6 @@ function updateHud() {
   bestNum.value = best
   comboText.value = combo > 1 ? 'x' + combo : '-'
   levelLabel.value = tt('diff_' + diffKey.value)
-  noticeText.value = noticeKey ? tt(noticeKey, noticeVars) : ''
   statusRef.value = status
 
   if (status === 'over') {
@@ -826,8 +822,6 @@ function setupBoard(seed) {
   if (boardEl.value && boardEl.value.classList) boardEl.value.classList.remove('shake')
   loadBest()
   status = 'ready'
-  noticeKey = 'readyHint'
-  noticeVars = null
   resultVisible.value = false
   updateHud()
   render()
@@ -841,8 +835,6 @@ function startGame() {
     return
   }
   status = 'playing'
-  noticeKey = 'play'
-  noticeVars = null
   resultVisible.value = false
   updateHud()
   render()
@@ -854,8 +846,6 @@ function newGame(opts) {
   if (opts.difficulty && DIFF[opts.difficulty]) diffKey.value = opts.difficulty
   setupBoard(opts.seed)
   status = 'playing'
-  noticeKey = 'play'
-  noticeVars = null
   resultVisible.value = false
   updateHud()
   render()
@@ -983,8 +973,6 @@ function attemptSwap(r1, c1, r2, c2) {
     moves--
     combo = 0
     cascadeDepth = 0
-    noticeKey = 'play'
-    noticeVars = null
     /* The data layer has already swapped the two colours, so each tile must
      * START on its partner's square and slide home — that reads as the two gems
      * crossing over rather than blinking to a new colour. */
@@ -1007,8 +995,6 @@ function attemptSwap(r1, c1, r2, c2) {
     [r1, c1],
     [r2, c2],
   ]
-  noticeKey = 'noMatch'
-  noticeVars = null
   phase = 'reverting'
   phaseElapsed = 0
   phaseDuration = REVERT_MS
@@ -1135,8 +1121,6 @@ function onShuffleDone() {
   clearFx()
   phase = 'idle'
   phaseElapsed = 0
-  noticeKey = 'reshuffled'
-  noticeVars = null
   if (!hasMove(grid)) grid = buildPlayableBoard(config.colors)
   updateHud()
   render()
@@ -1177,8 +1161,6 @@ function startShuffle() {
   phase = 'shuffling'
   phaseElapsed = 0
   phaseDuration = SHUFFLE_MS
-  noticeKey = 'shuffling'
-  noticeVars = null
   updateHud()
   render()
 }
@@ -1417,8 +1399,9 @@ html.dark .m3-shell {
 
 /* 记分 HUD + 操作贴棋盘:竖屏自上而下、宽度同棋盘 */
 .m3-layout {
-  /* 方形棋盘:三限 = 容器宽 / 上限 560 / 竖屏纵向预算(两行芯片 + 按钮行 + 提示行 + 间隙) */
-  --m3-board-w: min(100%, 560px, calc(100cqh - 158px));
+  /* 方形棋盘:三限 = 容器宽 / 竖屏纵向预算(两行芯片 + 按钮行 + 间隙,留余量)。
+     不设像素上限:棋盘直接铺满游戏区,宝石与落点跟着变大 */
+  --m3-board-w: min(100%, calc(100cqh - 158px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1455,15 +1438,6 @@ html.dark .m3-shell {
 /* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
 .m3-actions .el-button + .el-button {
   margin-left: 0;
-}
-.m3-notice {
-  width: 100%;
-  min-height: 18px;
-  margin: 0;
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary, #6b7592);
 }
 
 /* Board */
@@ -1970,26 +1944,20 @@ html.dark .m3-board :deep(.cell.c6) {
 }
 
 /* 手机横屏:记分搬进外壳左栏底边、提示/重排进左栏控件行,记分条整条让位;
-   棋盘独占游戏区并水平居中(棋盘尺寸只用 cqw/cqh 推,整块没有左右偏移量),
-   状态行(「没有可消除的走法…」)留在棋盘下方一条,不压棋盘 */
+   棋盘独占游戏区并水平居中(棋盘尺寸只用 cqw/cqh 推,整块没有左右偏移量) */
 @media (orientation: landscape) and (max-height: 520px) {
   .m3-shell :deep(.gs-stats),
   .m3-shell :deep(.gs-controls) {
     display: flex;
   }
   .m3-layout {
-    /* 方形棋盘:三限 = 上限 560 / 游戏区高(扣 16 边距 + 状态行 18 + 间距) / 游戏区宽 */
-    --m3-board-w: min(560px, calc(100cqh - 42px), calc(100cqw - 24px));
-    gap: 6px;
+    /* 方形棋盘:三限 = 游戏区高(上下各让 8) / 游戏区宽 / 容器宽(不设像素上限) */
+    --m3-board-w: min(calc(100cqh - 16px), calc(100cqw - 24px));
     justify-content: center;
   }
-  .m3-stats,
-  .m3-actions {
-    display: none;
-  }
-  /* 只留状态行:排到棋盘下面(DOM 里记分条在棋盘之前,竖屏要的就是这个顺序) */
+  /* 记分条与操作都已搬进外壳,棋盘上方这条整条不占位 */
   .m3-meta {
-    order: 1;
+    display: none;
   }
 }
 </style>

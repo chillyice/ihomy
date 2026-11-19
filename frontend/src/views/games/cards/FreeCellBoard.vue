@@ -167,7 +167,9 @@ import {
   cloneState,
   deal,
   findHint,
+  isStuck,
   isValidState,
+  isWon as isWonState,
   move,
   sourceCards,
 } from '@/utils/games/freecell'
@@ -319,6 +321,14 @@ const loadState = () => {
     if (raw.game.status !== STATUS.PLAYING) return false
     game.value = raw.game
     elapsed.value = raw.elapsed
+    // 旧存档可能已经无路可走但状态还停在 PLAYING:读档时重新结算一次
+    if (isWonState(game.value)) {
+      game.value = { ...game.value, status: STATUS.WON }
+      clearState()
+    } else if (isStuck(game.value)) {
+      game.value = { ...game.value, status: STATUS.LOST }
+      clearState()
+    }
     return true
   } catch (e) {
     return false
@@ -541,7 +551,8 @@ onMounted(async () => {
     await play.load()
     startNew()
   } else if (!loadState()) startNew()
-  else startTimer()
+  else if (game.value.status === STATUS.PLAYING) startTimer()
+  else if (game.value.status === STATUS.LOST) finishLose()
   measureFelt()
   setTimeout(measureFelt, 320)
 })

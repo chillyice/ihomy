@@ -951,10 +951,11 @@ onBeforeUnmount(() => {
   padding: 14px clamp(10px, 2vw, 22px) 18px;
   --ludo-paper: #f8f0dd;
   --ludo-cell-line: rgba(58, 46, 34, 0.07);
-  /* 棋盘 1:1 恒定方形:宽取「撑满卡片」与「视口高扣除顶栏页脚后折算」较小者;
-     230px ≈ 顶栏 + 页脚 + 页面/卡片内边距 + 组间距 + 页底留白(方形盘比 16:10 桌多扣);
-     「一起玩」横幅实测高度走 --room-bar-h */
-  --ludo-board-max: min(620px, calc(100cqh - 150px - var(--room-bar-h, 0px)));
+  /* 棋盘 1:1 恒定方形:宽取「撑满卡片」与「游戏区高扣卡片上下内边距」较小者。
+     游戏区是外壳的 .gs-body(container-type:size),100cqh 就是游戏区实际高——
+     房间横幅在信息栏里,本来就不在这块高度内,不需要再扣;
+     也不设像素上限:棋盘直接铺满整页,棋格与点选热区跟着变大,看得清也点得准 */
+  --ludo-board-max: calc(100cqh - 32px);
 }
 
 html.dark .ludo-card {
@@ -1514,10 +1515,10 @@ html.dark .ludo-card {
     align-items: stretch;
   }
 
-  /* 纵向堆叠:棋盘再扣侧栏(状态+骰子+玩家压缩态实测约 308px)与顶栏页脚约 475px,
-     横幅走 --room-bar-h;堆叠态侧栏全宽展开,不封顶 */
+  /* 纵向堆叠:棋盘扣卡片内边距与侧栏(状态 + 骰子 + 玩家 + 规则)实测高度,
+     留一点余量给卡片间距;同样不设像素上限 */
   .ludo-card {
-    --ludo-board-max: min(620px, calc(100cqh - 395px - var(--room-bar-h, 0px)));
+    --ludo-board-max: calc(100cqh - 396px);
   }
 
   .ludo-side {
@@ -1573,15 +1574,15 @@ html.dark .ludo-card {
   }
 }
 
-/* 手机沉浸态:页头/底栏/游戏工具栏都不在布局里了,棋盘按真实可用高度放大 */
+/* 手机沉浸态:页头/底栏/游戏工具栏都不在布局里了,棋盘按真实可用高度放大(同样不封顶) */
 :global(html.game-mobile-immersive) .ludo-card {
-  --ludo-board-max: min(620px, calc(100cqh - 16px - var(--room-bar-h, 0px)));
+  --ludo-board-max: calc(100cqh - 32px);
 }
 
 @media (max-width: 860px) and (orientation: portrait) {
   :global(html.game-mobile-immersive) .ludo-card {
     /* 竖屏堆叠:只扣卡片内边距 + 侧栏(状态/骰子/玩家/规则)实测高度 */
-    --ludo-board-max: min(620px, calc(100cqh - 340px - var(--room-bar-h, 0px)));
+    --ludo-board-max: calc(100cqh - 396px);
   }
 }
 </style>

@@ -195,7 +195,9 @@ import {
   deal,
   drawStock,
   findHint,
+  isStuck,
   isValidState,
+  isWon as isWonState,
   move,
   sourceCards,
 } from '@/utils/games/solitaire'
@@ -349,6 +351,14 @@ const loadState = () => {
     game.value = raw.game
     elapsed.value = raw.elapsed
     drawCount.value = raw.game.drawCount
+    // 旧存档可能停在「牌堆还没翻完但已经走不动」的死局:读档时按当前口径重新结算
+    if (isWonState(game.value)) {
+      game.value = { ...game.value, status: STATUS.WON }
+      clearState()
+    } else if (isStuck(game.value)) {
+      game.value = { ...game.value, status: STATUS.LOST }
+      clearState()
+    }
     return true
   } catch (e) {
     return false
@@ -621,7 +631,8 @@ onMounted(async () => {
       best.value = game.value.score
       saveBest()
     }
-    startTimer()
+    if (game.value.status === STATUS.PLAYING) startTimer()
+    else if (game.value.status === STATUS.LOST) finishLose()
   }
   // 首帧量一次(父级固定高度可能晚一帧才生效),再补量一次兜底
   measureFelt()
