@@ -1139,6 +1139,15 @@ html.game-mobile-immersive .mobile-sub-content .page.game-shell {
     calc(var(--gs-safe-b, env(safe-area-inset-bottom, 0px)) + var(--gs-pad-b, var(--gs-pad)))
     calc(env(safe-area-inset-left, 0px) + var(--gs-pad)) !important;
 }
+/* 手机横屏沉浸态:游戏里系统状态栏已隐藏,注入的安全区顶随之变 0,外壳头行只剩 12px 顶距——
+   返回键落在系统「顶缘下拉手势区」里,首次触点被手势区吃掉,表现就是返回键按不动。
+   原生壳(html.app-native)下把整壳压到手势区之外(约一个状态栏高),max() 兜住
+   状态栏可见的机型(那时 --safe-area-inset-top 本来就不小于手势区);网页端无手势区不压 */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.app-native.game-mobile-immersive .mobile-sub-content .page.game-shell {
+    padding-top: calc(max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), 30px) + var(--gs-pad)) !important;
+  }
+}
 html.game-mobile-immersive .mobile-sub-content .page.game-page-readable {
   overflow: hidden;
 }

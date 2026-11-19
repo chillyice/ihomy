@@ -22,6 +22,10 @@ import('qweather-icons/font/qweather-icons.css')
 
 initTheme()
 
+// 原生壳标识:安卓/iOS 有系统手势区/状态栏,网页端没有——
+// 安全区兜底规则(如游戏沉浸态顶缘手势区避让)按这个类精准限定,不误伤浏览器/PWA
+if (isNativeApp()) document.documentElement.classList.add('app-native')
+
 // 壳内令牌在 Keystore,读取是异步的:必须在挂载前完成,否则首帧会以游客态渲染
 // (首页会先拉一批游客数据、再突变登录态)。Web 端直接跳过。
 async function loadBootTokens() {
