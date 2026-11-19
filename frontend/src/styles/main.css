@@ -982,6 +982,13 @@ html.game-shell .mobile-game-chrome {
   .gs-body {
     grid-area: body;
   }
+  /* 游戏区内容贴中栏:居中的棋盘(2048/扫雷/象棋这类定尺寸棋盘)会在中栏与棋盘之间
+     留出一条 100px 上下的白带,看着像中栏被甩到了左边。横屏只把横向对齐改靠左,
+     纵向仍按页面原本的 center/start 排。is-stretch 的页面(纸牌、数独)本来满宽,不动 */
+  .page.game-shell > .gs-body.is-center,
+  .page.game-shell > .gs-body.is-start {
+    align-items: flex-start;
+  }
   .gs-footer {
     grid-area: footer;
   }
