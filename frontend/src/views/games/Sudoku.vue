@@ -245,11 +245,6 @@
             {{ $t('games.sudoku.quickFill') }}
           </button>
           <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
-          <!-- 撤销的第二摆放:手机横屏时棋子右上角那条(用时 + 撤销)整条隐去,
-               撤销键挪到这里,排在保存/加载旁边 -->
-          <button type="button" class="sd-tool sd-tool-undo" :disabled="!history.length" @click="undo">
-            {{ $t('games.sudoku.undo') }}
-          </button>
           <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
             {{ $t('games.sudoku.snapshot.save') }}
           </button>
@@ -261,6 +256,11 @@
             @click="restoreSnapshot"
           >
             {{ $t('games.sudoku.snapshot.load') }}
+          </button>
+          <!-- 撤销的文字键:手机横屏(棋子右上角那条整条隐去)与手机竖屏(右上角图标撤销隐去)时进这行,
+               位置固定在加载右侧、提示左侧;桌面/平板仍用棋盘右上角的图标撤销,这一颗隐藏 -->
+          <button type="button" class="sd-tool sd-tool-undo" :disabled="!history.length" @click="undo">
+            {{ $t('games.sudoku.undo') }}
           </button>
           <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
         </div>
@@ -2333,6 +2333,14 @@ html.dark .sd-cell.conflict {
 
 /* 窄窗(手机竖):数字盘与工具键压一档,棋盘仍是通栏最大尺寸 */
 @container (max-width: 549px) {
+  /* 手机竖屏:撤销变文字键进工具行(加载右侧、提示左侧),棋盘右上角的图标撤销隐去;
+     用时条因此只剩一颗芯片,按单行算高 */
+  .sd-tool-undo {
+    display: block;
+  }
+  .sd-meta-actions {
+    display: none;
+  }
   .sd-tool {
     padding: 6px 11px;
     font-size: 12px;
