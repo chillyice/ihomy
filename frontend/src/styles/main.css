@@ -776,6 +776,55 @@ html.theme-warm .page.game-shell {
   align-items: center;
 }
 
+/* --- 深色游戏底(.gs-on-dark):页面把 --gs-bg 换成深绿/深蓝后,浅色主题仍按「浅底深字」
+ * 给字色——标题、返回、选择框、复选框落在深底上几乎看不见,次级按钮还像贴了一张浅米纸。
+ * 主题那两条按钮规则(光尘硬编码浅米底、暖居走 token,都带 !important)在这里让位,
+ * 统一成「白玻璃 + 白字」,禁用档退回低透明度。
+ * 只罩头部、控件行、数据栏这几个容器:规则弹窗挂在 .gs-rail 下、全屏时不 teleport,
+ * 改在容器上才不会把浅底弹窗里的字一起刷白;游戏区里自绘的 HUD 条各自挂
+ * .gs-on-dark-surface 拿同一套口径。 */
+.page.game-shell.gs-on-dark :is(.gs-head, .gs-controls, .gs-stats),
+.page.game-shell.gs-on-dark .gs-on-dark-surface {
+  --color-line: rgba(255, 255, 255, 0.14);
+  --color-card-2: rgba(255, 255, 255, 0.24);
+  --color-border: rgba(255, 255, 255, 0.24);
+  --color-text: #fff;
+  --color-text-secondary: rgba(255, 255, 255, 0.82);
+  --color-text-tertiary: rgba(255, 255, 255, 0.45);
+}
+.page.game-shell.gs-on-dark .gs-title {
+  color: #fff;
+}
+/* 复选框标签吃的是元素上解析好的 --el-checkbox-text-color,容器 token 覆盖接不到 */
+.page.game-shell.gs-on-dark :is(.gs-head, .gs-controls) .el-checkbox {
+  --el-checkbox-text-color: #fff;
+  --el-checkbox-checked-text-color: #fff;
+}
+/* 次级按钮(返回/全屏/宽屏/规则/新游戏/撤销):须压过主题那两条带 !important 的规则 */
+.page.game-shell.gs-on-dark
+  :is(.gs-head, .gs-controls)
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text),
+.page.game-shell.gs-on-dark .gs-on-dark-surface .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+.page.game-shell.gs-on-dark
+  :is(.gs-head, .gs-controls)
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover,
+.page.game-shell.gs-on-dark
+  .gs-on-dark-surface
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+.page.game-shell.gs-on-dark :is(.gs-head, .gs-controls) .el-button.is-disabled,
+.page.game-shell.gs-on-dark .gs-on-dark-surface .el-button.is-disabled {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
 /* --- 规则弹窗(规则不再常驻/折叠在页面里:模态框放得下长规则,还能分页) --- */
 .gs-rules-tabs {
   display: flex;

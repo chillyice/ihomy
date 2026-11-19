@@ -3,7 +3,13 @@
      逐字保留原实现(仍是命令式 canvas 渲染 + requestAnimationFrame 循环),本组件只换外壳、i18n 与 DOM 绑定。
      规范见 docs/UI设计提示词.md §43;配色取自原版深蓝面板,收在 --bb-* 令牌里 -->
 <template>
-  <GameShell ref="shellEl" class="bb-shell" :title="$t('games.embedded.bubble.title')" body-align="center" @back="router.push('/games')">
+  <GameShell
+    ref="shellEl"
+    class="bb-shell gs-on-dark"
+    :title="$t('games.embedded.bubble.title')"
+    body-align="center"
+    @back="router.push('/games')"
+  >
     <!-- 难度跟游戏名走(和象棋/黑白棋同一处),开局进行中锁定 -->
     <template #titleExtra>
       <el-select v-model="diffKey" class="bb-diff" :teleported="!isFullscreen" :disabled="diffLocked" @change="onDiffChange">
@@ -20,7 +26,7 @@
 
     <!-- 计分芯片 + 操作贴画布:与画布同宽排在画布上方;手机横屏收成画布左侧一列 -->
     <div class="bb-layout" @contextmenu.prevent @dblclick.prevent>
-      <div class="bb-meta">
+      <div class="bb-meta gs-on-dark-surface">
         <div class="bb-actions">
           <el-button size="small" round :disabled="newDisabled" @click="restart">
             {{ $t('games.embedded.bubble.newGame') }}
@@ -731,10 +737,7 @@ onBeforeUnmount(() => {
 html.dark .bb-shell {
   --gs-bg: radial-gradient(120% 120% at 50% 0%, #131834 0%, #070915 60%);
 }
-/* 深底上的标题要走浅色(外壳标题默认沿用页面文字色,浅色主题下会看不出) */
-.bb-shell :deep(.gs-title) {
-  color: var(--bb-ink);
-}
+/* 深底上的标题/头部按钮统一交给全局 .gs-on-dark(见 main.css 的「深色游戏底」段) */
 .bb-diff {
   width: 88px;
 }

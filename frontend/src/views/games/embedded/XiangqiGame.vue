@@ -5,7 +5,7 @@
 <template>
   <GameShell
     ref="shellEl"
-    class="xq-shell"
+    class="xq-shell gs-on-dark"
     :title="$t('games.embedded.xiangqi.title')"
     body-align="center"
     new-game
@@ -43,7 +43,7 @@
 
     <!-- 状态 + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏收成棋盘左侧一列 -->
     <div class="xq-layout" @contextmenu.prevent @dblclick.prevent>
-      <div class="xq-meta">
+      <div class="xq-meta gs-on-dark-surface">
         <span class="xq-status">{{ statusText }}</span>
         <div class="xq-actions">
           <el-button size="small" round :disabled="aiThinking" @click="undoMove">
@@ -1054,9 +1054,7 @@ html.dark .xq-shell {
   align-items: center;
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-text-primary, #444);
-}
-html.dark .xq-status {
+  /* 整页底是深绿渐变(深浅主题同一块),状态字走浅色一档,别跟主题文字色走 */
   color: #ffe9a8;
 }
 /* 按钮靠这条的右端;横屏时挪到棋盘左上 */

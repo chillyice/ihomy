@@ -4,7 +4,7 @@
 <template>
   <GameShell
     ref="shellEl"
-    class="rv-shell"
+    class="rv-shell gs-on-dark"
     :title="$t('games.embedded.reversi.title')"
     body-align="center"
     new-game
@@ -62,7 +62,7 @@
 
     <!-- 记分 HUD 贴棋盘:竖屏/桌面与棋盘同宽排在棋盘上方,手机横屏整条让位给外壳左栏底边 -->
     <div class="rv-layout" @contextmenu.prevent @dblclick.prevent>
-      <div class="rv-meta">
+      <div class="rv-meta gs-on-dark-surface">
         <div class="rv-actions">
           <el-button size="small" round :disabled="undoDisabled" @click="undo">
             {{ $t('games.embedded.reversi.undo') }}
@@ -625,6 +625,13 @@ onBeforeUnmount(() => {
 /* 原版深绿渐变整页底(--gs-bg,必须同时给 dark 档) */
 .rv-shell {
   --gs-bg: linear-gradient(160deg, #1b2a22, #29503a);
+  /* 记分板与状态条落在深绿整页底上:不用主题卡片色(浅色主题是白/奶油卡,深底上像贴了
+     一块亮纸),改用半透明玻璃 + 浅色字,深浅主题同一套 */
+  --rv-glass-bg: rgba(255, 255, 255, 0.08);
+  --rv-glass-line: rgba(255, 255, 255, 0.16);
+  --rv-ink: #fff;
+  --rv-ink-dim: rgba(255, 255, 255, 0.72);
+  --rv-accent: #a8e6a3;
 }
 html.dark .rv-shell {
   --gs-bg: linear-gradient(160deg, #122019, #1d3d2a);
@@ -685,14 +692,14 @@ html.dark .rv-shell {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--color-card, #fff);
-  border: 1px solid var(--color-border, #d8dde3);
+  background: var(--rv-glass-bg);
+  border: 1px solid var(--rv-glass-line);
   border-radius: 10px;
   padding: 4px;
 }
 .rv-lab {
   font-size: 12px;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rv-ink-dim);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -700,7 +707,7 @@ html.dark .rv-shell {
 .rv-score b {
   font-size: 24px;
   line-height: 1.1;
-  color: var(--color-text-primary, #1f2328);
+  color: var(--rv-ink);
 }
 .rv-dot {
   width: 13px;
@@ -725,8 +732,8 @@ html.dark .rv-shell {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--color-card, #fff);
-  border: 1px solid var(--color-border, #d8dde3);
+  background: var(--rv-glass-bg);
+  border: 1px solid var(--rv-glass-line);
   border-radius: 10px;
   padding: 4px 8px;
 }
@@ -735,19 +742,20 @@ html.dark .rv-shell {
   font-weight: 700;
   text-align: center;
   min-height: 19px;
-  color: var(--el-color-primary, #388e3c);
+  /* 品牌棕在深绿玻璃底上只有 2:1,状态改用同色系的浅绿 */
+  color: var(--rv-accent);
 }
 .rv-status.over {
-  color: #c0392b;
+  color: #ffb3a7;
 }
 .rv-sub {
   font-size: 12px;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rv-ink-dim);
   margin-top: 2px;
   text-align: center;
 }
 .rv-sub b {
-  color: var(--color-text-primary, #1f2328);
+  color: var(--rv-ink);
 }
 
 /* Board */
@@ -887,8 +895,8 @@ html.dark .rv-shell {
   width: 100%;
   min-width: 0;
   padding: 6px 8px;
-  background: var(--color-card, #fff);
-  border: 1px solid var(--color-border, #d8dde3);
+  background: var(--rv-glass-bg);
+  border: 1px solid var(--rv-glass-line);
   border-radius: 10px;
 }
 .rv-side-score {
@@ -902,13 +910,13 @@ html.dark .rv-shell {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rv-ink-dim);
   white-space: nowrap;
 }
 .rv-side-count b {
   font-size: 16px;
   line-height: 1.1;
-  color: var(--color-text-primary, #1f2328);
+  color: var(--rv-ink);
   font-variant-numeric: tabular-nums;
 }
 .rv-side-status {
@@ -922,18 +930,18 @@ html.dark .rv-shell {
 .rv-side-line {
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--el-color-primary, #388e3c);
+  color: var(--rv-accent);
 }
 .rv-side-line.over {
-  color: #c0392b;
+  color: #ffb3a7;
 }
 .rv-side-sub {
   font-size: 11px;
   line-height: 1.4;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rv-ink-dim);
 }
 .rv-side-sub b {
-  color: var(--color-text-primary, #1f2328);
+  color: var(--rv-ink);
 }
 .rv-side-undo {
   width: 100%;
