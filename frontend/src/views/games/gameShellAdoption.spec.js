@@ -11,10 +11,13 @@ import { fileURLToPath } from 'node:url'
 const SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
 const GAME_DIR = join(SRC, 'views/games')
 const CARDS_DIR = join(GAME_DIR, 'cards')
+/** iframe 转自研的开源小游戏组件(gameShellAdoption 同样要求进外壳) */
+const EMBEDDED_DIR = join(GAME_DIR, 'embedded')
 
-/** 已迁到 GameShell 的游戏页(全部自研舞台页;P9/P10 的 embed 本地化完成后再逐个挪入) */
+/** 已迁到 GameShell 的游戏页(全部自研舞台页;P9/P10 的 embed 本地化组件同批登记) */
 const MIGRATED = [
   'Baohuang.vue',
+  'BubbleGame.vue',
   'Cards.vue',
   'Doudizhu.vue',
   'EmbedGame.vue',
@@ -24,14 +27,18 @@ const MIGRATED = [
   'Ludo.vue',
   'Mahjong.vue',
   'Mahjong3d.vue',
+  'Match3Game.vue',
   'Minesweeper.vue',
   'PetLinkLink.vue',
+  'ReversiGame.vue',
   'Runway52.vue',
   'Snake.vue',
   'SnakeMatch.vue',
   'Sudoku.vue',
   'Tetris.vue',
+  'TrexGame.vue',
   'WebGame.vue',
+  'XiangqiGame.vue',
 ]
 
 /** 尚未迁移(按计划分批进行);不是游戏舞台的页面归 EXEMPT */
@@ -46,16 +53,28 @@ const CARD_BOARD = ['FreeCellBoard.vue', 'KlondikeBoard.vue', 'SpiderBoard.vue']
 const read = (file) => readFileSync(file, 'utf8')
 const vueFiles = (dir) => readdirSync(dir).filter((n) => n.endsWith('.vue'))
 
+/** 页面在 views/games 之外时按 embedded/ 解析(MIGRATED 名单同时覆盖两处) */
+const pagePath = (name) => {
+  try {
+    readFileSync(join(GAME_DIR, name))
+    return join(GAME_DIR, name)
+  } catch {
+    return join(EMBEDDED_DIR, name)
+  }
+}
+
 describe('统一游戏外壳守门', () => {
   it('每个游戏页都必须在迁移名单里挂号', () => {
     const known = new Set([...MIGRATED, ...PENDING, ...EXEMPT, ...CARD_BOARD])
-    const unknown = [...vueFiles(GAME_DIR), ...vueFiles(CARDS_DIR)].filter((name) => !known.has(name) && !(name === 'CardDragGhost.vue'))
+    const unknown = [...vueFiles(GAME_DIR), ...vueFiles(CARDS_DIR), ...vueFiles(EMBEDDED_DIR)].filter(
+      (name) => !known.has(name) && !(name === 'CardDragGhost.vue'),
+    )
     expect(unknown, `新游戏页请决定是否用 GameShell 并登记到本文件:\n${unknown.join('\n')}`).toEqual([])
   })
 
   it('已迁移页不再自己拼头部,也不用魔法数算高度', () => {
     for (const name of MIGRATED) {
-      const src = read(join(GAME_DIR, name))
+      const src = read(pagePath(name))
       expect(src, `${name} 应使用 GameShell`).toContain("from '@/components/games/GameShell.vue'")
       expect(src, `${name} 不应再引入 PageToolbar`).not.toContain('components/PageToolbar.vue')
       expect(src, `${name} 不应再引入 GameHeader`).not.toContain('components/games/GameHeader.vue')

@@ -1,5 +1,5 @@
-<!-- 开源小游戏分发器:象棋/黑白棋/消消乐/泡泡龙已本地化为 Vue 组件(embedded/),
-     三维弹球/小恐龙继续整包 iframe 直跑(public/mini-games/,引擎与贴图不改)。
+<!-- 开源小游戏分发器:象棋/黑白棋/消消乐/泡泡龙/小恐龙已本地化为 Vue 组件(embedded/),
+     三维弹球继续整包 iframe 直跑(public/mini-games/,wasm 引擎无法自研)。
      iframe 壳保留触控守卫与站内沉浸浮层;全屏由外壳统一提供 -->
 <template>
   <component :is="localGame" v-if="localGame" />
@@ -100,6 +100,10 @@ const src = computed(() => (game.value ? embeddedGameSrc(game.value.slug) : ''))
 // 已本地化的开源游戏:直接渲染 Vue 组件(不再 iframe),名单随 P9/P10 迁移扩大
 const LOCAL_EMBEDDED = {
   xiangqi: defineAsyncComponent(() => import('./embedded/XiangqiGame.vue')),
+  reversi: defineAsyncComponent(() => import('./embedded/ReversiGame.vue')),
+  match3: defineAsyncComponent(() => import('./embedded/Match3Game.vue')),
+  bubble: defineAsyncComponent(() => import('./embedded/BubbleGame.vue')),
+  trex: defineAsyncComponent(() => import('./embedded/TrexGame.vue')),
 }
 const localGame = computed(() => LOCAL_EMBEDDED[route.params.slug] || null)
 
@@ -123,15 +127,25 @@ watch(
   },
 )
 
+// 光影:iframe 页由分发器挂起;本地化组件自己挂起/还原(见 embedded/*.vue)。
+// flush:'post' 保证「本地→iframe」切换时子组件已还原、这里再挂上,不会漏挂。
+watch(
+  localGame,
+  (game) => {
+    if (!game) sunLight?.suspendEffects()
+  },
+  { immediate: true, flush: 'post' },
+)
+
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
-  sunLight?.suspendEffects()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   if (document.fullscreenElement) document.exitFullscreen?.()
-  sunLight?.restoreEffects?.()
+  // 本地化组件的还原在它自己的卸载钩子里完成,这里只管 iframe 态
+  if (!localGame.value) sunLight?.restoreEffects?.()
 })
 </script>
 

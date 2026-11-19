@@ -1010,7 +1010,8 @@ html.dark .xq-status {
 
 .xq-board-wrap {
   position: relative;
-  background: var(--xq-wood, #e8c99b);
+  /* 原版木色棋盘底,深浅主题同一块木头;不再留无人覆盖的 --xq-wood 间接层 */
+  background: #e8c99b;
   border-radius: 10px;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.5),

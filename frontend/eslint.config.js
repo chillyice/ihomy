@@ -46,4 +46,12 @@ export default [
       'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
+  {
+    // Chromium 离线页小恐龙引擎的逐字移植(见文件头出处):原实现的变量命名与未用形参保持原样,
+    // 只关掉「未使用」这类打磨项;no-undef 等正确性检查照旧生效
+    files: ['src/utils/games/trexRunner.js'],
+    rules: {
+      'no-unused-vars': 'off',
+    },
+  },
 ]
