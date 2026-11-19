@@ -116,6 +116,19 @@
       </div>
 
       <div class="ms-board-wrap">
+        <!-- 旗标键的第二摆放:手机横屏贴在棋盘左侧(与棋盘零间距一起居中);
+             竖屏/桌面用棋盘右上角那颗,左栏底边那颗横屏撤掉 -->
+        <el-button
+          size="small"
+          class="gs-icon-btn ms-flag-side"
+          :type="flagMode ? 'primary' : 'default'"
+          :title="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+          :aria-label="flagMode ? $t('games.minesweeper.revealMode') : $t('games.minesweeper.flagMode')"
+          :aria-pressed="flagMode"
+          @click="flagMode = !flagMode"
+        >
+          <el-icon><Flag /></el-icon>
+        </el-button>
         <div class="ms-board">
           <button
             v-for="(cell, i) in board.cells"
@@ -614,17 +627,18 @@ onBeforeUnmount(() => {
 /* 手机横屏:数据整条搬进外壳左栏底边,旗标键跟在芯片后面(放不下就换行);
    数据条整条让位,棋盘独占游戏区;
    纵向预算只留 16px(上下各 ~4,底边贴近页面,手机上外壳底边距再叠安全区) */
+/* 旗标键的第二摆放(棋盘左侧)默认隐藏,只在手机横屏出现 */
+.ms-flag-side {
+  display: none;
+}
+
 @media (orientation: landscape) and (max-height: 520px) {
   .ms-shell :deep(.gs-stats) {
     display: flex;
   }
-  /* 旗标键与芯片同排:高度齐控件规格、按正方形触控面给足宽度(只留图标会被压成 12px) */
+  /* 旗标键挪到棋盘左侧贴靠(见 .ms-flag-side),左栏底边只留数据芯片 */
   .ms-shell :deep(.gs-stats) .ms-flag-btn {
-    align-self: stretch;
-    width: auto;
-    min-width: var(--gs-control-h);
-    height: var(--gs-control-h);
-    padding: 0;
+    display: none;
   }
   .ms-layout {
     --ms-cell-h: calc((100cqh - 16px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
@@ -638,6 +652,23 @@ onBeforeUnmount(() => {
   .ms-board-wrap {
     min-width: 0;
     max-height: 100%;
+    /* 旗标键 + 棋盘作为一组居中,两者零间距贴靠 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ms-flag-side {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: var(--gs-control-h);
+    height: var(--gs-control-h);
+    padding: 0;
+    border-radius: var(--gs-radius) 0 0 var(--gs-radius);
+  }
+  .ms-board {
+    /* 组内居中由外层负责,棋盘不再自己用 auto 外边距,保证与旗标键贴死 */
+    margin-inline: 0;
+    border-radius: 0 10px 10px 0;
   }
   /* 外壳横屏档默认把居中棋盘改成贴左栏;扫雷格子边长按高度算,
      盘面窄于游戏区时右侧会甩白,这里恢复水平居中(纵向仍按 center 排) */
