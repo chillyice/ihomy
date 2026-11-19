@@ -518,15 +518,23 @@ const W = MX * 2 + CELL * 8,
   H = MY * 2 + CELL * 9
 let ctx = null
 
+/** 位图应有的宽度:显示宽 × dpr(显示宽不足设计宽时按设计宽,避免位图比设计还小) */
+const bitmapW = () => {
+  const cv = cvRef.value
+  const cssW = cv ? cv.getBoundingClientRect().width : 0
+  return Math.round(W * Math.max(1, cssW / W) * (window.devicePixelRatio || 1))
+}
+
 function setupCanvas() {
   const cv = cvRef.value
   if (!cv) return
   ctx = cv.getContext('2d')
-  const dpr = window.devicePixelRatio || 1
-  cv.width = W * dpr
-  cv.height = H * dpr
-  // 显示尺寸交给 CSS(--xq-cv-w 的 min 三限响应式);位图固定 W×H×dpr 保证清晰
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  // 位图分辨率跟着显示宽度走:棋盘铺满游戏区后显示宽可能远大于设计宽 W,
+  // 固定 W×dpr 的位图会被拉糊;按显示宽放大位图,显示多大都清晰
+  const k = bitmapW() / W
+  cv.width = Math.round(W * k)
+  cv.height = Math.round(H * k)
+  ctx.setTransform(k, 0, 0, k, 0, 0)
 }
 const px = (c) => MX + c * CELL
 const py = (r) => MY + r * CELL
@@ -956,15 +964,40 @@ watch(locale, () => {
   draw()
 })
 
+/** 显示尺寸变化(全屏/宽屏/旋屏/窗口拉伸)时按新宽度重设位图,棋盘始终清晰。
+ *  重设位图会清空画布,所以位图宽真变了才重设并补一次 draw */
+let cvObserver = null
+let sizeTimers = []
+const syncCanvas = () => {
+  const cv = cvRef.value
+  if (!cv) return
+  if (Math.abs(cv.width - bitmapW()) <= 1) return
+  setupCanvas()
+  draw()
+}
+const watchCanvasSize = () => {
+  if (typeof ResizeObserver !== 'undefined' && cvRef.value) {
+    cvObserver = new ResizeObserver(syncCanvas)
+    cvObserver.observe(cvRef.value)
+  }
+  // 首帧外壳布局还没收敛(容器宽从 0 长起来)时补量两次
+  sizeTimers = [260, 900].map((t) => setTimeout(syncCanvas, t))
+}
+
 onMounted(() => {
   sunLight?.suspendEffects()
   setupCanvas()
   newGame()
+  watchCanvasSize()
 })
 
 onBeforeUnmount(() => {
   disposed = true
   clearTimeout(aiTimer)
+  sizeTimers.forEach((t) => clearTimeout(t))
+  sizeTimers = []
+  cvObserver?.disconnect()
+  cvObserver = null
   sunLight?.restoreEffects()
 })
 </script>
@@ -988,21 +1021,30 @@ html.dark .xq-shell {
 
 /* 数据条贴棋盘:与棋盘同宽排在棋盘上方 */
 .xq-layout {
-  --xq-cv-w: min(100%, 500px, calc((100cqh - 64px) * 0.9026));
+  /* 画布宽 = min(游戏区宽 − 木框左右内边距, 剩余高度 × 宽高比)。
+     容器宽必须用 cqw:木框是内容定宽的收缩盒,画布用 100% 会与木框宽度循环解析,
+     木框被画布的固有尺寸(位图宽 × dpr)撑开后,底色就会在画布右侧多出一条。
+     不设像素上限:棋盘直接铺满游戏区,棋子与点选热区跟着变大(位图按显示宽重设,见 setupCanvas) */
+  --xq-cv-w: min(calc(100cqw - 12px), calc((100cqh - 64px) * 0.9026));
+  /* 木框外宽 = 画布 + 左右各 6px 内边距 */
+  --xq-board-w: calc(var(--xq-cv-w) + 12px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  /* 整列宽 = 木框外宽:水平居中交给外壳(body-align="center"),与 2048/扫雷/消消乐同口径 */
+  width: var(--xq-board-w);
+  max-width: 100%;
   min-width: 0;
   min-height: 0;
 }
+/* 数据条与木框外沿对齐 */
 .xq-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  width: var(--xq-cv-w);
+  width: var(--xq-board-w);
   min-width: 0;
 }
 .xq-status {
@@ -1032,6 +1074,9 @@ html.dark .xq-status {
 
 .xq-board-wrap {
   position: relative;
+  /* 宽度按画布宽 + 内边距明确算出,不依赖内容收缩 */
+  width: var(--xq-board-w);
+  box-sizing: border-box;
   /* 原版木色棋盘底,深浅主题同一块木头;不再留无人覆盖的 --xq-wood 间接层 */
   background: #e8c99b;
   border-radius: 10px;
@@ -1100,17 +1145,16 @@ html.dark .xq-status {
     display: flex;
   }
   .xq-layout {
-    --xq-cv-w: min(100%, 500px, calc((100cqh - 16px) * 0.9026));
-    display: flex;
-    align-items: center;
-    width: 100%;
+    --xq-cv-w: min(calc(100cqw - 12px), calc((100cqh - 16px) * 0.9026));
     max-height: 100%;
   }
   .xq-meta {
     display: none;
   }
-  .xq-board-wrap {
-    max-width: 100%;
+  /* 外壳横屏档默认把居中棋盘改成贴左栏;象棋棋盘按高度定宽,右侧同样会甩白,
+     这里恢复右栏内水平居中(纵向仍按 center 排),与 2048/扫雷同一处理 */
+  .page.game-shell.xq-shell :deep(.gs-body.is-center) {
+    align-items: center;
   }
 }
 </style>

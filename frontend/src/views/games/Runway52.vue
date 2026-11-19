@@ -47,4 +47,12 @@ const goBack = () => {
   min-height: 0;
   border-radius: 0;
 }
+
+/* 手机横屏/矮窗:外壳游戏区给多高就占多高(静态页自己按容器高铺满),
+   不再用 320px 的下限把矮游戏区撑破、顶出外壳 */
+@media (max-height: 520px) {
+  .runway-table {
+    min-height: 0;
+  }
+}
 </style>

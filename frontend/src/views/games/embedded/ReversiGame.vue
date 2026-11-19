@@ -647,9 +647,10 @@ html.dark .rv-shell {
   font-size: 13px;
 }
 
-/* 记分 HUD + 棋盘:竖屏自上而下,宽度同棋盘 */
+/* 记分 HUD + 棋盘:竖屏自上而下,宽度同棋盘。
+   棋盘宽度 = 剩余高度 × 宽高比,不设像素上限:直接铺满游戏区,格子和落点跟着变大 */
 .rv-layout {
-  --rv-board-w: min(100%, 460px, calc((100cqh - 128px) * 0.9677));
+  --rv-board-w: min(100%, calc((100cqh - 128px) * 0.9677));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -967,7 +968,7 @@ html.dark .rv-shell {
     font-size: 12px;
   }
   .rv-layout {
-    --rv-board-w: min(100%, 460px, calc((100cqh - 16px) * 0.9677));
+    --rv-board-w: min(100%, calc((100cqh - 16px) * 0.9677));
     max-height: 100%;
     justify-content: center;
   }

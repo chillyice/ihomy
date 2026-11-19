@@ -450,12 +450,11 @@ const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 const stageEl = ref(null)
 const tableEl = ref(null)
 // 牌桌设计画布:高按下限取、宽跟随游戏区宽高比 —— 整块游戏区铺成一张麻将桌(手机横屏尤其明显),
-// 内部全按设计尺寸画,再统一缩放到刚好铺满。桌面大屏封顶 1.2 倍,牌不至于放成巨无霸。
+// 内部全按设计尺寸画,再统一缩放到刚好铺满。缩放不封顶:大屏/宽屏上牌跟着变大,
+// 手牌看得清、点得准,不再在两侧留出大片空毯面。
 // 下限是内容撑出来的:14 张手牌一行(46px)+ 两侧副露栏 + 两侧牌河 + 中央信息(宽)、四家牌行 + 一条牌河(高)。
 const MJ_MIN_W = 1000
 const MJ_MIN_H = 500
-const MJ_MAX_W = 1500
-const MJ_MAX_SCALE = 1.2
 const tableW = ref(MJ_MIN_W)
 const tableH = ref(MJ_MIN_H)
 const tableScale = ref(1)
@@ -467,11 +466,11 @@ watch(
       const { width, height } = stage.getBoundingClientRect()
       if (!width || !height) return
       const aspect = width / height
-      const w = Math.min(MJ_MAX_W, Math.max(MJ_MIN_W, MJ_MIN_H * aspect))
+      const w = Math.max(MJ_MIN_W, MJ_MIN_H * aspect)
       const h = Math.max(MJ_MIN_H, w / aspect)
       tableW.value = Math.round(w)
       tableH.value = Math.round(h)
-      tableScale.value = Math.min(width / w, height / h, MJ_MAX_SCALE)
+      tableScale.value = Math.min(width / w, height / h)
     }
     fitTable()
     const observer = new ResizeObserver(fitTable)

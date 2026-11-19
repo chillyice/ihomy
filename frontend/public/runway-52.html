@@ -45,6 +45,33 @@ dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border
 @media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.console{grid-template-columns:1fr}.console .history{grid-column:auto}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 body.in-immersive .shell{padding-top:54px}
+/* ===== 铺满游戏区 =====
+ * 这页是嵌在小游戏外壳里的(iframe 高度就是外壳的游戏区),所以「整页」= iframe 视口:
+ * 宽屏/横屏把页面锁成一屏高,棋盘在可用高宽里取最大的正方形,右侧回合栏自己滚动;
+ * 不再出现「棋盘比屏幕还高、要滚动才能看全」的纵向滚动。
+ * 手机竖屏/窄窗仍是上下堆叠的内容流(竖屏滚一屏,好过把棋盘缩成小方块)。 */
+@media (min-width:781px),(min-aspect-ratio:5/4){
+  html,body{height:100%}
+  body{display:flex;flex-direction:column}
+  .shell{flex:1 1 auto;min-height:0;width:100%;max-width:1400px;display:flex;flex-direction:column;padding:0 clamp(12px,2.2vw,32px) 8px}
+  .top{flex:0 0 auto;min-height:54px}
+  .intro{flex:0 0 auto;margin:8px 0}
+  .table{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1fr) clamp(230px,27%,320px);gap:14px;align-items:stretch}
+  .table>section{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .chart-fit{flex:1 1 auto;min-height:0;display:grid;place-items:center;container-type:size}
+  .chart-frame{width:min(100%,100cqh);aspect-ratio:1;padding:6px}
+  .chart{width:100%;height:100%}
+  .key{flex:0 0 auto;margin:6px 0 0;font-size:11px;gap:5px 14px}
+  .console{min-height:0;overflow-y:auto;align-content:start;overscroll-behavior:contain}
+}
+/* 矮屏(手机横屏):页面头部让位给棋盘,图例收进规则弹窗,棋盘再大一圈 */
+@media (min-aspect-ratio:1/1) and (max-height:560px){
+  body.in-immersive .shell{padding-top:0}
+  .top{min-height:44px}
+  .brand{display:none}
+  .intro{display:none}
+  .key{display:none}
+}
 </style>
 </head>
 <body>
@@ -56,7 +83,7 @@ body.in-immersive .shell{padding-top:54px}
 <div class="intro"><h2>飞行棋桌面</h2><p class="tag" id="table-label"></p></div>
 <div class="table">
 <section aria-label="飞行棋盘">
-<div class="chart-frame"><div class="chart" id="chart"><svg viewBox="0 0 700 700" aria-hidden="true"></svg><div id="tokens"></div></div></div>
+<div class="chart-fit"><div class="chart-frame"><div class="chart" id="chart"><svg viewBox="0 0 700 700" aria-hidden="true"></svg><div id="tokens"></div></div></div></div>
 <div class="key"><span><b>★</b>起飞区（安全，机场旁环外）</span><span><b>◉</b>第一步（进环格）</span><span><b>⇢</b>本家航线格，飞跃 12 格</span><span><b>◎</b>归航跑道</span></div>
 </section>
 <aside class="console" aria-label="回合控制">
