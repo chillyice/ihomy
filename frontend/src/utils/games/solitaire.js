@@ -282,8 +282,38 @@ function hasAnyMove(state) {
   return false
 }
 
-/** 无路可走判定:牌堆与废牌堆都空(再也翻不出牌)且桌面/花色堆都没有合法移动。
- * 只做保守判定——只要还能翻牌或还有一步可走,就不算输。 */
+/**
+ * 翻牌堆还能不能翻出可走的牌:按当前翻牌数把牌堆/废牌堆完整走一圈(含扣回),
+ * 任意时刻废牌堆顶能进花色堆或能叠到桌面列,就说明还有棋可走。
+ * 只在桌面本身没有可走步时调用——此时桌面与花色堆不变,翻牌不会衍生新的桌面走法。
+ */
+function stockCycleYieldsMove(state) {
+  if (!state.stock.length && !state.waste.length) return false
+  const stock = state.stock.map((card) => ({ ...card }))
+  const waste = state.waste.map((card) => ({ ...card }))
+  const seen = new Set()
+  for (;;) {
+    const key = `${stock.map((card) => card.id).join(',')}|${waste.map((card) => card.id).join(',')}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    if (!stock.length) {
+      while (waste.length) stock.push(waste.pop())
+    }
+    const count = Math.min(state.drawCount, stock.length)
+    for (let i = 0; i < count; i++) {
+      const card = stock.pop()
+      card.faceUp = true
+      waste.push(card)
+    }
+    const top = waste[waste.length - 1]
+    if (!top) return false
+    if (canPutOnFoundation(state, top)) return true
+    if (state.tableau.some((pile) => canStackOnTableau(pile[pile.length - 1] || null, top))) return true
+  }
+}
+
+/** 无路可走判定:桌面/废牌堆顶都没有合法移动,且翻牌堆完整循环一圈也翻不出能走的牌
+ * (牌堆空后会把废牌堆扣回重翻)。只做保守判定——只要循环中任意一刻有牌能走就不算输。 */
 export function isStuck(state) {
   if (!state || state.status !== STATUS.PLAYING) return false
   if (isWon(state)) return false
@@ -293,8 +323,8 @@ export function isStuck(state) {
     state.tableau.reduce((n, pile) => n + pile.length, 0) +
     SUITS.reduce((n, suit) => n + state.foundations[suit].length, 0)
   if (total !== 52) return false
-  if (state.stock.length || state.waste.length) return false
-  return !hasAnyMove(state)
+  if (hasAnyMove(state)) return false
+  return !stockCycleYieldsMove(state)
 }
 
 /** 结算通关 / 无路可走,写回 status */

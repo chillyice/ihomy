@@ -52,6 +52,38 @@ function takeFromStock(state, suit, rank) {
   return taken
 }
 
+/**
+ * 完整 52 张的「牌堆循环死局」:四门 A~8 已在花色堆,七列顶牌全黑(同色不能互叠),
+ * 9 与红 10/J/Q 全压在列底摸不到,牌堆只剩三张 K——翻多少轮都无处可放。
+ */
+function stockLoopDeadState(drawCount = 1) {
+  const state = blankState()
+  state.drawCount = drawCount
+  for (const suit of SUITS) {
+    for (let rank = 1; rank <= 8; rank++) state.foundations[suit].push(card(suit, rank))
+  }
+  const buried = [
+    card('S', 9, false),
+    card('C', 9, false),
+    card('H', 9, false),
+    card('D', 9, false),
+    card('H', 10, false),
+    card('D', 10, false),
+    card('H', 11, false),
+    card('D', 11, false),
+    card('H', 12, false),
+    card('D', 12, false),
+  ]
+  const tops = [card('S', 10), card('S', 11), card('S', 12), card('S', 13), card('C', 10), card('C', 11), card('C', 12)]
+  state.tableau = tops.map((top, index) => {
+    const pile = index < 3 ? [buried[index * 2], buried[index * 2 + 1]] : []
+    return [...pile, top]
+  })
+  state.tableau[3].unshift(buried[6], buried[7], buried[8], buried[9])
+  state.stock = [card('C', 13, false), card('H', 13, false), card('D', 13, false)]
+  return state
+}
+
 describe('纸牌接龙发牌', () => {
   it('7 列依次 1~7 张且只有列尾正面,其余 24 张进牌堆', () => {
     const state = deal(1, seeded(2))
@@ -231,6 +263,33 @@ describe('纸牌接龙提示与无路可走', () => {
     const state = blankState()
     state.stock = [{ ...card('S', 1), faceUp: false }]
     expect(isStuck(state)).toBe(false)
+  })
+
+  it('牌堆还有牌但整轮循环都翻不出可走牌时判输', () => {
+    expect(isStuck(stockLoopDeadState(1))).toBe(true)
+    expect(isStuck(stockLoopDeadState(3))).toBe(true)
+    expect(drawStock(stockLoopDeadState(1)).status).toBe(STATUS.LOST)
+  })
+
+  it('牌堆里某张牌翻出来能走时不算输(哪怕不是第一张)', () => {
+    for (const drawCount of [1, 3]) {
+      const state = stockLoopDeadState(drawCount)
+      const nine = state.tableau.flat().find((c) => c.suit === 'C' && c.rank === 9)
+      state.tableau = state.tableau.map((pile) => pile.filter((c) => c !== nine))
+      state.stock = [{ ...nine, faceUp: false }, ...state.stock]
+      expect(isStuck(state)).toBe(false)
+    }
+  })
+
+  it('一次翻三张时,永远翻不到牌堆顶的牌不算可走', () => {
+    const state = stockLoopDeadState(3)
+    const nine = state.tableau.flat().find((c) => c.suit === 'C' && c.rank === 9)
+    state.tableau = state.tableau.map((pile) => pile.filter((c) => c !== nine))
+    const king = state.stock.pop()
+    state.tableau[0].unshift({ ...king, faceUp: false })
+    // 3 张牌一次翻完:C9 永远压在废牌堆底,回收后仍是同一顺序
+    state.stock.push({ ...nine, faceUp: false })
+    expect(isStuck(state)).toBe(true)
   })
 })
 
