@@ -12,6 +12,23 @@
       <p>{{ $t('games.petlink.coverHint') }}</p>
     </template>
 
+    <!-- 提示/重排/暂停/静音:竖屏与桌面用棋盘下面那条(.game-bottombar),
+         手机横屏搬进外壳左栏头部以下(两条同时只露一条,见样式里的横屏档);封面不显示 -->
+    <template #actions>
+      <div v-if="screen === 'game'" class="pl-rail-actions">
+        <el-button size="small" :disabled="frozen" @click="doHint">💡 {{ $t('games.petlink.hint') }}</el-button>
+        <el-button size="small" :disabled="frozen || shufflesLeft <= 0" @click="doShuffle">
+          🔀 {{ $t('games.petlink.shuffle') }}
+        </el-button>
+        <el-button size="small" :disabled="won || lost" @click="togglePause">
+          {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
+        </el-button>
+        <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
+          {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
+        </el-button>
+      </div>
+    </template>
+
     <template #extras>
       <GameRoomBar
         v-if="screen === 'game'"
@@ -1123,6 +1140,58 @@ function onKeydown(e) {
 }
 html.dark .pl-shell {
   --gs-bg: linear-gradient(rgba(5, 6, 5, 0.92), rgba(3, 4, 3, 0.96));
+}
+/* 整页自带深色底:外壳头部(返回/游戏名/规则/新游戏)、左栏按钮和棋盘下面那条的按钮
+   默认字色取自主题——浅色模式下是暖棕,落在暗底上几乎看不见。主题那条次级按钮规则把
+   --color-line / --color-text 硬套进按钮(带 !important),所以不去和它抢选择器,而是
+   在这三块容器上把变量改成浅色玻璃口径(含 hover 与禁用档的取色)。深色模式同一套。
+   只罩这三处容器:规则弹窗挂在 .gs-rail 下、全屏时不 teleport,改在容器上才不会把
+   浅底弹窗里的字也刷白。 */
+.pl-shell :deep(.gs-head) .gs-title {
+  color: #fff;
+}
+.pl-shell :deep(.gs-head),
+.pl-shell :deep(.gs-controls),
+.game-bottombar {
+  --color-line: rgba(255, 255, 255, 0.14);
+  --color-card-2: rgba(255, 255, 255, 0.24);
+  --color-border: rgba(255, 255, 255, 0.24);
+  --color-text: #fff;
+  --color-text-secondary: rgba(255, 255, 255, 0.82);
+  --color-text-tertiary: rgba(255, 255, 255, 0.45);
+}
+/* 外壳左栏那组按钮是「第二份摆放」:竖屏/桌面用棋盘下面那条,手机横屏才撑出来 */
+.pl-shell :deep(.gs-controls) {
+  display: none;
+}
+.pl-rail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* 手机横屏:提示/重排/暂停/静音搬进左栏(头部以下),横幅那条整条让位 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pl-shell :deep(.gs-controls) {
+    display: flex;
+  }
+  .pl-shell :deep(.gs-actions) {
+    justify-content: flex-start;
+    margin-inline-start: 0;
+  }
+  /* 「左栏的下面」:这组按钮贴着左栏底边(doc 顺序在房间条之后,
+     用 order 把房间条留在头部下面,按钮自己吃走剩下的空间落到最下) */
+  .pl-shell :deep(.gs-controls) {
+    order: 1;
+    margin-top: auto;
+  }
+  .pl-shell :deep(.gs-extras) {
+    order: 0;
+  }
+  /* 带 .pl-shell 前缀:.game-bottombar 自己的 display:flex 写在文件更下面,
+     同权时后者会赢,这里必须提权才能把横幅那条真正收掉 */
+  .pl-shell .game-bottombar {
+    display: none;
+  }
 }
 .pl-layout {
   position: relative;
