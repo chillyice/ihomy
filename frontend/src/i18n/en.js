@@ -1922,6 +1922,18 @@ export default {
       roomEnded: 'This game has ended',
       coverHint: 'Play solo too: empty seats are filled by the computer',
     },
+    runway52: {
+      rule1: 'Take turns rolling. A 6 launches a plane or moves one already flying; with a legal move, the turn rolls again after moving.',
+      rule2:
+        'After six straight rolls without a 6, the next roll of 1–5 may also send one plane to the take-off pad; that launch ends the turn with no extra roll.',
+      rule3:
+        'Landing on your own colour hops 4 cells ahead; landing on your lane cell (⇢) rides the dashed line 12 cells ahead. Home-stretch cells trigger no jumps.',
+      rule4:
+        'Landing on a rival sends it back to the hangar; your leap line crosses the home stretch of the diagonal colour and sweeps any plane parked on the 4th cell from the centre back too. Your take-off pad is private and safe.',
+      rule5:
+        'After the circuit your colour leads to the dark centre. Overshooting is allowed: walk to the centre first, then bounce back with the spare steps; only landing exactly on the centre counts as home. With no legal move, play passes on.',
+      rule6: 'The first fleet to bring all four planes home wins.',
+    },
     mahjong3d: {
       title: 'Mahjong 3D',
       desc: 'A true 3D table: sit at the table in perspective view with rounded tiles, a live wall and dice; same rules as Mahjong — winning hands earn points',

@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { mahjongTileSrc } from './mahjongTiles'
+import { MAHJONG_TILE_COUNT } from './mahjong'
 
 // ---------- 尺寸常量(世界单位;牌立放:宽 X、高 Y、厚 Z) ----------
 // 桌面按「最坏局面也放得下」反推:手牌 13+摸牌+四组副露(暗杠 4 张)同排、
@@ -106,7 +107,7 @@ export function riverTileTransform(seat, index) {
   const row = Math.min(Math.floor(index / RIVER_COLS), RIVER_ROWS - 1)
   const cols = riverRowCols(row)
   const col = Math.min(index % RIVER_COLS, cols - 1)
-  const v = LAYOUT.wallV + TILE.D + 0.06 + row * TILE.LIE_PITCH
+  const v = LAYOUT.wallV + TILE.D + 0.12 + row * TILE.LIE_PITCH
   const u = (col - (cols - 1) / 2) * TILE.PITCH
   return { ...toWorld(seat, u, v), yaw: seatFrame(seat).yaw }
 }
@@ -128,10 +129,27 @@ export function wallStackCounts(wallLeft) {
   })
 }
 
-/** 牌墙第 stackIndex 摞的位置(两层摞,行内居中) */
-export function wallStackTransform(seat, stackIndex, stackCount) {
-  const u = (stackIndex - (stackCount - 1) / 2) * (TILE.W + 0.06)
+/** 牌墙第 stackIndex 摞的位置(两层摞);maxStacks 给定时按固定原点排布,消耗不滑动 */
+export function wallStackTransform(seat, stackIndex, stackCount, maxStacks = stackCount) {
+  const u = (stackIndex - (maxStacks - 1) / 2) * (TILE.W + 0.06)
   return { ...toWorld(seat, u, LAYOUT.wallV), yaw: seatFrame(seat).yaw }
+}
+
+/** 牌墙最大摞数:开局 136 − 4×13(起手)= 84 张,每边 21 张两层摞 = 11 摞;消耗时墙面不滑动 */
+const WALL_MAX_STACKS = Math.ceil((MAHJONG_TILE_COUNT - 4 * 13) / 4 / 2)
+
+/** 牌墙全部牌位:两层摞(底层贴桌面,顶层抬高 TILE.D+缝隙),固定原点、按剩余数从行尾逐张消失 */
+export function wallTiles(wallLeft, maxStacks = WALL_MAX_STACKS) {
+  const out = []
+  for (const side of wallStackCounts(wallLeft)) {
+    const ms = Math.max(maxStacks, side.stacks)
+    for (let s = 0; s < side.stacks; s++) {
+      const pos = wallStackTransform(side.seat, s, side.stacks, ms)
+      out.push({ ...pos, y: TILE.D / 2 })
+      if (side.tops[s]) out.push({ ...pos, y: TILE.D + 0.005 })
+    }
+  }
+  return out
 }
 
 /** 骰子与风位牌的桌面位置(中央区) */
@@ -422,7 +440,7 @@ export function createMahjong3dTable(container, opts = {}) {
   const tweens = []
   let disposed = false
 
-  function addTile(parent, kind, { x, z, yaw }, mode /* stand | lieUp | lieDown */, tileId = null) {
+  function addTile(parent, kind, { x, y = 0, z, yaw }, mode /* stand | lieUp | lieDown */, tileId = null) {
     const mesh = new THREE.Mesh(tileGeo, null)
     mesh.castShadow = true
     mesh.receiveShadow = true
@@ -431,7 +449,8 @@ export function createMahjong3dTable(container, opts = {}) {
     if (mode === 'lieDown') mesh.rotation.x = Math.PI / 2
     const holder = new THREE.Group()
     holder.rotation.y = yaw
-    holder.position.set(x, 0, z)
+    // y 抬升由调用方传入(牌墙顶层摞在底层之上);mesh 的 y 相对 holder 再抬半厚
+    holder.position.set(x, y, z)
     holder.add(mesh)
     tileMaterials(kind).then((mats) => {
       if (!disposed) mesh.material = mats
@@ -540,17 +559,11 @@ export function createMahjong3dTable(container, opts = {}) {
       }))
       relayoutRow(seat)
     },
-    /** 牌墙:按剩余张数重建四边两层堆 */
+    /** 牌墙:按剩余张数重建四边两层堆(固定原点,从行尾逐张消失) */
     setWall(wallLeft) {
       clearGroup(groups.wall)
-      for (const side of wallStackCounts(wallLeft)) {
-        for (let s = 0; s < side.stacks; s++) {
-          const pos = wallStackTransform(side.seat, s, side.stacks)
-          addTile(groups.wall, null, pos, 'lieDown')
-          if (side.tops[s]) {
-            addTile(groups.wall, null, { ...pos, y: TILE.D + 0.005 }, 'lieDown')
-          }
-        }
+      for (const t of wallTiles(wallLeft)) {
+        addTile(groups.wall, null, t, 'lieDown')
       }
     },
     /** 双骰:掷骰动画(随机翻滚后停到 d1/d2) */

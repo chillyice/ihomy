@@ -15,6 +15,7 @@ import {
   seatFrame,
   wallStackCounts,
   wallStackTransform,
+  wallTiles,
   windPlateTransform,
 } from './mahjong3dTable'
 
@@ -216,6 +217,40 @@ describe('wallStackCounts 牌墙分配', () => {
   it('0 与负数安全', () => {
     expect(wallStackCounts(0).every((s) => s.count === 0 && s.stacks === 0)).toBe(true)
     expect(wallStackCounts(-3).every((s) => s.count === 0)).toBe(true)
+  })
+})
+
+describe('wallTiles 牌墙牌位(两层摞 + 固定原点逐张消失)', () => {
+  it('满墙 84 张逐张对应剩余数,0 与 83 安全', () => {
+    expect(wallTiles(84)).toHaveLength(84)
+    expect(wallTiles(83)).toHaveLength(83)
+    expect(wallTiles(0)).toHaveLength(0)
+  })
+
+  it('两层堆叠:底层 y=D/2、顶层 y=1.5D 上下贴齐不相交', () => {
+    const tiles = wallTiles(84)
+    const bottoms = tiles.filter((t) => Math.abs(t.y - TILE.D / 2) < 1e-6)
+    const tops = tiles.filter((t) => t.y > TILE.D)
+    expect(bottoms).toHaveLength(44)
+    expect(tops).toHaveLength(40)
+    for (const top of tops) {
+      expect(top.y).toBeGreaterThanOrEqual(TILE.D) // 顶层底面 ≥ 底层顶面(不互相吃进)
+      expect(top.y).toBeLessThan(TILE.D * 1.5 + 0.01)
+    }
+  })
+
+  it('消耗不滑动:少墙的每个牌位都是满墙牌位的子集(只从行尾消失)', () => {
+    const full = new Set(wallTiles(84).map((t) => `${t.x.toFixed(4)},${t.y.toFixed(4)},${t.z.toFixed(4)}`))
+    for (const t of wallTiles(80)) {
+      expect(full.has(`${t.x.toFixed(4)},${t.y.toFixed(4)},${t.z.toFixed(4)}`)).toBe(true)
+    }
+  })
+
+  it('牌墙行都在呢面内', () => {
+    for (const t of wallTiles(84)) {
+      expect(Math.abs(t.x)).toBeLessThanOrEqual(TABLE.W / 2)
+      expect(Math.abs(t.z)).toBeLessThanOrEqual(TABLE.D / 2)
+    }
   })
 })
 
