@@ -17,7 +17,7 @@
     user-select: none;
   }
 
-  /* 舞台:机台按 642:525 原比例居中,上方主画面、下方记分板,尺寸由脚本按可用空间算 */
+  /* 舞台:竖屏按「记分板在上 → 主画面居中 → 手柄贴底」排,尺寸由脚本按可用空间算 */
   #stage {
     position: fixed;
     inset: 0;
@@ -29,10 +29,21 @@
   #rig {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 6px;
     max-width: 100%;
     max-height: 100%;
   }
+  /* 记分板:每帧从画布底部记分带拷一张过来,竖屏固定在最上面 */
+  #hud {
+    display: block;
+    width: 100%;
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  }
+  /* 取不到画面时退回整张机台(记分带留在主画面底部) */
+  body.no-split #hud { display: none; }
   /* 主画面:画布是整张机台,靠 overflow 把底部记分带裁掉 */
   #field {
     position: relative;
@@ -50,16 +61,6 @@
     background: #000;
     touch-action: manipulation;
   }
-  /* 记分板:每帧从画布底部记分带拷一张过来 */
-  #hud {
-    display: block;
-    width: 100%;
-    background: #000;
-    border-radius: 8px;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
-  }
-  /* 取不到画面时退回整张机台(记分带留在主画面底部) */
-  body.no-split #hud { display: none; }
 
   /* 载入/报错状态 */
   #status {
@@ -76,40 +77,77 @@
   }
   #status[hidden] { display: none; }
 
-  /* 触屏操作条:键位与桌面一致(Z 左挡板 / X 右挡板 / 空格发球 / F2 开新局) */
-  #touch { display: none; }
-  @media (pointer: coarse) {
-    #touch {
-      position: absolute;
-      inset: auto 0 0 0;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 0 12px 14px;
+  /* 手柄:触屏才出现。竖屏占最底一行,横屏浮在画面底部两侧(不占布局) */
+  #pad { display: none; }
+  .tk {
+    appearance: none;
+    -webkit-appearance: none;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(18, 24, 38, 0.72);
+    color: #dbe4f5;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    touch-action: none;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: transform 0.08s ease, background 0.12s ease, box-shadow 0.12s ease;
+  }
+  .tk:active,
+  .tk.down {
+    transform: scale(0.96);
+    background: rgba(96, 140, 255, 0.5);
+    box-shadow: 0 0 24px rgba(96, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .tk-flip { height: clamp(84px, 12vh, 128px); border-radius: 22px; font-size: 15px; }
+  .tk-flip .glyph { font-size: 22px; line-height: 1; }
+  .tk-mid { display: flex; flex-direction: column; gap: 6px; }
+  .tk-launch { height: clamp(52px, 7.5vh, 80px); border-radius: 16px; font-size: 13px; }
+  .tk-new { height: 26px; border-radius: 10px; font-size: 12px; font-weight: 500; opacity: 0.72; }
+  @media (pointer: coarse) and (orientation: portrait) {
+    #rig { width: 100%; height: 100%; justify-content: space-between; }
+    #pad { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
+    #pad .tk-flip { flex: 1 1 0; }
+    #pad .tk-mid { flex: 0 0 92px; }
+  }
+  @media (pointer: coarse) and (orientation: landscape) {
+    #rig { justify-content: center; }
+    /* 横屏机台居中,两侧留出来的空白正好放手柄,不压画面 */
+    #pad {
+      display: block;
+      position: fixed;
+      inset: 0;
       pointer-events: none;
     }
-    .tk {
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      background: rgba(20, 26, 40, 0.55);
-      color: #dbe4f5;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      backdrop-filter: blur(6px);
-      transition: transform 0.08s ease, background 0.12s ease;
+    #pad .tk-flip,
+    #pad .tk-mid {
+      position: absolute;
+      width: 104px;
     }
-    .tk:active { transform: scale(0.94); background: rgba(120, 160, 255, 0.42); }
-    .tk-center { display: flex; flex: 1 1 auto; gap: 10px; justify-content: center; }
-    .tk-wide { width: 88px; border-radius: 32px; font-size: 13px; }
-    .tk-sm { width: 48px; height: 48px; font-size: 11px; font-weight: 500; align-self: flex-start; opacity: 0.85; }
+    #pad .tk-mid {
+      right: 14px;
+      bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+      gap: 8px;
+    }
+    #pad [data-key='90'] {
+      left: 14px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+    #pad [data-key='88'] {
+      right: 14px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+    #pad .tk-flip { height: 76px; }
+  }
+
+  /* 触屏上键盘改绑没有意义,齿轮与面板只在鼠标环境露出 */
+  @media (pointer: coarse) {
+    #gear,
+    #kbPanel { display: none !important; }
   }
 
   /* 按键设置:齿轮入口 + 重绑定面板(桌面与触屏都可用) */
@@ -204,18 +242,18 @@
 <body>
 <div id="stage">
   <div id="rig">
+    <canvas id="hud" aria-label="记分板"></canvas>
     <div id="field">
       <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
-      <div id="touch">
-        <button class="tk" data-key="90" aria-label="左挡板">◀</button>
-        <div class="tk-center">
-          <button class="tk tk-sm" data-key="113" aria-label="开新局">新局</button>
-          <button class="tk tk-wide" data-key="32" aria-label="发球">发球</button>
-        </div>
-        <button class="tk" data-key="88" aria-label="右挡板">▶</button>
-      </div>
     </div>
-    <canvas id="hud" aria-label="记分板"></canvas>
+    <div id="pad">
+      <button class="tk tk-flip" data-key="90" aria-label="左挡板"><span class="glyph">◀</span>左挡板</button>
+      <div class="tk-mid">
+        <button class="tk tk-launch" data-key="32" aria-label="发球">发球</button>
+        <button class="tk tk-new" data-key="113" aria-label="开新局">新局</button>
+      </div>
+      <button class="tk tk-flip" data-key="88" aria-label="右挡板">右挡板<span class="glyph">▶</span></button>
+    </div>
   </div>
   <div id="status">载入中…</div>
   <button id="gear" aria-label="按键设置">⚙</button>
@@ -312,18 +350,27 @@
   const canvasEl = document.getElementById('canvas')
   const hudEl = document.getElementById('hud')
   const hudCtx = hudEl.getContext('2d')
+  const padEl = document.getElementById('pad')
   const STAGE_PAD = 16 // 与 #stage 的 padding 8px 一致(左右/上下各 8)
   const RIG_GAP = 6 // 与 #rig 的 gap 一致
   let splitOn = true // 取不到画面时置 false,退回整张机台
   let fieldW = 0
   let hudH = 0
 
+  // 手柄竖屏占布局一行、横屏 fixed 浮层(不占)。按透视后的样式判断,不用另存状态。
+  function padHeight() {
+    const cs = window.getComputedStyle(padEl)
+    if (cs.display === 'none' || cs.position === 'fixed') return 0
+    return padEl.offsetHeight || 0
+  }
+
   function layout() {
     const availW = Math.max(80, stageEl.clientWidth - STAGE_PAD)
     const availH = Math.max(80, stageEl.clientHeight - STAGE_PAD)
-    // 竖着放「主画面 + 记分板」,两段加起来正好是整张机台的高度:
-    // 宽度靠可用高反推,再与可用宽取小。
-    fieldW = Math.max(80, Math.floor(Math.min(availW, ((availH - RIG_GAP) * TABLE_W) / TABLE_H)))
+    // 竖着放「记分板 + 主画面 + 手柄」,三段加起来不出屏:宽度靠可用高反推,再与可用宽取小。
+    const padH = padHeight()
+    const reserved = RIG_GAP + (padH ? padH + RIG_GAP : 0)
+    fieldW = Math.max(80, Math.floor(Math.min(availW, ((availH - reserved) * TABLE_W) / TABLE_H)))
     const cutY = splitOn ? BAR_TOP : TABLE_H
     const fieldH = Math.floor((fieldW * cutY) / TABLE_W)
     hudH = splitOn ? Math.floor((fieldW * (TABLE_H - cutY)) / TABLE_W) : 0
@@ -378,6 +425,17 @@
       layout()
       syncEngine()
     }).observe(stageEl)
+  }
+
+  // 手柄竖屏占布局、横屏浮层:翻转时尺寸可能没变(近方形窗口),按方向再排一次
+  if (window.matchMedia) {
+    const mqOrient = window.matchMedia('(orientation: portrait)')
+    const onOrient = function () {
+      layout()
+      syncEngine()
+    }
+    if (mqOrient.addEventListener) mqOrient.addEventListener('change', onOrient)
+    else if (mqOrient.addListener) mqOrient.addListener(onOrient)
   }
 
   // —— 每帧把记分带拷到记分板 ——
@@ -590,10 +648,21 @@
   renderPanel()
 
 
-  document.querySelectorAll('#touch .tk').forEach(function (btn) {
+  // 手柄按键:按下/抬起都派发到 SDL 收得到的目标;手指滑出仍算抬起,别卡住挡板
+  document.querySelectorAll('#pad .tk').forEach(function (btn) {
     const code = Number(btn.dataset.key)
+    let held = false
+    const release = function (e) {
+      if (!held) return
+      held = false
+      btn.classList.remove('down')
+      e.preventDefault()
+      pressKey(code, false)
+    }
     btn.addEventListener('pointerdown', function (e) {
       e.preventDefault()
+      held = true
+      btn.classList.add('down')
       try {
         btn.setPointerCapture(e.pointerId)
       } catch (_) {
@@ -601,12 +670,12 @@
       }
       pressKey(code, true)
     })
-    const up = function (e) {
+    btn.addEventListener('pointerup', release)
+    btn.addEventListener('pointercancel', release)
+    btn.addEventListener('pointerleave', release)
+    btn.addEventListener('contextmenu', function (e) {
       e.preventDefault()
-      pressKey(code, false)
-    }
-    btn.addEventListener('pointerup', up)
-    btn.addEventListener('pointercancel', up)
+    })
   })
 
   // 点一下画面把焦点交给 canvas,否则外框里按键可能被父页面吃掉
