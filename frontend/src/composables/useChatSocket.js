@@ -38,6 +38,8 @@ export function createChatSocket({
   let retryTimer = null
   let retryCount = 0
   let disposed = false
+  // 最近一次收到 pong 的时刻:半死连接(能写不能读)不触发 onclose,只能靠对端回执判活
+  let lastPongAt = 0
 
   const emit = (type, data) => {
     const set = listeners.get(type)
@@ -60,8 +62,16 @@ export function createChatSocket({
 
   const startHeartbeat = () => {
     stopHeartbeat()
+    lastPongAt = Date.now()
     heartbeatTimer = setInterval(() => {
-      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }))
+      if (!ws || ws.readyState !== 1) return
+      // 连续两拍没回 pong:对端已收不到/回不来(移动网络黑洞、NAT 半开),onclose 也可能永不触发,
+      // 光靠退避重连等于永远卡在「显示已连接」——这里主动判死并重建
+      if (Date.now() - lastPongAt > heartbeatMs * 2) {
+        forceReconnect()
+        return
+      }
+      ws.send(JSON.stringify({ type: 'ping' }))
     }, heartbeatMs)
   }
 
@@ -102,7 +112,11 @@ export function createChatSocket({
       } catch {
         return
       }
-      if (pkt && pkt.type) emit(pkt.type, pkt.data)
+      if (pkt && pkt.type) {
+        // 任何下行都算对端活着;pong 之外的消息同样更新心跳基准
+        lastPongAt = Date.now()
+        emit(pkt.type, pkt.data)
+      }
     }
     socket.onclose = () => {
       if (ws !== socket) return
@@ -133,6 +147,23 @@ export function createChatSocket({
     } catch {
       /* 已关闭/正在关闭:忽略 */
     }
+  }
+
+  /**
+   * 心跳判死后的重建:与 reconnectNow 的区别是这条连接确实已经不可用,
+   * 必须发 close 让上层切到「未连接」并补拉历史/盘面(静默重拨会让界面一直显示在线)。
+   */
+  const forceReconnect = () => {
+    if (disposed) return
+    retryCount = 0
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+    dropSocket()
+    status.value = SOCKET_STATUS.CLOSED
+    emit('close')
+    connect()
   }
 
   /**

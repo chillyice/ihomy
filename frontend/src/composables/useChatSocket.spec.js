@@ -57,6 +57,41 @@ describe('createChatSocket', () => {
     expect(ws.sent.length).toBe(2)
   })
 
+  it('回 pong 时心跳只发 ping 不重连;连续两拍收不到 pong 判死并主动重建', () => {
+    const sock = make()
+    let closed = 0
+    sock.on('close', () => (closed += 1))
+    sock.connect()
+    const ws = FakeWebSocket.instances[0]
+    ws.open()
+    // 正常对端:每拍都回 pong,连接保持
+    for (let i = 0; i < 3; i += 1) {
+      vi.advanceTimersByTime(25000)
+      ws.receive({ type: 'pong', data: {} })
+    }
+    expect(FakeWebSocket.instances.length).toBe(1)
+    expect(closed).toBe(0)
+    // 半死连接:能发不能收,两拍无回执后重建,且必须发 close 让上层切到未连接
+    vi.advanceTimersByTime(75000)
+    expect(closed).toBe(1)
+    expect(FakeWebSocket.instances.length).toBe(2)
+    expect(ws.readyState).toBe(3)
+    expect(sock.status.value).toBe(SOCKET_STATUS.CONNECTING)
+  })
+
+  it('非 pong 的下行也刷新心跳基准(收到牌局信令说明连接还活着)', () => {
+    const sock = make()
+    sock.connect()
+    const ws = FakeWebSocket.instances[0]
+    ws.open()
+    vi.advanceTimersByTime(25000)
+    ws.receive({ type: 'game-signal', data: { roomId: 1, event: 'mj:public' } })
+    vi.advanceTimersByTime(25000)
+    ws.receive({ type: 'game-signal', data: { roomId: 1, event: 'mj:public' } })
+    vi.advanceTimersByTime(25000)
+    expect(FakeWebSocket.instances.length).toBe(1)
+  })
+
   it('断开后按指数退避重连:3s → 6s → 12s,连上归零后重又从 3s 开始', () => {
     const sock = make()
     sock.connect()

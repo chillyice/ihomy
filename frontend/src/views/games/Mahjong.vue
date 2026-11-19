@@ -309,6 +309,16 @@
           </div>
         </template>
 
+        <!-- 断线浮层:牌局信令全走聊天 WebSocket,断开期间点击发不出去,明示「正在重连」 -->
+        <Transition name="game-overlay">
+          <div v-if="linkDown" class="overlay link-overlay" role="status" aria-live="polite">
+            <div class="overlay-card link-overlay-card">
+              <div class="overlay-title">{{ $t('games.mahjong.reconnecting') }}</div>
+              <div class="overlay-sub">{{ $t('games.mahjong.reconnectingHint') }}</div>
+            </div>
+          </div>
+        </Transition>
+
         <!-- 结算浮层 -->
         <Transition name="game-overlay">
           <div v-if="phase === 'ended'" class="overlay game-overlay">
@@ -361,6 +371,7 @@
 import { computed, h, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { gameApi, roomApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
@@ -501,6 +512,9 @@ const rulesLabel = computed(() => {
 let session = 0 // 会话令牌:重开/离开时旧循环自行退出
 const turnWaiters = new Map() // seat -> resolve(action)
 const claimWaiters = new Map() // seat -> resolve('claim' | 'pass')
+// seat -> 正在等待的询问(断线重连后房主据此补发,否则询问只发过一次就丢了)
+const pendingPrompts = new Map()
+let lastPublishKey = '' // 上次广播内容的指纹:同一状态不重复推
 
 const myId = computed(() => play.myId)
 const mySeat = computed(() => {
@@ -820,6 +834,8 @@ async function startGame() {
   const mySession = session
   turnWaiters.clear()
   claimWaiters.clear()
+  pendingPrompts.clear()
+  lastPublishKey = ''
   phase.value = 'playing'
   result.value = null
   guestClaim.value = null
@@ -1091,6 +1107,7 @@ function resolveClaims(fromSeat, kind, mySession) {
           if (timer) clearTimeout(timer)
           for (const seat of seats) {
             claimWaiters.delete(seat)
+            pendingPrompts.delete(seat)
             if (seat === mySeat.value) {
               localClaim.value = null
               claimChiOptions.value = []
@@ -1142,6 +1159,7 @@ function resolveClaims(fromSeat, kind, mySession) {
                 declined(seat)
               }
             })
+            pendingPrompts.set(seat, { kind: claimKind, options })
             play.send('mj:claim', { to: st.userId, seat, kind: claimKind, options })
           }
         }
@@ -1227,6 +1245,7 @@ function sendToHost(action) {
 
 function onTileClick(tile) {
   if (!canDiscardNow.value) return
+  if (blockedByLink()) return
   const action = { type: 'discard', tileId: tile.id }
   if (isGuest.value) sendToHost(action)
   else resolveSeatAction(mySeat.value, action)
@@ -1234,6 +1253,7 @@ function onTileClick(tile) {
 
 function declareSelfWin() {
   if (!canSelfWin.value) return
+  if (blockedByLink()) return
   if (isGuest.value) sendToHost({ type: 'win' })
   else resolveSeatAction(mySeat.value, { type: 'win' })
 }
@@ -1241,6 +1261,7 @@ function declareSelfWin() {
 /** 本机回合内杠(暗杠/补杠):访客发意图,房主/单机直接进主循环 */
 function declareSelfGang(opt) {
   if (!myTurn.value || !opt) return
+  if (blockedByLink()) return
   if (isGuest.value) sendToHost({ type: 'gang', kind: opt.kind, gangType: opt.type })
   else resolveSeatAction(mySeat.value, { type: 'gang', kind: opt.kind, gangType: opt.type })
 }
@@ -1248,6 +1269,7 @@ function declareSelfGang(opt) {
 /** 应答碰/杠/吃/胡询问:take=true 吃时 extra 为选中的两张组合 */
 function answerClaim(take, extra = null) {
   if (!claimPrompt.value) return
+  if (blockedByLink()) return
   const kind = claimPrompt.value
   if (isGuest.value) {
     guestClaim.value = null
@@ -1277,15 +1299,16 @@ function publicSnapshot() {
 }
 
 /** 房主广播公共盘面 + 按人下发各自手牌(其余人只看张数) */
-function publishAll() {
+function publishAll({ force = false } = {}) {
   if (!play.active || !play.isHost) return
   wallCount.value = wall.value.length
   handCounts.value = hands.value.map((h) => h.length)
-  play.send('mj:public', { state: publicSnapshot() })
+  const state = publicSnapshot()
+  const outs = []
   for (const s of seatList.value) {
     if (s.ai || !s.userId || String(s.userId) === String(play.myId)) continue
     const mine = s.seat === turn.value && phase.value === 'playing'
-    play.send('mj:hand', {
+    outs.push({
       to: s.userId,
       seat: s.seat,
       tiles: hands.value[s.seat],
@@ -1294,6 +1317,23 @@ function publishAll() {
       canGangKinds: mine ? seatGangOptions(s.seat) : [],
       myTurn: mine,
     })
+  }
+  // 同一动作常触发两次发布(提交后各自刷新):内容完全一致就别重复推,弱网下等于把 KB 翻倍。
+  // 断线重连的补发必须真发,走 force。
+  const key = JSON.stringify([state, outs])
+  if (!force && key === lastPublishKey) return
+  lastPublishKey = key
+  play.send('mj:public', { state })
+  for (const o of outs) play.send('mj:hand', o)
+}
+
+/** 重连补发:吃碰杠询问只在发起那一刻推过一次,且吃/碰/杠不限时,访客重连拿不到就双方一起卡住 */
+function replayClaims() {
+  if (!play.isHost) return
+  for (const [seat, prompt] of pendingPrompts) {
+    const st = seatList.value.find((s) => s.seat === seat)
+    if (!st || st.ai || st.auto || !st.userId) continue
+    play.send('mj:claim', { to: st.userId, seat, kind: prompt.kind, options: prompt.options })
   }
 }
 
@@ -1353,7 +1393,10 @@ function onRoomSignal(data) {
     handleGuestAuto(data)
     return
   }
-  if (data.event === 'sync' && play.isHost) publishAll()
+  if (data.event === 'sync' && play.isHost) {
+    publishAll({ force: true })
+    replayClaims()
+  }
 }
 
 /** 房主处理托管请求:席位加 auto 标记;若正等这席位操作,立即按超时交给 AI 过渡 */
@@ -1453,6 +1496,37 @@ watch(
   },
 )
 
+/** 连接状态明示:断线时棋盘上的点击都会静默失败,先挡一下再重连,别让它看起来像卡死 */
+const linkDown = ref(false)
+let linkTimer = null
+watch(
+  () => chatStore.socketStatus,
+  (status) => {
+    if (status === 'open') {
+      if (linkTimer) {
+        clearTimeout(linkTimer)
+        linkTimer = null
+      }
+      linkDown.value = false
+      return
+    }
+    if (linkTimer) return
+    // 瞬断(重拨只要几百毫秒)不闪浮层
+    linkTimer = setTimeout(() => {
+      linkTimer = null
+      linkDown.value = play.active
+    }, 800)
+  },
+  { immediate: true },
+)
+
+/** 房间局信令发不出去时给一次提示(单机局没有连接依赖,不受影响) */
+function blockedByLink() {
+  if (!play.active || chatStore.socketStatus === 'open') return false
+  ElMessage.warning(t('games.mahjong.linkLost'))
+  return true
+}
+
 // ---------- 结算 ----------
 
 function endDraw(mySession) {
@@ -1532,6 +1606,7 @@ function abortWaiters() {
   }
   turnWaiters.clear()
   claimWaiters.clear()
+  pendingPrompts.clear()
   localClaim.value = null
   guestClaim.value = null
   busyAi.value = false
@@ -1544,6 +1619,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   session += 1
   abortWaiters()
+  if (linkTimer) {
+    clearTimeout(linkTimer)
+    linkTimer = null
+  }
   sunLight?.restoreEffects()
 })
 </script>
@@ -2371,6 +2450,13 @@ html.dark .rules-chip {
   backdrop-filter: var(--overlay-blur);
   border-radius: inherit;
   z-index: 5;
+}
+/* 断线浮层压在结算浮层之下:结算是终局,重连提示不该盖住它 */
+.link-overlay {
+  z-index: 4;
+}
+.link-overlay-card {
+  padding: 18px 24px;
 }
 .overlay-card {
   display: flex;
