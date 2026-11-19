@@ -421,9 +421,17 @@ function toggleCard(card) {
 // 在轮到自己时自动打出(能大过桌面就出),打不出则整体收回(清空选中,牌落回去)。
 const pendingAuto = ref([])
 function extendSelect(ids) {
+  // 拖选 = 逐张翻转:扫过未选的选上、扫过已选的取消(批量取消选中);
+  // 触摸点按的轻微抖动也会走上这条(阈值内不打断),翻转语义正好把「点已选牌反选」一并兜住。
   // 拖选途中若电脑换手重排,扫过的旧 id 会失效,过滤到当前手牌防残留点亮别的牌
   const handIds = new Set(myHand.value.map((card) => card.id))
-  selected.value = [...new Set([...selected.value, ...ids])].filter((id) => handIds.has(id))
+  const set = new Set(selected.value)
+  for (const id of ids) {
+    if (!handIds.has(id)) continue
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+  }
+  selected.value = [...set]
 }
 function markAuto(ids) {
   const handIds = new Set(myHand.value.map((card) => card.id))
