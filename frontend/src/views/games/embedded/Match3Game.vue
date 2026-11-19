@@ -33,14 +33,33 @@
       <p>{{ $t('games.embedded.match3.aim') }}</p>
     </template>
 
-    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏记分收成棋盘左侧一列,
-         提示/重排挪到棋盘右侧(竖排两键),新游戏在外壳头部「规则」左边 -->
+    <!-- 记分:手机横屏进外壳左栏底边(芯片一行,样式与 2048 的得分/最高分同一套 .gh-chip);
+         竖屏用棋盘上方那条记分条,这一份隐藏 -->
+    <template #stats>
+      <span v-for="chip in chips" :key="chip.key" class="gh-chip">
+        <span>{{ tt(chip.key) }}</span
+        ><b>{{ chip.value }}</b>
+      </span>
+    </template>
+
+    <!-- 提示/重排:手机横屏进外壳左栏控件行;竖屏用记分条右端 -->
+    <template #actions>
+      <el-button size="small" :disabled="hintDisabled" @click="doHint">
+        {{ $t('games.embedded.match3.hint') }}
+      </el-button>
+      <el-button size="small" :disabled="shuffleDisabled" @click="doShuffle">
+        {{ $t('games.embedded.match3.shuffle') }}
+      </el-button>
+    </template>
+
+    <!-- 记分 HUD + 操作贴棋盘:与棋盘同宽排在棋盘上方;手机横屏这一条让位,
+         棋盘独占游戏区、水平居中,状态行浮在游戏区底边 -->
     <div class="m3-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="m3-meta">
         <div class="m3-stats">
-          <span v-for="chip in chips" :key="chip.key" class="m3-stat">
-            <small>{{ tt(chip.key) }}</small>
-            <b>{{ chip.value }}</b>
+          <span v-for="chip in chips" :key="chip.key" class="gh-chip">
+            <span>{{ tt(chip.key) }}</span
+            ><b>{{ chip.value }}</b>
           </span>
         </div>
         <div class="m3-actions">
@@ -1416,37 +1435,16 @@ html.dark .m3-shell {
   width: var(--m3-board-w);
   min-width: 0;
 }
+/* 记分芯片沿用 .gh-chip(与 2048 的得分/最高分同一套皮) */
 .m3-stats {
   display: flex;
   flex: 1 1 100%;
   flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
 }
-.m3-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border: 1px solid var(--color-border, #d7deee);
-  border-radius: 9px;
-  background: var(--color-card, #f5f7fd);
-  color: var(--color-text-secondary, #3a4668);
-  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.m3-stat small {
-  font-size: 10.5px;
-  font-weight: 400;
-  opacity: 0.75;
-}
-.m3-stat b {
-  color: var(--el-color-primary, #6366f1);
-}
-/* 按钮靠这条的右端(竖屏/桌面在棋盘上方那条的右端);手机横屏竖排成棋盘右侧一列 */
+/* 按钮靠这条的右端(竖屏/桌面在棋盘上方那条的右端) */
 .m3-actions {
   display: flex;
   align-items: center;
@@ -1962,74 +1960,36 @@ html.dark .m3-board :deep(.cell.c6) {
     --gap: 4px;
     --pad: 6px;
   }
-  .m3-stat {
-    padding: 3px 7px;
-    font-size: 11px;
-  }
 }
 
-/* 手机横屏:三列 —— 左列记分 + 提示行,中列棋盘,右列 提示 重排 两键(贴棋盘右侧);
-   记分与提示行本来住在 .m3-meta 里,这里 display:contents 把这一层拆掉,
-   二者的盒子直接当网格项用,竖屏那套 DOM 不动 */
+/* 外壳里的记分/操作是「第二份摆放」:竖屏与桌面用棋盘上方那条记分条,
+   外壳左栏底边那行芯片与左栏控件行只在手机横屏出现(样式在 main.css 横屏档) */
+.m3-shell :deep(.gs-stats),
+.m3-shell :deep(.gs-controls) {
+  display: none;
+}
+
+/* 手机横屏:记分搬进外壳左栏底边、提示/重排进左栏控件行,记分条整条让位;
+   棋盘独占游戏区并水平居中(棋盘尺寸只用 cqw/cqh 推,整块没有左右偏移量),
+   状态行(「没有可消除的走法…」)留在棋盘下方一条,不压棋盘 */
 @media (orientation: landscape) and (max-height: 520px) {
+  .m3-shell :deep(.gs-stats),
+  .m3-shell :deep(.gs-controls) {
+    display: flex;
+  }
   .m3-layout {
-    --m3-meta-w: 122px;
-    --m3-action-w: 54px;
-    --m3-board-w: min(100%, 560px, calc(100cqh - 16px));
-    display: grid;
-    grid-template-columns: var(--m3-meta-w) minmax(0, 1fr) var(--m3-action-w);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'stats board actions'
-      'notice board actions';
-    column-gap: 10px;
-    row-gap: 4px;
-    width: min(100%, calc(var(--m3-meta-w) + 20px + var(--m3-action-w) + var(--m3-board-w) + 16px));
-    max-height: 100%;
-  }
-  .m3-meta {
-    display: contents;
-  }
-  .m3-stats {
-    grid-area: stats;
-    align-self: start;
-    flex: 0 0 auto;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    /* 芯片只包自身内容:左列不再整栏拉满,读起来紧凑 */
-    align-items: flex-start;
-    gap: 4px;
-    width: 100%;
-  }
-  /* 横屏列里芯片压成一行:标签与数值相邻,内边距/字号跟外壳芯片同一紧凑档 */
-  .m3-stat {
-    justify-content: flex-start;
-    padding: 2px 7px;
-    font-size: 11px;
-  }
-  .m3-stat b {
-    font-size: 12px;
-  }
-  .m3-notice {
-    grid-area: notice;
-    align-self: start;
-    text-align: left;
-  }
-  /* 提示/重排:棋盘右侧竖排一列,整列贴着棋盘垂直居中 */
-  .m3-actions {
-    grid-area: actions;
-    flex-direction: column;
-    align-self: center;
-    margin-left: 0;
+    /* 方形棋盘:三限 = 上限 560 / 游戏区高(扣 16 边距 + 状态行 18 + 间距) / 游戏区宽 */
+    --m3-board-w: min(560px, calc(100cqh - 42px), calc(100cqw - 24px));
     gap: 6px;
+    justify-content: center;
   }
-  .m3-actions .el-button {
-    width: 100%;
-    margin-left: 0;
+  .m3-stats,
+  .m3-actions {
+    display: none;
   }
-  .m3-board-wrap {
-    grid-area: board;
-    align-self: center;
+  /* 只留状态行:排到棋盘下面(DOM 里记分条在棋盘之前,竖屏要的就是这个顺序) */
+  .m3-meta {
+    order: 1;
   }
 }
 </style>
