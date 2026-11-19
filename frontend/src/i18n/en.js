@@ -1082,7 +1082,7 @@ export default {
         title: 'Reversi',
         desc: 'Sandwich discs to flip them; whoever holds more at the end wins',
         tip: 'Sandwich the opponent’s discs to flip them. Black moves first.',
-        rules: 'U = undo · R = restart · tap a glowing square to place.',
+        rules: 'U = undo · R = new game · tap a glowing square to place.',
         modePve: 'vs Computer',
         modePvp: 'Two players',
         levelEasy: 'Easy',

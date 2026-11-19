@@ -2,17 +2,30 @@
      黑白棋 · 奥赛罗:夹子翻面规则 + 三档电脑(贪心/1 层/α-β 4 层),双人/人机、悔棋、U/R 快捷键;
      规则引擎与搜索逐字保留原实现,棋盘沿用原版命令式渲染(翻面动画零改动),只换外壳与 i18n。 -->
 <template>
-  <GameShell ref="shellEl" class="rv-shell" :title="$t('games.embedded.reversi.title')" body-align="center" @back="router.push('/games')">
+  <GameShell
+    ref="shellEl"
+    class="rv-shell"
+    :title="$t('games.embedded.reversi.title')"
+    body-align="center"
+    new-game
+    :new-game-disabled="newDisabled"
+    :new-game-confirm="isStarted && !isOver"
+    @new-game="startGame"
+    @back="router.push('/games')"
+  >
+    <!-- 对战模式与难度同处一行;AI 先手跟在后面 -->
     <template #titleExtra>
-      <el-select v-model="mode" class="rv-mode" :teleported="!isFullscreen" @change="onSettingChange">
-        <el-option value="pve" :label="$t('games.embedded.reversi.modePve')" />
-        <el-option value="pvp" :label="$t('games.embedded.reversi.modePvp')" />
-      </el-select>
-      <el-select v-model="level" class="rv-level" :teleported="!isFullscreen" @change="onSettingChange">
-        <el-option value="easy" :label="$t('games.embedded.reversi.levelEasy')" />
-        <el-option value="normal" :label="$t('games.embedded.reversi.levelNormal')" />
-        <el-option value="hard" :label="$t('games.embedded.reversi.levelHard')" />
-      </el-select>
+      <div class="rv-setup">
+        <el-select v-model="mode" class="rv-mode" :teleported="!isFullscreen" @change="onSettingChange">
+          <el-option value="pve" :label="$t('games.embedded.reversi.modePve')" />
+          <el-option value="pvp" :label="$t('games.embedded.reversi.modePvp')" />
+        </el-select>
+        <el-select v-model="level" class="rv-level" :teleported="!isFullscreen" @change="onSettingChange">
+          <el-option value="easy" :label="$t('games.embedded.reversi.levelEasy')" />
+          <el-option value="normal" :label="$t('games.embedded.reversi.levelNormal')" />
+          <el-option value="hard" :label="$t('games.embedded.reversi.levelHard')" />
+        </el-select>
+      </div>
       <el-checkbox v-model="aiFirst" class="rv-ai-first" @change="onSettingChange">
         {{ $t('games.embedded.reversi.aiFirst') }}
       </el-checkbox>
@@ -23,15 +36,36 @@
       <p>{{ $t('games.embedded.reversi.rules') }}</p>
     </template>
 
-    <!-- 记分 HUD + 按钮贴棋盘:与棋盘同宽排在棋盘上方;手机横屏收成棋盘左侧一列 -->
+    <!-- 手机横屏:悔棋 + 棋子数 + 计分板搬进外壳左栏底边;竖屏用棋盘上方那条 HUD,这一份隐藏 -->
+    <template #stats>
+      <div class="rv-side">
+        <div class="rv-side-score">
+          <span class="rv-side-count">
+            <span class="rv-dot black"></span>{{ $t('games.embedded.reversi.black') }}<b>{{ blackCount }}</b>
+          </span>
+          <span class="rv-side-count">
+            <span class="rv-dot white"></span>{{ $t('games.embedded.reversi.white') }}<b>{{ whiteCount }}</b>
+          </span>
+        </div>
+        <div class="rv-side-status">
+          <b :class="['rv-side-line', { over: isOver }]">{{ statusLine }}</b>
+          <span class="rv-side-sub">
+            <span class="rv-dot" :class="turnDotCls"></span> <b>{{ turnText }}</b> · {{ $t('games.embedded.reversi.moveLabel') }}
+            <b>{{ moveCountRef }}</b> · {{ $t('games.embedded.reversi.leadLabel') }} <b>{{ leadText }}</b>
+          </span>
+        </div>
+        <el-button class="rv-side-undo" size="small" round :disabled="undoDisabled" @click="undo">
+          {{ $t('games.embedded.reversi.undo') }}
+        </el-button>
+      </div>
+    </template>
+
+    <!-- 记分 HUD 贴棋盘:竖屏/桌面与棋盘同宽排在棋盘上方,手机横屏整条让位给外壳左栏底边 -->
     <div class="rv-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="rv-meta">
         <div class="rv-actions">
           <el-button size="small" round :disabled="undoDisabled" @click="undo">
             {{ $t('games.embedded.reversi.undo') }}
-          </el-button>
-          <el-button size="small" round :disabled="newDisabled" @click="startGame">
-            {{ $t('games.embedded.reversi.restart') }}
           </el-button>
         </div>
         <div class="rv-score">
@@ -46,7 +80,7 @@
           <span :class="['rv-status', { over: isOver }]">{{ statusLine }}</span>
           <span class="rv-sub">
             <span class="rv-dot" :class="turnDotCls"></span> <b>{{ turnText }}</b> · {{ $t('games.embedded.reversi.moveLabel') }}
-            <b>{{ moveCount }}</b> · {{ $t('games.embedded.reversi.leadLabel') }} <b>{{ leadText }}</b>
+            <b>{{ moveCountRef }}</b> · {{ $t('games.embedded.reversi.leadLabel') }} <b>{{ leadText }}</b>
           </span>
         </div>
       </div>
@@ -595,6 +629,12 @@ onBeforeUnmount(() => {
 html.dark .rv-shell {
   --gs-bg: linear-gradient(160deg, #122019, #1d3d2a);
 }
+.rv-setup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .rv-mode {
   width: 96px;
 }
@@ -838,47 +878,103 @@ html.dark .rv-shell {
   color: var(--color-text-secondary, #6b7280);
 }
 
-/* 手机横屏:按钮 + 记分 + 状态收成棋盘左侧一列(按钮贴棋盘一侧靠上),棋盘独占右侧 */
+/* 手机横屏左栏底边的记分板:棋子数、状态、悔棋自上而下,窄栏里也读得清 */
+.rv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-border, #d8dde3);
+  border-radius: 10px;
+}
+.rv-side-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.rv-side-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+  white-space: nowrap;
+}
+.rv-side-count b {
+  font-size: 16px;
+  line-height: 1.1;
+  color: var(--color-text-primary, #1f2328);
+  font-variant-numeric: tabular-nums;
+}
+.rv-side-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+.rv-side-line {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--el-color-primary, #388e3c);
+}
+.rv-side-line.over {
+  color: #c0392b;
+}
+.rv-side-sub {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #6b7280);
+}
+.rv-side-sub b {
+  color: var(--color-text-primary, #1f2328);
+}
+.rv-side-undo {
+  width: 100%;
+  margin-left: 0;
+}
+
+/* 外壳里的记分板是「第二份摆放」:竖屏与桌面用棋盘上方那条 HUD,
+   外壳左栏底边那块只在手机横屏出现(样式在 main.css 横屏档) */
+.rv-shell :deep(.gs-stats) {
+  display: none;
+}
+
+/* 手机横屏:HUD 整条让位,悔棋 + 棋子数 + 计分板进外壳左栏底边,棋盘独占右侧;
+   对战模式与难度同处一行(见 .rv-setup),新游戏在外壳头部「规则」左边 */
 @media (orientation: landscape) and (max-height: 520px) {
+  /* 左栏加宽一点:一行两个选择器各得一半,「人机对战」四个字才放得下 */
+  .page.game-shell.rv-shell {
+    --gs-rail-w: clamp(168px, 24%, 210px);
+  }
+  .rv-shell :deep(.gs-stats) {
+    display: flex;
+  }
+  /* 左栏窄:两个选择器各占一半,文字区才不会被挤没 */
+  .rv-setup > .el-select {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+  .rv-setup :deep(.el-select__wrapper) {
+    padding: 4px 6px;
+    gap: 2px;
+    font-size: 12px;
+  }
   .rv-layout {
-    --rv-meta-w: 132px;
     --rv-board-w: min(100%, 460px, calc((100cqh - 16px) * 0.9677));
-    display: grid;
-    grid-template-columns: var(--rv-meta-w) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'meta board';
-    column-gap: 10px;
-    width: min(100%, calc(var(--rv-meta-w) + 10px + var(--rv-board-w) + 16px));
     max-height: 100%;
+    justify-content: center;
   }
   .rv-meta {
-    grid-area: meta;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: start;
-    align-self: start;
-    width: 100%;
-    height: auto;
-    gap: 8px;
-  }
-  .rv-actions {
-    order: -1;
-    justify-content: flex-end;
-    margin-left: 0;
-  }
-  .rv-actions .el-button + .el-button {
-    margin-left: 0;
-  }
-  /* 横屏列里记分压成一行:标签靠左、数值靠右(和扫雷左列同一读法) */
-  .rv-score {
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 4px 8px;
+    display: none;
   }
   .rv-board-wrap {
-    grid-area: board;
-    align-self: center;
     max-width: 100%;
   }
 }

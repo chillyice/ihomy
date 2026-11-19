@@ -1075,7 +1075,7 @@ export default {
         title: '黑白棋',
         desc: '夹住对方的棋子就能翻面，最后棋子多的一方获胜',
         tip: '夹住对方棋子即可将其翻面,黑棋先行。',
-        rules: 'U 悔棋 · R 重开 · 点击高亮格落子。',
+        rules: 'U 悔棋 · R 新游戏 · 点击高亮格落子。',
         modePve: '人机对战',
         modePvp: '双人对战',
         levelEasy: '简单',
