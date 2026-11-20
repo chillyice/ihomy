@@ -84,21 +84,37 @@ html.game-mobile-immersive .runway-table {
 }
 
 /* 手机横屏沉浸态:航线 52 的墨绿底铺满整页——外壳底色同化成页面底色,左栏与四周留白不再露应用底色;
-   头部标题换浅色、按钮改透明描边款,贴静态页自己的 .quiet 风格 */
+   头部标题换浅色、次级按钮改白玻璃(与 main.css 的 .gs-on-dark 同一套口径)。
+   这里不用 gs-on-dark 类:深底只在「横屏矮屏」这一档出现,类名加不了媒体查询条件。
+   token 一档给头部里其它小件(复选框、标签、禁用档)取浅色值;按钮的底色与字色再显式钉一档——
+   光尘那条次级按钮规则是硬编码浅米底、暖居那条走 token 且带 !important,不钉就会被任意一边抢走。 */
 @media (orientation: landscape) and (max-height: 520px) {
   html.game-mobile-immersive .rw-shell {
     --gs-bg: #172522;
   }
+  html.game-mobile-immersive .rw-shell .gs-head {
+    --color-line: rgba(255, 255, 255, 0.14);
+    --color-card-2: rgba(255, 255, 255, 0.24);
+    --color-border: rgba(255, 255, 255, 0.24);
+    --color-text: #fff;
+    --color-text-secondary: rgba(255, 255, 255, 0.82);
+    --color-text-tertiary: rgba(255, 255, 255, 0.45);
+  }
   html.game-mobile-immersive .rw-shell .gs-title {
     color: #f4f4e7;
   }
-  html.game-mobile-immersive .rw-shell .gs-head .el-button:not(.is-link) {
-    background: transparent;
-    border-color: #40524a;
-    color: #f4f4e7;
+  html.game-mobile-immersive
+    .rw-shell
+    :is(.gs-head, .gs-controls)
+    .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+    background: rgba(255, 255, 255, 0.14) !important;
+    color: #fff !important;
   }
-  html.game-mobile-immersive .rw-shell .gs-head .el-button:not(.is-link):hover {
-    background: #30433a;
+  html.game-mobile-immersive
+    .rw-shell
+    :is(.gs-head, .gs-controls)
+    .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+    background: rgba(255, 255, 255, 0.24) !important;
   }
 }
 </style>

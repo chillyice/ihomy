@@ -39,7 +39,11 @@ h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-famil
 dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border-radius:13px;padding:22px;width:min(450px,calc(100vw - 28px))}dialog::backdrop{background:#0a1510bd}dialog h2{margin:2px 0 8px}dialog p,dialog ol{color:#d4dfd4}dialog ol{padding-left:22px}dialog li{margin:7px 0}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.dialog-actions .roll{padding:8px 17px;min-height:39px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fields label{display:grid;gap:4px}.fields select{background:#182922;color:var(--text);border:1px solid #718777;border-radius:6px;padding:8px;min-width:0}
 @media(max-width:780px){.table{grid-template-columns:1fr}.top{min-height:64px}.intro{margin:12px 0 8px}.key{margin-bottom:2px}}
 .choices{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.choices[hidden]{display:none}.choice{flex:1;border:1px solid #839688;border-radius:6px;background:#273e33;color:var(--text);padding:6px;font:700 12px var(--body)}.choice:hover{background:#405b4b}.choice:disabled{opacity:.6}
-@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
+@media(max-width:470px){.top-actions{gap:5px}.quiet{padding:6px 9px}h1{font-size:20px}.brand{gap:7px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
+/* 回合卡钉底只留给「单列堆叠」的窄屏:横屏两栏(≥5/4)本来就有右侧回合栏,卡片再钉在底边会
+   横跨整个宽度压住棋盘左下角(停机坪那块)——窄横屏 iframe 468×344 实测重叠 25px,
+   右栏还空着。两栏档让卡片留在右栏里,和桌面/横屏一个位置。 */
+@media(max-width:470px) and (max-aspect-ratio:5/4){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 body.in-immersive .shell{padding-top:54px}
 /* 手机沉浸态:外壳左栏已提供规则/新游戏,页面顶部这组重复按钮撤掉(竖屏/横屏都撤,桌面不受影响) */
@@ -119,24 +123,28 @@ const TEAMS = [
 const N = 52, GOAL = 57, HANGAR = -1, CIRCUIT_LAST = 50, R0 = 51;
 const STORE = 'runway52.table.v1';
 const mod = (i,n=N) => (i%n+n)%n;
-/* 主环格位:整环相对停机坪逆时针转过 6 格(41.5°)——第一步(进环 D1)连同其外侧的起飞区
-   从停机坪顺时针侧翻到逆时针侧,二者依旧径向相邻(起飞区贴第一步外侧的相对关系不变);
+/* 主环格位:整环相对停机坪逆时针转过 5 格(34.6°)——第一步(进环 D1)连同其外侧的起飞区
+   从停机坪顺时针侧翻到逆时针侧;转过 6 格时 ★ 离停机坪板边还空着约 59(差不多两格),
+   再顺时针回退 1 格后 ★ 离板边约 30,与它离第一步的 31 相近,板旁不再甩出一大截空当。
    归航跑道口 A1 随环离开停机坪角,四条跑道线整体跟着转。引擎索引/时序不受影响,
    只有「格心画在哪」变了。 */
 const point = (i,r=244) => {
- const a = (-135+mod(i-6)*360/N)*Math.PI/180;
+ const a = (-135+mod(i-5)*360/N)*Math.PI/180;
  return [350+r*Math.cos(a),350+r*Math.sin(a)];
 };
 /* 进环格序(格名 A1B1C1D1 四色循环×13 组):进度 1..50 依次落在 13C+3 .. 13C——
    起飞走一步到上一家色的 D1,自家色 A1(本色)是归航跑道口;进度 51 起转入归航跑道
-   (整环逆时针转 6 格后,A1 不再压在停机坪角上,四条跑道口随环前移) */
+   (整环旋转后,A1 不再压在停机坪角上,四条跑道口随环前移) */
 const publicIndex = (color,progress) => mod(13*color+2+progress);
 const isPublic = p => p>=1&&p<=CIRCUIT_LAST;
 /* 起飞区:不在主环上,压在进环第一格 D1 的正外侧(环外 275 半径),与第一步只隔一圈间距;
-   整环逆时针转 6 格后,D1 连同本起飞区落在停机坪的逆时针侧 */
+   整环绕到停机坪逆时针侧后,D1 连同本起飞区落在板边外侧约一格处 */
 const takeoffSpot = color => point(color*13+3,275);
+/* 停机坪机位:2×2 落在「色名分割线」与「HANGAR 编号」之间的空档正中——
+   原先把这两行之间的空档落在偏下的位置,四架飞机贴到编号上、上面却空一条,
+   看着像整摞机位往下错了一截;上提 7 后上下各留一条同宽的边。 */
 const stand = (color,p) => {
- const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
+ const t=TEAMS[color];return [t.x+48+p%2*45,t.y+58+Math.floor(p/2)*39];
 };
 function coords(color,progress,piece) {
  if(progress===HANGAR) return stand(color,piece);
