@@ -597,11 +597,12 @@ onBeforeUnmount(() => {
   --ms-cell-max: 26px;
 }
 
-/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip) */
+/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip);
+   三个读数一行、各占等分宽度(不放圆角小方卡) */
 .ms-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   height: var(--gs-control-h);
   min-width: 0;

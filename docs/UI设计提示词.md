@@ -1012,7 +1012,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
    - 芯片块宽 = 左栏宽 = 按钮宽,**形状上必须与按钮区分**:芯片是**纯文字**(无描边、无底色、无圆角,`justify-content:space-between` 标签左、数值右),按钮是全宽圆角实底;别再给芯片加圆角小方卡;
    - 芯片保持单行「标签 · 数值」(标签 10.5px、数值 `b` 12px);`#stats` 里放图标键时给 `min-width: var(--gs-control-h)`,否则两列把它压成细条;
    - 泡泡龙这类自带芯片行的页面同口径(它自己的 `.bb-chip` 在横屏档同样两列 + 去框);
-   - 竖屏/平板/电脑仍是「数据条横在棋盘上方」,芯片恢复基础 `.gh-chip` 样式。
+   - 竖屏/平板/电脑仍是「数据条横在棋盘上方」,**芯片读法与左栏同一套纯文字**(基础 `.gh-chip` 就是无框:标签左、数值右);数据条**强行一行不换行**(`flex-wrap:nowrap`),每块 `flex:1 1 0` 等分整条宽度,放不下只让标签省略号收窄(数值与单位永不截断),`≤480px` 字号降一档(标签 11px / 数值 12px);只有一项读数的条(数独用时)不参与等分(`flex:0 1 auto`,贴左);牌桌类数据条上限 760px 居中,免得宽屏把「标签 · 数值」拉成两头。
+
 6d. **深色底板**:页根挂 `.gs-on-dark`,`main.css` 覆盖 `--gs-*` 令牌(白玻璃 / 白字 / 浅描边),深色游戏(象棋、黑白棋、泡泡龙、平面麻将、立体麻将)只挂类不写色;要让底色铺满整页就挂页面类(如 `mj-live`)把桌毡铺到页根——**CSS 变量只向下继承**,令牌放在游戏区里头部读不到。
 7. **公共能力入壳,页面不再各写一份**:返回/标题/规则弹窗/全屏/宽屏/手柄标签(`useGamepad`→`gamepadConnected`)/一屏适配(`useGameView` with `fit`)/触摸守卫(`.game-surface`)/`--room-bar-h` 口径。页面可传 `fit:false` 与 `readable` 自行管高度(牌桌类),但头部与控件行仍走外壳。
 8. **迁移与本地化**:**18 个游戏舞台页已全部迁完 GameShell(V13.8–V13.16)**,`GameHeader.vue` 归零引用(待删);`/games/embed/*` 的单文件开源游戏(象棋/黑白棋/消消乐/泡泡龙/小恐龙)本地化为 `views/games/embedded/<Name>Game.vue` —— 原 `h1`→`title`、`.toolbar`→`settings`+`actions`、`.tip`→`rules`、原 `<style>` 加 scoped 且 `body{}` 规则迁到组件根类、`document`/`window` 监听收进 `onMounted/onBeforeUnmount`、canvas 尺寸改读 `--gs-h`,**玩法逻辑逐字保留**;wasm 弹球继续 iframe(`WebGame.vue`)。文件头保留 `Based on litegame-hub (MIT © 2026 DongGuoTao), localized as a Vue component`。**新增一款游戏 = 优先本地化成组件 + 进外壳**,wasm 类不可自研的才放整包静态目录。

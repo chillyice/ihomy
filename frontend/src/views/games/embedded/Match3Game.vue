@@ -1418,11 +1418,11 @@ html.dark .m3-shell {
   width: var(--m3-board-w);
   min-width: 0;
 }
-/* 记分芯片沿用 .gh-chip(与 2048 的得分/最高分同一套皮) */
+/* 记分芯片沿用 .gh-chip(与 2048 的得分/最高分同一套皮,纯文字、等分一行) */
 .m3-stats {
   display: flex;
   flex: 1 1 100%;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   min-width: 0;

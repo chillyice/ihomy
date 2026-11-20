@@ -599,11 +599,12 @@ onBeforeUnmount(() => {
 .bf-shell:fullscreen .bf-layout {
   width: min(calc(100% - 16px), calc(100cqh - var(--bf-meta-h) - 16px), 900px);
 }
-/* 分数/最高分:固定一条控制行高,点一下出分享图(芯片样式沿用 .gh-chip) */
+/* 分数/最高分:固定一条控制行高,点一下出分享图(芯片样式沿用 .gh-chip);
+   两个读数一行、各占一半宽度,不放圆角小方卡 */
 .bf-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   height: var(--gs-control-h);
   min-width: 0;

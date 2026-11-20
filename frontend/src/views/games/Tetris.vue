@@ -466,11 +466,12 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
 }
-/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip) */
+/* 数据芯片:固定一条控制行高,与棋盘同宽左对齐(芯片样式沿用 .gh-chip);
+   四个读数一行、各占等分宽度(不放圆角小方卡) */
 .tt-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   width: min(100%, calc(var(--tt-board-w) + var(--tt-side-w) + 30px));
   height: var(--gs-control-h);

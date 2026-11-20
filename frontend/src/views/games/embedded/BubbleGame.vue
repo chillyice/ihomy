@@ -728,7 +728,6 @@ onBeforeUnmount(() => {
   --bb-line: #2c3358;
   --bb-muted: #9aa3c7;
   --bb-ink: #eef1ff;
-  --bb-chip-bg: rgba(17, 21, 46, 0.9);
   --bb-chip-ink: #b9c4ff;
   --gs-accent: #7c9cff;
   --gs-bg: radial-gradient(120% 120% at 50% 0%, #1b2148 0%, #0f1226 60%);
@@ -767,6 +766,8 @@ html.dark .bb-shell {
   gap: 6px;
   min-width: 0;
 }
+/* 计分芯片:一行「标签左 · 数值右」的纯文字(无描边、无底色、无圆角,与上方按钮区分),
+   四块等分画布宽度;窄屏放不下时只收窄标签,数值永远完整 */
 .bb-chip {
   flex: 1 1 0;
   min-width: 0;
@@ -774,28 +775,20 @@ html.dark .bb-shell {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding: 3px 8px;
-  background: var(--bb-chip-bg);
-  border: 1px solid var(--bb-line);
-  border-radius: 8px;
   font-size: 11px;
   color: var(--bb-chip-ink);
   white-space: nowrap;
 }
+.bb-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bb-chip b {
+  flex: 0 0 auto;
   font-size: 13px;
   color: #fff;
   font-variant-numeric: tabular-nums;
-}
-/* 窄屏竖屏:四个芯片挤一行会溢出(分数会长到 5~6 位),改 2×2;竖屏这里高度本来就有余量 */
-@media (max-width: 420px) and (orientation: portrait) {
-  .bb-layout {
-    --bb-cv-w: min(100%, 440px, calc((100cqh - 78px) * 0.676667));
-  }
-  .bb-chips {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 /* 画布外框:原版深蓝面板 */
@@ -883,8 +876,7 @@ html.dark .bb-shell {
     gap: 8px;
   }
   /* 两列:每块占半栏,标签靠左、数值贴右;内容(min-width:max-content)放不进
-     半栏的那一块自己撑成整行,退回一列,不压缩文字。
-     芯片只留文字,去掉圆角小方卡(与外排按钮区分) */
+     半栏的那一块自己撑成整行,退回一列,不压缩文字(其余档的行内两/四块同理) */
   .bb-chips {
     flex: 1 1 auto;
     flex-direction: row;
@@ -904,9 +896,6 @@ html.dark .bb-shell {
     min-height: 24px;
     padding: 0 2px;
     gap: 4px;
-    border: 0;
-    border-radius: 0;
-    background: none;
     font-size: 10.5px;
   }
   .bb-chip b {

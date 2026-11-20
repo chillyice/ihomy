@@ -46,29 +46,39 @@
   width: 100%;
   gap: 8px 14px;
 }
+/* 数据条:读数一行排开、各占等分宽度(与外壳数据芯片同一读法);
+   宽度上限与 2048 的棋盘框同档,免得桌面宽屏把「标签 · 数值」拉成两头 */
 .sol-stats {
   display: flex;
+  flex: 1 1 100%;
   justify-content: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
 }
+/* 芯片是纯文字:没有描边、没有底色、没有圆角,标签靠左、数值贴右 */
 .sol-stat {
   display: flex;
+  flex: 1 1 0;
   flex-direction: row;
   align-items: baseline;
+  justify-content: space-between;
   gap: 4px;
   min-width: 0;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
   white-space: nowrap;
 }
 .sol-stat-label {
+  min-width: 0;
+  overflow: hidden;
   font-size: 10px;
   color: var(--color-text-secondary, #8a8a8a);
   letter-spacing: 1px;
+  text-overflow: ellipsis;
 }
 .sol-stat-value {
+  flex: 0 0 auto;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -494,9 +504,6 @@ body.card-dragging .sol-cardface {
   margin-top: 4px;
 }
 
-html.dark .sol-stat {
-  background: rgba(255, 255, 255, 0.08);
-}
 html.dark .sol-cardface {
   background: #f3f1ea;
 }
@@ -508,8 +515,9 @@ html.dark .sol-overlay {
 }
 
 @media (max-width: 560px) {
-  .sol-stat {
-    padding: 2px 6px;
+  .sol-stat-label {
+    font-size: 9px;
+    letter-spacing: 0;
   }
   .sol-felt {
     padding: 6px;

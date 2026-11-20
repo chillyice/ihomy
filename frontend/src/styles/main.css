@@ -460,34 +460,44 @@ html.theme-warm .gc-pin .fp-topbar {
   justify-content: flex-end;
   margin-left: auto;
 }
+/* 数据芯片:一行「标签左 · 数值右」的纯文字,没有描边、没有底色、也没有圆角 ——
+   圆角小方卡会和旁边的按钮/选择框混成一片,棋盘上方那一条也更吵。
+   芯片在数据条里等分宽度(flex:1 1 0),多个读数各占一份,与手机横屏左栏底边那条同一读法。 */
 .gh-chip {
   display: inline-flex;
+  flex: 1 1 0;
   align-items: baseline;
+  justify-content: space-between;
   gap: 5px;
-  padding: 3px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: rgba(var(--color-brand-rgb), 0.06);
+  min-width: 0;
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
   white-space: nowrap;
 }
+/* 一行放不下时只让标签收窄(数值与单位永远完整显示) */
+.gh-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .gh-chip b {
+  flex: 0 0 auto;
   font-size: 13px;
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
-/* 可点击芯片(如 2048 的分数/最高分):点一下生成分享图 */
+/* 可点击芯片(如 2048 的分数/最高分):点一下生成分享图(纯文字只能靠字色给反馈) */
 .gh-chip.is-shareable {
   cursor: pointer;
   transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
+    color 0.18s ease,
     transform 0.12s ease;
 }
 .gh-chip.is-shareable:hover {
-  border-color: rgba(var(--color-brand-rgb), 0.55);
-  background: rgba(var(--color-brand-rgb), 0.12);
+  color: var(--color-text);
+}
+.gh-chip.is-shareable:hover b {
+  color: var(--color-brand);
 }
 .gh-chip.is-shareable:active {
   transform: scale(0.97);
@@ -495,6 +505,17 @@ html.theme-warm .gc-pin .fp-topbar {
 .gh-chip.is-shareable:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
+}
+/* 窄屏(手机竖屏):读数动辄四五个挤一行,字号与间距收一档,标签才不至于被压成「目…」;
+   手机横屏档在后面另外降到 10.5px,档位不冲突 */
+@media (max-width: 480px) {
+  .gh-chip {
+    gap: 4px;
+    font-size: 11px;
+  }
+  .gh-chip b {
+    font-size: 12px;
+  }
 }
 .gh-rules-panel {
   padding: 8px 16px 12px;
@@ -716,10 +737,12 @@ html.theme-warm .page.game-shell {
   gap: var(--gs-gap);
   min-width: 0;
 }
+/* 数据行:多个读数强行排成一行、各占等分宽度(芯片 flex:1 1 0),
+   手机横屏档再改回两列换行(见下面的横屏段) */
 .gs-stats {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   min-width: 0;
 }
@@ -760,7 +783,6 @@ html.theme-warm .page.game-shell {
 .page.game-shell .gs-stats .gh-chip {
   align-items: center;
   height: var(--gs-control-h);
-  padding-block: 0;
 }
 .gs-controls .el-select {
   width: auto;

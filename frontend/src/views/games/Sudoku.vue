@@ -1591,6 +1591,10 @@ onBeforeUnmount(() => {
   height: var(--gs-control-h);
   min-width: 0;
 }
+/* 这条上只有一项读数,不参与等分:标签与用时贴在一起,撤销留在右端 */
+.sd-meta .gh-chip {
+  flex: 0 1 auto;
+}
 /* 撤销/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会按容器查询挪到用时上面 */
 .sd-meta-actions {
   display: flex;
