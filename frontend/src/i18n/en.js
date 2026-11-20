@@ -2409,6 +2409,9 @@ export default {
       resize: 'Drag to resize the contacts column',
       backFamily: 'Back to family',
     },
+    sheet: {
+      resize: 'Drag up to enlarge the chat window',
+    },
     dm: {
       fallbackTitle: 'Chat ({id})',
     },

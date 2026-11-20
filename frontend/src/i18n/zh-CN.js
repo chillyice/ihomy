@@ -2391,6 +2391,9 @@ export default {
       resize: '拖动调整对象列宽度',
       backFamily: '回家庭房',
     },
+    sheet: {
+      resize: '往上拖放大聊天窗口',
+    },
     dm: {
       fallbackTitle: '私聊({id})',
     },

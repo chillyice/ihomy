@@ -5,8 +5,18 @@
 <template>
   <template v-if="show">
     <template v-if="expanded">
-      <!-- 移动端:半屏抽屉 -->
-      <div v-if="isMobile" class="chat-float-sheet">
+      <!-- 移动端:半屏抽屉(顶部把手可上下拖动改高度,往上拖即放大聊天框) -->
+      <div v-if="isMobile" ref="sheetEl" class="chat-float-sheet">
+        <div
+          class="sheet-grip"
+          role="separator"
+          aria-orientation="horizontal"
+          :aria-label="$t('chat.sheet.resize')"
+          :title="$t('chat.sheet.resize')"
+          @pointerdown="onSheetGripDown"
+        >
+          <span class="sheet-grip-bar" aria-hidden="true"></span>
+        </div>
         <div class="sheet-head">
           <span class="sheet-title">{{ $t('chat.title') }}</span>
           <el-button text circle size="small" @click="collapse">
@@ -79,12 +89,14 @@ import { useChatStore } from '@/stores/chat'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useDragResize } from '@/utils/useDragResize'
+import { haptic } from '@/utils/haptics'
 import { useFloatDelete, FLOAT_DELETE_ZONE } from '@/composables/useFloatDelete'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const FLOAT_POS_KEY = 'ihomy:chat:float:v1'
 const PANEL_POS_KEY = 'ihomy:chat:panel:v1'
+const SHEET_H_KEY = 'ihomy:chat:sheet:v1'
 const BALL_SIZE = 48
 const PANEL_W = 360
 const PANEL_H = 520
@@ -134,6 +146,65 @@ const panelStyle = computed(() => ({
   height: `${panelSize.value.h}px`,
   zIndex: 'var(--z-float)',
 }))
+
+// ---------- 手机端抽屉高度:顶部把手往上拖即放大聊天框 ----------
+// 抽屉高度和内容页下边距共用 html 上的 --chat-sheet-h(main.css),自定义值以 px 覆盖它;
+// null = 用 CSS 默认 52dvh,用户没拖过就不写死任何尺寸。
+const sheetEl = ref(null)
+const sheetH = ref(null)
+try {
+  const saved = Math.round(Number(localStorage.getItem(SHEET_H_KEY)))
+  if (Number.isFinite(saved) && saved >= 200) sheetH.value = saved
+} catch {}
+const SHEET_MIN_H = 240
+const SHEET_TOP_GAP = 8
+const applySheetH = () => {
+  if (typeof document === 'undefined') return
+  const h = sheetActive.value ? sheetH.value : null
+  if (h == null) document.documentElement.style.removeProperty('--chat-sheet-h')
+  else document.documentElement.style.setProperty('--chat-sheet-h', `${h}px`)
+}
+/** 拖拽的高度上限:CSS max-height 已按视口与刘海算好,取解析后的像素值(算不出来再退回视口高度) */
+const sheetCapH = () => {
+  const el = sheetEl.value
+  const cap = el ? parseFloat(getComputedStyle(el).maxHeight) : NaN
+  if (Number.isFinite(cap)) return Math.max(SHEET_MIN_H, Math.round(cap))
+  return Math.max(SHEET_MIN_H, (window.innerHeight || 0) - SHEET_TOP_GAP)
+}
+let sheetDrag = null
+const detachSheetDrag = () => {
+  window.removeEventListener('pointermove', onSheetMove)
+  window.removeEventListener('pointerup', onSheetEnd)
+  window.removeEventListener('pointercancel', onSheetEnd)
+  sheetDrag = null
+}
+const onSheetMove = (e) => {
+  if (!sheetDrag || e.pointerId !== sheetDrag.id) return
+  sheetDrag.moved = true
+  // 往上拖(dy 为负)→ 更高;夹在 [最小高度, 上限] 之间(上限在按下时定死,拖动中不再抖动)
+  const next = sheetDrag.h + (sheetDrag.y - e.clientY)
+  sheetH.value = Math.round(Math.max(SHEET_MIN_H, Math.min(next, sheetDrag.cap)))
+}
+const onSheetEnd = (e) => {
+  if (!sheetDrag || e.pointerId !== sheetDrag.id) return
+  const moved = sheetDrag.moved
+  detachSheetDrag()
+  if (!moved || sheetH.value == null) return
+  try {
+    localStorage.setItem(SHEET_H_KEY, String(sheetH.value))
+  } catch {}
+  haptic('tap')
+}
+const onSheetGripDown = (e) => {
+  if (e.isPrimary === false || e.button !== 0) return
+  const h = sheetEl.value?.getBoundingClientRect().height
+  if (!h) return
+  sheetDrag = { id: e.pointerId, y: e.clientY, h, cap: sheetCapH(), moved: false }
+  window.addEventListener('pointermove', onSheetMove)
+  window.addEventListener('pointerup', onSheetEnd)
+  window.addEventListener('pointercancel', onSheetEnd)
+  e.preventDefault()
+}
 
 // 松手时记录拖动状态，拦住随拖动产生的 click，同时保留键盘激活。
 let ignoreBallClick = false
@@ -302,16 +373,23 @@ watch(
   (v) => {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('chat-sheet-open', v)
+    applySheetH()
   },
   { immediate: true },
 )
+// 拖动中实时改高度(内容页下边距同源跟着变)
+watch(sheetH, applySheetH)
 
 // 卸载兜底:拖动中被隐藏/路由切走时不残留窗口级监听与删除条
 onBeforeUnmount(() => {
   detachTrack?.()
+  detachSheetDrag()
   dockCancel()
   if (notifyTimer) clearTimeout(notifyTimer)
-  if (typeof document !== 'undefined') document.documentElement.classList.remove('chat-sheet-open')
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.remove('chat-sheet-open')
+    document.documentElement.style.removeProperty('--chat-sheet-h')
+  }
 })
 </script>
 
@@ -442,6 +520,9 @@ onBeforeUnmount(() => {
   right: 0;
   bottom: 0;
   height: var(--chat-sheet-h, 52vh);
+  /* 拖到最高时兜底:顶边不顶出屏幕、不压状态栏(safe-area 在刘海屏上还要再让一截) */
+  max-height: calc(100vh - 8px);
+  max-height: calc(100dvh - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - 8px);
   display: flex;
   flex-direction: column;
   background: var(--color-card);
@@ -450,11 +531,33 @@ onBeforeUnmount(() => {
   z-index: var(--z-float);
   padding: 0 12px 8px;
 }
+/* 顶部把手:一条短横,往上拖放大聊天框(热区撑满抽屉宽,触屏拖拽不吃页面滚动) */
+.sheet-grip {
+  flex: none;
+  margin: 0 -12px;
+  padding: 8px 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none; /* 拖拽把手 */
+}
+.sheet-grip-bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+  transition: background var(--dur-fast) ease;
+}
+.sheet-grip:hover .sheet-grip-bar,
+.sheet-grip:active .sheet-grip-bar {
+  background: var(--color-brand-text);
+}
 .sheet-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 4px 6px;
+  padding: 2px 4px 6px;
   flex-shrink: 0;
 }
 .sheet-title {
