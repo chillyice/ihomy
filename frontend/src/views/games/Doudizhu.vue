@@ -1,6 +1,8 @@
-<!-- 斗地主:单机三人局(玩家 + 两位电脑)。叫分抢地主、常见牌型判定与电脑选牌都在
-     utils/games/doudizhu.js(纯函数,单测覆盖);本页只做发牌、叫分、回合驱动与结算展示。
-     赢下对局走统一 H5 奖励通道(按天限次)。 -->
+<!-- 斗地主:三人局(玩家 + 两位电脑,「一起玩」房间里换成真人/AI 混坐)。
+     叫分抢地主、常见牌型判定与电脑选牌都在 utils/games/doudizhu.js(纯函数,单测覆盖);
+     本页只做发牌、叫分、回合驱动与结算展示。房间局房主是唯一裁判:
+     公共盘面走 dz:public、各家手牌点对点走 dz:hand、访客意图走 dz:act(见 composables/useCardRoomPlay)。
+     赢下对局走统一 H5 奖励通道(按天限次);房间局不发单机奖励,按席位成绩结算。 -->
 <template>
   <GameShell
     ref="shellEl"
@@ -8,7 +10,9 @@
     :title="$t('games.doudizhu.title')"
     body-align="stretch"
     readable
-    :new-game="phase === 'playing' || phase === 'bid'"
+    :room-mode="play.active"
+    :default-wide="play.active"
+    :new-game="!play.active && (phase === 'playing' || phase === 'bid')"
     :new-game-confirm="true"
     @back="goBack"
     @new-game="startGame"
@@ -26,12 +30,14 @@
     <div class="fight-card">
       <FightTable
         :seats="seatViews"
+        :my-seat="tableSeat"
+        :spectator="room.watching"
         :hand="myHand"
         :selected="selected"
         :last-play="lastPlayView"
         :status-text="statusText"
         :info-chips="infoChips"
-        :my-name="$t('games.fight.me')"
+        :my-name="seatName(mySeat)"
         :my-role-label="myRoleLabel"
         :my-tone="myTone"
         :my-note="myNote"
@@ -41,8 +47,8 @@
         @auto-select="markAuto"
       >
         <template #actions>
-          <template v-if="phase === 'bid' && bidTurn === 0">
-            <el-button size="small" round @click="bid(0, 0)">{{ $t('games.doudizhu.bidPass') }}</el-button>
+          <template v-if="phase === 'bid' && isMyBidTurn">
+            <el-button size="small" round @click="bidAction(0)">{{ $t('games.doudizhu.bidPass') }}</el-button>
             <el-button
               v-for="v in [1, 2, 3]"
               :key="v"
@@ -50,13 +56,13 @@
               round
               :type="v === 3 ? 'primary' : 'default'"
               :disabled="v <= highestBid"
-              @click="bid(0, v)"
+              @click="bidAction(v)"
             >
               {{ $t('games.doudizhu.bidN', { n: v }) }}
             </el-button>
           </template>
           <template v-else-if="phase === 'playing'">
-            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passTurn()">
+            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passAction">
               {{ $t('games.fight.pass') }}
             </el-button>
             <el-button size="small" round :disabled="!myTurn" @click="hint">{{ $t('games.fight.hint') }}</el-button>
@@ -64,6 +70,9 @@
               {{ $t('games.fight.play') }}
             </el-button>
           </template>
+          <el-button v-if="play.active && room.seated" size="small" round :type="room.autoOn ? 'primary' : 'default'" @click="toggleAuto">
+            {{ room.autoOn ? $t('games.room.autoOff') : $t('games.room.autoOn') }}
+          </el-button>
         </template>
 
         <template #center-extra>
@@ -82,12 +91,19 @@
                 <div v-if="phase === 'ended'" class="fight-overlay-meta">{{ resultMeta }}</div>
                 <div v-if="rewardMsg" class="fight-overlay-reward">{{ rewardMsg }}</div>
                 <div class="fight-overlay-actions">
-                  <el-button type="primary" size="small" round @click="startGame">
-                    {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
-                  </el-button>
-                  <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
-                    {{ $t('games.back') }}
-                  </el-button>
+                  <template v-if="play.active">
+                    <el-button type="primary" size="small" round @click="onResultAction">
+                      {{ $t('games.room.backRoom') }}
+                    </el-button>
+                  </template>
+                  <template v-else>
+                    <el-button type="primary" size="small" round @click="startGame">
+                      {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
+                    </el-button>
+                    <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
+                      {{ $t('games.back') }}
+                    </el-button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -99,16 +115,22 @@
 </template>
 
 <script setup>
-// 回合驱动:玩家固定 0 号座,两位电脑由 setTimeout 依次行动;每次重开/离开把 session +1,
-// 旧定时器醒来发现令牌变了就自行退出,避免切页后还在改状态。
+// 回合驱动:裁判端(单机 = 本机,房间 = 房主)推牌局;电脑/托管席位按 AI 延迟出牌,
+// 真人席位等点击(房间局 35s 不来由电脑代打)。每次重开/离开把 session +1,
+// 旧定时器/旧等待醒来发现令牌变了就自行退出,避免切页后还在改状态。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import FightTable from '@/components/games/FightTable.vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { gameApi } from '@/api'
+import { useChatStore } from '@/stores/chat'
+import { useRoomChatStore } from '@/stores/roomChat'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
+import { CARD_ACT_TIMEOUT, useCardRoomPlay } from '@/composables/useCardRoomPlay'
 import { cardRankText } from '@/utils/games/cardCore'
 import { DDZ_COMBO, dzAiBid, dzAiChoose, dzBeats, dzBidStrength, dzCombo, dzDeal, dzPlays, dzValue } from '@/utils/games/doudizhu'
+import { seededRng } from '@/utils/games/seededRng'
 
 const SEATS = 3
 const AI_DELAY = 760
@@ -116,9 +138,11 @@ const BID_DELAY = 620
 
 const router = useRouter()
 const { t } = useI18n()
+const chatStore = useChatStore()
+const roomChat = useRoomChatStore()
 
 const shellEl = ref(null)
-const goBack = () => router.push('/games')
+const goBack = () => play.exitToLobby({ aiGame: true })
 
 const phase = ref('idle') // idle | bid | playing | ended
 const hands = ref([[], [], []])
@@ -136,6 +160,8 @@ const bidsLeft = ref(0)
 const bidLog = ref([])
 const finishOrder = ref([])
 const result = ref('')
+/** 房间局:地主方是否赢(公共事实,各端据此算自己的胜负与交卷分;result 是各人视角) */
+const winnerIsLandlord = ref(false)
 const rewardMsg = ref('')
 const springLabel = ref('')
 const playCounts = ref([0, 0, 0])
@@ -144,9 +170,32 @@ const bubbles = ref(['', '', ''])
 let session = 0
 let aiTimer = null
 
-const myHand = computed(() => hands.value[0])
-const handCounts = computed(() => hands.value.map((hand) => hand.length))
-const myTurn = computed(() => phase.value === 'playing' && turn.value === 0)
+// ---------- 「一起玩」房间(?room=<id>) ----------
+
+// 房间层要挂在 useGameRoomPlay 的信令回调上,先声明再赋值(回调只在挂载后才会到)
+let room = null
+const play = useGameRoomPlay({ onSignal: (data) => room && room.onSignal(data) })
+room = useCardRoomPlay(play, {
+  seatCount: SEATS,
+  prefix: 'dz',
+  getHand: (seat) => hands.value[seat] || [],
+  snapshot,
+  applyPublic,
+  handPayload: (seat) => ({ tiles: hands.value[seat] || [] }),
+  applyHand,
+})
+
+/** 我的座位:单机固定 0 号位,房间里按成员加入顺序 */
+const mySeat = computed(() => (play.active ? room.mySeat : 0))
+const tableSeat = computed(() => Math.max(0, mySeat.value))
+/** 这一席位由电脑代打(空位 / 托管):AI 延迟出牌,不等点击 */
+const isAiSeat = (seat) => (play.active ? room.isAiSeat(seat) : seat !== mySeat.value)
+
+const myHand = computed(() => hands.value[mySeat.value] || [])
+const localCounts = computed(() => hands.value.map((hand) => hand.length))
+const handCounts = computed(() => (play.active ? room.counts : localCounts.value))
+const myTurn = computed(() => phase.value === 'playing' && turn.value === mySeat.value && !room.autoOn && !play.isSpectator)
+const isMyBidTurn = computed(() => phase.value === 'bid' && bidTurn.value === mySeat.value && !room.autoOn && !play.isSpectator)
 const lastCombo = computed(() => last.value?.combo || null)
 const selectedCards = computed(() => {
   const ids = new Set(selected.value)
@@ -154,29 +203,50 @@ const selectedCards = computed(() => {
 })
 const selection = computed(() => (selected.value.length ? dzCombo(selectedCards.value) : null))
 const canPlay = computed(() => myTurn.value && !!selection.value && dzBeats(selection.value, lastCombo.value))
-const isLandlord = computed(() => landlord.value === 0)
-const myRoleLabel = computed(() => roleOf(0))
-const myTone = computed(() => (landlord.value < 0 ? '' : toneOf(0)))
+const isLandlord = computed(() => landlord.value === mySeat.value)
+const myRoleLabel = computed(() => roleOf(mySeat.value))
+const myTone = computed(() => (landlord.value < 0 ? '' : toneOf(mySeat.value)))
 
-const seatName = (seat) => (seat === 0 ? t('games.fight.me') : t('games.fight.aiName', { n: seat }))
+const seatName = (seat) => {
+  const st = play.active ? room.seatAt(seat) : null
+  if (st?.userId != null && st.name) return st.name
+  if (seat === mySeat.value) return t('games.fight.me')
+  return t('games.fight.aiName', { n: seat })
+}
+const roomBubble = (seat) => {
+  if (!play.active) return bubbles.value[seat] || ''
+  const st = room.seatAt(seat)
+  return st?.userId != null ? roomChat.bubbleOf(play.room?.id, st.userId) : ''
+}
 const toneOf = (seat) => (seat === landlord.value ? 'landlord' : 'farmer')
 const roleOf = (seat) => {
   if (landlord.value < 0) return ''
   return seat === landlord.value ? t('games.doudizhu.landlord') : t('games.doudizhu.farmer')
 }
 const comboLabel = (combo) => (combo ? t(`games.doudizhu.combo.${combo.type}`) : '')
+/** 席位分数只在牌局结束后有意义:胜方记倍数分,负方 0(与上报交卷同口径) */
+const seatScore = (seat) => {
+  if (!play.active || phase.value !== 'ended') return 0
+  return (seat === landlord.value) === winnerIsLandlord.value ? multiplier.value * 10 : 0
+}
 
 const seatViews = computed(() =>
-  hands.value.map((hand, seat) => ({
-    name: seatName(seat),
-    count: hand.length,
-    active: phase.value === 'bid' ? bidTurn.value === seat : phase.value === 'playing' && turn.value === seat,
-    finished: finishOrder.value.includes(seat),
-    roleLabel: roleOf(seat),
-    tone: toneOf(seat),
-    finishedLabel: finishOrder.value.includes(seat) ? t('games.fight.out') : '',
-    bubble: bubbles.value[seat] || '',
-  })),
+  Array.from({ length: SEATS }, (_, seat) => {
+    const st = play.active ? room.seatAt(seat) : null
+    return {
+      name: seatName(seat),
+      avatar: st?.avatar || '',
+      count: handCounts.value[seat] || 0,
+      score: seatScore(seat),
+      auto: !!(st && !st.ai && st.auto),
+      active: phase.value === 'bid' ? bidTurn.value === seat : phase.value === 'playing' && turn.value === seat,
+      finished: finishOrder.value.includes(seat),
+      roleLabel: roleOf(seat),
+      tone: toneOf(seat),
+      finishedLabel: finishOrder.value.includes(seat) ? t('games.fight.out') : '',
+      bubble: roomBubble(seat),
+    }
+  }),
 )
 
 const lastPlayView = computed(() => {
@@ -206,10 +276,12 @@ const infoChips = computed(() => {
 
 const statusText = computed(() => {
   if (phase.value === 'idle') return ''
+  if (room.watching) return t('games.room.spectatorHint')
   if (phase.value === 'bid') {
-    return bidTurn.value === 0 ? t('games.doudizhu.bidHint') : t('games.doudizhu.bidWait', { name: seatName(bidTurn.value) })
+    return bidTurn.value === mySeat.value ? t('games.doudizhu.bidHint') : t('games.doudizhu.bidWait', { name: seatName(bidTurn.value) })
   }
   if (phase.value === 'ended') return ''
+  if (room.autoOn) return t('games.room.botState')
   if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.doudizhu.yourLead')
   return t('games.fight.thinking', { name: seatName(turn.value) })
 })
@@ -238,10 +310,79 @@ function bidText(entry) {
     : t('games.doudizhu.bidLogPass', { name: seatName(entry.seat) })
 }
 
+// ---------- 房间快照 / 落盘 ----------
+
+/** 房主公共快照:不含任何人的手牌(底牌叫完地主后才公开,叫分阶段只报张数与分数) */
+function snapshot() {
+  return {
+    phase: phase.value,
+    turn: turn.value,
+    bidTurn: bidTurn.value,
+    highestBid: highestBid.value,
+    highestSeat: highestSeat.value,
+    bidsLeft: bidsLeft.value,
+    bidLog: bidLog.value,
+    landlord: landlord.value,
+    multiplier: multiplier.value,
+    last: last.value,
+    passCount: passCount.value,
+    counts: localCounts.value,
+    finishOrder: finishOrder.value,
+    winnerIsLandlord: phase.value === 'ended' ? winnerIsLandlord.value : null,
+    spring: springLabel.value,
+    bottom: landlord.value >= 0 ? bottom.value : [],
+  }
+}
+
+function applyPublic(state) {
+  if (!state) return
+  if (state.phase) phase.value = state.phase
+  turn.value = Number(state.turn) || 0
+  bidTurn.value = Number(state.bidTurn) || 0
+  highestBid.value = Number(state.highestBid) || 0
+  highestSeat.value = Number.isFinite(Number(state.highestSeat)) ? Number(state.highestSeat) : -1
+  bidsLeft.value = Math.max(0, Number(state.bidsLeft) || 0)
+  bidLog.value = Array.isArray(state.bidLog) ? state.bidLog : []
+  landlord.value = Number.isFinite(Number(state.landlord)) ? Number(state.landlord) : -1
+  multiplier.value = Math.max(1, Number(state.multiplier) || 1)
+  last.value = state.last || null
+  passCount.value = Math.max(0, Number(state.passCount) || 0)
+  finishOrder.value = Array.isArray(state.finishOrder) ? state.finishOrder : []
+  springLabel.value = state.spring || ''
+  bottom.value = Array.isArray(state.bottom) ? state.bottom : []
+  if (state.winnerIsLandlord != null) {
+    winnerIsLandlord.value = !!state.winnerIsLandlord
+    result.value = winnerIsLandlord.value === isLandlord.value ? 'win' : 'lose'
+  }
+  // 别人的回合不再替自己留选中:风向一变,留着高亮容易误触
+  if (turn.value !== mySeat.value || phase.value !== 'playing') {
+    selected.value = []
+    pendingAuto.value = []
+  }
+  if (phase.value === 'ended') autoReport()
+}
+
+function applyHand(data) {
+  const tiles = Array.isArray(data?.tiles) ? data.tiles : []
+  const prev = hands.value[mySeat.value] || []
+  // 每次发布都会带一份手牌,内容没变就别清选中(否则别人出牌一次就把我正在选的牌清空)
+  const same = prev.length === tiles.length && prev.every((card, i) => card.id === tiles[i].id)
+  hands.value = hands.value.map((hand, i) => (i === mySeat.value ? tiles : hand))
+  if (same) return
+  // 手牌真变了(开局/重连补发):旧 id 已经不在手里,选中一起清掉
+  selected.value = []
+  pendingAuto.value = []
+}
+
+const publishRoom = () => room.publish()
+
+// ---------- 发牌 / 叫分 ----------
+
 function startGame() {
+  if (play.active && !play.isHost) return
   session += 1
   clearTimer()
-  const deal = dzDeal()
+  const deal = dzDeal(play.active ? seededRng(play.seed) : Math.random)
   hands.value = deal.hands
   bottom.value = deal.bottom
   landlord.value = -1
@@ -262,12 +403,89 @@ function startGame() {
   highestSeat.value = -1
   bidsLeft.value = SEATS
   bidLog.value = []
-  bidTurn.value = Math.floor(Math.random() * SEATS)
-  scheduleBid()
+  // 房间局房主先叫(种子 + 座位一致,几端看到的是同一副牌);单机随机起叫
+  bidTurn.value = play.active ? 0 : Math.floor(Math.random() * SEATS)
+  publishRoom()
+  drive(bidTurn.value)
+}
+
+// ---------- 回合驱动(裁判端) ----------
+
+function drive(seat) {
+  clearTimer()
+  if (!room.authority || play.ended) return
+  if (phase.value !== 'bid' && phase.value !== 'playing') return
+  const mySession = session
+  const apply = (action) => {
+    if (mySession !== session || play.ended) return
+    if (phase.value === 'bid') {
+      if (bidTurn.value !== seat) return
+      seatAction(seat, action)
+      return
+    }
+    if (phase.value !== 'playing' || turn.value !== seat) return
+    seatAction(seat, action)
+  }
+  if (isAiSeat(seat)) {
+    const delay = phase.value === 'bid' ? BID_DELAY : AI_DELAY
+    aiTimer = setTimeout(() => apply(null), delay)
+    return
+  }
+  // 真人:等点击 / 等房内远端的出牌意图;房间局 35s 不来交给电脑,单机不限时
+  room.waitAct(seat, play.active ? CARD_ACT_TIMEOUT : 0).then(apply)
+}
+
+/** 裁判端落一个出牌意图:电脑的(null)走 AI,真人的先按自己手里的牌复验再落盘 */
+function seatAction(seat, action) {
+  if (phase.value === 'bid') {
+    if (!action) {
+      const want = dzAiBid(hands.value[seat])
+      applyBid(seat, want > highestBid.value ? want : 0)
+      return
+    }
+    const value = Math.max(0, Math.min(3, Number(action.value) || 0))
+    applyBid(seat, value > highestBid.value ? value : 0)
+    return
+  }
+  if (!action || action.type === 'pass') {
+    aiFallbackOrPass(seat, action)
+    return
+  }
+  const ids = new Set(Array.isArray(action.ids) ? action.ids : [])
+  const cards = hands.value[seat].filter((card) => ids.has(card.id))
+  const combo = cards.length ? dzCombo(cards) : null
+  if (!combo || !dzBeats(combo, lastCombo.value)) {
+    aiFallbackOrPass(seat, null)
+    return
+  }
+  commitPlay(seat, combo)
+}
+
+/** 想出的牌不合法(或电脑该出):让 AI 按当前局面拿一手,出不了就过 */
+function aiFallbackOrPass(seat, action) {
+  if (action && action.type === 'pass' && last.value && last.value.seat !== seat) {
+    passTurn(seat)
+    return
+  }
+  const pick = pickAiPlay(seat)
+  if (pick) commitPlay(seat, pick)
+  else passTurn(seat)
+}
+
+function pickAiPlay(seat) {
+  return dzAiChoose({
+    hand: hands.value[seat],
+    last: lastCombo.value,
+    seat,
+    landlord: landlord.value,
+    handCounts: handCounts.value,
+    lastSeat: last.value ? last.value.seat : null,
+    playCounts: playCounts.value,
+  })
 }
 
 /** 叫分:0 = 不叫,1..3 必须高于当前最高分;每家各一次机会 */
-function bid(seat, value) {
+function applyBid(seat, value) {
   if (phase.value !== 'bid' || bidTurn.value !== seat) return
   if (value > 0 && value <= highestBid.value) return
   bidLog.value = [...bidLog.value, { seat, value }]
@@ -281,19 +499,8 @@ function bid(seat, value) {
     return
   }
   bidTurn.value = (seat + 1) % SEATS
-  scheduleBid()
-}
-
-function scheduleBid() {
-  clearTimer()
-  if (phase.value !== 'bid' || bidTurn.value === 0) return
-  const mySession = session
-  const seat = bidTurn.value
-  aiTimer = setTimeout(() => {
-    if (mySession !== session || phase.value !== 'bid' || bidTurn.value !== seat) return
-    const want = dzAiBid(hands.value[seat])
-    bid(seat, want > highestBid.value ? want : 0)
-  }, BID_DELAY)
+  publishRoom()
+  drive(bidTurn.value)
 }
 
 function settleBid() {
@@ -316,28 +523,8 @@ function settleBid() {
   last.value = null
   passCount.value = 0
   bubbles.value = ['', '', '']
-  scheduleTick()
-}
-
-function scheduleTick() {
-  clearTimer()
-  if (phase.value !== 'playing' || turn.value === 0) return
-  const mySession = session
-  const seat = turn.value
-  aiTimer = setTimeout(() => {
-    if (mySession !== session || phase.value !== 'playing' || turn.value !== seat) return
-    const pick = dzAiChoose({
-      hand: hands.value[seat],
-      last: lastCombo.value,
-      seat,
-      landlord: landlord.value,
-      handCounts: handCounts.value,
-      lastSeat: last.value ? last.value.seat : null,
-      playCounts: playCounts.value,
-    })
-    if (pick) commitPlay(seat, pick)
-    else passTurn(seat)
-  }, AI_DELAY)
+  publishRoom()
+  drive(turn.value)
 }
 
 function commitPlay(seat, combo) {
@@ -370,7 +557,8 @@ function advanceTurn() {
       break
     }
   }
-  scheduleTick()
+  publishRoom()
+  drive(turn.value)
 }
 
 function passTurn(seat = turn.value) {
@@ -399,8 +587,22 @@ function finishGame(landlordWin) {
     springLabel.value = t('games.doudizhu.antiSpring')
   }
   const myWin = landlordWin === isLandlord.value
+  winnerIsLandlord.value = landlordWin
   result.value = myWin ? 'win' : 'lose'
-  if (myWin) grantReward()
+  if (play.active) {
+    // 胜方按倍数记分、负方 0:房间按高分排名,同队的人一起报同一个分
+    publishRoom()
+    autoReport()
+  } else if (myWin) {
+    grantReward()
+  }
+}
+
+/** 房间局:牌局结束各自自动交卷(胜方报倍数分,负方报 0),房主按高分结算 */
+function autoReport() {
+  if (!play.active || play.reported || phase.value !== 'ended') return
+  const mine = isLandlord.value === winnerIsLandlord.value
+  play.report(mine ? multiplier.value * 10 : 0)
 }
 
 async function grantReward() {
@@ -410,6 +612,27 @@ async function grantReward() {
   } catch (e) {
     rewardMsg.value = t('games.rewardFailed')
   }
+}
+
+// ---------- 本机交互 ----------
+
+function bidAction(value) {
+  if (!isMyBidTurn.value) return
+  room.local({ type: 'bid', value })
+}
+
+function passAction() {
+  if (!myTurn.value) return
+  room.local({ type: 'pass' })
+}
+
+function toggleAuto() {
+  room.setAuto(!room.autoOn)
+}
+
+function onResultAction() {
+  if (!play.active) return startGame()
+  router.push(`/games/room/${play.room?.id}`)
 }
 
 function toggleCard(card) {
@@ -458,7 +681,9 @@ watch(myTurn, (turn) => {
 
 function playSelected() {
   if (!canPlay.value) return
-  commitPlay(0, selection.value)
+  const ids = selection.value.cards.map((card) => card.id)
+  if (!room.local({ type: 'play', ids })) return
+  pendingAuto.value = []
 }
 
 function hint() {
@@ -467,6 +692,35 @@ function hint() {
   selected.value = plays.length ? plays[0].cards.map((card) => card.id) : []
   pendingAuto.value = []
 }
+
+// ---------- 房间生命周期 ----------
+
+/** 房间开局:房主发牌,访客等第一份公共盘面(先进入 playing 渲染,手牌由 dz:hand 补) */
+watch(
+  () => [play.active, play.status, play.isHost],
+  () => {
+    if (!play.active) return
+    if (play.status !== 'PLAYING' || phase.value !== 'idle') return
+    if (play.isHost) {
+      startGame()
+      return
+    }
+    room.syncSeats()
+    phase.value = 'playing'
+    play.requestSync()
+  },
+  { immediate: true },
+)
+
+/** WS 断线重连后补一次全量:否则访客手牌/盘面停在断线前,直到下一回合 */
+watch(
+  () => chatStore.socketStatus,
+  (status) => {
+    if (status !== 'open') return
+    if (!play.active || play.isHost || phase.value !== 'playing') return
+    play.requestSync()
+  },
+)
 
 onBeforeUnmount(() => {
   session += 1

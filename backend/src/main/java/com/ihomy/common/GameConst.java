@@ -36,7 +36,9 @@ public final class GameConst {
             PointsRuleConst.GAME_PETLINK, PointsRuleConst.GAME_SUDOKU, PointsRuleConst.GAME_2048,
             PointsRuleConst.GAME_MINESWEEPER, PointsRuleConst.GAME_SOLITAIRE, PointsRuleConst.GAME_SPIDER,
             PointsRuleConst.GAME_FREECELL, PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE,
-            PointsRuleConst.GAME_MAHJONG, PointsRuleConst.GAME_LUDO);
+            PointsRuleConst.GAME_MAHJONG, PointsRuleConst.GAME_LUDO,
+            PointsRuleConst.GAME_DOUDIZHU, PointsRuleConst.GAME_GUANDAN,
+            PointsRuleConst.GAME_BAOHUANG, PointsRuleConst.GAME_GOUJI);
 
     /** 对战赛制 mode:同种子赛(各自打完上报)/ 实时对战(WS 输入级同步) */
     public static final String MATCH_MODE_ASYNC = "ASYNC_SEED";
@@ -99,6 +101,8 @@ public final class GameConst {
      * 连连看/扫雷/数独天然适合合作,其余单人解谜/实时类按同种子 PK。
      * 麻将按 4 人对局(空位电脑补,ai=true),座位固定 4。
      * 飞行棋按 4 人对局(空位电脑补,ai=true),先走完四架飞机者胜(FIRST_FINISH)。
+     * 牌桌类(斗地主 3 / 掼蛋 4 / 保皇 5 / 够级 6 人)同样 ai=true:房主是裁判,
+     * 手牌只点对点下发,人多出来的按观战排(room_max_players=8),按席位成绩高分者胜。
      * maxSeats = 单局最多几名玩家(超出部分按进房顺序分配为观战):
      * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
@@ -124,7 +128,15 @@ public final class GameConst {
             java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, new RoomGame(PointsRuleConst.GAME_MAHJONG,
                     java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, true)),
             java.util.Map.entry(PointsRuleConst.GAME_LUDO, new RoomGame(PointsRuleConst.GAME_LUDO,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 4, true)));
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 4, true)),
+            java.util.Map.entry(PointsRuleConst.GAME_DOUDIZHU, new RoomGame(PointsRuleConst.GAME_DOUDIZHU,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 3, true)),
+            java.util.Map.entry(PointsRuleConst.GAME_GUANDAN, new RoomGame(PointsRuleConst.GAME_GUANDAN,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, true)),
+            java.util.Map.entry(PointsRuleConst.GAME_BAOHUANG, new RoomGame(PointsRuleConst.GAME_BAOHUANG,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 5, true)),
+            java.util.Map.entry(PointsRuleConst.GAME_GOUJI, new RoomGame(PointsRuleConst.GAME_GOUJI,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6, true)));
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
     public static final java.util.Map<String, String> ROOM_GAME_NAMES = java.util.Map.ofEntries(
@@ -138,5 +150,9 @@ public final class GameConst {
             java.util.Map.entry(PointsRuleConst.GAME_SPIDER, "蜘蛛纸牌"),
             java.util.Map.entry(PointsRuleConst.GAME_FREECELL, "自由纸牌"),
             java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, "麻将"),
-            java.util.Map.entry(PointsRuleConst.GAME_LUDO, "飞行棋"));
+            java.util.Map.entry(PointsRuleConst.GAME_LUDO, "飞行棋"),
+            java.util.Map.entry(PointsRuleConst.GAME_DOUDIZHU, "斗地主"),
+            java.util.Map.entry(PointsRuleConst.GAME_GUANDAN, "掼蛋"),
+            java.util.Map.entry(PointsRuleConst.GAME_BAOHUANG, "保皇"),
+            java.util.Map.entry(PointsRuleConst.GAME_GOUJI, "够级"));
 }

@@ -124,6 +124,42 @@ export const ROOM_GAMES = {
     maxSeats: 4,
     ai: true,
   },
+  game_doudizhu: {
+    code: 'game_doudizhu',
+    nameKey: 'games.doudizhu.title',
+    path: '/games/doudizhu',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 3,
+    ai: true,
+  },
+  game_guandan: {
+    code: 'game_guandan',
+    nameKey: 'games.guandan.title',
+    path: '/games/guandan',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 4,
+    ai: true,
+  },
+  game_baohuang: {
+    code: 'game_baohuang',
+    nameKey: 'games.baohuang.title',
+    path: '/games/baohuang',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 5,
+    ai: true,
+  },
+  game_gouji: {
+    code: 'game_gouji',
+    nameKey: 'games.gouji.title',
+    path: '/games/gouji',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 6,
+    ai: true,
+  },
 }
 
 export const roomGame = (code) => ROOM_GAMES[code] || null

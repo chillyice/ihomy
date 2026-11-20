@@ -1,6 +1,8 @@
-<!-- 掼蛋:单机四人两联邦(玩家 + 三位电脑,对家是搭子)。牌型/逢人配/炸弹梯度/进贡还贡/升级
+<!-- 掼蛋:四人两联邦(对家是搭子,「一起玩」房间里换成真人/AI 混坐)。牌型/逢人配/炸弹梯度/进贡还贡/升级
      都在 utils/games/guandan.js(纯函数,单测覆盖);本页只做发牌、回合驱动与结算展示。
-     我方拿下这一局走统一 H5 奖励通道(按天限次)。 -->
+     房间局房主是唯一裁判(公共盘面 gd:public、各家手牌点对点 gd:hand、访客意图 gd:act),
+     一局一结算:升级/进贡只对单机的连局有意义,房间打一局就回房间页开下一局。
+     我方拿下这一局走统一 H5 奖励通道(按天限次);房间局不发单机奖励。 -->
 <template>
   <GameShell
     ref="shellEl"
@@ -8,7 +10,9 @@
     :title="$t('games.guandan.title')"
     body-align="stretch"
     readable
-    :new-game="phase === 'playing'"
+    :room-mode="play.active"
+    :default-wide="play.active"
+    :new-game="!play.active && phase === 'playing'"
     :new-game-confirm="true"
     @back="goBack"
     @new-game="startMatch"
@@ -26,15 +30,17 @@
     <div class="fight-card">
       <FightTable
         :seats="seatViews"
+        :my-seat="tableSeat"
+        :spectator="room.watching"
         :hand="myHand"
         :selected="selected"
         :last-play="lastPlayView"
         :status-text="statusText"
         :info-chips="infoChips"
         :is-wild="isWildCard"
-        :my-name="$t('games.fight.me')"
-        :my-role-label="$t('games.guandan.teamUs')"
-        my-tone="royal"
+        :my-name="seatName(mySeat)"
+        :my-role-label="teamRole(mySeat)"
+        :my-tone="teamTone(mySeat)"
         :my-note="myNote"
         :sort-value="sortValue"
         @select="toggleCard"
@@ -43,7 +49,7 @@
       >
         <template #actions>
           <template v-if="phase === 'playing'">
-            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passTurn()">
+            <el-button size="small" round :disabled="!myTurn || !lastCombo" @click="passAction">
               {{ $t('games.fight.pass') }}
             </el-button>
             <el-button size="small" round :disabled="!myTurn" @click="hint">{{ $t('games.fight.hint') }}</el-button>
@@ -51,6 +57,9 @@
               {{ $t('games.fight.play') }}
             </el-button>
           </template>
+          <el-button v-if="play.active && room.seated" size="small" round :type="room.autoOn ? 'primary' : 'default'" @click="toggleAuto">
+            {{ room.autoOn ? $t('games.room.autoOff') : $t('games.room.autoOn') }}
+          </el-button>
         </template>
 
         <template #center-extra>
@@ -67,12 +76,19 @@
                 <div v-if="phase === 'ended'" class="fight-overlay-meta">{{ resultMeta }}</div>
                 <div v-if="rewardMsg" class="fight-overlay-reward">{{ rewardMsg }}</div>
                 <div class="fight-overlay-actions">
-                  <el-button type="primary" size="small" round @click="nextRound">
-                    {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
-                  </el-button>
-                  <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
-                    {{ $t('games.back') }}
-                  </el-button>
+                  <template v-if="play.active">
+                    <el-button type="primary" size="small" round @click="backToRoom">
+                      {{ $t('games.room.backRoom') }}
+                    </el-button>
+                  </template>
+                  <template v-else>
+                    <el-button type="primary" size="small" round @click="nextRound">
+                      {{ phase === 'idle' ? $t('games.fight.start') : $t('games.fight.again') }}
+                    </el-button>
+                    <el-button v-if="phase === 'ended'" size="small" round @click="goBack">
+                      {{ $t('games.back') }}
+                    </el-button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -84,14 +100,20 @@
 </template>
 
 <script setup>
-// 回合驱动与斗地主同构:玩家固定 0 号座,电脑按座位顺序行动,pass 累计到「只剩一家没表态」时清桌。
-// 一局打完先结算升级(打几 → 下一局级牌),下一局发牌前自动进贡还贡。
+// 回合驱动与斗地主同构:裁判端(单机 = 本机,房间 = 房主)推牌局,pass 累计到「只剩一家没表态」时清桌。
+// 单机连局:一局打完先结算升级(打几 → 下一局级牌),下一局发牌前自动进贡还贡;房间局打一局即结束。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import FightTable from '@/components/games/FightTable.vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { gameApi } from '@/api'
+import { useChatStore } from '@/stores/chat'
+import { useRoomChatStore } from '@/stores/roomChat'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
+import { CARD_ACT_TIMEOUT, useCardRoomPlay } from '@/composables/useCardRoomPlay'
+import { seededRng } from '@/utils/games/seededRng'
 import {
   GD_LEVELS,
   gdAdvance,
@@ -111,9 +133,11 @@ const AI_DELAY = 720
 
 const router = useRouter()
 const { t } = useI18n()
+const chatStore = useChatStore()
+const roomChat = useRoomChatStore()
 
 const shellEl = ref(null)
-const goBack = () => router.push('/games')
+const goBack = () => play.exitToLobby({ aiGame: true })
 
 const phase = ref('idle') // idle | playing | ended
 const level = ref(2)
@@ -130,15 +154,38 @@ const result = ref('')
 const matchWin = ref(false)
 const rewardMsg = ref('')
 const roundInfo = ref({ partnerRank: 0, step: 0 })
-// 电脑连续「让牌」次数:联邦出的牌不抢,但连让两次之后要自己推牌,否则一家可能整局很少出牌
+/** 房间局这一局谁赢(0/1 联邦;-1 = 未结束),各端据此算自己的胜负与交卷分 */
+const winnerTeam = ref(-1)
+
 const passStreak = ref([0, 0, 0, 0])
 
 let session = 0
 let aiTimer = null
 
-const myHand = computed(() => hands.value[0])
-const handCounts = computed(() => hands.value.map((hand) => hand.length))
-const myTurn = computed(() => phase.value === 'playing' && turn.value === 0)
+// ---------- 「一起玩」房间(?room=<id>) ----------
+
+// 房间层要挂在 useGameRoomPlay 的信令回调上,先声明再赋值(回调只在挂载后才会到)
+let room = null
+const play = useGameRoomPlay({ onSignal: (data) => room && room.onSignal(data) })
+room = useCardRoomPlay(play, {
+  seatCount: SEATS,
+  prefix: 'gd',
+  getHand: (seat) => hands.value[seat] || [],
+  snapshot,
+  applyPublic,
+  handPayload: (seat) => ({ tiles: hands.value[seat] || [] }),
+  applyHand,
+})
+
+/** 我的座位:单机固定 0 号位,房间里按成员加入顺序(联邦 = 座位奇偶,所以座位不能随手换) */
+const mySeat = computed(() => (play.active ? room.mySeat : 0))
+const tableSeat = computed(() => Math.max(0, mySeat.value))
+const isAiSeat = (seat) => (play.active ? room.isAiSeat(seat) : seat !== mySeat.value)
+
+const myHand = computed(() => hands.value[mySeat.value] || [])
+const localCounts = computed(() => hands.value.map((hand) => hand.length))
+const handCounts = computed(() => (play.active ? room.counts : localCounts.value))
+const myTurn = computed(() => phase.value === 'playing' && turn.value === mySeat.value && !room.autoOn && !play.isSpectator)
 const lastCombo = computed(() => last.value?.combo || null)
 const selectedCards = computed(() => {
   const ids = new Set(selected.value)
@@ -146,28 +193,47 @@ const selectedCards = computed(() => {
 })
 const selection = computed(() => (selected.value.length ? gdComboOf(selectedCards.value, level.value) : null))
 const canPlay = computed(() => myTurn.value && !!selection.value && gdBeats(selection.value, lastCombo.value))
-const activeCount = computed(() => hands.value.filter((hand) => hand.length).length)
+const activeCount = computed(() => handCounts.value.filter((n) => n > 0).length)
 
-const seatName = (seat) => (seat === 0 ? t('games.fight.me') : t('games.fight.aiName', { n: seat }))
-const isMyTeam = (seat) => seat % 2 === 0
+const seatName = (seat) => {
+  const st = play.active ? room.seatAt(seat) : null
+  if (st?.userId != null && st.name) return st.name
+  if (seat === mySeat.value) return t('games.fight.me')
+  return t('games.fight.aiName', { n: seat })
+}
+const roomBubble = (seat) => {
+  if (!play.active) return ''
+  const st = room.seatAt(seat)
+  return st?.userId != null ? roomChat.bubbleOf(play.room?.id, st.userId) : ''
+}
+const isMyTeam = (seat) => seat % 2 === mySeat.value % 2
 const sortValue = (card) => gdValue(card, level.value)
 const isWildCard = (card) => gdIsWild(card, level.value)
 
 const rankLabel = (rank) => t(`games.guandan.rank${rank}`)
 const teamRole = (seat) => (isMyTeam(seat) ? t('games.guandan.teamUs') : t('games.guandan.teamThem'))
 const teamTone = (seat) => (isMyTeam(seat) ? 'royal' : 'rebel')
+/** 席位分数:房间局结束后胜方联邦记升级步数,负方 0(与上报交卷同口径) */
+const seatScore = (seat) => {
+  if (!play.active || phase.value !== 'ended' || winnerTeam.value < 0) return 0
+  return seat % 2 === winnerTeam.value ? roundInfo.value.step * 10 : 0
+}
 
 const seatViews = computed(() =>
-  hands.value.map((hand, seat) => {
-    const order = finishOrder.value.indexOf(seat)
+  Array.from({ length: SEATS }, (_, seat) => {
+    const st = play.active ? room.seatAt(seat) : null
     return {
       name: seatName(seat),
-      count: hand.length,
+      avatar: st?.avatar || '',
+      count: handCounts.value[seat] || 0,
+      score: seatScore(seat),
+      auto: !!(st && !st.ai && st.auto),
       active: phase.value === 'playing' && turn.value === seat,
-      finished: order >= 0,
+      finished: finishOrder.value.includes(seat),
       roleLabel: teamRole(seat),
       tone: teamTone(seat),
-      finishedLabel: order >= 0 ? rankLabel(order + 1) : '',
+      finishedLabel: finishOrder.value.includes(seat) ? rankLabel(finishOrder.value.indexOf(seat) + 1) : '',
+      bubble: roomBubble(seat),
     }
   }),
 )
@@ -187,19 +253,23 @@ const lastPlayView = computed(() => {
   }
 })
 
-const infoChips = computed(() => [
-  { key: 'level', label: t('games.guandan.level'), value: gdLevelText(level.value) },
-  { key: 'round', label: t('games.guandan.round'), value: String(roundNo.value) },
-  {
-    key: 'score',
-    label: t('games.guandan.wins'),
-    value: `${teamWins.value[0]} : ${teamWins.value[1]}`,
-  },
-])
+const infoChips = computed(() => {
+  const chips = [
+    { key: 'level', label: t('games.guandan.level'), value: gdLevelText(level.value) },
+    { key: 'round', label: t('games.guandan.round'), value: String(roundNo.value) },
+  ]
+  // 房间打一局即结束,联邦胜场没有累计意义,只留级牌与本局
+  if (!play.active) {
+    chips.push({ key: 'score', label: t('games.guandan.wins'), value: `${teamWins.value[0]} : ${teamWins.value[1]}` })
+  }
+  return chips
+})
 
 const statusText = computed(() => {
   if (phase.value === 'idle') return ''
+  if (room.watching) return t('games.room.spectatorHint')
   if (phase.value === 'ended') return ''
+  if (room.autoOn) return t('games.room.botState')
   if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.guandan.yourLead')
   return t('games.fight.thinking', { name: seatName(turn.value) })
 })
@@ -213,11 +283,10 @@ const myNote = computed(() => {
 
 const resultMeta = computed(() => {
   if (matchWin.value) return t('games.guandan.matchWinHint')
-  const parts = [
-    t('games.guandan.partnerRank', { n: roundInfo.value.partnerRank }),
-    t('games.guandan.upgrade', { n: roundInfo.value.step }),
-    t('games.guandan.levelNow', { level: gdLevelText(level.value) }),
-  ]
+  const parts = [t('games.guandan.partnerRank', { n: roundInfo.value.partnerRank })]
+  if (!play.active) {
+    parts.push(t('games.guandan.upgrade', { n: roundInfo.value.step }), t('games.guandan.levelNow', { level: gdLevelText(level.value) }))
+  }
   return parts.join(' · ')
 })
 
@@ -226,15 +295,80 @@ const clearTimer = () => {
   aiTimer = null
 }
 
+// ---------- 房间快照 / 落盘 ----------
+
+function snapshot() {
+  return {
+    phase: phase.value,
+    level: level.value,
+    turn: turn.value,
+    last: last.value,
+    passCount: passCount.value,
+    passStreak: passStreak.value,
+    counts: localCounts.value,
+    finishOrder: finishOrder.value,
+    roundNo: roundNo.value,
+    teamWins: teamWins.value,
+    roundInfo: roundInfo.value,
+    tribute: tributeText.value,
+    winnerTeam: phase.value === 'ended' ? winnerTeam.value : -1,
+  }
+}
+
+function applyPublic(state) {
+  if (!state) return
+  if (state.phase) phase.value = state.phase
+  level.value = Math.max(2, Math.min(14, Number(state.level) || 2))
+  turn.value = Number(state.turn) || 0
+  last.value = state.last || null
+  passCount.value = Math.max(0, Number(state.passCount) || 0)
+  passStreak.value =
+    Array.isArray(state.passStreak) && state.passStreak.length === SEATS ? state.passStreak.map((n) => Number(n) || 0) : [0, 0, 0, 0]
+  finishOrder.value = Array.isArray(state.finishOrder) ? state.finishOrder : []
+  roundNo.value = Math.max(0, Number(state.roundNo) || 0)
+  teamWins.value = Array.isArray(state.teamWins) && state.teamWins.length === 2 ? state.teamWins.map((n) => Number(n) || 0) : [0, 0]
+  roundInfo.value = state.roundInfo || { partnerRank: 0, step: 0 }
+  tributeText.value = state.tribute || ''
+  if (state.winnerTeam != null && state.winnerTeam >= 0) {
+    winnerTeam.value = Number(state.winnerTeam)
+    result.value = winnerTeam.value === mySeat.value % 2 ? 'win' : 'lose'
+  }
+  if (turn.value !== mySeat.value || phase.value !== 'playing') {
+    selected.value = []
+    pendingAuto.value = []
+  }
+  if (phase.value === 'ended') autoReport()
+}
+
+function applyHand(data) {
+  const tiles = Array.isArray(data?.tiles) ? data.tiles : []
+  const prev = hands.value[mySeat.value] || []
+  const same = prev.length === tiles.length && prev.every((card, i) => card.id === tiles[i].id)
+  hands.value = hands.value.map((hand, i) => (i === mySeat.value ? tiles : hand))
+  if (same) return
+  selected.value = []
+  pendingAuto.value = []
+}
+
+const publishRoom = () => room.publish()
+
+// ---------- 发牌 / 连局 ----------
+
 function startMatch() {
+  if (play.active && !play.isHost) return
   level.value = 2
   teamWins.value = [0, 0]
   finishOrder.value = []
   roundNo.value = 0
+  winnerTeam.value = -1
   dealRound(false)
 }
 
 function nextRound() {
+  if (play.active) {
+    backToRoom()
+    return
+  }
   if (phase.value === 'idle' || matchWin.value) {
     startMatch()
     return
@@ -243,15 +377,17 @@ function nextRound() {
 }
 
 function dealRound(withTribute) {
+  if (play.active && !play.isHost) return
   session += 1
   clearTimer()
   const playLevel = level.value
   const prevOrder = [...finishOrder.value]
-  const dealt = gdDeal()
+  const dealt = gdDeal(play.active ? seededRng(play.seed) : Math.random)
   let nextHands = dealt
   let leader = 0
   tributeText.value = ''
-  if (withTribute && prevOrder.length === SEATS) {
+  // 进贡还贡是连局规则:房间打一局就结束,不做进贡
+  if (!play.active && withTribute && prevOrder.length === SEATS) {
     const res = gdTribute(dealt, playLevel, prevOrder)
     nextHands = res.hands
     leader = res.leader
@@ -271,33 +407,69 @@ function dealRound(withTribute) {
   pendingAuto.value = []
   finishOrder.value = []
   result.value = ''
+  winnerTeam.value = -1
   matchWin.value = false
   rewardMsg.value = ''
   roundInfo.value = { partnerRank: 0, step: 0 }
   passStreak.value = [0, 0, 0, 0]
   roundNo.value += 1
   phase.value = 'playing'
-  scheduleTick()
+  publishRoom()
+  drive(turn.value)
 }
 
-function scheduleTick() {
+// ---------- 回合驱动(裁判端) ----------
+
+function drive(seat) {
   clearTimer()
-  if (phase.value !== 'playing' || turn.value === 0) return
+  if (!room.authority || play.ended) return
+  if (phase.value !== 'playing') return
   const mySession = session
-  const seat = turn.value
-  aiTimer = setTimeout(() => {
-    if (mySession !== session || phase.value !== 'playing' || turn.value !== seat) return
-    const pick = gdAiChoose({
-      hand: hands.value[seat],
-      last: lastCombo.value,
-      level: level.value,
-      seat,
-      handCounts: handCounts.value,
-      lastSeat: last.value && passStreak.value[seat] < 2 ? last.value.seat : null,
-    })
+  const apply = (action) => {
+    if (mySession !== session || play.ended) return
+    if (phase.value !== 'playing' || turn.value !== seat) return
+    seatAction(seat, action)
+  }
+  if (isAiSeat(seat)) {
+    aiTimer = setTimeout(() => apply(null), AI_DELAY)
+    return
+  }
+  room.waitAct(seat, play.active ? CARD_ACT_TIMEOUT : 0).then(apply)
+}
+
+/** 裁判端落一个出牌意图:电脑的(null)走 AI,真人的先按自己手里的牌复验再落盘 */
+function seatAction(seat, action) {
+  if (!action || action.type === 'pass') {
+    if (action && action.type === 'pass' && last.value && last.value.seat !== seat) {
+      passTurn(seat)
+      return
+    }
+    const pick = pickAiPlay(seat)
     if (pick) commitPlay(seat, pick)
     else passTurn(seat)
-  }, AI_DELAY)
+    return
+  }
+  const ids = new Set(Array.isArray(action.ids) ? action.ids : [])
+  const cards = hands.value[seat].filter((card) => ids.has(card.id))
+  const combo = cards.length ? gdComboOf(cards, level.value) : null
+  if (!combo || !gdBeats(combo, lastCombo.value)) {
+    const pick = pickAiPlay(seat)
+    if (pick) commitPlay(seat, pick)
+    else passTurn(seat)
+    return
+  }
+  commitPlay(seat, combo)
+}
+
+function pickAiPlay(seat) {
+  return gdAiChoose({
+    hand: hands.value[seat],
+    last: lastCombo.value,
+    level: level.value,
+    seat,
+    handCounts: handCounts.value,
+    lastSeat: last.value && passStreak.value[seat] < 2 ? last.value.seat : null,
+  })
 }
 
 function commitPlay(seat, combo) {
@@ -329,7 +501,8 @@ function advanceTurn() {
       break
     }
   }
-  scheduleTick()
+  publishRoom()
+  drive(turn.value)
 }
 
 function passTurn(seat = turn.value) {
@@ -347,21 +520,35 @@ function passTurn(seat = turn.value) {
 function endRound(winnerSeat) {
   phase.value = 'ended'
   clearTimer()
+  winnerTeam.value = winnerSeat % 2
   const partnerRank = finishOrder.value.indexOf((winnerSeat + 2) % SEATS) + 1
   const step = gdAdvance(partnerRank)
-  const winnerTeam = winnerSeat % 2
-  const wonAtAce = level.value === 14
-  if (wonAtAce) {
-    matchWin.value = true
-  } else {
-    const idx = GD_LEVELS.indexOf(level.value)
-    level.value = GD_LEVELS[Math.min(GD_LEVELS.length - 1, idx + step)]
-  }
-  teamWins.value = teamWins.value.map((n, i) => (i === winnerTeam ? n + 1 : n))
   roundInfo.value = { partnerRank, step }
-  const myWin = winnerTeam === 0
+  // 升级只对单机连局有意义:房间打一局即结束,回去开下一局
+  if (!play.active) {
+    if (level.value === 14) {
+      matchWin.value = true
+    } else {
+      const idx = GD_LEVELS.indexOf(level.value)
+      level.value = GD_LEVELS[Math.min(GD_LEVELS.length - 1, idx + step)]
+    }
+    teamWins.value = teamWins.value.map((n, i) => (i === winnerTeam.value ? n + 1 : n))
+  }
+  const myWin = winnerTeam.value === mySeat.value % 2
   result.value = myWin ? 'win' : 'lose'
-  if (myWin) grantReward()
+  if (play.active) {
+    publishRoom()
+    autoReport()
+  } else if (myWin) {
+    grantReward()
+  }
+}
+
+/** 房间局:一局打完各自交卷(胜方联邦报升级步数,负方报 0),房主按高分结算 */
+function autoReport() {
+  if (!play.active || play.reported || phase.value !== 'ended' || winnerTeam.value < 0) return
+  const mine = winnerTeam.value === mySeat.value % 2
+  play.report(mine ? roundInfo.value.step * 10 : 0)
 }
 
 async function grantReward() {
@@ -373,18 +560,35 @@ async function grantReward() {
   }
 }
 
+// ---------- 本机交互 ----------
+
+function passAction() {
+  if (!myTurn.value) return
+  room.local({ type: 'pass' })
+}
+
+function toggleAuto() {
+  room.setAuto(!room.autoOn)
+}
+
+function backToRoom() {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
+
+function blockedByLink() {
+  if (!play.active || play.isHost || chatStore.socketStatus === 'open') return false
+  ElMessage.warning(t('games.mahjong.linkLost'))
+  return true
+}
+
 function toggleCard(card) {
   selected.value = selected.value.includes(card.id) ? selected.value.filter((id) => id !== card.id) : [...selected.value, card.id]
 }
 
 // ---------- 扩选与自动出牌 ----------
-// 左键拖选:拖过的牌并入选择(随时可选,不限于自己回合);右键拖选:标记的牌
-// 在轮到自己时自动打出(能大过桌面就出),打不出则整体收回(清空选中,牌落回去)。
 const pendingAuto = ref([])
 function extendSelect(ids) {
-  // 拖选 = 逐张翻转:扫过未选的选上、扫过已选的取消(批量取消选中);
-  // 触摸点按的轻微抖动也会走上这条(阈值内不打断),翻转语义正好把「点已选牌反选」一并兜住。
-  // 拖选途中若电脑换手重排,扫过的旧 id 会失效,过滤到当前手牌防残留点亮别的牌
   const handIds = new Set(myHand.value.map((card) => card.id))
   const set = new Set(selected.value)
   for (const id of ids) {
@@ -419,7 +623,10 @@ watch(myTurn, (turn) => {
 
 function playSelected() {
   if (!canPlay.value) return
-  commitPlay(0, selection.value)
+  if (blockedByLink()) return
+  const ids = selection.value.cards.map((card) => card.id)
+  if (!room.local({ type: 'play', ids })) return
+  pendingAuto.value = []
 }
 
 function hint() {
@@ -434,6 +641,33 @@ function hint() {
   const sorted = [...plays].sort((a, b) => Number(a.bomb) - Number(b.bomb) || a.rank - b.rank || b.len - a.len)
   selected.value = sorted[0].cards.map((card) => card.id)
 }
+
+// ---------- 房间生命周期 ----------
+
+watch(
+  () => [play.active, play.status, play.isHost],
+  () => {
+    if (!play.active) return
+    if (play.status !== 'PLAYING' || phase.value !== 'idle') return
+    if (play.isHost) {
+      startMatch()
+      return
+    }
+    room.syncSeats()
+    phase.value = 'playing'
+    play.requestSync()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => chatStore.socketStatus,
+  (status) => {
+    if (status !== 'open') return
+    if (!play.active || play.isHost || phase.value !== 'playing') return
+    play.requestSync()
+  },
+)
 
 onBeforeUnmount(() => {
   session += 1

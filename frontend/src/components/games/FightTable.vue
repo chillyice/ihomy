@@ -17,8 +17,14 @@
         </div>
         <div class="ft-seat-main">
           <div class="ft-seat-name" :title="s.name">{{ s.name }}</div>
-          <div v-if="s.roleLabel" class="ft-role" :class="s.tone">{{ s.roleLabel }}</div>
-          <div class="ft-seat-count">{{ $t('games.fight.cardsLeft', { n: s.count }) }}</div>
+          <div v-if="s.roleLabel || s.auto" class="ft-seat-tags">
+            <span v-if="s.roleLabel" class="ft-role" :class="s.tone">{{ s.roleLabel }}</span>
+            <span v-if="s.auto" class="ft-role auto">{{ $t('games.room.autoOn') }}</span>
+          </div>
+          <div class="ft-seat-count">
+            {{ $t('games.fight.cardsLeft', { n: s.count }) }}
+            <span v-if="s.score != null && s.score !== 0" class="ft-seat-score">· {{ s.score }}</span>
+          </div>
         </div>
         <div v-if="s.finishedLabel" class="ft-finish">{{ s.finishedLabel }}</div>
         <div v-else-if="s.bubble" class="ft-seat-bubble">{{ s.bubble }}</div>
@@ -52,7 +58,7 @@
       <slot name="table-extra" />
     </div>
 
-    <div class="ft-my-area">
+    <div v-if="!spectator" class="ft-my-area">
       <div class="ft-my-head">
         <span class="ft-my-name">{{ myName }}</span>
         <span v-if="myRoleLabel" class="ft-role my" :class="myTone">{{ myRoleLabel }}</span>
@@ -107,6 +113,8 @@ const props = defineProps({
   myTone: { type: String, default: '' },
   myNote: { type: String, default: '' },
   sortValue: { type: Function, default: null },
+  /** 观战:房间里只看看,不显示自己的手牌与操作栏 */
+  spectator: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['select', 'extend-select', 'auto-select'])
@@ -371,6 +379,18 @@ const cardLabel = (card) => {
 .ft-seat-count {
   font-size: 11px;
   opacity: 0.82;
+}
+.ft-seat-score {
+  margin-left: 2px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+/* 身份/托管徽标同排,放不下就让后面的那个换行,别把座位卡撑宽 */
+.ft-seat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 92px;
 }
 .ft-role {
   display: inline-block;
