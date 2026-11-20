@@ -138,7 +138,8 @@
       <div v-loading="hist.loading" class="hist-box">
         <template v-if="shape">
           <div class="hist-axis">
-            <span>{{ shape.hi }}</span><span>{{ shape.lo }}</span>
+            <span>{{ shape.hi }}</span
+            ><span>{{ shape.lo }}</span>
           </div>
           <svg class="hist-svg" :viewBox="'0 0 ' + shape.w + ' ' + shape.h" preserveAspectRatio="none" aria-hidden="true">
             <polyline
@@ -151,7 +152,8 @@
             />
           </svg>
           <div class="hist-axis">
-            <span>{{ shape.from }}</span><span>{{ shape.to }}</span>
+            <span>{{ shape.from }}</span
+            ><span>{{ shape.to }}</span>
           </div>
         </template>
         <el-empty v-else-if="!hist.loading" :description="$t('iot.historyEmpty')" :image-size="80" />

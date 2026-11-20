@@ -201,24 +201,28 @@ const onCompositionEnd = () => {
   search.run(query.value)
 }
 
-watch(paletteOpen, async (open) => {
-  if (open) {
-    lastFocused = document.activeElement
-    query.value = ''
-    active.value = 0
+watch(
+  paletteOpen,
+  async (open) => {
+    if (open) {
+      lastFocused = document.activeElement
+      query.value = ''
+      active.value = 0
+      search.reset()
+      await nextTick()
+      inputEl.value?.focus()
+      document.addEventListener('keydown', onPanelKeydown, true)
+      return
+    }
+    document.removeEventListener('keydown', onPanelKeydown, true)
+    // 关闭即弃掉上一次的结果与进行中的响应,下次打开是干净的
     search.reset()
-    await nextTick()
-    inputEl.value?.focus()
-    document.addEventListener('keydown', onPanelKeydown, true)
-    return
-  }
-  document.removeEventListener('keydown', onPanelKeydown, true)
-  // 关闭即弃掉上一次的结果与进行中的响应,下次打开是干净的
-  search.reset()
-  const back = lastFocused
-  lastFocused = null
-  if (back && typeof back.focus === 'function' && document.contains(back)) back.focus()
-}, { immediate: true })
+    const back = lastFocused
+    lastFocused = null
+    if (back && typeof back.focus === 'function' && document.contains(back)) back.focus()
+  },
+  { immediate: true },
+)
 
 // 结果集变短时把高亮收回边界内,避免 Enter 落在已不存在的项上
 watch(
