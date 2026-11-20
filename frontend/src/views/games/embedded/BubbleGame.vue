@@ -883,7 +883,8 @@ html.dark .bb-shell {
     gap: 8px;
   }
   /* 两列:每块占半栏,标签靠左、数值贴右;内容(min-width:max-content)放不进
-     半栏的那一块自己撑成整行,退回一列,不压缩文字 */
+     半栏的那一块自己撑成整行,退回一列,不压缩文字。
+     芯片只留文字,去掉圆角小方卡(与外排按钮区分) */
   .bb-chips {
     flex: 1 1 auto;
     flex-direction: row;
@@ -901,8 +902,11 @@ html.dark .bb-shell {
     min-width: max-content;
     max-width: 100%;
     min-height: 24px;
-    padding: 0 7px;
+    padding: 0 2px;
     gap: 4px;
+    border: 0;
+    border-radius: 0;
+    background: none;
     font-size: 10.5px;
   }
   .bb-chip b {

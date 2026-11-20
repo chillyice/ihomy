@@ -1043,8 +1043,8 @@ html.game-shell .mobile-game-chrome {
      内里仍是「标签 → 数值」一行(标签靠左、数值贴右,和消消乐记分条同一读法)。
      分列靠 flex-basis 50% + min-width:max-content:内容放不进半栏的那一块
      自然撑成整行,于是退回一列 —— 不压缩文字、不横向溢出,也不需要 JS 量宽。
-     与按钮区分:芯片没有描边、没有实底,是浅品牌色的小方卡(圆角 8,比按钮的 10 更方),
-     不和下面那排全宽圆角按钮混成一片。 */
+     与按钮区分:芯片没有描边、没有底色、也没有圆角,就是一行「标签左 · 数值右」的纯文字
+     (只有文字与列对齐),不和下面那排全宽圆角按钮混成一片。 */
   .page.game-shell > .gs-stats {
     grid-row: 2;
     grid-column: 1;
@@ -1064,13 +1064,13 @@ html.game-shell .mobile-game-chrome {
     max-width: 100%;
     height: auto;
     min-height: 24px;
-    padding: 0 7px;
+    padding: 0 2px;
     gap: 4px;
     align-items: center;
     justify-content: space-between;
     border: 0;
-    border-radius: 8px;
-    background: rgba(var(--color-brand-rgb), 0.09);
+    border-radius: 0;
+    background: none;
     font-size: 10.5px;
   }
   .page.game-shell > .gs-stats > .gh-chip b {
