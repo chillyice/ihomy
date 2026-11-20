@@ -3284,6 +3284,8 @@ export default {
       sourceHuawei: '华为运动健康（HMS Health Kit）',
       sourceHc: '健康连接（Health Connect）',
       androidUnavailable: '这台手机还没有可用的「健康连接」,先在系统里装好并让手环把数据写进去。',
+      androidNoAppid: '这台手机有「华为运动健康」,健康直连还在开通审核中——通过后更新 App 就能连上。',
+      androidNoHealthApp: '先在手机上装好「华为运动健康」,让手环或手表把数据写进去。',
       androidGroups: '授权范围',
       androidGroupSleep: '睡眠',
       androidGroupActivity: '活动',
@@ -6920,6 +6922,12 @@ export default {
         '佳明、华为的手表要先在它们自己的 App 里打开「与 Apple 健康共享」,手机上没有的数据这边也不会有。',
       ],
       androidNote: '安卓手机不用这么麻烦:装好 ihomy 的 App,进「设置 → 健康数据」找到「手机同步」,点一次授权就每天自动同步。',
+      huaweiTitle: '华为手机的说明',
+      huaweiItems: [
+        '华为手机里没有「健康连接」,数据源是「华为运动健康」:步数、距离、卡路里、体重这些基础数据可以每天自动同步。',
+        '睡眠与心率华为暂不向个人应用开放直连;可以在手机的「设置 → 华为帐号 → 隐私中心 → 申请数据副本」勾选「运动健康」,约一周后能拿到数据导出包。',
+        '直连的「授权」入口会在 ihomy 完成华为数据服务开通后,随 App 更新自动出现;导出包上传能力也会随后提供。',
+      ],
     },
     visible: {
       title: '内容谁看得见',

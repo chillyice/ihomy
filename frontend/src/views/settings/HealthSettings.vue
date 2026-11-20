@@ -49,7 +49,7 @@
             <el-tag size="small" type="warning">{{ $t('settings.health.rejected') }} {{ syncResult.rejected || 0 }}</el-tag>
           </div>
         </template>
-        <div v-else class="share-tip android-missing">{{ $t('settings.health.androidUnavailable') }}</div>
+        <div v-else class="share-tip android-missing">{{ $t(unavailableKey) }}</div>
       </template>
 
       <div v-else-if="entryKind === HEALTH_ENTRY.ANDROID_WEB" class="connect-row">
@@ -265,6 +265,14 @@ const groupText = (g) => {
   }[g]
   return key ? t(`settings.health.${key}`) : g
 }
+
+// 华为机不可用时给具体原因:NO_APPID=服务端华为开通还在审核中,NO_HEALTH_APP=没装华为运动健康
+const unavailableKey = computed(() => {
+  const s = native.value.huaweiStatus
+  if (s === 'NO_APPID') return 'settings.health.androidNoAppid'
+  if (s === 'NO_HEALTH_APP') return 'settings.health.androidNoHealthApp'
+  return 'settings.health.androidUnavailable'
+})
 
 const lastSyncText = computed(() => {
   const last = native.value.last

@@ -82,6 +82,11 @@
           <li v-for="(x, i) in $tm('help.health.limitItems')" :key="i">{{ x }}</li>
         </ul>
         <p class="help-p help-note">{{ $t('help.health.androidNote') }}</p>
+
+        <h4 class="help-sub">{{ $t('help.health.huaweiTitle') }}</h4>
+        <ul class="help-ul">
+          <li v-for="(x, i) in $tm('help.health.huaweiItems')" :key="i">{{ x }}</li>
+        </ul>
       </section>
 
       <section class="card help-sec">

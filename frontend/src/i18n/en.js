@@ -3447,6 +3447,8 @@ export default {
       sourceHuawei: 'Huawei Health (HMS Health Kit)',
       sourceHc: 'Health Connect',
       androidUnavailable: 'Health Connect is not available on this phone yet; install it and let your band write data first.',
+      androidNoAppid: 'Huawei Health is available here, but direct sync is still being set up — update the app once it is approved.',
+      androidNoHealthApp: 'Install Huawei Health first and let your band or watch write data into it.',
       androidGroups: 'Granted scopes',
       androidGroupSleep: 'Sleep',
       androidGroupActivity: 'Activity',
@@ -7004,6 +7006,12 @@ export default {
       ],
       androidNote:
         'Android is simpler: install the ihomy app, open Settings → Health data, find phone sync and allow once; it then syncs every day on its own.',
+      huaweiTitle: 'About Huawei phones',
+      huaweiItems: [
+        'Huawei phones do not ship Health Connect; the data source there is Huawei Health, and basic data such as steps, distance, calories and weight can sync every day automatically.',
+        'Sleep and heart rate are not open to personal apps by Huawei; you can request a copy of your data in Settings → Huawei account → Privacy centre → Request a copy, choose Health, and get an export after about a week.',
+        'The grant button appears with an app update once the ihomy Huawei data service is approved; export-file upload will follow.',
+      ],
     },
     visible: {
       title: 'Who can see what',

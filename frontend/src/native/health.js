@@ -44,7 +44,16 @@ export async function healthNativeStatus() {
   if (!healthSyncSupported()) return { supported: false, available: false, groups: {}, granted: [], last: null }
   const avail = await IhomyHealth.isAvailable().catch(() => ({ available: false }))
   if (!avail || !avail.available) {
-    return { supported: true, available: false, status: avail && avail.status, groups: {}, granted: [], last: null }
+    return {
+      supported: true,
+      available: false,
+      status: avail && avail.status,
+      // 华为链状态(NO_HMS/NO_HEALTH_APP/NO_APPID/OK),华为机不可用时用于细分提示
+      huaweiStatus: (avail && avail.huaweiStatus) || '',
+      groups: {},
+      granted: [],
+      last: null,
+    }
   }
   const [status, last] = await Promise.all([
     IhomyHealth.groupStatus({ groups: HEALTH_GROUPS }).catch(() => null),

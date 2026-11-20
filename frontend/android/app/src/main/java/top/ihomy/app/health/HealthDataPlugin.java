@@ -54,6 +54,9 @@ public class HealthDataPlugin extends Plugin {
         ret.put("available", provider != null);
         ret.put("provider", provider == null ? "" : provider);
         ret.put("status", huaweiActive(ctx) ? HuaweiHealthReader.sdkStatus(ctx) : HealthConnectReader.sdkStatus(ctx));
+        // 华为链自身的状态(NO_HMS/NO_HEALTH_APP/NO_APPID/OK):两条链都不可用时,前端靠它
+        // 区分「华为机但 AGC 还没配好」和「这台手机没有健康数据服务」两种情况
+        ret.put("huaweiStatus", HuaweiHealthReader.sdkStatus(ctx));
         call.resolve(ret);
     }
 
