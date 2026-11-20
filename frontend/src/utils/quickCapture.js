@@ -2,8 +2,8 @@
 // 原生壳走系统相机(camera.js),浏览器/PWA 回落 <input capture>,拿到 File 后上传到
 // 「随手拍」相册(不存在就建一本,可见范围跟着家庭走)。
 //
-// 相册按名字查找并缓存 id:同一家庭只建一本,不占 backup_key(那是手机自动备份的语义)。
-// 上传走现有 photoApi.upload,不新增后端接口。
+// 相册按名字查找并缓存 id:只在「自家可写」的相册里找(分享来的只读不认),同一家庭只建一本,
+// 不占 backup_key(那是手机自动备份的语义)。上传走现有 photoApi.upload,不新增后端接口。
 import { albumApi, photoApi } from '@/api'
 import { isNativeApp } from '@/utils/platform'
 
@@ -61,6 +61,15 @@ function pickPhoto() {
   })
 }
 
+/**
+ * 从相册列表里挑一本可写的同名相册。
+ * 列表会混入「别人家分享给我家」的相册(带 sharedFrom,只读),往里传会被后端按跨家庭拒掉,
+ * 所以同名时只认自家那本;一本可写的都没有就返回 null,由调用方新建。
+ */
+export function pickWritableAlbum(list, name) {
+  return (list || []).find((a) => a && a.name === name && !a.sharedFrom && !a.readOnly) || null
+}
+
 /** 取或建「随手拍」相册(name 由调用方传 i18n 文案) */
 export async function ensureQuickAlbum(name) {
   if (quickAlbumId) return quickAlbumId
@@ -68,7 +77,7 @@ export async function ensureQuickAlbum(name) {
   creating = (async () => {
     try {
       const list = await albumApi.list()
-      const hit = (list || []).find((a) => a && a.name === name)
+      const hit = pickWritableAlbum(list, name)
       if (hit) {
         quickAlbumId = hit.id
         return quickAlbumId
