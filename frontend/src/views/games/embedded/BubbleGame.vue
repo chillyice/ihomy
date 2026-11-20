@@ -28,7 +28,7 @@
       <p>{{ $t('games.embedded.bubble.aimTip') }}</p>
     </template>
 
-    <!-- 计分芯片贴画布:竖屏与画布同宽排在画布上方;手机横屏收成画布左侧一列,得分压到栏底 -->
+    <!-- 计分芯片贴画布:竖屏与画布同宽排在画布上方;手机横屏收成画布左侧两列,得分压到栏底 -->
     <div class="bb-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="bb-meta gs-on-dark-surface">
         <div class="bb-chips">
@@ -858,10 +858,13 @@ html.dark .bb-shell {
   color: var(--bb-chip-ink);
 }
 
-/* 手机横屏:芯片收成画布左侧一列,「得分」压到左栏底边(操作键已交给外壳头部的「新游戏」) */
+/* 手机横屏:芯片收进画布左侧那一栏、排两列(和外壳左栏底边的计分板同一口径),
+   「得分」压到最后一行贴左栏底边(操作键已交给外壳头部的「新游戏」) */
 @media (orientation: landscape) and (max-height: 520px) {
   .bb-layout {
-    --bb-meta-w: 132px;
+    /* 栏宽比芯片一列时宽一点:两列各得 ~78px,「最佳 12345」这类才并得下;
+       画布宽由高度定,加宽这一栏只吃掉横向留白,不挤画布 */
+    --bb-meta-w: 160px;
     --bb-cv-w: min(100%, 440px, calc((100cqh - 22px) * 0.676667));
     display: grid;
     grid-template-columns: var(--bb-meta-w) minmax(0, 1fr);
@@ -871,7 +874,7 @@ html.dark .bb-shell {
     width: min(100%, calc(var(--bb-meta-w) + 10px + var(--bb-cv-w) + 14px));
     max-height: 100%;
   }
-  /* 左栏占满画布高度:得分芯片才能贴在画布底边那一侧 */
+  /* 左栏占满画布高度:芯片行贴着画布底边那一侧排 */
   .bb-meta {
     grid-area: meta;
     align-self: stretch;
@@ -879,20 +882,31 @@ html.dark .bb-shell {
     height: auto;
     gap: 8px;
   }
+  /* 两列:每块占半栏,标签靠左、数值贴右;内容(min-width:max-content)放不进
+     半栏的那一块自己撑成整行,退回一列,不压缩文字 */
   .bb-chips {
     flex: 1 1 auto;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    align-content: flex-end;
+    gap: 4px;
   }
-  /* 「得分」排到最末并顶到底边(发射/下压/最佳留在上面) */
+  /* 「得分」排到最末一行(发射/进度/最佳留在上面) */
   .bb-chip--score {
     order: 1;
-    margin-top: auto;
   }
-  /* 横屏列里芯片压成一行:标签靠左、数值靠右(和黑白棋/扫雷左列同一读法) */
   .bb-chip {
-    flex: 0 0 auto;
-    padding: 4px 8px;
+    flex: 1 1 calc(50% - 2px);
+    min-width: max-content;
+    max-width: 100%;
+    min-height: 24px;
+    padding: 0 7px;
+    gap: 4px;
+    font-size: 10.5px;
+  }
+  .bb-chip b {
+    font-size: 12px;
   }
   .bb-frame {
     grid-area: frame;

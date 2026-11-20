@@ -1009,7 +1009,7 @@ html.game-shell .mobile-game-chrome {
  * 横屏改成两栏:左栏 = 返回 + 游戏名 + 模式选择,第二行 新游戏 + 规则,
  * 再往下只放棋盘左侧放不下的按钮(设置/操作),最底下一行是计分/时间芯片;
  * 右栏 = 游戏区(棋盘、数独数字盘等)按高度铺满。计分芯片原先单独成中栏,
- * 现在压成一行贴左栏底边,不再从棋盘身边切走一条宽度。
+ * 现在贴左栏底边排两列,不再从棋盘身边切走一条宽度。
  * 门槛与上面的矮屏档一致(横屏 + max-height:520px),平板横屏(高 820)、
  * 电脑横屏(高 900)仍是上下一行式布局。 */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -1021,9 +1021,9 @@ html.game-shell .mobile-game-chrome {
        会比顶边多出一大截空白;竖屏仍走 env,横屏刘海一侧的左右安全区也照旧保留) */
     --gs-safe-b: 0px;
     display: grid;
-    /* 两栏:左栏 = 公共按钮 + 底边的计分芯片,右栏 = 游戏区吃满剩余宽度。
+    /* 两栏:左栏 = 公共按钮 + 底边的计分板,右栏 = 游戏区吃满剩余宽度。
        计分芯片不再单独成中栏 —— 中栏会从棋盘身边切走 50~96px,芯片还只能
-       竖着摞成一列;挪到左栏底边后每个芯片恢复「标签 + 数值」一行,
+       竖着摞成一列;挪到左栏底边后每个芯片恢复「标签 + 数值」一行(两列排布),
        游戏区也少让一条栏间距 */
     grid-template-columns: var(--gs-rail-w) minmax(0, 1fr);
     /* 只声明两行(游戏区 + 计分芯片):第三行留给 .gs-footer,没有它就不该占行——
@@ -1039,14 +1039,18 @@ html.game-shell .mobile-game-chrome {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  /* 计分芯片:左栏最下面一行,芯片内「标签 + 数值」并排(和消消乐记分条同一读法),
-     放不下就换行;紧凑档压掉内边距与字号,窄左栏里也读得清 */
+  /* 计分板:左栏最下面一行,整块与左栏按钮同宽;芯片排两列,每块占半栏,
+     内里仍是「标签 → 数值」一行(标签靠左、数值贴右,和消消乐记分条同一读法)。
+     分列靠 flex-basis 50% + min-width:max-content:内容放不进半栏的那一块
+     自然撑成整行,于是退回一列 —— 不压缩文字、不横向溢出,也不需要 JS 量宽。
+     与按钮区分:芯片没有描边、没有实底,是浅品牌色的小方卡(圆角 8,比按钮的 10 更方),
+     不和下面那排全宽圆角按钮混成一片。 */
   .page.game-shell > .gs-stats {
     grid-row: 2;
     grid-column: 1;
     flex-direction: row;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch;
     justify-content: flex-start;
     align-content: flex-end;
     gap: 4px;
@@ -1054,14 +1058,29 @@ html.game-shell .mobile-game-chrome {
     padding: 0;
     overflow: visible;
   }
-  .page.game-shell > .gs-stats .gh-chip {
+  .page.game-shell > .gs-stats > .gh-chip {
+    flex: 1 1 calc(50% - 2px);
+    min-width: max-content;
+    max-width: 100%;
     height: auto;
-    padding: 2px 7px;
+    min-height: 24px;
+    padding: 0 7px;
     gap: 4px;
-    font-size: 11px;
+    align-items: center;
+    justify-content: space-between;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(var(--color-brand-rgb), 0.09);
+    font-size: 10.5px;
   }
-  .page.game-shell > .gs-stats .gh-chip b {
+  .page.game-shell > .gs-stats > .gh-chip b {
     font-size: 12px;
+  }
+  /* 不是芯片的整块计分板(黑白棋 .rv-side:棋子数 + 状态行 + 悔棋):保持整栏一块,
+     不切两列,它内部自带的并排读法不变 */
+  .page.game-shell > .gs-stats > :not(.gh-chip) {
+    flex: 1 1 100%;
+    min-width: 0;
   }
   /* 游戏区跨左栏的两行:芯片只在左栏底边占位,不从棋盘高度里扣 */
   .gs-body {
