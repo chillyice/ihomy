@@ -94,15 +94,12 @@ import { useUserStore } from '@/stores/user'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useFloatDelete } from '@/composables/useFloatDelete'
-import { useRoute } from 'vue-router'
-import { gameMuted } from '@/utils/games/gameSound'
 import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition } from '@/utils/mediaSession'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const { t } = useI18n()
-const route = useRoute()
 const userStore = useUserStore()
 const floatsStore = useFloatsStore()
 const audioEl = ref(null)
@@ -230,26 +227,6 @@ watch(expanded, () => {
 })
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
-// 背景音乐只在「游戏里」放:进游戏从头播,离开游戏完全停止(暂停 + 进度归零,不留给回来接着放的余地);
-// 游戏列表和其它站内页都不接管播放状态。游戏页头部的静音键(utils/games/gameSound.js 那份全局状态)
-// 只负责「播 / 不播」,不背别的含义。
-const inGame = computed(() => route.path.startsWith('/games/'))
-// 一局游戏 = 一个页面:换游戏也当作「重新进游戏」,从这首的开头放(各游戏若自带曲目,换的就是曲目本身)
-const gamePageKey = computed(() => (inGame.value ? route.path : ''))
-// 本次进游戏还没起播成功(歌单、曲目或签名地址晚到):地址就绪后补一次
-let gameBgmArmed = false
-const startGameBgm = () => {
-  const el = audioEl.value
-  if (!el || !currentTrack.value.url) return
-  el.play()
-    .then(() => {
-      playing.value = true
-      gameBgmArmed = false
-    })
-    .catch(() => {
-      playing.value = false
-    })
-}
 const playedPct = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0))
 const bufferedPct = computed(() => (duration.value ? (buffered.value / duration.value) * 100 : 0))
 
@@ -277,50 +254,6 @@ watch(
   { immediate: true },
 )
 
-// 进出游戏 / 游戏之间切换:每次都从开头放(不留上一次的进度),离开游戏彻底停(暂停 + 归零)
-watch(
-  gamePageKey,
-  (key) => {
-    const el = audioEl.value
-    if (key) {
-      if (el) el.currentTime = 0
-      gameBgmArmed = !gameMuted.value
-      if (gameBgmArmed) startGameBgm()
-      return
-    }
-    if (el) {
-      el.pause()
-      el.currentTime = 0
-    }
-    gameBgmArmed = false
-  },
-  { immediate: true },
-)
-
-// 静音键只管播/不播:静音就停,取消静音从当前位置接着放(游戏内才有这个键)
-watch(gameMuted, (muted) => {
-  if (!inGame.value) return
-  if (muted) {
-    audioEl.value?.pause()
-    return
-  }
-  gameBgmArmed = true
-  startGameBgm()
-})
-
-// 直接刷新落在游戏页:歌单、曲目、签名地址、<audio> 元素都比路由晚到,就绪后补一次起播
-watch([playSrc, () => playlist.value.length], async () => {
-  if (!inGame.value || !gameBgmArmed) return
-  await nextTick()
-  startGameBgm()
-})
-
-// 刷新落在游戏页时浏览器会拦掉自动播放:等页面里的第一次点按(真手势)再补一次
-const onFirstGesture = () => {
-  if (!inGame.value || !gameBgmArmed || gameMuted.value) return
-  startGameBgm()
-}
-
 const loadBackgroundPlaylist = async () => {
   if (!userStore.isLoggedIn) {
     playlist.value = []
@@ -342,8 +275,6 @@ const loadBackgroundPlaylist = async () => {
 
 const togglePlay = () => {
   if (!audioEl.value || !currentTrack.value.url) return
-  // 用户自己按了播放/暂停:不再需要「地址就绪后补起播」这条兜底
-  gameBgmArmed = false
   if (playing.value) {
     audioEl.value.pause()
     playing.value = false
@@ -468,9 +399,6 @@ onMounted(() => {
   window.addEventListener('orientationchange', onViewportChange)
   window.addEventListener('visibilitychange', onVisibilityChange)
   window.visualViewport?.addEventListener('resize', onViewportChange)
-  // 捕获阶段先挂:手势解锁不受游戏页自己的点击处理影响
-  document.addEventListener('pointerdown', onFirstGesture, true)
-  window.addEventListener('keydown', onFirstGesture, true)
 })
 onBeforeUnmount(() => {
   clearTimeout(expandClampTimer)
@@ -480,8 +408,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('orientationchange', onViewportChange)
   window.removeEventListener('visibilitychange', onVisibilityChange)
   window.visualViewport?.removeEventListener('resize', onViewportChange)
-  document.removeEventListener('pointerdown', onFirstGesture, true)
-  window.removeEventListener('keydown', onFirstGesture, true)
   clearMediaSession('float')
 })
 </script>

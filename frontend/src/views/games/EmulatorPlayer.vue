@@ -32,6 +32,41 @@
           <el-icon><RefreshRight /></el-icon>
           <span class="gt-label">{{ $t('gba.reload') }}</span>
         </el-button>
+        <el-button
+          v-if="fileName || src"
+          class="gt-mute"
+          size="small"
+          round
+          :type="muted ? 'primary' : 'default'"
+          :title="muted ? $t('games.unmute') : $t('games.mute')"
+          :aria-label="muted ? $t('games.unmute') : $t('games.mute')"
+          :aria-pressed="muted"
+          @click="toggleGameMuted"
+        >
+          <el-icon>
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 9.5h3l4.5-3.5v12L7 14.5H4z" />
+              <template v-if="muted">
+                <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" />
+              </template>
+              <template v-else>
+                <path d="M15.5 8.6a5 5 0 0 1 0 6.8" />
+                <path d="M18.4 6.2a8.6 8.6 0 0 1 0 11.6" />
+              </template>
+            </svg>
+          </el-icon>
+          <span class="gt-label">{{ muted ? $t('games.unmute') : $t('games.mute') }}</span>
+        </el-button>
         <el-tag v-if="fileName || src" size="small" type="info" effect="plain">
           {{ $t('games.gamepadEmulator') }}
         </el-tag>
@@ -215,6 +250,7 @@ import { serverUrl } from '@/utils/assetUrl'
 import { formatDateTime } from '@/utils/datetime'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { gameMuted, toggleGameMuted } from '@/utils/games/gameSound'
 import { emulatorAccept, emulatorSystemsText, systemOf, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 
 const props = defineProps({
@@ -231,6 +267,8 @@ const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
+// ROM 自己的背景音乐/音效:静音键只做「播 / 不播」,与浮窗播放器那份站内音乐互不相干
+const muted = gameMuted
 const container = ref(null)
 const stage = ref(null)
 const consoleEl = ref(null)
@@ -700,6 +738,50 @@ const pick = () => fileInput.value?.click()
 // 清理旧模拟器(只清 DOM + 释放全局引用;objectUrl 由调用方在合适时机释放,否则会提前失效)
 // EmulatorJS 没有 destroy API:只清 DOM 不停核心,核心的模拟主循环与音频回调会继续跑——
 // 返回上级页面后游戏声音仍在放、CPU 照跑。先暂停(等价暂停按钮)再拆 DOM。
+// 光暂停不够:OpenAL(Emscripten 的 WebAudio 实现)里已经排好的循环音源会脱离核心自己放下去,
+// 退出游戏后还能听见 ROM 的背景音乐。所以还要停音源、关掉它的 AudioContext。
+const stopEmulatorAudio = () => {
+  const al = ejsInstance?.gameManager?.Module?.AL
+  if (!al) return
+  try {
+    al.paused = true
+  } catch (e) {
+    /* 上下文已销毁 */
+  }
+  const contexts = al.contexts ? (typeof al.contexts.values === 'function' ? [...al.contexts.values()] : Object.values(al.contexts)) : []
+  contexts.forEach((ctx) => {
+    if (Array.isArray(ctx?.sources)) {
+      ctx.sources.forEach((s) => {
+        try {
+          s.gain.gain.value = 0
+        } catch (e) {
+          /* 音源已回收 */
+        }
+      })
+    }
+    try {
+      ctx?.audioCtx?.close?.()
+    } catch (e) {
+      /* 已关闭 */
+    }
+  })
+}
+
+// 静音键:压掉模拟器自己的声音。EJS 的 setVolume 只改当前音源(之后新起的 BGM 不受它管),
+// 所以再压一层 OpenAL 上下文的全局增益,新的音源也一起静音。
+const applyEmulatorMute = (value) => {
+  const ejs = ejsInstance
+  if (!ejs) return
+  try {
+    ejs.setVolume?.(value ? 0 : ejs.volume || 0.5)
+  } catch (e) {
+    /* 核心还没起来时没有音量接口 */
+  }
+  const gain = ejs.gameManager?.Module?.AL?.currentCtx?.gain?.gain
+  if (gain) gain.value = value ? 0 : 1
+}
+watch(muted, applyEmulatorMute)
+
 const teardownEmulator = () => {
   stopSync()
   releaseAllPad()
@@ -718,6 +800,7 @@ const teardownEmulator = () => {
   } catch (e) {
     /* pause 已停则无操作;paused 标志错乱时这里兜底 */
   }
+  stopEmulatorAudio()
   if (container.value) container.value.innerHTML = ''
   delete window.EJS_emulator
   ejsInstance = null
@@ -764,6 +847,7 @@ const loadRom = async (romUrl) => {
       onEmulatorReady()
       reconcileAfterStart()
       syncScreenAspect()
+      applyEmulatorMute(gameMuted.value)
       gameStarted.value = true
       startSync()
     }
