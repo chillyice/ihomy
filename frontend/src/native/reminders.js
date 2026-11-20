@@ -184,6 +184,8 @@ async function doSync() {
   const remote = new Map()
   for (const it of items) {
     if (!it || it.done || !it.key) continue
+    // 只勾了邮箱的提醒(appNotify=false):不进 remote,已注册的旧闹钟会按「远端已消失」取消
+    if (it.appNotify === false) continue
     if (remote.size >= limit) break
     if (isPast(it.date, it.time)) continue
     remote.set(it.key, it)

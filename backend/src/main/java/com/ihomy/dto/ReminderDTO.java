@@ -4,11 +4,13 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 /**
  * 提醒事项表单。
  * repeatType:ONCE 一次性 / DAILY 每日 / WEEKLY 每周 / MONTHLY 每月 / YEARLY 每年;
  * 每年重复时 calendar 选 solar 阳历或 lunar 农历,农历须给 lunarMonth/lunarDay(与 isLeap)。
+ * notifyChannels:提醒方式 EMAIL/APP;空列表=仅应用内,null=本次不改(编辑时)。
  */
 @Data
 public class ReminderDTO {
@@ -24,4 +26,6 @@ public class ReminderDTO {
     private Integer lunarDay;
     /** 农历是否闰月:0 否 / 1 是 */
     private Integer isLeap;
+    /** 提醒方式 EMAIL/APP(可多选);空列表=仅应用内,null=本次不改 */
+    private List<String> notifyChannels;
 }

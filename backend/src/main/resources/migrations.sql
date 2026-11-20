@@ -3867,3 +3867,32 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('health_workout_type', 'CARDIO',     '混合有氧'),
 ('health_workout_type', 'MIND_BODY',  '身心训练'),
 ('health_workout_type', 'OTHER',      '其他运动');
+
+-- ------------------------------------------------------------
+-- 2026-11-20(V13.86):日程提醒支持邮箱通道
+--   ① family_reminder.notify_channels:提醒方式(逗号分隔 EMAIL/APP),NULL 或空=仅应用内(保持原行为)。
+--   ② family_reminder.last_notified_date:到点通知原子抢占日期,邮件与应用内共用去重
+--      (原来只靠 family_notification 行判断,邮件单独开启时没有通知行会每 5 分钟重发)。
+--   幂等:information_schema 条件判断,重跑无害;不做 backfill(避免部署当天吞掉当天后续提醒)。
+-- ------------------------------------------------------------
+SET @add_reminder_channels := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_reminder` ADD COLUMN `notify_channels` VARCHAR(50) DEFAULT NULL COMMENT ''提醒方式(逗号分隔):EMAIL邮件/APP应用内;NULL或空=仅应用内'' AFTER `done`',
+    'SELECT ''skip: notify_channels already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder' AND COLUMN_NAME = 'notify_channels'
+);
+PREPARE add_reminder_channels_stmt FROM @add_reminder_channels;
+EXECUTE add_reminder_channels_stmt;
+DEALLOCATE PREPARE add_reminder_channels_stmt;
+
+SET @add_reminder_notified := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_reminder` ADD COLUMN `last_notified_date` DATE DEFAULT NULL COMMENT ''最近一次到点通知日期(邮件/应用内共用,防 5 分钟重复推送)'' AFTER `notify_channels`',
+    'SELECT ''skip: last_notified_date already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder' AND COLUMN_NAME = 'last_notified_date'
+);
+PREPARE add_reminder_notified_stmt FROM @add_reminder_notified;
+EXECUTE add_reminder_notified_stmt;
+DEALLOCATE PREPARE add_reminder_notified_stmt;

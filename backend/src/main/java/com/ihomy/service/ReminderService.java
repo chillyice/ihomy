@@ -1,14 +1,17 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.NotifyChannels;
 import com.ihomy.common.RepeatSchedule;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.ReminderDTO;
 import com.ihomy.entity.Notification;
 import com.ihomy.entity.Reminder;
 import com.ihomy.entity.ReminderCheck;
+import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.NotificationMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
@@ -18,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -34,7 +38,8 @@ import java.util.Set;
  * 重复规则:每日=每天;每周=remind_date 的星期;每月=remind_date 的日号;
  * 每年=阳历月日或农历月日(闰月严格匹配),判定唯一来源是 {@link RepeatSchedule}。
  * 完成态:一次性用 done 列;循环提醒按 (提醒, 日期) 记在 family_reminder_check,系列不终止。
- * 同一天同一提醒只通知一次(以当日已存在该提醒的通知为准)。
+ * 同一天同一提醒只通知一次(以当日已存在该提醒的通知为准,另有 last_notified_date 原子抢占兜底)。
+ * 提醒方式(V13.86):notify_channels 空=仅应用内(历史默认);勾了 EMAIL 额外给创建人账号邮箱发高重要性邮件。
  * 关联计划的提醒(plan_id 非空)由家庭计划托管,提醒侧只允许勾完成。
  */
 @Slf4j
@@ -51,6 +56,7 @@ public class ReminderService {
     private final SysUserMapper sysUserMapper;
     private final NotificationService notificationService;
     private final AudienceService audienceService;
+    private final ReminderMailService reminderMailService;
 
     /**
      * 家庭提醒列表:未完成优先,再按触发时间升序。
@@ -95,6 +101,7 @@ public class ReminderService {
         m.put("lunarDay", r.getLunarDay());
         m.put("isLeap", r.getIsLeap());
         m.put("done", r.getDone());
+        m.put("notifyChannels", NotifyChannels.parse(r.getNotifyChannels()));
         m.put("planId", r.getPlanId());
         m.put("createdBy", r.getCreatedBy());
         m.put("readOnly", readOnly);
@@ -118,6 +125,7 @@ public class ReminderService {
         r.setRemindTime(dto.getRemindTime());
         applyRepeat(r, dto);
         r.setDone(0);
+        r.setNotifyChannels(NotifyChannels.normalize(dto.getNotifyChannels()));
         r.setCreatedBy(userId);
         reminderMapper.insert(r);
         return r;
@@ -136,6 +144,8 @@ public class ReminderService {
             // 循环改回一次性:历史按日完成记录不再有意义,避免切回循环时误判为已完成
             if (!isRecurring(r)) reminderCheckMapper.deleteByReminderId(id);
         }
+        // 提醒方式:null=本次不改;空列表归一成空串(仅应用内),非空写规范顺序
+        if (dto.getNotifyChannels() != null) r.setNotifyChannels(NotifyChannels.normalize(dto.getNotifyChannels()));
         reminderMapper.updateById(r);
     }
 
@@ -202,7 +212,14 @@ public class ReminderService {
                 if (r.getRemindTime() == null || r.getRemindTime().isAfter(now.plusMinutes(5))) continue;
                 // 当日已通知则跳过(重复类提醒一天一次,防止 5 分钟重复推送)
                 if (notifiedToday(r, today)) continue;
-                notifyFamily(r);
+                boolean app = NotifyChannels.appEnabled(r.getNotifyChannels());
+                SysUser mailTo = NotifyChannels.emailEnabled(r.getNotifyChannels()) ? emailRecipient(r) : null;
+                // 只勾了邮箱但创建人没有可用邮箱 = 没有任何可投递通道
+                if (!app && mailTo == null) continue;
+                // 原子抢占当天通知权:邮件通道没有 family_notification 行,不能只靠上面的行去重
+                if (!claimNotify(r, today)) continue;
+                if (app) notifyFamily(r);
+                if (mailTo != null) reminderMailService.send(mailTo, r, today);
             } catch (Exception e) {
                 // 单条提醒处理失败不影响其他提醒
                 log.error("reminder notify failed, reminderId={}", r.getId(), e);
@@ -233,6 +250,25 @@ public class ReminderService {
             notificationService.create((Long) m.get("id"), "reminder",
                     "提醒：" + r.getTitle(), r.getId(), "reminder", null);
         }
+    }
+
+    /** 邮件收件人:提醒创建人的账号邮箱(演示假账号/未填邮箱一律不发) */
+    private SysUser emailRecipient(Reminder r) {
+        if (r.getCreatedBy() == null) return null;
+        SysUser creator = sysUserMapper.selectById(r.getCreatedBy());
+        if (creator == null) return null;
+        if (creator.getIsFake() != null && creator.getIsFake() == 1) return null;
+        return StringUtils.hasText(creator.getEmail()) ? creator : null;
+    }
+
+    /** 抢占当天通知权:条件更新 last_notified_date,影响行数 1 才继续(邮件/应用内共用一次) */
+    private boolean claimNotify(Reminder r, LocalDate today) {
+        int affected = reminderMapper.update(null, new LambdaUpdateWrapper<Reminder>()
+                .eq(Reminder::getId, r.getId())
+                .and(w -> w.isNull(Reminder::getLastNotifiedDate)
+                        .or().lt(Reminder::getLastNotifiedDate, today))
+                .set(Reminder::getLastNotifiedDate, today));
+        return affected > 0;
     }
 
     /** 当日是否已为某位成员发过该提醒通知(家庭为单位查重) */

@@ -1110,6 +1110,8 @@ CREATE TABLE `family_task` (
 --     remind_date 语义:一次性=触发当天;每周=基准星期;每月=基准日号;每年=锚定公历日(展示/排序用)
 --     plan_id 非空 = 由家庭计划托管(单向:计划→提醒,提醒侧不改计划状态)
 --     V10.95 循环提醒扩展:YEARLY + 阳历/农历 + 闰月,日历口径只在 common/RepeatSchedule 一处
+--     V13.86 提醒方式:notify_channels 逗号分隔 EMAIL/APP(NULL 或空=仅应用内);
+--           last_notified_date = 到点通知原子抢占日期(邮件/应用内共用,防 5 分钟重复推送)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_reminder`;
 CREATE TABLE `family_reminder` (
@@ -1125,6 +1127,8 @@ CREATE TABLE `family_reminder` (
   `lunar_day`   TINYINT       DEFAULT NULL COMMENT '农历日(1-30,农历每年时必填)',
   `is_leap`     TINYINT       NOT NULL DEFAULT 0 COMMENT '农历是否闰月: 0否/1是（当年无该闰月则不触发）',
   `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成(每年/每日等循环提醒恒为0,按日完成记录见 family_reminder_check)',
+  `notify_channels`   VARCHAR(50) DEFAULT NULL COMMENT '提醒方式(逗号分隔):EMAIL邮件/APP应用内;NULL或空=仅应用内',
+  `last_notified_date` DATE       DEFAULT NULL COMMENT '最近一次到点通知日期(邮件/应用内共用,防 5 分钟重复推送)',
   `plan_id`     BIGINT        DEFAULT NULL COMMENT '关联计划ID(family_plan.id;NULL=独立提醒)',
   `created_by`  BIGINT        NOT NULL COMMENT '创建人ID',
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

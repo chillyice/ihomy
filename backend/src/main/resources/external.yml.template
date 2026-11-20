@@ -60,9 +60,14 @@ app:
   weather-project-id:
   weather-key-id:
   weather-private-key:         # Ed25519 私钥 PEM;不入 git,推荐只配 DB 并用 ENC(...) 加密
+  # 邮件通道共用 spring.mail.*(见文件上方 SMTP 段);未配 host 时密码找回与日程提醒邮件都不可用
   # 密码找回邮件:发件人(空=取 spring.mail.username);重置链接基址(指向前端重置页)
+  # 日程提醒邮件(V13.86):发件人默认 reminder@ihomy.top(需是 SMTP 账号允许的发件地址),
+  #   收件人=提醒创建人的账号邮箱,邮件重要性为高;链接基址指向前端日程页
   mail:
     from:                      # 如 no-reply@example.com
+    reminder-from:             # 留空用 application.yml 基线 reminder@ihomy.top
+    reminder-url-base:         # 留空用 application.yml 基线 https://ihomy.top/plan
     reset-url-base:            # 如 https://ihomy.top/reset-password(留空用 application.yml 基线)
   # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature),在应用内「设置-家庭 AI 配置」维护,不再走全局 yml(V9.48)
   # Android 客户端版本(可选覆盖,基线见 application.yml):发布 APK 到 /files/app/ 后填 latest-version(与仓库根 VERSION 同步)。

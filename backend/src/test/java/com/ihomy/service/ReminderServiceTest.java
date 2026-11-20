@@ -4,10 +4,12 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.NotifyChannels;
 import com.ihomy.dto.ReminderDTO;
 import com.ihomy.entity.Notification;
 import com.ihomy.entity.Reminder;
 import com.ihomy.entity.ReminderCheck;
+import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.NotificationMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
@@ -52,8 +54,9 @@ class ReminderServiceTest {
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final AudienceService audienceService = mock(AudienceService.class);
-    private final ReminderService service = new ReminderService(
-            reminderMapper, checkMapper, notificationMapper, userMapper, notificationService, audienceService);
+    private final ReminderMailService reminderMailService = mock(ReminderMailService.class);
+    private final ReminderService service = new ReminderService(reminderMapper, checkMapper, notificationMapper,
+            userMapper, notificationService, audienceService, reminderMailService);
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -75,7 +78,16 @@ class ReminderServiceTest {
         r.setCalendar(DictConst.CALENDAR_SOLAR);
         r.setIsLeap(0);
         r.setDone(done);
+        r.setCreatedBy(USER);
         return r;
+    }
+
+    private SysUser user(Long id, String email, int fake) {
+        SysUser u = new SysUser();
+        u.setId(id);
+        u.setEmail(email);
+        u.setIsFake(fake);
+        return u;
     }
 
     // ---------------------------------------------------------------- 按日完成
@@ -263,6 +275,7 @@ class ReminderServiceTest {
                 reminder(DictConst.REPEAT_DAILY, TODAY, LocalTime.of(8, 0), 0)));
         when(checkMapper.selectList(any())).thenReturn(List.of());
         when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(reminderMapper.update(isNull(), any())).thenReturn(1);
         when(userMapper.selectMembersByFamily(FAMILY)).thenReturn(List.of(
                 Map.of("id", USER), Map.of("id", 8L)));
 
@@ -296,11 +309,117 @@ class ReminderServiceTest {
         when(reminderMapper.selectList(any())).thenReturn(List.of(lunar));
         when(checkMapper.selectList(any())).thenReturn(List.of());
         when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(reminderMapper.update(isNull(), any())).thenReturn(1);
         when(userMapper.selectMembersByFamily(FAMILY)).thenReturn(List.of(Map.of("id", USER)));
 
         service.notifyDue(LocalDate.of(2026, 9, 25), LocalTime.of(8, 1));
 
         verify(notificationService).create(eq(USER), eq("reminder"), eq("提醒：吃药"),
                 eq(REMINDER_ID), eq("reminder"), isNull());
+    }
+
+    // ---------------------------------------------------------------- 提醒方式(邮箱/应用内)
+
+    @Test
+    void createNormalizesNotifyChannels() {
+        ReminderDTO dto = new ReminderDTO();
+        dto.setTitle("吃药");
+        dto.setRemindDate(TODAY);
+        dto.setRemindTime(LocalTime.of(8, 0));
+        dto.setRepeatType(DictConst.REPEAT_ONCE);
+        dto.setNotifyChannels(List.of("app", "EMAIL", "SMS"));
+
+        service.create(USER, FAMILY, dto);
+
+        ArgumentCaptor<Reminder> captor = ArgumentCaptor.forClass(Reminder.class);
+        verify(reminderMapper).insert(captor.capture());
+        assertThat(captor.getValue().getNotifyChannels()).isEqualTo("EMAIL,APP");
+    }
+
+    @Test
+    void createWithEmptyChannelsStoresEmptyString() {
+        ReminderDTO dto = new ReminderDTO();
+        dto.setTitle("吃药");
+        dto.setRemindDate(TODAY);
+        dto.setRemindTime(LocalTime.of(8, 0));
+        dto.setRepeatType(DictConst.REPEAT_ONCE);
+        dto.setNotifyChannels(List.of());
+
+        service.create(USER, FAMILY, dto);
+
+        ArgumentCaptor<Reminder> captor = ArgumentCaptor.forClass(Reminder.class);
+        verify(reminderMapper).insert(captor.capture());
+        // 空串=仅应用内(历史默认),与 NULL 同义
+        assertThat(captor.getValue().getNotifyChannels()).isEmpty();
+    }
+
+    @Test
+    void notifyEmailOnlySkipsInAppAndMailsCreator() {
+        Reminder r = reminder(DictConst.REPEAT_DAILY, TODAY, LocalTime.of(8, 0), 0);
+        r.setNotifyChannels(NotifyChannels.EMAIL);
+        when(reminderMapper.selectList(any())).thenReturn(List.of(r));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+        when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(reminderMapper.update(isNull(), any())).thenReturn(1);
+        SysUser creator = user(USER, "me@example.com", 0);
+        when(userMapper.selectById(USER)).thenReturn(creator);
+
+        service.notifyDue(TODAY, LocalTime.of(8, 1));
+
+        verify(notificationService, never()).create(anyLong(), anyString(), anyString(),
+                anyLong(), anyString(), any());
+        verify(reminderMailService).send(creator, r, TODAY);
+    }
+
+    @Test
+    void notifyBothChannelsWhenBothSelected() {
+        Reminder r = reminder(DictConst.REPEAT_DAILY, TODAY, LocalTime.of(8, 0), 0);
+        r.setNotifyChannels("EMAIL,APP");
+        when(reminderMapper.selectList(any())).thenReturn(List.of(r));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+        when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(reminderMapper.update(isNull(), any())).thenReturn(1);
+        SysUser creator = user(USER, "me@example.com", 0);
+        when(userMapper.selectById(USER)).thenReturn(creator);
+        when(userMapper.selectMembersByFamily(FAMILY)).thenReturn(List.of(Map.of("id", USER)));
+
+        service.notifyDue(TODAY, LocalTime.of(8, 1));
+
+        verify(notificationService).create(eq(USER), eq("reminder"), eq("提醒：吃药"),
+                eq(REMINDER_ID), eq("reminder"), isNull());
+        verify(reminderMailService).send(creator, r, TODAY);
+    }
+
+    @Test
+    void notifyEmailOnlyWithoutUsableAddressSkipsWithoutClaiming() {
+        Reminder r = reminder(DictConst.REPEAT_DAILY, TODAY, LocalTime.of(8, 0), 0);
+        r.setNotifyChannels(NotifyChannels.EMAIL);
+        when(reminderMapper.selectList(any())).thenReturn(List.of(r));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+        when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(userMapper.selectById(USER)).thenReturn(user(USER, null, 0));
+
+        service.notifyDue(TODAY, LocalTime.of(8, 1));
+
+        verify(notificationService, never()).create(anyLong(), anyString(), anyString(),
+                anyLong(), anyString(), any());
+        verify(reminderMailService, never()).send(any(), any(), any());
+        // 没有可投递通道就不抢占用,避免同一天后续补上邮箱后仍能发
+        verify(reminderMapper, never()).update(isNull(), any());
+    }
+
+    @Test
+    void notifySkipsWhenDailyClaimAlreadyTaken() {
+        when(reminderMapper.selectList(any())).thenReturn(List.of(
+                reminder(DictConst.REPEAT_DAILY, TODAY, LocalTime.of(8, 0), 0)));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+        when(notificationMapper.selectCount(any())).thenReturn(0L);
+        when(reminderMapper.update(isNull(), any())).thenReturn(0);
+
+        service.notifyDue(TODAY, LocalTime.of(8, 1));
+
+        verify(notificationService, never()).create(anyLong(), anyString(), anyString(),
+                anyLong(), anyString(), any());
+        verify(reminderMailService, never()).send(any(), any(), any());
     }
 }

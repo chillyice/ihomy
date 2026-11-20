@@ -37,6 +37,10 @@ public class Reminder {
     /** 农历是否闰月:0 否 / 1 是 */
     private Integer isLeap;
     private Integer done;
+    /** 提醒方式:逗号分隔 EMAIL/APP;NULL 或空=仅应用内提醒(历史默认) */
+    private String notifyChannels;
+    /** 最近一次到点通知日期(邮件/应用内共用,防 5 分钟重复推送) */
+    private LocalDate lastNotifiedDate;
     /** 关联计划ID:非空=由家庭计划托管,提醒侧只允许勾完成 */
     private Long planId;
     private Long createdBy;

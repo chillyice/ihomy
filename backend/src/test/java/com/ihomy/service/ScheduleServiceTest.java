@@ -464,6 +464,25 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void occurrencesCarryAppNotifyFlagFromChannels() {
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        LocalDate today = LocalDate.now();
+        Reminder app = reminder(1L, DictConst.REPEAT_ONCE, today, LocalTime.of(9, 0), 0);
+        Reminder emailOnly = reminder(2L, DictConst.REPEAT_ONCE, today, LocalTime.of(10, 0), 0);
+        emailOnly.setNotifyChannels("EMAIL");
+        when(reminderMapper.selectList(any())).thenReturn(List.of(app, emailOnly));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+
+        List<Map<String, Object>> items = occurrenceItems(service.occurrences(FAMILY, today, today));
+
+        // 只勾邮箱的提醒仍进日程,但标注不注册原生闹钟
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0)).containsEntry("appNotify", true);
+        assertThat(items.get(1)).containsEntry("appNotify", false);
+    }
+
+    @Test
     void occurrencesDropDoneAndPlanTasksAndPlanManagedReminders() {
         when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());

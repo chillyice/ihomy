@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.AnniversaryDate;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.NotifyChannels;
 import com.ihomy.common.RepeatSchedule;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.FamilyPlan;
@@ -278,6 +279,8 @@ public class ScheduleService {
                 item.put("calendar", r.getCalendar());
                 item.put("done", done);
                 item.put("doneToday", done && d.equals(LocalDate.now()));
+                // 应用内提醒开关:原生闹钟注册端据此跳过「只勾了邮箱」的提醒
+                item.put("appNotify", NotifyChannels.appEnabled(r.getNotifyChannels()));
                 if (shared) {
                     item.put("readOnly", true);
                     item.put("shared", true);

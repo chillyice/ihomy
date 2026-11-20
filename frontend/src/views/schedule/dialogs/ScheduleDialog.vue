@@ -87,6 +87,15 @@
         </el-form-item>
       </div>
 
+      <!-- 提醒方式:仅「提醒/每日任务」可配,默认不选=App 内提醒,记住上次选择 -->
+      <el-form-item v-if="showNotifyChannels" :label="$t('schedule.dialog.notifyChannels')">
+        <el-checkbox-group v-model="form.notifyChannels">
+          <el-checkbox value="EMAIL" :label="$t('schedule.dialog.notifyEmail')" />
+          <el-checkbox value="APP" :label="$t('schedule.dialog.notifyApp')" />
+        </el-checkbox-group>
+        <div class="field-hint">{{ $t('schedule.dialog.notifyHint') }}</div>
+      </el-form-item>
+
       <div v-if="planReminderHint" class="field-hint">{{ planReminderHint }}</div>
       <!-- 「给谁看」:纪念日/提醒可分享到亲友圈;计划与待办(计划本身)不参与分享 -->
       <div v-if="shareable && audience.state.loaded" class="audience-block">
@@ -112,6 +121,7 @@ import { ElMessage } from 'element-plus'
 import { anniversaryApi, planApi, reminderApi } from '@/api'
 import { classify, REPEAT, REPEAT_OPTIONS } from '@/utils/scheduleType'
 import { isDateString, todayString } from '@/utils/scheduleCalendar'
+import { loadLastChannels, normalizeChannels, saveLastChannels } from '@/utils/notifyChannels'
 import { useAudience } from '@/composables/useAudience'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 
@@ -144,6 +154,8 @@ const blank = () => {
     date: today,
     repeat: REPEAT.NONE,
     remind: 'NONE',
+    // 新建时沿用本机上次选择(首次为空=默认不选);编辑由 fill 覆盖成该条记录的值
+    notifyChannels: loadLastChannels(),
     time: '08:00',
     advanceDays: 3,
     calendar: 'solar',
@@ -203,6 +215,7 @@ const fill = (it) => {
       initialDate: record.remindDate || '',
       repeat: recurring ? record.repeatType : REPEAT.NONE,
       remind: 'ON_TIME',
+      notifyChannels: normalizeChannels(record.notifyChannels),
       time: record.remindTime ? String(record.remindTime).slice(0, 5) : '08:00',
       calendar: yearly ? record.calendar || 'solar' : 'solar',
       month,
@@ -245,6 +258,9 @@ const kind = computed(() =>
   }),
 )
 const typeText = computed(() => t('schedule.type.' + kind.value))
+
+// 只有落到 family_reminder 的类型(提醒/每日任务)才有「提醒方式」;纪念日提前提醒与计划不写这张表
+const showNotifyChannels = computed(() => form.remind !== 'NONE' && (kind.value === 'REMINDER' || kind.value === 'TASK'))
 
 // 「给谁看」:只有纪念日与提醒(family_anniversary / family_reminder)可分享,计划与待办不参与
 const audience = useAudience('reminder')
@@ -387,9 +403,12 @@ const onSave = async () => {
         lunarMonth: lunar ? form.month : null,
         lunarDay: lunar ? form.day : null,
         isLeap: lunar ? form.isLeap : 0,
+        // 空数组=仅应用内(后端同口径);提交即记住本次选择,下次新建默认沿用
+        notifyChannels: normalizeChannels(form.notifyChannels),
       }
       if (form.id) await reminderApi.update(form.id, payload)
       else savedId = (await reminderApi.create(payload))?.id
+      saveLastChannels(form.notifyChannels)
     } else {
       const payload = {
         name: form.title.trim(),
