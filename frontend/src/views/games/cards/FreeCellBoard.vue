@@ -142,7 +142,6 @@ import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { cardRoomScore } from '@/utils/gameRoom'
 import { seededRng } from '@/utils/games/seededRng'
 import { useCardDrag } from '@/composables/useCardDrag'
-import { usePenTap } from '@/composables/usePenTap'
 import { formatClock } from '@/utils/games/gameClock'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
 import {
@@ -431,8 +430,6 @@ const { drag, startDrag, shouldIgnoreClick, cancelDrag } = useCardDrag({
 })
 // 拖动中的牌在原位隐藏(显示已由跟随指针的幽灵接管),避免同张牌出现在两处;sourceCards 返回的就是牌桌上的对象,可按引用比对
 const isDragged = (card) => drag.active && drag.cards.includes(card)
-// iPad 手写笔的点按兜底:未起拖的那种按下按一次点击补发,双击自动移动才认得出手写笔
-usePenTap(feltEl, { isBusy: () => drag.active })
 
 // ---------- 点击与双击 ----------
 let lastTapKey = ''

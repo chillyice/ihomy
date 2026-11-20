@@ -1,27 +1,26 @@
-// 触控笔点按兜底(iPad + Apple Pencil):Safari 对 pointerType 为 pen 的手势不保证补发 click,
-// 纸牌的「点选 / 双击自动移动」全靠 click,于是手写笔双击没反应、手指正常。
-// 做法:在 pointerup 上直接把这次按下补发成一次 click(带 __ihomyPenTap 标记),
-// 浏览器随后若又补发了真 click,就在捕获阶段吞掉,保证「一次按下 = 一次点击」,双击计时也才准。
-// 只管手写笔;手指/鼠标继续走原生 click,拖牌本体仍由 useCardDrag 处理。
+// 全站手写笔点按兜底(iPad + Apple Pencil):在 App.vue 挂一次,所有页面共用。
+//
+// 为什么需要:iPadOS Safari 对手写笔(pointerType === 'pen')不保证补发 click,而站内交互几乎全靠 click
+// (按钮点按、卡片选中、纸牌双击自动移动……)。症状是「手指点得动、手写笔点不动」。
+// 做法:把「一次手写笔按下」确定性映射成「一次 click」;浏览器随后若又补发了真 click,在 document 捕获阶段吞掉,
+// 保证一次按下 = 一次点击(双击计时、点选/取消选中才不会被一次按下算成两次)。
+//
+// 不接管:手指/鼠标、长按(PEN_LONG_PRESS_MS 以上)、拖动(位移超阈值)、拖牌进行中(body.card-dragging)、
+// canvas 手写板与输入框(见 utils/penTap.js PEN_TAP_EXCLUDED_SELECTOR),需要例外的地方自己标 data-pen-tap="off"。
 import { onBeforeUnmount, onMounted } from 'vue'
-import { isPenTapCandidate, shouldSwallowPenClick } from '@/utils/games/penTap'
+import { isPenTapCandidate, isPenTapExcluded, shouldSwallowPenClick } from '@/utils/penTap'
 
-/**
- * @param {import('vue').Ref<HTMLElement|null>} elRef 牌桌根容器(事件在捕获阶段挂在它上面)
- * @param {{ isBusy?: () => boolean }} [opts] isBusy:拖牌已开始时返回 true,那次按下交给拖拽收尾
- */
-export function usePenTap(elRef, { isBusy = () => false } = {}) {
+export function usePenTap() {
   let down = null
-  /** 上次补发点击的落笔点与时间,用于判浏览器补发的 click 要不要吞 */
+  /** 上次补发点击的落笔点与时间:用来判浏览器补发的 click 要不要吞 */
   let tapPoint = null
-  let el = null
 
   const onPointerDown = (event) => {
-    if (event.pointerType !== 'pen') {
+    if (event.pointerType !== 'pen' || isPenTapExcluded(event.target)) {
       down = null
       return
     }
-    down = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, target: event.target }
+    down = { pointerId: event.pointerId, at: Date.now(), x: event.clientX, y: event.clientY, target: event.target }
   }
 
   const onPointerUp = (event) => {
@@ -29,7 +28,9 @@ export function usePenTap(elRef, { isBusy = () => false } = {}) {
     if (!start || event.pointerId !== start.pointerId) return
     down = null
     const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y)
-    if (!isPenTapCandidate({ pointerType: event.pointerType, distance, busy: isBusy() })) return
+    // 拖牌(useCardDrag)进行中由拖拽收尾,不能再补一次点击
+    const busy = typeof document !== 'undefined' && document.body.classList.contains('card-dragging')
+    if (!isPenTapCandidate({ pointerType: event.pointerType, distance, duration: Date.now() - start.at, busy })) return
     const target = start.target && start.target.isConnected ? start.target : event.target
     if (!target) return
     tapPoint = { at: Date.now(), x: event.clientX, y: event.clientY }
@@ -54,27 +55,29 @@ export function usePenTap(elRef, { isBusy = () => false } = {}) {
     const tap = tapPoint
     const sinceTap = tap ? Date.now() - tap.at : -1
     const distanceFromTap = tap ? Math.hypot(event.clientX - tap.x, event.clientY - tap.y) : NaN
-    if (!shouldSwallowPenClick({ pointerType: event.pointerType, synthetic: !!event.__ihomyPenTap, sinceTap, distanceFromTap })) return
+    const swallow = shouldSwallowPenClick({
+      synthetic: !!event.__ihomyPenTap,
+      excluded: isPenTapExcluded(event.target),
+      sinceTap,
+      distanceFromTap,
+    })
+    if (!swallow) return
     event.stopPropagation()
     event.preventDefault()
   }
 
   onMounted(() => {
-    el = elRef.value
-    if (!el) return
-    el.addEventListener('pointerdown', onPointerDown, true)
-    el.addEventListener('pointerup', onPointerUp, true)
-    el.addEventListener('pointercancel', onPointerCancel, true)
-    el.addEventListener('click', onClickCapture, true)
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('pointerup', onPointerUp, true)
+    document.addEventListener('pointercancel', onPointerCancel, true)
+    document.addEventListener('click', onClickCapture, true)
   })
 
   onBeforeUnmount(() => {
-    if (!el) return
-    el.removeEventListener('pointerdown', onPointerDown, true)
-    el.removeEventListener('pointerup', onPointerUp, true)
-    el.removeEventListener('pointercancel', onPointerCancel, true)
-    el.removeEventListener('click', onClickCapture, true)
-    el = null
+    document.removeEventListener('pointerdown', onPointerDown, true)
+    document.removeEventListener('pointerup', onPointerUp, true)
+    document.removeEventListener('pointercancel', onPointerCancel, true)
+    document.removeEventListener('click', onClickCapture, true)
     down = null
   })
 }

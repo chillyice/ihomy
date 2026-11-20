@@ -115,7 +115,6 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import { useCardDrag } from '@/composables/useCardDrag'
-import { usePenTap } from '@/composables/usePenTap'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { formatClock } from '@/utils/games/gameClock'
 import { seededRng } from '@/utils/games/seededRng'
@@ -422,8 +421,6 @@ const { drag, startDrag, shouldIgnoreClick, cancelDrag } = useCardDrag({
 })
 // 拖动中的牌在原位隐藏(显示已由跟随指针的幽灵接管),避免同张牌出现在两处;sourceCards 返回的就是牌桌上的对象,可按引用比对
 const isDragged = (card) => drag.active && drag.cards.includes(card)
-// iPad 手写笔的点按兜底:未起拖的那种按下按一次点击补发,双击自动移动才认得出手写笔
-usePenTap(feltEl, { isBusy: () => drag.active })
 
 // ---------- 点击与双击 ----------
 let lastTapKey = ''

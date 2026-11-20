@@ -77,6 +77,7 @@ import { isNativeApp } from '@/utils/platform'
 import { initPrefSync } from '@/utils/userPref'
 import { useDevice } from '@/composables/useDevice'
 import { useHotkeys } from '@/composables/useHotkeys'
+import { usePenTap } from '@/composables/usePenTap'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import WarmLayout from '@/components/warm/WarmLayout.vue'
@@ -124,6 +125,9 @@ const routeReady = ref(false)
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)
 // 全局快捷键:模块级单例,只绑一次;面板状态由这里与 CommandPalette 共享
 const { closePalette, openPalette } = useHotkeys()
+// 手写笔点按兜底(iPad + Apple Pencil):全站唯一一处在 document 捕获阶段补发 click,
+// 站内所有只吃 @click 的交互(含纸牌双击自动移动)跟着一起恢复
+usePenTap()
 const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
