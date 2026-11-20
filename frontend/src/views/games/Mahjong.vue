@@ -6,7 +6,7 @@
   <GameShell
     ref="shellEl"
     class="mj-shell"
-    :class="{ 'mj-room': play.active }"
+    :class="{ 'mj-room': play.active, 'mj-live': feltTable, 'gs-on-dark': feltTable }"
     :title="$t('games.mahjong.title')"
     body-align="stretch"
     readable
@@ -488,6 +488,8 @@ const isGuest = computed(() => play.active && !play.isHost)
 
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended
+/** 单机对局中:整页铺成绿桌布、头部走深底白字(封面与房间局不算,房间局有房间条仍按外壳两栏排) */
+const feltTable = computed(() => phase.value !== 'idle' && !play.active)
 const turn = ref(0) // 0..3 座次
 const seatList = ref([]) // [{ seat, userId, name, ai }]
 const hands = ref([[], [], [], []]) // 暗手牌实例 id;访客只有自己那格
@@ -2548,6 +2550,36 @@ html.dark .rules-chip {
 }
 .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
   padding: 6px 8px 0;
+}
+
+/* ===== 单机对局:整块主区铺成一张绿桌布 =====
+ * 与「对抗牌局」同一套口径:桌毡底色上到页面级(--gs-bg),头部那一行也落在毡面上,牌桌的
+ * 边界就是画面边界。手牌/牌河本来就把整块游戏区铺满,所以只需把 .mj-table 自绘的底色与
+ * 桌沿让位,否则页面上会浮出一块矩形;头部同时挂 gs-on-dark(main.css 那段),否则浅色
+ * 主题的深棕字与浅米按钮压在绿毡上几乎看不清(深色主题本来就是浅字,所以只有浅色才明显)。
+ * 封面(选规则)与「一起玩」房间局不算:前者是浅底表单,后者有房间条与左栏。 */
+.page.game-shell.mj-shell.mj-live:not(.mj-room) {
+  --mj-felt-a: #3f7d5c;
+  --mj-felt-b: #28553f;
+  --gs-bg:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.16) 0%, transparent 60%),
+    linear-gradient(158deg, var(--mj-felt-a) 0%, var(--mj-felt-b) 100%);
+}
+html.dark .page.game-shell.mj-shell.mj-live:not(.mj-room) {
+  --mj-felt-a: #294f3f;
+  --mj-felt-b: #16302a;
+}
+/* 全屏走 Fullscreen API 时外壳把底色换回内容页底,这里拉回桌布 */
+.page.game-shell.mj-shell.mj-live:not(.mj-room):fullscreen {
+  background: var(--gs-bg);
+}
+/* 桌布已由页面铺好:牌桌不再自绘底色/桌沿,只留中央高光(与页面同一个渐变,叠不出两层亮斑) */
+.page.game-shell.mj-shell.mj-live:not(.mj-room) .mj-table {
+  background: none;
+  box-shadow: none;
+}
+.page.game-shell.mj-shell.mj-live:not(.mj-room) .mj-table::after {
+  display: none;
 }
 
 /* ===== 手机横屏:整块游戏区就是一张麻将桌 =====

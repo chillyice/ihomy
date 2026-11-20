@@ -1568,6 +1568,10 @@ a {
 html.theme-warm .gc-main:has(.m3-shell) {
   padding: 0;
 }
+/* 平面麻将单机局把整块主区铺成桌布:主区那圈内边距让出去,绿毡才贴到顶栏与侧栏的边 */
+html.theme-warm .gc-main:has(.mj-shell) {
+  padding: 0;
+}
 
 /* ========== 页面通用:标题栏 + 面包屑 ========== */
 .page-header {
