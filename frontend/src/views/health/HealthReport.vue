@@ -1,6 +1,7 @@
-<!-- 健康报表(本人看 + 分享快照共用):按后端返回的 cards 顺序渲染,每张卡片只认 card.id。
-     数据窗口与「最近一天」都由后端算好(HealthReportService),这里不做任何取数判断,
-     分享快照页直接把同一份 JSON 丢进来即可,不需要再登录。 -->
+<!-- 健康报表(本人看 + 分享快照共用):按后端返回的 cards 分组渲染,每张卡片只认 card.id。
+     数据窗口与「锚定日」都由后端算好(HealthReportService),这里不做任何取数判断;
+     分享快照页直接把同一份 JSON 丢进来即可,不需要再登录(readOnly 下不显示「查看详情」)。
+     分组顺序与卡片元数据在 reportCards.js,与后端 HealthReportCard 同口径。 -->
 <template>
   <div v-if="report" class="report">
     <div class="report-meta">
@@ -8,80 +9,100 @@
       <span v-if="readOnly" class="readonly-badge">{{ $t('health.report.readOnlySnapshot') }}</span>
     </div>
 
-    <div class="report-grid">
-      <section
-        v-for="card in cards"
-        :key="card.id"
-        class="card report-card"
-        :class="[`report-card--${card.id}`, { 'is-wide': WIDE_CARDS.includes(card.id) }]"
-      >
-        <div class="report-head">
-          <span class="section-label">{{ cardTitle($t, card.id) }}</span>
-          <span class="report-sub">{{ subText(card) }}</span>
-        </div>
-
-        <div v-if="!card.hasData" class="empty-hint">{{ $t('health.noDataShort') }}</div>
-
-        <!-- 最近一晚睡眠:时长 + 入睡/起床 + 睡眠节奏轴 -->
-        <template v-else-if="card.id === 'sleep_last'">
-          <div class="hero-row">
-            <span class="hero-val">{{ sleepText($t, card.sleep?.totalMin) }}</span>
-            <span class="hero-sub"> {{ clockText(card.sleep?.startTime) }} – {{ clockText(card.sleep?.endTime) }} </span>
-          </div>
-          <HealthSleepNight
-            v-if="card.stages?.length"
-            :stages="card.stages"
-            :start-time="card.sleep?.startTime"
-            :end-time="card.sleep?.endTime"
-            :label="cardTitle($t, card.id)"
-          />
-          <div v-else class="empty-hint">{{ $t('health.sleep.noStages') }}</div>
-        </template>
-
-        <!-- 异常提醒:参考区间 + 个人基线 -->
-        <HealthAlertCard v-else-if="card.id === 'alerts'" :card="card" />
-
-        <!-- 近 7 天序列:柱状 + 合计/日均 -->
-        <template v-else-if="SERIES_CARDS.includes(card.id)">
-          <div class="hero-row">
-            <span class="hero-val">{{ heroText(card) }}</span>
-            <span class="hero-sub">{{ subStatText(card) }}</span>
-          </div>
-          <HealthTrendChart
-            :mode="card.id === 'resting_hr_7d' ? 'line' : 'bar'"
-            :values="seriesValues(card)"
-            :labels="seriesLabels(card)"
-            :label="cardTitle($t, card.id)"
-          />
-        </template>
-
-        <!-- 最近一天的点指标(心率/血氧):折线 + 最小-最大带 -->
-        <template v-else-if="POINT_CARDS.includes(card.id)">
-          <div class="hero-row">
-            <span class="hero-val">{{ withUnit(card.metric, formatMetric(card.metric, card.avg)) }}</span>
-            <span class="hero-sub">
-              {{ withUnit(card.metric, formatMetric(card.metric, card.min)) }} –
-              {{ withUnit(card.metric, formatMetric(card.metric, card.max)) }}
+    <div v-for="section in sections" :key="section.key" class="report-section">
+      <div class="section-label report-group">{{ $t(`health.report.group.${section.key}`) }}</div>
+      <div class="report-grid">
+        <section
+          v-for="card in section.cards"
+          :key="card.id"
+          class="card report-card"
+          :class="[`report-card--${card.id}`, { 'is-wide': WIDE_CARDS.includes(card.id) }]"
+        >
+          <div class="report-head">
+            <span class="section-label">{{ cardTitle($t, card.id) }}</span>
+            <span class="report-head-right">
+              <span class="report-sub">{{ subText(card) }}</span>
+              <button v-if="!readOnly && card.meta?.detail" type="button" class="detail-link" @click="emit('detail', card.meta.detail)">
+                {{ $t('health.report.detail') }}
+              </button>
             </span>
           </div>
-          <HealthTrendChart
-            mode="line"
-            :values="pointValues(card)"
-            :labels="pointLabels(card)"
-            :points="pointBands(card)"
-            :label="cardTitle($t, card.id)"
-          />
-        </template>
 
-        <!-- 体重趋势:近 30 天折线 + 区间变化 -->
-        <template v-else-if="card.id === 'weight_trend'">
-          <div class="hero-row">
-            <span class="hero-val">{{ withUnit(card.metric, formatMetric(card.metric, card.latest)) }}</span>
-            <span class="hero-sub">{{ changeText(card) }}</span>
-          </div>
-          <HealthTrendChart mode="line" :values="weightValues(card)" :labels="weightLabels(card)" :label="cardTitle($t, card.id)" />
-        </template>
-      </section>
+          <div v-if="!card.hasData" class="empty-hint">{{ $t('health.noDataShort') }}</div>
+
+          <!-- 最近一晚睡眠:时长 + 入睡/起床 + 睡眠节奏轴 -->
+          <template v-else-if="card.id === 'sleep_last'">
+            <div class="hero-row">
+              <span class="hero-val">{{ sleepText($t, card.sleep?.totalMin) }}</span>
+              <span class="hero-sub"> {{ clockText(card.sleep?.startTime) }} – {{ clockText(card.sleep?.endTime) }} </span>
+            </div>
+            <HealthSleepNight
+              v-if="card.stages?.length"
+              :stages="card.stages"
+              :start-time="card.sleep?.startTime"
+              :end-time="card.sleep?.endTime"
+              :label="cardTitle($t, card.id)"
+            />
+            <div v-else class="empty-hint">{{ $t('health.sleep.noStages') }}</div>
+          </template>
+
+          <!-- 异常提醒:参考区间 + 个人基线 -->
+          <HealthAlertCard v-else-if="card.id === 'alerts'" :card="card" />
+
+          <!-- 近 7 天序列:柱状 + 合计/日均;静息心率/HRV 是每天一个点,走折线 -->
+          <template v-else-if="SERIES_CARDS.includes(card.id)">
+            <div class="hero-row">
+              <span class="hero-val">{{ heroText(card) }}</span>
+              <span class="hero-sub">{{ subStatText(card) }}</span>
+            </div>
+            <HealthTrendChart
+              :mode="LINE_SERIES.includes(card.id) ? 'line' : 'bar'"
+              :values="seriesValues(card)"
+              :labels="seriesLabels(card)"
+              :average="card.avg"
+              :average-label="$t('health.trend.avg')"
+              :format-value="seriesFormat(card)"
+              :label="cardTitle($t, card.id)"
+            />
+          </template>
+
+          <!-- 最近一天的点指标(心率/血氧):折线 + 最小-最大带 -->
+          <template v-else-if="POINT_CARDS.includes(card.id)">
+            <div class="hero-row">
+              <span class="hero-val">{{ withUnit(card.metric, formatMetric(card.metric, card.avg)) }}</span>
+              <span class="hero-sub">
+                {{ withUnit(card.metric, formatMetric(card.metric, card.min)) }} –
+                {{ withUnit(card.metric, formatMetric(card.metric, card.max)) }}
+              </span>
+            </div>
+            <HealthTrendChart
+              mode="line"
+              :values="pointValues(card)"
+              :labels="pointLabels(card)"
+              :points="pointBands(card)"
+              :average="card.avg"
+              :average-label="$t('health.trend.avg')"
+              :format-value="pointFormat(card)"
+              :label="cardTitle($t, card.id)"
+            />
+          </template>
+
+          <!-- 体重趋势:近 30 天折线 + 区间变化 -->
+          <template v-else-if="card.id === 'weight_trend'">
+            <div class="hero-row">
+              <span class="hero-val">{{ withUnit(card.metric, formatMetric(card.metric, card.latest)) }}</span>
+              <span class="hero-sub">{{ changeText(card) }}</span>
+            </div>
+            <HealthTrendChart
+              mode="line"
+              :values="weightValues(card)"
+              :labels="weightLabels(card)"
+              :format-value="seriesFormat(card)"
+              :label="cardTitle($t, card.id)"
+            />
+          </template>
+        </section>
+      </div>
     </div>
   </div>
 </template>
@@ -92,25 +113,28 @@ import { useI18n } from 'vue-i18n'
 import HealthTrendChart from './HealthTrendChart.vue'
 import HealthSleepNight from './HealthSleepNight.vue'
 import HealthAlertCard from './report/HealthAlertCard.vue'
-import { cardMeta, cardTitle } from './reportCards'
+import { cardTitle, groupCards } from './reportCards'
 import { clockText, dayLabel, formatMetric, sleepText, withUnit } from '@/utils/healthMetrics'
 
 const props = defineProps({
   /** HealthReportService.build 的返回(或分享快照里的同一份 JSON) */
   report: { type: Object, default: null },
-  /** 分享快照页为 true:顶部标一行「只读快照」 */
+  /** 分享快照页为 true:顶部标一行「只读快照」,且不显示「查看详情」 */
   readOnly: { type: Boolean, default: false },
 })
 
+const emit = defineEmits(['detail'])
+
 const { t } = useI18n()
 
-const SERIES_CARDS = ['sleep_7d', 'steps_7d', 'energy_7d', 'exercise_7d', 'resting_hr_7d', 'menstrual_7d']
+const SERIES_CARDS = ['sleep_7d', 'steps_7d', 'energy_7d', 'exercise_7d', 'distance_7d', 'resting_hr_7d', 'hrv_7d', 'menstrual_7d']
+const LINE_SERIES = ['resting_hr_7d', 'hrv_7d']
 const POINT_CARDS = ['hr_day', 'spo2_day']
 const WIDE_CARDS = ['sleep_last', 'alerts']
 const isoText = (v) => (v ? String(v).slice(0, 10) : '—')
 const anchorText = computed(() => isoText(props.report?.anchorDate))
 
-const cards = computed(() => (Array.isArray(props.report?.cards) ? props.report.cards.filter((c) => cardMeta(c.id)) : []))
+const sections = computed(() => groupCards(props.report?.cards))
 
 function subText(card) {
   if (card.date) return isoText(card.date)
@@ -126,9 +150,26 @@ const pointBands = (card) => (card.points || []).map((p) => ({ min: p.min, max: 
 const weightLabels = (card) => (card.points || []).map((p) => dayLabel(p.startTime))
 const weightValues = (card) => (card.points || []).map((p) => Number(p.value))
 
+/** 读数格式化:睡眠走时长文案,其余带单位;月经量等没有单位的直接数字 */
+function seriesFormat(card) {
+  if (card.id === 'sleep_7d') return (v) => (v == null ? '' : sleepText(t, v))
+  return (v) => (v == null ? '' : withUnit(card.metric, formatMetric(card.metric, v)))
+}
+
+/** 点指标读数:有 min/max 且不同就显示区间,否则显示值 */
+function pointFormat(card) {
+  return (v, i) => {
+    const band = card.points?.[i]
+    if (band && Number.isFinite(Number(band.min)) && Number.isFinite(Number(band.max)) && Number(band.min) !== Number(band.max)) {
+      return `${withUnit(card.metric, formatMetric(card.metric, band.min))} – ${withUnit(card.metric, formatMetric(card.metric, band.max))}`
+    }
+    return v == null ? '' : withUnit(card.metric, formatMetric(card.metric, v))
+  }
+}
+
 function heroText(card) {
   if (card.id === 'sleep_7d') return sleepText(t, card.total)
-  if (card.id === 'resting_hr_7d') return withUnit(card.metric, formatMetric(card.metric, card.avg))
+  if (card.id === 'resting_hr_7d' || card.id === 'hrv_7d') return withUnit(card.metric, formatMetric(card.metric, card.avg))
   return withUnit(card.metric, formatMetric(card.metric, card.total))
 }
 
@@ -160,6 +201,12 @@ function changeText(card) {
   border: 1px solid var(--color-border);
   border-radius: 999px;
 }
+.report-section + .report-section {
+  margin-top: 14px;
+}
+.report-group {
+  margin-bottom: 8px;
+}
 .report-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -177,9 +224,25 @@ function changeText(card) {
   justify-content: space-between;
   gap: 8px;
 }
+.report-head-right {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
 .report-sub {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+.detail-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.detail-link:hover {
+  text-decoration: underline;
 }
 .hero-row {
   display: flex;
@@ -189,7 +252,7 @@ function changeText(card) {
   margin: 6px 0 2px;
 }
 .hero-val {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--color-text-primary);
 }

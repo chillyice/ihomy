@@ -1,11 +1,75 @@
-<!-- 健康数据同步(V12.88):手机/手表把睡眠与体征上报到本站。
+<!-- 健康数据设置(V12.88,五段重排见 V13.87):连接 → 同步 → 导入 → 导出 → 隐私与数据。
+     顺序就是使用顺序:先看本机怎么连(按系统只展示本系统的方法,iOS 与 Android 互不显示对方的),
+     再拿通用上报令牌,补历史走「导入」,拿数据走「导出」,最后是同意与清除。
      上报令牌只够 /health/ingest 与 /health/ping,明文只在生成时显示一次;
      敏感指标同意开关与「谁看过我的数据」同页管理,授权以服务端为准。 -->
 <template>
   <div>
-    <div class="card settings-card" v-loading="loading">
-      <div class="section-label">{{ $t('settings.health.title') }}</div>
-      <div class="share-tip">{{ $t('settings.health.hint') }}</div>
+    <!-- ① 连接:Android 壳直连健康连接;Android 浏览器去装 App;iOS 走快捷指令(指向导入段) -->
+    <div v-if="entryKind !== HEALTH_ENTRY.OTHER" class="card settings-card health-connect">
+      <div class="section-label">{{ connectTitle }}</div>
+
+      <template v-if="entryKind === HEALTH_ENTRY.ANDROID_APP">
+        <div class="share-tip">{{ $t('settings.health.connectHcHint') }}</div>
+        <div v-if="native.provider" class="share-tip">
+          {{
+            $t('settings.health.androidSource', {
+              source: native.provider === 'HUAWEI_HEALTH' ? $t('settings.health.sourceHuawei') : $t('settings.health.sourceHc'),
+            })
+          }}
+        </div>
+
+        <template v-if="native.available">
+          <div class="connect-row">
+            <span class="result-label">{{ $t('settings.health.androidGroups') }}</span>
+            <div class="group-chips">
+              <el-tag v-for="g in groups" :key="g" size="small" :type="isGranted(g) ? 'success' : 'info'">
+                {{ groupText(g) }}
+              </el-tag>
+            </div>
+            <el-button size="small" :loading="authorizing" @click="authorize">{{ $t('settings.health.androidAuthorize') }}</el-button>
+          </div>
+
+          <div class="privacy-row">
+            <div class="privacy-text">
+              <div class="row-title">{{ $t('settings.health.androidAuto') }}</div>
+              <div class="share-tip">{{ $t('settings.health.androidAutoHint') }}</div>
+            </div>
+            <el-switch v-model="autoSync" :loading="savingAuto" @change="onAutoSyncChange" />
+          </div>
+
+          <div class="health-actions">
+            <el-button type="primary" :loading="syncing" @click="syncNow">{{ $t('settings.health.androidSyncNow') }}</el-button>
+            <span class="result-time">{{ lastSyncText }}</span>
+          </div>
+
+          <div v-if="syncResult" class="result-row">
+            <el-tag size="small" type="success">{{ $t('settings.health.accepted') }} {{ syncResult.accepted || 0 }}</el-tag>
+            <el-tag size="small" type="info">{{ $t('settings.health.duplicated') }} {{ syncResult.duplicated || 0 }}</el-tag>
+            <el-tag size="small" type="warning">{{ $t('settings.health.rejected') }} {{ syncResult.rejected || 0 }}</el-tag>
+          </div>
+        </template>
+        <div v-else class="share-tip android-missing">{{ $t('settings.health.androidUnavailable') }}</div>
+      </template>
+
+      <div v-else-if="entryKind === HEALTH_ENTRY.ANDROID_WEB" class="connect-row">
+        <span class="share-tip">{{ $t('settings.health.connectAndroidWeb') }}</span>
+        <router-link to="/app">
+          <el-button size="small" type="primary" plain>{{ $t('settings.health.appDownload') }}</el-button>
+        </router-link>
+      </div>
+
+      <div v-else class="connect-row">
+        <span class="share-tip">{{ $t('settings.health.connectAppleHint') }}</span>
+        <el-button size="small" type="primary" plain @click="openShortcutImport">{{ $t('settings.health.connectAppleAction') }}</el-button>
+        <span class="result-time">{{ lastIngestText }}</span>
+      </div>
+    </div>
+
+    <!-- ② 同步:通用关联方式(上报令牌),iOS 快捷指令也从这里取令牌 -->
+    <div class="card settings-card health-sync" v-loading="loading">
+      <div class="section-label">{{ $t('settings.health.syncTitle') }}</div>
+      <div class="share-tip">{{ $t('settings.health.syncHint') }}</div>
 
       <div class="health-endpoint">
         <span class="endpoint-label">{{ $t('settings.health.endpoint') }}</span>
@@ -24,7 +88,6 @@
           <code class="plain-token">{{ plainToken }}</code>
           <el-button size="small" type="primary" plain @click="copyPlain">{{ $t('settings.health.copy') }}</el-button>
         </div>
-        <div class="share-tip">{{ $t('settings.health.usage') }}</div>
       </div>
 
       <el-table v-if="tokens.length" :data="tokens" border stripe size="small" class="health-table">
@@ -67,77 +130,13 @@
       </div>
     </div>
 
-    <!-- 导入(手机导出包一次性导入)/ 导出 CSV:报表页只看报表,这些动作都收在设置里 -->
-    <HealthImport />
+    <!-- ③ 导入:Apple 健康导出包 + iOS 快捷指令(仅 iOS;Android 不显示苹果通道) -->
+    <HealthImport v-if="showAppleImport" ref="importRef" />
 
-    <div class="card settings-card health-shortcut">
-      <div class="section-label">{{ $t('settings.health.tplTitle') }}</div>
-      <div class="share-tip">
-        {{ $t('settings.health.tplHint') }}
-        <router-link class="tpl-more" to="/help#health">{{ $t('settings.health.tplMore') }}</router-link>
-      </div>
+    <!-- ④ 导出:近 90 天 CSV -->
+    <HealthExport />
 
-      <ol class="tpl-steps">
-        <li>{{ $t('settings.health.tplStep1') }}</li>
-        <li>{{ $t('settings.health.tplStep2') }}</li>
-        <li>{{ $t('settings.health.tplStep3') }}</li>
-        <li>{{ $t('settings.health.tplStep4') }}</li>
-      </ol>
-
-      <div class="tpl-body">
-        <div class="tpl-body-head">
-          <span class="tpl-body-label">{{ $t('settings.health.tplBodyLabel') }}</span>
-          <el-button size="small" type="primary" plain @click="copyText(TPL_BODY)">{{ $t('settings.health.copy') }}</el-button>
-        </div>
-        <pre class="tpl-code">{{ TPL_BODY }}</pre>
-        <div class="share-tip">{{ $t('settings.health.tplBodyNote') }}</div>
-      </div>
-    </div>
-
-    <div v-if="nativeSupported" class="card settings-card health-android">
-      <div class="section-label">{{ $t('settings.health.androidTitle') }}</div>
-      <div class="share-tip">{{ $t('settings.health.androidHint') }}</div>
-      <div v-if="native.provider" class="share-tip">
-        {{
-          $t('settings.health.androidSource', {
-            source: native.provider === 'HUAWEI_HEALTH' ? $t('settings.health.sourceHuawei') : $t('settings.health.sourceHc'),
-          })
-        }}
-      </div>
-
-      <template v-if="native.available">
-        <div class="android-row">
-          <span class="result-label">{{ $t('settings.health.androidGroups') }}</span>
-          <div class="group-chips">
-            <el-tag v-for="g in groups" :key="g" size="small" :type="isGranted(g) ? 'success' : 'info'">
-              {{ groupText(g) }}
-            </el-tag>
-          </div>
-          <el-button size="small" :loading="authorizing" @click="authorize">{{ $t('settings.health.androidAuthorize') }}</el-button>
-        </div>
-
-        <div class="privacy-row">
-          <div class="privacy-text">
-            <div class="row-title">{{ $t('settings.health.androidAuto') }}</div>
-            <div class="share-tip">{{ $t('settings.health.androidAutoHint') }}</div>
-          </div>
-          <el-switch v-model="autoSync" :loading="savingAuto" @change="onAutoSyncChange" />
-        </div>
-
-        <div class="health-actions">
-          <el-button type="primary" :loading="syncing" @click="syncNow">{{ $t('settings.health.androidSyncNow') }}</el-button>
-          <span class="result-time">{{ lastSyncText }}</span>
-        </div>
-
-        <div v-if="syncResult" class="result-row">
-          <el-tag size="small" type="success">{{ $t('settings.health.accepted') }} {{ syncResult.accepted || 0 }}</el-tag>
-          <el-tag size="small" type="info">{{ $t('settings.health.duplicated') }} {{ syncResult.duplicated || 0 }}</el-tag>
-          <el-tag size="small" type="warning">{{ $t('settings.health.rejected') }} {{ syncResult.rejected || 0 }}</el-tag>
-        </div>
-      </template>
-      <div v-else class="share-tip android-missing">{{ $t('settings.health.androidUnavailable') }}</div>
-    </div>
-
+    <!-- ⑤ 隐私与数据 -->
     <div class="card settings-card health-privacy">
       <div class="section-label">{{ $t('settings.health.privacyTitle') }}</div>
 
@@ -195,21 +194,31 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { formatDateTime } from '@/utils/datetime'
-import { isAndroidApp } from '@/utils/platform'
+import { HEALTH_ENTRY, healthEntryKind } from '@/utils/healthPlatform'
+import { isNativeApp, nativePlatform } from '@/utils/platform'
 import { copyText as copyToClipboard } from '@/utils/clipboard'
-import { SHORTCUT_BODY } from '@/utils/healthShortcut'
 import HealthImport from './HealthImport.vue'
+import HealthExport from './HealthExport.vue'
 
 const { t } = useI18n()
+
+// 入口形态决定「连接」段展示哪种方法;桌面浏览器整段不出现
+const entryKind = healthEntryKind({
+  isNative: isNativeApp(),
+  nativePlatform: nativePlatform(),
+  ua: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  maxTouchPoints: typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+})
+// 导出包与快捷指令都是苹果通道,安卓上不显示
+const showAppleImport = computed(() => entryKind !== HEALTH_ENTRY.ANDROID_APP && entryKind !== HEALTH_ENTRY.ANDROID_WEB)
+
+const connectTitle = computed(() => (entryKind === HEALTH_ENTRY.IOS ? t('settings.health.connectApple') : t('settings.health.connectHc')))
 
 const SOURCES = [
   { value: 'SHORTCUT', labelKey: 'settings.health.sourceShortcut' },
   { value: 'HEALTH_CONNECT', labelKey: 'settings.health.sourceHealthConnect' },
   { value: 'IOS_NATIVE', labelKey: 'settings.health.sourceNative' },
 ]
-
-// 请求体示例与帮助页共用(utils/healthShortcut.js),这里有复制按钮直接取用
-const TPL_BODY = SHORTCUT_BODY
 
 const loading = ref(false)
 const creating = ref(false)
@@ -230,7 +239,6 @@ const viewLogs = ref([])
 
 // 手机直连(仅 Android 壳):原生桥按需加载,Web 端不注册插件、不进首屏包
 let bridgeModule = null
-const nativeSupported = ref(false)
 const native = ref({ available: false, granted: [], last: null })
 const groups = ref([])
 const authorizing = ref(false)
@@ -238,6 +246,8 @@ const syncing = ref(false)
 const savingAuto = ref(false)
 const autoSync = ref(false)
 const syncResult = ref(null)
+
+const importRef = ref(null)
 
 const loadBridge = async () => {
   if (!bridgeModule) bridgeModule = await import('@/native/health')
@@ -265,9 +275,19 @@ const lastSyncText = computed(() => {
     : `${t('settings.health.androidLastSync')} ${when} · ${last.message || ''}`
 })
 
+/** iOS 连接卡上的「最近上报」:取最近一次上报结果的时间,没有就说还没有 */
+const lastIngestText = computed(() => {
+  const at = lastResult.value?.at
+  if (!at) return t('settings.health.lastIngestNone')
+  return t('settings.health.lastIngestAt', { time: formatDateTime(at) })
+})
+
+const openShortcutImport = () => {
+  importRef.value?.openShortcut?.()
+}
+
 const loadNative = async () => {
-  nativeSupported.value = isAndroidApp()
-  if (!nativeSupported.value) return
+  if (entryKind !== HEALTH_ENTRY.ANDROID_APP) return
   const m = await loadBridge()
   groups.value = m.HEALTH_GROUPS
   try {
@@ -462,51 +482,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.health-privacy {
+.health-sync {
   margin-top: 16px;
 }
-.health-shortcut {
-  margin-top: 16px;
-}
-.tpl-more {
-  margin-left: 6px;
-  color: var(--color-primary);
-  white-space: nowrap;
-}
-.tpl-steps {
-  margin: 10px 0 0;
-  padding-left: 20px;
-  font-size: 13px;
-  line-height: 1.9;
-  color: var(--color-text-primary);
-}
-.tpl-body {
-  margin-top: 12px;
-}
-.tpl-body-head {
+.connect-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.tpl-body-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-.tpl-code {
-  margin: 0 0 6px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-2);
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre;
-  overflow-x: auto;
-}
-.health-android {
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 10px;
 }
 .android-row {
   display: flex;
@@ -620,6 +604,9 @@ onMounted(() => {
 }
 .clear-select {
   width: 160px;
+}
+.health-privacy {
+  margin-top: 16px;
 }
 @media (max-width: 640px) {
   .health-name,

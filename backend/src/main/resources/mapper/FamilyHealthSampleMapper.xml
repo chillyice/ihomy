@@ -40,4 +40,24 @@
         WHERE `user_id` = #{userId} AND `metric` = #{metric}
     </delete>
 
+    <!--
+      长区间趋势:逐点指标按天聚合,一天一行。
+      平均值取 value_num(小时桶里已是均值),最小/最大优先用小时桶自带的 min/max,
+      没有(min/max 为空的旧数据)就退回 value_num,避免整天值被当成 0。
+    -->
+    <select id="selectDailyPoints" resultType="java.util.Map">
+        SELECT DATE_FORMAT(`start_time`, '%Y-%m-%d') AS `date`,
+               AVG(`value_num`) AS `value`,
+               MIN(COALESCE(`value_min`, `value_num`)) AS `min`,
+               MAX(COALESCE(`value_max`, `value_num`)) AS `max`,
+               COUNT(*) AS `count`
+        FROM `family_health_sample`
+        WHERE `user_id` = #{userId}
+          AND `metric` = #{metric}
+          AND `start_time` &gt;= #{from}
+          AND `start_time` &lt; #{toExclusive}
+        GROUP BY DATE_FORMAT(`start_time`, '%Y-%m-%d')
+        ORDER BY `date`
+    </select>
+
 </mapper>

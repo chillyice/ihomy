@@ -28,7 +28,7 @@ class HealthReportCardTest {
     @Test
     void sanitizeCapsAtMaxCards() {
         List<String> many = new java.util.ArrayList<>();
-        // 同一张卡重复 20 次也只能算一张;目录本身只有 11 张,上限 12 不会被撑破
+        // 同一张卡重复 20 次也只能算一张;目录本身只有 13 张,上限 13 不会被撑破
         for (int i = 0; i < 20; i++) many.add(HealthReportCard.SLEEP_LAST);
         many.addAll(HealthReportCard.allIds());
         assertThat(HealthReportCard.sanitize(many)).hasSize(HealthReportCard.allIds().size());

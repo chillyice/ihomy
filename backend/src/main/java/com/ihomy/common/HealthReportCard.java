@@ -19,15 +19,17 @@ public final class HealthReportCard {
     public static final String STEPS_7D = "steps_7d";
     public static final String ENERGY_7D = "energy_7d";
     public static final String EXERCISE_7D = "exercise_7d";
+    public static final String DISTANCE_7D = "distance_7d";
     public static final String RESTING_HR_7D = "resting_hr_7d";
+    public static final String HRV_7D = "hrv_7d";
     public static final String HR_DAY = "hr_day";
     public static final String SPO2_DAY = "spo2_day";
     public static final String WEIGHT_TREND = "weight_trend";
     public static final String MENSTRUAL_7D = "menstrual_7d";
     public static final String ALERTS = "alerts";
 
-    /** 单张报表最多 12 张卡片(偏好值与分享快照都按这个上限收口) */
-    public static final int MAX_CARDS = 12;
+    /** 单张报表最多 13 张卡片(偏好值与分享快照都按这个上限收口,当前目录恰好 13 张) */
+    public static final int MAX_CARDS = 13;
 
     /** 一个卡片:是否敏感组、取数窗口天数(锚定日往前) */
     public record Def(String id, boolean sensitive, int rangeDays) {
@@ -45,7 +47,9 @@ public final class HealthReportCard {
         put(STEPS_7D, 7);
         put(ENERGY_7D, 7);
         put(EXERCISE_7D, 7);
+        put(DISTANCE_7D, 7);
         put(RESTING_HR_7D, 7);
+        put(HRV_7D, 7);
         put(HR_DAY, 1);
         put(SPO2_DAY, 1);
         put(WEIGHT_TREND, 30);

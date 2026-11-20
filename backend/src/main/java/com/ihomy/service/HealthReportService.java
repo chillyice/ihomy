@@ -116,7 +116,9 @@ public class HealthReportService {
             case HealthReportCard.STEPS_7D -> daySeries(userId, "STEPS", anchor);
             case HealthReportCard.ENERGY_7D -> daySeries(userId, "ACTIVE_ENERGY", anchor);
             case HealthReportCard.EXERCISE_7D -> daySeries(userId, "EXERCISE_MIN", anchor);
+            case HealthReportCard.DISTANCE_7D -> daySeries(userId, "DISTANCE", anchor);
             case HealthReportCard.RESTING_HR_7D -> daySeries(userId, "RESTING_HR", anchor);
+            case HealthReportCard.HRV_7D -> daySeries(userId, "HRV", anchor);
             case HealthReportCard.HR_DAY -> pointDay(userId, "HEART_RATE", anchor);
             case HealthReportCard.SPO2_DAY -> pointDay(userId, "SPO2", anchor);
             case HealthReportCard.WEIGHT_TREND -> weightTrend(userId, anchor);
@@ -380,7 +382,9 @@ public class HealthReportService {
             case "STEPS" -> HealthReportCard.STEPS_7D;
             case "ACTIVE_ENERGY" -> HealthReportCard.ENERGY_7D;
             case "EXERCISE_MIN" -> HealthReportCard.EXERCISE_7D;
+            case "DISTANCE" -> HealthReportCard.DISTANCE_7D;
             case "RESTING_HR" -> HealthReportCard.RESTING_HR_7D;
+            case "HRV" -> HealthReportCard.HRV_7D;
             default -> metric.toLowerCase();
         };
     }

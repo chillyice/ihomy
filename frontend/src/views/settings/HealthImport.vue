@@ -1,9 +1,10 @@
-<!-- 健康数据导入 / 导出(设置 → 健康数据)。
-     导入:把 iPhone「健康」App 导出的 导出.zip / export.xml 一次性灌进来,多年的历史也能导;
+<!-- 健康数据导入(设置 → 健康数据 → 导入)。两种「补历史」的做法放在同一张卡里:
+     ① 导出包:iPhone「健康」导出的 导出.zip / export.xml 一次性灌进来,多年的历史也能导;
+     ② 快捷指令:iOS 专属的自动上报(不装 App 的无奈之法),默认收起,只在 iOS 上出现。
      解析与归一全在浏览器里做(utils/health/appleHealthImport.js),只走既有的上报通道,
-     数据落登录者本人,家庭成员照旧看不到。报表页只看报表,入口统一收在这里。 -->
+     数据落登录者本人,家庭成员照旧看不到。通用关联方式(上报令牌)在上面的「同步」卡。 -->
 <template>
-  <div class="card settings-card health-import" v-loading="phase === 'parse'">
+  <div ref="rootRef" class="card settings-card health-import" v-loading="phase === 'parse'">
     <div class="section-label">{{ $t('settings.health.importTitle') }}</div>
     <div class="share-tip">{{ $t('settings.health.importHint') }}</div>
 
@@ -62,16 +63,36 @@
 
     <div class="share-tip retention-tip">{{ $t('settings.health.importRetention') }}</div>
 
-    <div class="import-divider" />
+    <!-- 第二种办法:快捷指令自动上报(仅 iOS;默认收起,桌面看不到) -->
+    <template v-if="showShortcut">
+      <div class="import-divider" />
+      <button type="button" class="method-toggle" @click="shortcutOpen = !shortcutOpen">
+        <span class="row-title">{{ $t('settings.health.importShortcutTitle') }}</span>
+        <el-icon class="toggle-icon" :class="{ open: shortcutOpen }"><ArrowDown /></el-icon>
+      </button>
+      <div class="share-tip">
+        {{ $t('settings.health.importShortcutHint') }}
+        <router-link class="tpl-more" to="/help#health">{{ $t('settings.health.tplMore') }}</router-link>
+      </div>
 
-    <div class="row-title">{{ $t('settings.health.exportTitle') }}</div>
-    <div class="share-tip">{{ $t('settings.health.exportHint') }}</div>
-    <div class="import-row">
-      <el-button :loading="exporting" @click="exportCsv">
-        <el-icon><Download /></el-icon>
-        <span>{{ $t('settings.health.exportBtn') }}</span>
-      </el-button>
-    </div>
+      <div v-show="shortcutOpen" class="method-body">
+        <ol class="tpl-steps">
+          <li>{{ $t('settings.health.tplStep1') }}</li>
+          <li>{{ $t('settings.health.tplStep2') }}</li>
+          <li>{{ $t('settings.health.tplStep3') }}</li>
+          <li>{{ $t('settings.health.tplStep4') }}</li>
+        </ol>
+
+        <div class="tpl-body">
+          <div class="tpl-body-head">
+            <span class="tpl-body-label">{{ $t('settings.health.tplBodyLabel') }}</span>
+            <el-button size="small" type="primary" plain @click="copyText(TPL_BODY)">{{ $t('settings.health.copy') }}</el-button>
+          </div>
+          <pre class="tpl-code">{{ TPL_BODY }}</pre>
+          <div class="share-tip">{{ $t('settings.health.tplBodyNote') }}</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -79,9 +100,12 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Download, UploadFilled } from '@element-plus/icons-vue'
+import { ArrowDown, UploadFilled } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
-import { saveBlobResponse } from '@/utils/download'
+import { copyText as copyToClipboard } from '@/utils/clipboard'
+import { HEALTH_ENTRY, healthEntryKind } from '@/utils/healthPlatform'
+import { isNativeApp, nativePlatform } from '@/utils/platform'
+import { SHORTCUT_BODY } from '@/utils/healthShortcut'
 import {
   IMPORT_PROVIDER,
   buildImportPlan,
@@ -93,8 +117,18 @@ import {
 
 const { t } = useI18n()
 
-// 导出范围与报表页原先一致:近 90 天
-const EXPORT_DAYS = 90
+// 快捷指令只有 iPhone 用得上;iPad/桌面不显示,免得整段步骤白占屏
+const entryKind = healthEntryKind({
+  isNative: isNativeApp(),
+  nativePlatform: nativePlatform(),
+  ua: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  maxTouchPoints: typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints,
+})
+const showShortcut = computed(() => entryKind === HEALTH_ENTRY.IOS)
+
+// 请求体示例与帮助页共用(utils/healthShortcut.js),这里有复制按钮直接取用
+const TPL_BODY = SHORTCUT_BODY
+
 // zip 解不开时给的具体说法(不同浏览器/压缩方式分开讲,别只丢一句「失败」)
 const ZIP_HINTS = {
   ZIP_NO_EOCD: 'importErrZip',
@@ -103,6 +137,7 @@ const ZIP_HINTS = {
   ZIP_NO_INFLATE: 'importErrZipBrowser',
 }
 
+const rootRef = ref(null)
 const fileInput = ref(null)
 const fileName = ref('')
 const phase = ref('idle') // idle | parse | plan | send
@@ -112,7 +147,7 @@ const sent = ref(0)
 const total = ref(0)
 const plan = ref(null)
 const result = ref(null)
-const exporting = ref(false)
+const shortcutOpen = ref(false)
 
 const busy = computed(() => phase.value === 'parse' || phase.value === 'send')
 
@@ -124,17 +159,16 @@ const tzOffset = () => {
   return `${min < 0 ? '-' : '+'}${p(Math.floor(abs / 60))}:${p(abs % 60)}`
 }
 
-const shiftDay = (offset) => {
-  const d = new Date()
-  d.setHours(12, 0, 0, 0)
-  d.setDate(d.getDate() + offset)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
 const errorText = (err) => {
   const key = ZIP_HINTS[err?.message]
   return key ? t(`settings.health.${key}`) : t('settings.health.importErrGeneric', { message: err?.message || '' })
+}
+
+/** 复制统一入口:成功后提示;共用 utils/clipboard(内嵌壳/局域网 http 下 clipboard 不可用) */
+const copyText = async (text) => {
+  const ok = await copyToClipboard(text)
+  if (ok) ElMessage.success(t('settings.health.copied'))
+  else ElMessage.warning(t('settings.health.copyFailed'))
 }
 
 const reset = () => {
@@ -214,20 +248,14 @@ const startImport = async () => {
   }
 }
 
-const exportCsv = async () => {
-  const from = shiftDay(-(EXPORT_DAYS - 1))
-  const to = shiftDay(0)
-  exporting.value = true
-  try {
-    const blob = await healthApi.exportCsv({ from, to })
-    await saveBlobResponse(blob, `health-${from}_${to}.csv`)
-    ElMessage.success(t('settings.health.exportDone', { from, to }))
-  } catch (e) {
-    ElMessage.error(e?.message || t('common.failed'))
-  } finally {
-    exporting.value = false
-  }
+/** 「连接 Apple 健康」那边的主按钮:滚到这张卡并把快捷指令那段展开 */
+const openShortcut = () => {
+  if (!showShortcut.value) return
+  shortcutOpen.value = true
+  rootRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
 }
+
+defineExpose({ openShortcut })
 </script>
 
 <style scoped>
@@ -266,6 +294,64 @@ const exportCsv = async () => {
 .import-divider {
   margin: 16px 0 12px;
   border-top: 1px solid var(--color-border);
+}
+.method-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.toggle-icon {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  transition: transform 0.2s;
+}
+.toggle-icon.open {
+  transform: rotate(180deg);
+}
+.method-body {
+  margin-top: 6px;
+}
+.tpl-more {
+  margin-left: 6px;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.tpl-steps {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--color-text-primary);
+}
+.tpl-body {
+  margin-top: 12px;
+}
+.tpl-body-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tpl-body-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.tpl-code {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-2);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
 }
 @media (max-width: 640px) {
   .import-row {

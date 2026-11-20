@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
   BED_MAX,
+  CHART,
   LANE,
   LANE_ROWS,
+  avgClock,
+  avgOf,
   axisMax,
   bandPaths,
   bars,
   bedtimeDots,
   bedtimeOffset,
   bedtimeTicks,
+  indexAtX,
   linePaths,
   sleepAxis,
   sleepAxisTicks,
   sleepLaneBars,
   sleepLaneRows,
+  slotCenterX,
   stackBar,
+  stageAt,
+  timeAtX,
   timelineSegments,
+  viewBoxX,
   xTicks,
   yAt,
 } from './healthChart'
@@ -222,5 +230,69 @@ describe('睡眠进度轴几何', () => {
     expect(bars[0].x).toBeCloseTo(LANE.padL, 6)
     expect(bars[0].x + bars[0].w).toBeCloseTo(LANE.w - LANE.padR, 6)
     expect(sleepLaneBars([], null)).toEqual([])
+  })
+})
+
+// 指针读数:坐标换算错了只会读到隔壁那天,所以下标映射单独钉住
+describe('图表指针读数', () => {
+  it('折线按等距点取最近下标,超界夹到两端', () => {
+    expect(indexAtX(CHART.padL, 3)).toBe(0)
+    expect(indexAtX(CHART.w - CHART.padR, 3)).toBe(2)
+    expect(indexAtX(CHART.padL + (CHART.w - CHART.padL - CHART.padR) / 2, 3)).toBe(1)
+    expect(indexAtX(0, 3)).toBe(0)
+    expect(indexAtX(999, 3)).toBe(2)
+    expect(indexAtX(100, 0)).toBe(-1)
+    expect(indexAtX(100, 1)).toBe(0)
+  })
+
+  it('柱状按槽位取整(槽内任意位置都落同一根柱),槽位中心可单独取', () => {
+    const slot = (CHART.w - CHART.padL - CHART.padR) / 4
+    expect(indexAtX(CHART.padL + slot * 2 + slot / 2, 4, 'bar')).toBe(2)
+    expect(indexAtX(CHART.padL + slot * 2 + 2, 4, 'bar')).toBe(2)
+    expect(slotCenterX(0, 2)).toBeCloseTo(CHART.padL + (CHART.w - CHART.padL - CHART.padR) / 4, 6)
+    expect(slotCenterX(1, 2)).toBeCloseTo(CHART.padL + ((CHART.w - CHART.padL - CHART.padR) * 3) / 4, 6)
+  })
+
+  it('屏幕坐标 → viewBox:等比缩放到图形宽度,拿不到 rect 时退回左内边', () => {
+    expect(viewBoxX(360, { left: 0, width: 720 }, 360)).toBe(180)
+    expect(viewBoxX(100, { left: 100, width: 360 }, 360)).toBe(0)
+    expect(viewBoxX(100, null, 360)).toBe(CHART.padL)
+    expect(viewBoxX(100, { left: 0, width: 0 }, 360)).toBe(CHART.padL)
+  })
+
+  it('avgOf 跳过空值,全空返回 null(不补 0)', () => {
+    expect(avgOf([1, null, 3, 'x'])).toBe(2)
+    expect(avgOf([])).toBeNull()
+    expect(avgOf([null, undefined])).toBeNull()
+  })
+
+  it('进度轴 x → 时刻,超界夹到轴两端', () => {
+    const axis = sleepAxis('2026-11-17T23:00:00', '2026-11-18T07:00:00')
+    expect(timeAtX(LANE.padL, axis)).toBe(axis.from)
+    expect(timeAtX(LANE.w - LANE.padR, axis)).toBeCloseTo(axis.to, 6)
+    expect(timeAtX(-50, axis)).toBe(axis.from)
+    expect(timeAtX(LANE.padL + (LANE.w - LANE.padL - LANE.padR) / 2, axis)).toBeCloseTo(axis.from + axis.span / 2, 6)
+    expect(timeAtX(100, null)).toBeNull()
+  })
+
+  it('stageAt 只认区间内,空档返回 null(页面显示「无数据」)', () => {
+    const axis = sleepAxis('2026-11-17T23:00:00', '2026-11-18T07:00:00')
+    const bars = sleepLaneBars([{ stage: 'DEEP', startTime: '2026-11-17T23:00:00', endTime: '2026-11-18T00:00:00' }], axis)
+    const inside = Date.parse('2026-11-17T23:30:00')
+    expect(stageAt(bars, inside)?.code).toBe('DEEP')
+    expect(stageAt(bars, Date.parse('2026-11-18T02:00:00'))).toBeNull()
+    expect(stageAt(bars, null)).toBeNull()
+    expect(stageAt(null, inside)).toBeNull()
+  })
+
+  it('平均入睡/起床跨午夜不会算歪', () => {
+    const avg = avgClock([
+      { startTime: '2026-11-16T23:00:00', endTime: '2026-11-17T07:00:00' },
+      { startTime: '2026-11-18T00:00:00', endTime: '2026-11-18T06:30:00' },
+    ])
+    expect(avg).toEqual({ bed: '23:30', wake: '06:45', nights: 2 })
+    // 白天小睡不进入睡平均;没有可用数据时两端都是 null
+    expect(avgClock([{ startTime: '2026-11-18T12:00:00' }])).toEqual({ bed: null, wake: null, nights: 0 })
+    expect(avgClock(null)).toEqual({ bed: null, wake: null, nights: 0 })
   })
 })

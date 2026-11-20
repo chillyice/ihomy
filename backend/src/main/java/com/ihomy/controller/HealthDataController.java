@@ -222,14 +222,15 @@ public class HealthDataController {
         return Result.success(queryService.stages(viewer(), id));
     }
 
-    @Operation(summary = "单指标趋势(≤366 天)")
+    @Operation(summary = "单指标趋势(≤366 天;bucket=DAY 时逐点指标按天聚合)")
     @GetMapping("/metric")
     public Result<Map<String, Object>> metric(
             @RequestParam(required = false) Long userId,
             @RequestParam String metric,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return Result.success(queryService.metric(viewer(), userId, metric, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String bucket) {
+        return Result.success(queryService.metric(viewer(), userId, metric, from, to, bucket));
     }
 
     @Operation(summary = "训练记录列表(≤366 天,按开始时间倒序)")

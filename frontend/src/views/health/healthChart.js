@@ -40,8 +40,46 @@ export function xTicks(labels, count = 7) {
   return idx.map((i) => ({ x: xAt(i, n), label: list[i] }))
 }
 
-/** 柱状:null 不画(缺数据就是不画,不伪造 0) */
-export function bars(values, max, ratio = 0.55) {
+/** 指针读数的下标换算:viewBox x → 最近的数据下标(超出两端夹到端点);无数据返回 -1 */
+export function indexAtX(x, n, mode = 'line') {
+  const count = Number(n) || 0
+  if (!count) return -1
+  if (count === 1) return 0
+  const px = Number(x)
+  if (mode === 'bar') {
+    const slot = innerW() / count
+    const i = Math.floor((px - CHART.padL) / slot)
+    return Math.max(0, Math.min(count - 1, Number.isFinite(i) ? i : 0))
+  }
+  const ratio = (px - CHART.padL) / innerW()
+  const i = Math.round(ratio * (count - 1))
+  return Math.max(0, Math.min(count - 1, Number.isFinite(i) ? i : 0))
+}
+
+/** 柱状槽位中心(读数竖线用,缺数据的那天也能定位) */
+export function slotCenterX(i, n) {
+  const count = Number(n) || 0
+  if (!count) return CHART.padL
+  const slot = innerW() / count
+  return CHART.padL + slot * i + slot / 2
+}
+
+/** 屏幕 clientX → viewBox 内的 x(SVG 等比缩放;rect 取不到时按左内边算) */
+export function viewBoxX(clientX, rect, viewW = CHART.w) {
+  if (!rect || !rect.width) return CHART.padL
+  return ((Number(clientX) - rect.left) / rect.width) * viewW
+}
+
+/** 有值点的平均(跳过 null/非数);没有值返回 null(不补 0) */
+export function avgOf(values) {
+  const list = (values || [])
+    .filter((v) => v != null && v !== '')
+    .map(Number)
+    .filter((v) => Number.isFinite(v))
+  return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null
+}
+
+/** 柱状:null 不画(缺数据就是不画,不伪造 0) */ export function bars(values, max, ratio = 0.55) {
   const list = values || []
   const n = list.length
   const slot = n ? innerW() / n : innerW()
@@ -286,4 +324,50 @@ export function sleepLaneBars(stages, axis) {
     })
   }
   return out
+}
+
+/** 进度轴 x → 绝对毫秒(超出轴两端夹到端点);轴缺失返回 null */
+export function timeAtX(x, axis) {
+  if (!axis || !axis.span) return null
+  return axis.from + clamp01((Number(x) - LANE.padL) / LANE_INNER_W()) * axis.span
+}
+
+/** 某一时刻落在哪段分期里(空档/轴外返回 null,页面据此显示「无数据」) */
+export function stageAt(bars, ms) {
+  if (ms == null) return null
+  return (bars || []).find((b) => ms >= b.from && ms <= b.to) || null
+}
+
+/** 18:00 起算的分钟 → HH:MM(跨午夜自动绕回) */
+const clockFromOffset = (off) => {
+  const mins = (18 * 60 + off) % (24 * 60)
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+}
+
+const endOffset = (endTime) => {
+  const m = String(endTime || '').match(/T(\d{2}):(\d{2})/)
+  if (!m) return null
+  let mins = Number(m[1]) * 60 + Number(m[2])
+  if (mins < 18 * 60) mins += 24 * 60
+  return mins - 18 * 60
+}
+
+/** 若干晚的平均入睡 / 起床钟点(按 18:00 起点折算,跨午夜不会算歪) */
+export function avgClock(nights) {
+  const beds = []
+  const wakes = []
+  for (const n of nights || []) {
+    const bed = bedtimeOffset(n?.startTime)
+    if (bed != null) beds.push(bed)
+    const wake = endOffset(n?.endTime)
+    if (wake != null) wakes.push(wake)
+  }
+  const mean = (list) => (list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null)
+  const bed = mean(beds)
+  const wake = mean(wakes)
+  return {
+    bed: bed == null ? null : clockFromOffset(bed),
+    wake: wake == null ? null : clockFromOffset(wake),
+    nights: beds.length,
+  }
 }

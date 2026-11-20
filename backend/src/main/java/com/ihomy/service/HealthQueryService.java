@@ -193,6 +193,17 @@ public class HealthQueryService {
         }
     }
 
+    /** 可空小数(日聚合的 AVG/MIN/MAX):没有值就返回 null,不补 0 */
+    private static Double numOf(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     // ==================== 睡眠分段 ====================
 
     public Map<String, Object> stages(Viewer viewer, Long sleepId) {
@@ -226,8 +237,13 @@ public class HealthQueryService {
 
     // ==================== 单指标趋势 ====================
 
+    /**
+     * 单指标趋势。bucket=DAY 时逐点指标按天聚合(每天平均 + 当天最小/最大):
+     * 小时级样本一年几千行,原样返回会被 2000 行上限截断,长区间只能靠日聚合。
+     * 日聚合指标本来一天一行,忽略 bucket。
+     */
     public Map<String, Object> metric(Viewer viewer, Long targetUserId, String metric,
-                                      LocalDate from, LocalDate to) {
+                                      LocalDate from, LocalDate to, String bucket) {
         HealthMetric.Def def = HealthMetric.find(metric);
         if (def == null || HealthMetric.PERIOD_SESSION.equals(def.period())) {
             throw new BizException(ResultCode.NOT_FOUND, "指标不存在");
@@ -243,15 +259,29 @@ public class HealthQueryService {
         if (ChronoUnit.DAYS.between(begin, end) > MAX_METRIC_RANGE_DAYS) {
             throw new BizException(ResultCode.BAD_REQUEST, "单次最多查看 366 天数据");
         }
-        List<FamilyHealthSample> rows = sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
-                .eq(FamilyHealthSample::getUserId, target.getId())
-                .eq(FamilyHealthSample::getMetric, def.code())
-                .ge(FamilyHealthSample::getStartTime, begin.atStartOfDay())
-                .lt(FamilyHealthSample::getStartTime, end.plusDays(1).atStartOfDay())
-                .orderByAsc(FamilyHealthSample::getStartTime)
-                .last("LIMIT 2000"));
+        boolean daily = "DAY".equalsIgnoreCase(bucket) && !HealthMetric.PERIOD_DAY.equals(def.period());
         List<Map<String, Object>> points = new ArrayList<>();
-        rows.forEach(r -> points.add(sampleMap(r)));
+        if (daily) {
+            for (Map<String, Object> r : sampleMapper.selectDailyPoints(target.getId(), def.code(),
+                    begin, end.plusDays(1))) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("date", String.valueOf(r.get("date")));
+                item.put("value", numOf(r.get("value")));
+                item.put("min", numOf(r.get("min")));
+                item.put("max", numOf(r.get("max")));
+                item.put("count", intOf(r.get("count")));
+                points.add(item);
+            }
+        } else {
+            List<FamilyHealthSample> rows = sampleMapper.selectList(new LambdaQueryWrapper<FamilyHealthSample>()
+                    .eq(FamilyHealthSample::getUserId, target.getId())
+                    .eq(FamilyHealthSample::getMetric, def.code())
+                    .ge(FamilyHealthSample::getStartTime, begin.atStartOfDay())
+                    .lt(FamilyHealthSample::getStartTime, end.plusDays(1).atStartOfDay())
+                    .orderByAsc(FamilyHealthSample::getStartTime)
+                    .last("LIMIT 2000"));
+            rows.forEach(r -> points.add(sampleMap(r)));
+        }
 
         privacyService.logView(viewer.id(), viewer.ip(), target.getId(), viewer.familyId(),
                 "METRIC", def.code(), begin, end);
@@ -261,6 +291,7 @@ public class HealthQueryService {
         data.put("metric", def.code());
         data.put("unit", def.unit());
         data.put("period", def.period());
+        data.put("bucket", daily || HealthMetric.PERIOD_DAY.equals(def.period()) ? "DAY" : "POINT");
         data.put("from", begin);
         data.put("to", end);
         data.put("points", points);
