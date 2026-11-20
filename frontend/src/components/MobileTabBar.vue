@@ -23,7 +23,7 @@
     >
       <span v-if="item.capture" class="capture-btn" :class="{ busy: capturing }">
         <span v-if="capturing" class="capture-spinner" aria-hidden="true" />
-        <el-icon v-else><Plus /></el-icon>
+        <el-icon v-else><Camera /></el-icon>
       </span>
       <el-icon v-else class="tab-icon"><component :is="iconOf(item)" /></el-icon>
       <span v-if="!item.capture" class="tab-label">{{ labelOf(item) }}</span>
@@ -34,7 +34,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { HomeFilled, Grid, User, Plus } from '@element-plus/icons-vue'
+import { HomeFilled, Grid, User, Camera } from '@element-plus/icons-vue'
 import { iconComp } from '@/utils/navModules'
 
 const props = defineProps({

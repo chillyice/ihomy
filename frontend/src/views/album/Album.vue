@@ -98,8 +98,8 @@
               :class="{ active: a.id === activeAlbumId }"
               @click="selectAlbum(a.id)"
             >
-              <div class="pane-cover" :style="a.cover ? { backgroundImage: `url(${a.cover})` } : {}">
-                <AlbumDefaultCover v-if="!a.cover" :size="28" />
+              <div class="pane-cover">
+                <AlbumThumbnail :url="a.cover" :size="28" />
               </div>
               <div class="pane-info">
                 <span class="pane-name">{{ a.name }}</span>
@@ -108,7 +108,14 @@
               </div>
             </div>
           </div>
-          <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" :image-size="60" />
+          <div v-else-if="loadError" class="pane-empty">
+            {{ t('common.loadFailed') }} <el-button text @click="load">{{ t('common.retry') }}</el-button>
+          </div>
+          <el-empty
+            v-else-if="!loading"
+            :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')"
+            :image-size="60"
+          />
         </div>
         <div class="wide-col album-detail-pane">
           <AlbumDetail v-if="activeAlbumId" :album-id="activeAlbumId" inline @open-album="selectAlbum" @close="clearActive">
@@ -163,8 +170,8 @@
                 />
               </svg>
             </span>
-            <div class="rl-thumb" :style="a.cover ? { backgroundImage: `url(${a.cover})` } : {}">
-              <AlbumDefaultCover v-if="!a.cover" :size="28" />
+            <div class="rl-thumb">
+              <AlbumThumbnail :url="a.cover" :size="28" />
             </div>
             <div class="rl-main">
               <span class="rl-name">{{ a.name }}</span>
@@ -191,9 +198,8 @@
             @contextmenu.prevent
           >
             <div class="album-cover-wrap">
-              <div v-if="a.cover" class="album-cover" :style="{ backgroundImage: `url(${a.cover})` }"></div>
-              <div v-else class="album-cover">
-                <AlbumDefaultCover :size="64" />
+              <div class="album-cover">
+                <AlbumThumbnail :url="a.cover" :size="64" />
               </div>
               <span v-if="!selectMode" class="album-vis" :class="albumVis(a)">{{ visibilityLabel(t, albumVis(a)) }}</span>
               <span v-if="a.sharedFrom" class="album-shared">{{ sharedFromText(a.sharedFrom) }}</span>
@@ -285,7 +291,8 @@ import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
-import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
+import AlbumThumbnail from '@/components/AlbumThumbnail.vue'
+import { albumMemoryKey, preferredAlbum } from '@/utils/albumImages'
 import PhotoCascade from './PhotoCascade.vue'
 import AlbumDetail from './AlbumDetail.vue'
 import { formatDate } from '@/utils/datetime'
@@ -363,12 +370,19 @@ const selectAllVisible = () => selectAll(topAlbums.value.filter((a) => !a.readOn
 const wideList = computed(() => viewWide.value && !selectMode.value)
 const { wideEl, colStyle } = useWideCols(wideList)
 const activeAlbumId = ref(null)
-const activeAlbum = computed(() => topAlbums.value.find((a) => a.id === activeAlbumId.value) || null)
+const activeAlbum = computed(() => albums.value.find((a) => a.id === activeAlbumId.value) || null)
+let panelClosed = false
+watch([wideList, topAlbums], ([wide, roots]) => {
+  if (!wide || panelClosed) return
+  const saved = activeAlbumId.value ?? localStorage.getItem(albumMemoryKey(userStore.userInfo))
+  activeAlbumId.value = preferredAlbum(albums.value, roots, saved)
+})
 
 // 返回键先回「全部相册」:第一次选中压一层同 URL 历史,popstate 只清选中、不离开页面
 //(Android 壳的返回键在 canGoBack 时走 router.back(),弹出这一层同样只触发 popstate)
 let panelLayerPushed = false
 const selectAlbum = (id) => {
+  panelClosed = false
   if (activeAlbumId.value === id) return
   activeAlbumId.value = id
   if (!panelLayerPushed) {
@@ -377,6 +391,7 @@ const selectAlbum = (id) => {
   }
 }
 const clearActive = () => {
+  panelClosed = true
   if (panelLayerPushed) {
     // 交给 popstate 统一清:程序内关闭也把这层退掉,免得下次返回要多按一次
     history.back()
@@ -385,6 +400,7 @@ const clearActive = () => {
   activeAlbumId.value = null
 }
 const onPopState = () => {
+  panelClosed = true
   panelLayerPushed = false
   activeAlbumId.value = null
 }
@@ -497,7 +513,10 @@ const onBatchDelete = async () => {
 
 // ---------- 后台同步完成时自动刷新列表 ----------
 const syncStore = useSyncStore()
-watch(syncStore.doneCount, () => load())
+watch(
+  () => syncStore.doneCount,
+  () => load(),
+)
 
 // 下拉刷新:load 内部已把错误落到 loadError,这里转成 reject 让指示器统一提示
 usePullRefresh({

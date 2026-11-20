@@ -12,7 +12,7 @@
       >
         <Transition :name="tabTransition" mode="out-in" @after-enter="restoreTabScroll">
           <KeepAlive>
-            <component :is="tabComponent" :key="activeTab" />
+            <component :is="tabComponent" :key="activeTab === 'home' && isElder ? 'elder-home' : activeTab" />
           </KeepAlive>
         </Transition>
       </div>
@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, provide, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -57,6 +57,7 @@ import MobileTabEditor from '@/components/MobileTabEditor.vue'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileGameChrome from '@/components/games/MobileGameChrome.vue'
 import MobileHomeFeed from '@/components/MobileHomeFeed.vue'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 import MobileMoreGrid from '@/components/MobileMoreGrid.vue'
 import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
@@ -85,7 +86,11 @@ const activeTab = ref('home')
 const { tabs, editorOpen, openEditor, ensureSynced } = useMobileTabs()
 
 // 三个 Tab 常驻缓存,切换时只换当前组件;KeepAlive 保证筛选/输入等状态不丢
-const tabComponent = computed(() => ({ home: MobileHomeFeed, more: MobileMoreGrid, me: MobileMePage })[activeTab.value])
+const { isElder } = useDisplayMode()
+const ElderHome = defineAsyncComponent(() => import('@/components/ElderHome.vue'))
+const tabComponent = computed(
+  () => ({ home: isElder.value ? ElderHome : MobileHomeFeed, more: MobileMoreGrid, me: MobileMePage })[activeTab.value],
+)
 
 // ========== 左右滑动切 Tab ==========
 // 触摸手势只做「意图识别」,不 preventDefault:纵向滚动、内部横滑列表都保持浏览器原生行为。

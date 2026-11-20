@@ -7,7 +7,7 @@
         <el-button text class="bc-nav" :title="$t('schedule.prevMonth')" :aria-label="$t('schedule.prevMonth')" @click="shiftMonth(-1)">
           <el-icon><ArrowLeft /></el-icon>
         </el-button>
-        <el-date-picker v-model="monthModel" type="month" value-format="YYYY-MM" style="width: 140px" />
+        <el-date-picker v-model="monthModel" type="month" :clearable="false" value-format="YYYY-MM" style="width: 140px" />
         <el-button text class="bc-nav" :title="$t('schedule.nextMonth')" :aria-label="$t('schedule.nextMonth')" @click="shiftMonth(1)">
           <el-icon><ArrowRight /></el-icon>
         </el-button>
@@ -52,7 +52,7 @@
         </div>
         <div class="bs-actions">
           <button
-            v-if="unassigned > 0"
+            v-if="loadedMonth === month && unassigned > 0"
             type="button"
             class="bs-chip"
             :class="{ 'is-active': isUnassignedFilter }"
@@ -69,7 +69,13 @@
       </div>
 
       <!-- 统计卡 -->
-      <div class="book-kpi-grid">
+      <el-skeleton v-if="loadedMonth !== month && loading" :rows="4" animated />
+      <el-result v-else-if="loadedMonth !== month" icon="warning" :title="$t('common.loadFailed')">
+        <template #extra
+          ><el-button @click="load">{{ $t('common.retry') }}</el-button></template
+        >
+      </el-result>
+      <div v-else class="book-kpi-grid">
         <div class="book-kpi card">
           <div class="book-kpi-label">{{ $t('book.income') }}</div>
           <div class="book-kpi-value is-income">+{{ money(stats.income) }}</div>
@@ -85,7 +91,7 @@
         </div>
       </div>
 
-      <div class="content">
+      <div v-if="loadedMonth === month" class="content">
         <!-- 明细列表:点账户余额条上的账户只看该账户的账目(统计卡与预算仍是本月全部) -->
         <div class="records card">
           <div class="records-head">
@@ -250,6 +256,7 @@
 <script setup>
 // 记账本页签:月度明细 + 收支统计 + 账户余额;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useBookMonth } from '@/composables/useBookMonth'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeft, ArrowRight, Delete, Edit, MoreFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -294,12 +301,12 @@ const CATEGORIES = BOOK_CATEGORIES
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const loading = ref(false)
+const { loading, loadedMonth, records, stats, accounts, budgetData, load, loadBudget, loadAccounts } = useBookMonth(
+  () => props.month,
+  () => userStore.isLoggedIn,
+  bookApi,
+)
 const saving = ref(false)
-const records = ref([])
-const stats = ref({})
-const accounts = ref([])
-const budgetData = ref(null)
 const accountMgrVisible = ref(false)
 const importVisible = ref(false)
 const recurringVisible = ref(false)
@@ -437,34 +444,6 @@ const accountText = (r) => {
     return `${r.fromAccountName || t('book.account.outside')} → ${r.toAccountName || t('book.account.outside')}`
   }
   return r.accountName || t('book.account.unassigned')
-}
-
-const load = async () => {
-  // 家庭账本是私有内容:游客不打注定 401 的请求,直接空态
-  if (!userStore.isLoggedIn) return
-  loading.value = true
-  try {
-    // 明细、账户、预算三者互不依赖,并行取;预算与明细同月份,记一笔后一起重拉
-    const [data, acc, budget] = await Promise.all([bookApi.list(props.month), bookApi.accounts(), bookApi.budget(props.month)])
-    records.value = data.records || []
-    stats.value = data.stats || {}
-    accounts.value = acc || []
-    budgetData.value = budget || null
-  } finally {
-    loading.value = false
-  }
-}
-
-// 预算增删改后只刷预算卡,不重拉明细与账户
-const loadBudget = async () => {
-  if (!userStore.isLoggedIn) return
-  budgetData.value = (await bookApi.budget(props.month)) || null
-}
-
-// 账户增删改后只刷余额条,不重拉明细
-const loadAccounts = async () => {
-  if (!userStore.isLoggedIn) return
-  accounts.value = (await bookApi.accounts()) || []
 }
 
 const openEditor = (r) => {

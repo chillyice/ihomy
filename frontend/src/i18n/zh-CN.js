@@ -152,6 +152,7 @@ export default {
     success: '密码修改成功',
   },
   home: {
+    familyLoadFailed: '家庭首页未能完整加载',
     loginToView: '登录查看更多',
     loginRegister: '登录/注册',
     sillEmpty: '今天还没有家人留言',

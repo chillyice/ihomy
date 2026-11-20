@@ -133,7 +133,8 @@
 
           <!-- 主区 -->
           <div class="gc-main" ref="mainEl">
-            <WarmHome v-if="route.path === '/home'" :weather-bg="weatherBg" />
+            <ElderHome v-if="route.path === '/home' && isElder" />
+            <WarmHome v-else-if="route.path === '/home'" :weather-bg="weatherBg" />
             <router-view v-else v-slot="{ Component, route }">
               <transition :name="route.meta.transition || 'fade'" mode="out-in">
                 <component :is="Component" :key="route.path" />
@@ -155,7 +156,7 @@
 </template>
 
 <script setup>
-import { computed, inject, watch, ref, onMounted, onBeforeUnmount, provide, nextTick } from 'vue'
+import { computed, inject, watch, ref, onMounted, onBeforeUnmount, provide, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
@@ -180,7 +181,8 @@ const { t } = useI18n()
 const themeStore = useThemeStore()
 const appStore = useAppStore()
 const userStore = useUserStore()
-const { isChild } = useDisplayMode()
+const { isChild, isElder } = useDisplayMode()
+const ElderHome = defineAsyncComponent(() => import('@/components/ElderHome.vue'))
 const sunLight = inject(SUN_LIGHT_KEY)
 // 侧栏模块拖入首页的共享拖拽状态(幽灵形态/位置由本组件渲染)
 const { dragging, label, x, y, overGrid, startDrag } = useWarmWidgetDrag()

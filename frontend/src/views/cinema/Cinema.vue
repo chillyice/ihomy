@@ -953,7 +953,10 @@ const onRefreshMap = async () => {
 
 // ---------- 后台同步完成时自动刷新列表 ----------
 const syncStore = useSyncStore()
-watch(syncStore.doneCount, () => load())
+watch(
+  () => syncStore.doneCount,
+  () => load(),
+)
 
 const openWishDialog = () => {
   wishDialog.form = { title: '', genres: [], reason: '' }

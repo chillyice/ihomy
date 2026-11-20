@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.ihomy.common.BizException;
 import com.ihomy.common.GameSaveName;
+import com.ihomy.common.PhotoThumbnail;
 import com.ihomy.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -298,6 +299,18 @@ public class FileService {
             // 顺带删除缩略图(约定:原图 xxx.jpg → xxx_thumb.jpg)
             Path thumb = thumbPath(target);
             if (thumb != null) Files.deleteIfExists(thumb);
+            if (rel.startsWith("pictures/")) {
+                Path albumThumb = albumThumbPath(target, false);
+                if (!Files.isSymbolicLink(albumThumb.getParent())) {
+                    Files.deleteIfExists(albumThumb);
+                    Files.deleteIfExists(albumThumbPath(target, true));
+                    try {
+                        Files.deleteIfExists(albumThumb.getParent());
+                    } catch (java.nio.file.DirectoryNotEmptyException ignored) {
+                        // Other photos still have previews in this album.
+                    }
+                }
+            }
             Path parent = target.getParent();
             if (parent != null && !parent.equals(root)) {
                 Files.delete(parent);  // 尝试清空父目录(如已空的相册目录),失败忽略
@@ -467,6 +480,17 @@ public class FileService {
             String rel = url.substring(prefix.length()).replace('\\', '/').replaceFirst("^/+", "");
             Path source = root.resolve(rel).normalize();
             if (!source.startsWith(root) || !Files.exists(source)) return;
+            if (rel.startsWith("pictures/")) {
+                try (var input = ImageIO.createImageInputStream(source.toFile())) {
+                    PhotoThumbnail.Encoded preview = PhotoThumbnail.create(input);
+                    if (preview == null) return;
+                    Path thumb = albumThumbPath(source, preview.png());
+                    if (Files.isSymbolicLink(thumb.getParent())) return;
+                    Files.createDirectories(thumb.getParent());
+                    Files.write(thumb, preview.bytes());
+                }
+                return;
+            }
             Path thumb = thumbPath(source);
             if (thumb == null || Files.exists(thumb)) return;
             BufferedImage src = ImageIO.read(source.toFile());
@@ -490,11 +514,16 @@ public class FileService {
     }
 
     /** 原图路径 → 缩略图路径(xxx.jpg → xxx_thumb.jpg);非图片返回 null */
-    private Path thumbPath(Path source) {
+    private static Path thumbPath(Path source) {
         String name = source.getFileName().toString();
         int dot = name.lastIndexOf('.');
         if (dot < 0) return null;
         String thumbName = name.substring(0, dot) + "_thumb.jpg";
         return source.resolveSibling(thumbName);
+    }
+
+    /** Album previews keep the full original filename in a dedicated directory to avoid extension collisions. */
+    public static Path albumThumbPath(Path source, boolean png) {
+        return source.getParent().resolve("@thumbnails-v2").resolve(source.getFileName() + (png ? ".png" : ".jpg"));
     }
 }

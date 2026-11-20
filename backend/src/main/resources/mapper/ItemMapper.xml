@@ -81,6 +81,7 @@
                 OR h.name LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         ORDER BY COALESCE(h.id, ih.id), COALESCE(r.floor, ir.floor), COALESCE(r.sort_order, ir.sort_order), COALESCE(r.id, ir.id), f.id, i.id
+        <if test="limit != null">LIMIT #{limit}</if>
     </select>
 
     <update id="takeAmount">

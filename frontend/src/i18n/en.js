@@ -149,6 +149,7 @@ export default {
     success: 'Password changed',
   },
   home: {
+    familyLoadFailed: 'Some family home information could not be loaded',
     loginToView: 'Sign in to see more',
     loginRegister: 'Login / Register',
     sillEmpty: 'No messages from family today',

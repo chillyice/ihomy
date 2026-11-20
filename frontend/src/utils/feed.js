@@ -2,6 +2,23 @@
 // t 为 vue-i18n 的 t 函数;sliceLen 为日记摘要截断长度(历史口径不同,默认 40)。
 export const FEED_TYPES = ['blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
 
+const feedRoutes = {
+  diary: '/diary',
+  photo: '/album',
+  video: '/cinema',
+  wish: '/wish',
+  task: '/task',
+  recipe: '/kitchen',
+  book: '/library',
+  blog: '/blog',
+}
+
+export function feedPath(f) {
+  if (f.type === 'blog' && f.id != null) return `/blog/${f.id}`
+  if (f.type === 'recipe' && f.id != null) return `/kitchen/recipe/${f.id}`
+  return feedRoutes[f.type]
+}
+
 export const feedTypeLabel = (t, type) => (FEED_TYPES.includes(type) ? t('feed.type.' + type) : '')
 
 export const feedSummary = (t, f, sliceLen = 40) => {

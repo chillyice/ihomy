@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { publicApi, homeApi } from '@/api'
 import { parseShareQuery } from '@/utils/shareLanding'
+import { useUserStore } from './user'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -9,7 +10,10 @@ export const useAppStore = defineStore('app', {
     modules: [],
     photos: [],
     stats: { memberCount: 0, upcomingEvents: [] },
-    loaded: false,
+    familyLoaded: false,
+    dashboardLoaded: false,
+    loadFailed: false,
+    generation: 0,
     loading: false,
     homeEditMode: false,
   }),
@@ -22,37 +26,51 @@ export const useAppStore = defineStore('app', {
     },
     // 初始化首页数据:公开数据 + 登录后私有仪表盘并行拉取(原串行两个 RTT)
     async init(force = false) {
-      if (this.loaded && !force) return
       if (this.loading) return
+      const { hid, homeId } = parseShareQuery(window.location.search)
+      const needsDashboard = useUserStore().isLoggedIn && !hid && !homeId
+      const fetchFamily = force || !this.familyLoaded
+      const fetchDashboard = needsDashboard && (force || !this.dashboardLoaded)
+      if (!fetchFamily && !fetchDashboard) return
+      const generation = this.generation
       this.loading = true
+      const loadFamily = async () => {
+        if (!fetchFamily) return
+        const pub = await publicApi.getHome(homeId ?? undefined, hid || undefined).catch(() => null)
+        if (generation !== this.generation) return
+        this.familyLoaded = !!pub
+        if (!pub) return
+        this.family = pub.family || null
+        if (!this.dashboardLoaded) this.modules = pub.modules || []
+        this.photos = pub.photos || []
+        this.stats = pub.stats || { memberCount: 0, upcomingEvents: [] }
+      }
+      const loadDashboard = async () => {
+        if (!fetchDashboard) return
+        const dash = await homeApi.getDashboard().catch(() => null)
+        if (generation !== this.generation) return
+        this.dashboardLoaded = Array.isArray(dash?.modules)
+        if (this.dashboardLoaded) this.modules = dash.modules
+      }
       try {
-        // 分享落地(/?hid=xxx 或 ?home_id=):游客打开分享链接时按链接里的家庭取数,
-        // 否则暖居/移动端会一律回落到「默认演示家庭」,看到的是别人家。
-        const { hid, homeId } = parseShareQuery(window.location.search)
-        const [pub, dash] = await Promise.all([
-          publicApi.getHome(homeId ?? undefined, hid || undefined).catch(() => null),
-          homeApi.getDashboard().catch(() => null),
-        ])
-        if (pub) {
-          this.family = pub.family || null
-          this.modules = pub.modules || []
-          this.photos = pub.photos || []
-          this.stats = pub.stats || { memberCount: 0, upcomingEvents: [] }
-        }
-        // 登录后私有模块覆盖公开模块列表
-        if (dash?.modules) this.modules = dash.modules
-        this.loaded = true
+        await Promise.all([loadFamily(), loadDashboard()])
+        if (generation !== this.generation) return
+        this.loadFailed = !this.familyLoaded || (needsDashboard && !this.dashboardLoaded)
       } finally {
-        this.loading = false
+        if (generation === this.generation) this.loading = false
       }
     },
     // 登出/切换家庭时清空缓存,下次 init 强制重新拉取
     reset() {
+      this.generation++
       this.family = null
       this.modules = []
       this.photos = []
       this.stats = { memberCount: 0, upcomingEvents: [] }
-      this.loaded = false
+      this.familyLoaded = false
+      this.dashboardLoaded = false
+      this.loading = false
+      this.loadFailed = false
     },
   },
 })

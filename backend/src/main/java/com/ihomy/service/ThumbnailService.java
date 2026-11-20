@@ -1,5 +1,6 @@
 package com.ihomy.service;
 
+import com.ihomy.common.PhotoThumbnail;
 import com.ihomy.entity.StorageDevice;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,16 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.concurrent.Semaphore;
@@ -33,7 +30,6 @@ import java.util.concurrent.Semaphore;
 @RequiredArgsConstructor
 public class ThumbnailService {
 
-    private static final int MAX_WIDTH = 480;
     /** 生成阶段并发上限:原图 byte[] + BufferedImage 全解码很吃堆(-Xmx384m),50 张并发生成会 OOM */
     private static final Semaphore GEN_SLOTS = new Semaphore(2);
 
@@ -42,7 +38,7 @@ public class ThumbnailService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    /** 取缩略图字节(jpeg);未命中则下载原图生成;不可读格式/失败返回 null(回退原图) */
+    /** 取缩略图字节(JPEG 或透明 PNG);未命中则下载原图生成;不适合缩放时回退原图。 */
     public byte[] thumb(StorageDevice device, String path, Long fsId) {
         try {
             Path cache = cachePath(device, path, fsId);
@@ -53,9 +49,12 @@ public class ThumbnailService {
             try {
                 byte[] src = readSource(device, path, fsId);
                 if (src == null || src.length == 0) return null;
-                BufferedImage img = ImageIO.read(new ByteArrayInputStream(src));
-                if (img == null) return null; // HEIC 等不可读 → 回退原图
-                byte[] thumbBytes = scale(img);
+                byte[] thumbBytes;
+                try (var input = ImageIO.createImageInputStream(new ByteArrayInputStream(src))) {
+                    var preview = PhotoThumbnail.create(input);
+                    if (preview == null) return null;
+                    thumbBytes = preview.bytes();
+                }
                 Files.createDirectories(cache.getParent());
                 // ponytail: 并发未命中可能重复生成同一张,写文件 REPLACE 幂等,浪费一次下载可接受
                 Files.write(cache, thumbBytes);
@@ -135,24 +134,7 @@ public class ThumbnailService {
         return storageService.readFileBytes(device, path);
     }
 
-    private byte[] scale(BufferedImage src) throws Exception {
-        int w = src.getWidth(), h = src.getHeight();
-        if (w <= MAX_WIDTH) {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ImageIO.write(src, "jpg", bos);
-            return bos.toByteArray();
-        }
-        int newH = Math.round(h * ((float) MAX_WIDTH / w));
-        BufferedImage dst = new BufferedImage(MAX_WIDTH, newH, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = dst.createGraphics();
-        g.drawImage(src, 0, 0, MAX_WIDTH, newH, null);
-        g.dispose();
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ImageIO.write(dst, "jpg", bos);
-        return bos.toByteArray();
-    }
-
-    /** 缓存文件:uploadDir/device-thumbs/{md5}.jpg */
+    /** 版本后缀区分早期未处理方向和透明通道的缓存。 */
     private Path cachePath(StorageDevice device, String path, Long fsId) throws Exception {
         return cachePath(device.getId(), path, fsId);
     }
@@ -161,7 +143,7 @@ public class ThumbnailService {
         String key = deviceId + ":" + (fsId != null && fsId > 0 ? "fs" + fsId : path);
         byte[] digest = MessageDigest.getInstance("MD5")
                 .digest(key.getBytes(StandardCharsets.UTF_8));
-        String name = HexFormat.of().formatHex(digest) + ".jpg";
+        String name = HexFormat.of().formatHex(digest) + "-v2.img";
         return Paths.get(uploadDir, "device-thumbs").resolve(name);
     }
 }

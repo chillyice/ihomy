@@ -20,7 +20,8 @@ public interface ItemMapper extends BaseMapper<Item> {
                                                  @Param("roomId") Long roomId,
                                                  @Param("furnitureId") Long furnitureId,
                                                  @Param("type") String type,
-                                                 @Param("visible") ContentAccessService.VisibleFilter visible);
+                                                 @Param("visible") ContentAccessService.VisibleFilter visible,
+                                                 @Param("limit") Integer limit);
 
     /**
      * 取出食材:原子扣减库存(quantity = quantity - amount)。

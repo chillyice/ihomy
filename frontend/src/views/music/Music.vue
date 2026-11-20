@@ -682,7 +682,10 @@ const loadPlaylists = async () => {
 }
 
 // 后台同步完成自动刷新(superync store doneCount++)
-watch(syncStore.doneCount, () => load())
+watch(
+  () => syncStore.doneCount,
+  () => load(),
+)
 
 const formatDuration = (s) => {
   if (!s) return ''

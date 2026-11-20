@@ -23,7 +23,7 @@
           <div class="category-row">
             <el-cascader
               v-model="form.category"
-              :options="categoryTree"
+              :options="categoryChoices.articles"
               :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
               :placeholder="$t('blog.categoryPlaceholder')"
               clearable
@@ -58,7 +58,7 @@
         <el-form-item :label="$t('blog.parentCategory')">
           <el-cascader
             v-model="newCatParent"
-            :options="categoryTree"
+            :options="categoryChoices.parents"
             :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
             :placeholder="$t('blog.rootCategory')"
             clearable
@@ -90,6 +90,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
+import { addBlogCategory, blogCategoryChoices } from '@/utils/blogCategories'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -110,27 +111,7 @@ const newCatName = ref('')
 const newCatParent = ref(null)
 const savingCategory = ref(false)
 
-// 扁平分类列表 → el-cascader 树形 options(value=path,checkStrictly 可选任意层级)
-const categoryTree = computed(() => {
-  const byParent = {}
-  for (const item of categories.value) {
-    const pid = item.parentId || 0
-    if (!byParent[pid]) byParent[pid] = []
-    byParent[pid].push(item)
-  }
-  const build = (parentId) =>
-    (byParent[parentId] || []).map((item) => ({
-      value: item.path,
-      label: item.name,
-      children: item.childCount > 0 ? build(item.id) : undefined,
-    }))
-  const tree = build(0)
-  // 旧分类(不在分类表,如迁移前的自由文本)注入顶级选项,保证编辑时 cascader 能回显
-  if (legacyCategory.value && !categories.value.some((c) => c.path === legacyCategory.value)) {
-    tree.push({ value: legacyCategory.value, label: legacyCategory.value })
-  }
-  return tree
-})
+const categoryChoices = computed(() => blogCategoryChoices(categories.value, legacyCategory.value))
 
 const openNewCatDialog = () => {
   newCatName.value = ''
@@ -153,12 +134,9 @@ const addCategory = async () => {
   if (!name || savingCategory.value) return
   savingCategory.value = true
   try {
-    await blogApi.addCategory(name, newCatParent.value)
-    categories.value = (await blogApi.categories()) || []
-    // 选中新建的分类:拼路径
-    const parent = categories.value.find((c) => c.id === newCatParent.value)
-    form.category = parent ? parent.path + '/' + name : name
+    form.category = await addBlogCategory(blogApi, categories.value, name, newCatParent.value)
     showCategoryDialog.value = false
+    await loadCategories()
   } catch (e) {
     ElMessage.error(e.message || 'Failed')
   } finally {

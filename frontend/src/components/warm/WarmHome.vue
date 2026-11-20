@@ -6,7 +6,12 @@
     <div class="gc-main-head">
       <div>
         <h2 class="gc-h2">{{ greeting }}</h2>
-        <div class="gc-subline">{{ familyName }} · {{ $t('warm.members', { n: memberCount }) }}</div>
+        <div class="gc-subline">
+          {{ familyName }} · {{ $t('warm.members', { n: memberCount }) }}
+          <router-link v-if="sunLight?.weather?.value?.temp != null" class="gc-weather-link" to="/weather">
+            {{ weatherTemp }}° · {{ weatherText }}
+          </router-link>
+        </div>
       </div>
       <div class="gc-head-btns">
         <template v-if="!editMode">
@@ -42,6 +47,7 @@
             'gc-card-tile': compact(w),
             'gc-item-card': w.id === 'item',
             'gc-photos': w.id === 'photos',
+            'gc-featured': w.featured,
             'gc-card-edit': editMode,
             'gc-card-link': isLinkCard(w),
             'gc-card-preview': w.kind === 'preview',
@@ -68,6 +74,17 @@
           <span class="gc-tile-icon">{{ w.icon }}</span>
           <span v-if="w.span >= 2" class="gc-tile-label">{{ w.label }}</span>
         </div>
+        <template v-else-if="cardData[w.id]?.status.value === 'loading'">
+          <h3 class="gc-card-h3">{{ w.label }}</h3>
+          <div class="gc-empty" role="status">{{ $t('common.loading') }}</div>
+        </template>
+        <template v-else-if="cardData[w.id]?.status.value === 'error'">
+          <h3 class="gc-card-h3">{{ w.label }}</h3>
+          <div class="gc-empty" role="status">
+            {{ $t('common.loadFailed') }}
+            <button type="button" class="gc-more" @click.stop="cardData[w.id].retry()">{{ $t('common.retry') }}</button>
+          </div>
+        </template>
 
         <!-- 天气活窗(暖居签名) -->
         <template v-else-if="w.id === 'weather'">
@@ -107,10 +124,24 @@
         <template v-else-if="w.id === 'feed'">
           <h3 class="gc-card-h3">{{ $t('warm.widget.feed') }}</h3>
           <div v-if="feeds.length" class="gc-list">
-            <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="gc-row" v-a11y-click @click="!editMode && goFeed(f)">
+            <div
+              v-for="(f, i) in feeds.slice(0, w.featured ? 3 : nFeed(w))"
+              :key="i"
+              class="gc-row"
+              v-a11y-click
+              @click="!editMode && goFeed(f)"
+            >
               <span class="gc-ic" :style="feedChipStyle(f.type)">{{ feedIcon(f.type) }}</span>
-              <span class="gc-val">{{ f.authorName || $t('feed.authorFallback') }}</span>
-              <span class="gc-muted">{{ feedSummary(f) }}</span>
+              <template v-if="w.featured">
+                <span class="gc-feed-entry">
+                  <span class="gc-feed-title">{{ feedSummary(f) }}</span>
+                  <small>{{ f.authorName || $t('feed.authorFallback') }}</small>
+                </span>
+              </template>
+              <template v-else>
+                <span class="gc-val">{{ f.authorName || $t('feed.authorFallback') }}</span>
+                <span class="gc-muted">{{ feedSummary(f) }}</span>
+              </template>
             </div>
           </div>
           <div v-else class="gc-empty">{{ $t('warm.noFeed') }}</div>
@@ -130,19 +161,22 @@
             @mouseleave="photoHover = false"
             @click="!editMode && advancePhotos()"
           >
-            <div
-              v-for="(p, i) in stackCards"
-              :key="p.id"
-              class="gc-photo-pcard"
-              :class="{ 'gc-photo-hovered': hoveredCard === i }"
-              :style="pcardStyle(i)"
-              @mouseenter="onCardEnter(i)"
-              @mouseleave="onCardLeave()"
-            >
-              <img :src="p.url" :alt="p.description || ''" loading="lazy" />
-            </div>
+            <img v-if="w.featured && topPhoto" class="gc-photo-lead" :src="topPhoto.url" :alt="photoCaption" />
+            <template v-else>
+              <div
+                v-for="(p, i) in stackCards"
+                :key="p.id"
+                class="gc-photo-pcard"
+                :class="{ 'gc-photo-hovered': hoveredCard === i }"
+                :style="pcardStyle(i)"
+                @mouseenter="onCardEnter(i)"
+                @mouseleave="onCardLeave()"
+              >
+                <img :src="p.url" :alt="p.description || ''" loading="lazy" />
+              </div>
+            </template>
             <div class="gc-photo-meta">
-              <span class="gc-photo-cap">{{ topPhoto?.description || $t('warm.familyPhoto') }}</span>
+              <span class="gc-photo-cap">{{ photoCaption }}</span>
               <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
             </div>
             <button
@@ -346,7 +380,7 @@
           <h3 class="gc-card-h3">{{ $t('warm.widget.reminder') }}</h3>
           <div v-if="reminders.length" class="gc-list">
             <div
-              v-for="r in reminders.slice(0, nReminder(w))"
+              v-for="r in reminders.slice(0, w.featured ? 3 : nReminder(w))"
               :key="r.key"
               class="gc-row"
               v-a11y-click
@@ -422,22 +456,26 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
-import { publicApi, bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '@/api'
+import { bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
 import { buildAgenda } from '@/utils/agenda'
-import { feedSummary as feedSummaryOf } from '@/utils/feed'
+import { feedPath, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { formatDate } from '@/utils/datetime'
+import { useHomeFeed } from '@/composables/useHomeFeed'
+import { useHomeCardData } from '@/composables/useHomeCardData'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { summarizePortfolio } from '@/utils/finance'
 import { dictText } from '@/utils/dict'
 import { parseWarmLayout } from '@/utils/warmHomeLayout'
-import { parseShareQuery, showCoverBanner } from '@/utils/shareLanding'
+import { showCoverBanner } from '@/utils/shareLanding'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
 const { t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const { scope, fetchFeed } = useHomeFeed()
 const sunLight = inject(SUN_LIGHT_KEY)
 
 // 每日一图 / 每日知识(公开接口,游客也可看;偏好读设置页 localStorage)
@@ -548,17 +586,16 @@ const resolveWidget = (entry) => {
   }
   const base = WIDGET_BY_ID[id]
   if (!base) return null
-  return { ...base, label: widgetLabel(base), span: entry.span || base.span, row }
+  return { ...base, label: widgetLabel(base), span: entry.span || base.span, row, featured: entry.featured === true }
 }
 
-// 默认展示 6 张(照片/纪念日/收支 3 行、寻物整行户型图);其余富组件(task/wish/reminder)由托盘加入,其余模块经侧栏拖入为入口卡片
+// 新布局首屏：左侧家庭照片，右侧两张短列表。旧排版继续使用原有卡片样式。
 const DEFAULT_LAYOUT = [
-  { id: 'weather', span: 8, row: 4 },
-  { id: 'feed', span: 4, row: 4 },
-  { id: 'photos', span: 4, row: 3 },
+  { id: 'photos', span: 8, row: 6, featured: true },
+  { id: 'reminder', span: 4, row: 3, featured: true },
+  { id: 'feed', span: 4, row: 3, featured: true },
   { id: 'anni', span: 4, row: 3 },
-  { id: 'finance', span: 4, row: 3 },
-  { id: 'item', span: 12, row: 4 },
+  { id: 'finance', span: 8, row: 3 },
 ]
 const STORAGE_KEY = 'ihomy:guangchen:home:v3'
 const LEGACY_KEY = 'ihomy:guangchen:home:v1'
@@ -613,14 +650,6 @@ watch(
     addedCodes.value = computeAddedCodes()
   },
   { deep: true, immediate: true },
-)
-// 每日内容卡片出现后才拉数据(公开接口:游客也能看)
-watch(
-  () => layout.value.some((e) => e.id === 'daily'),
-  (on) => {
-    if (on) loadDaily()
-  },
-  { immediate: true },
 )
 
 // ========== 布局动画(FLIP:先量后放,统一驱动「变大缩小 / 邻居移动 / 回弹」) ==========
@@ -1099,7 +1128,10 @@ const photoIndex = ref(0)
 const photoHover = ref(false)
 const hoveredCard = ref(-1) // 当前 hover 的照片卡索引(-1 = 无),hover 时该卡摆正放大(JS 追踪,正确处理扇形重叠)
 const PHOTO_STACK_N = 4
-const topPhoto = computed(() => photos.value[photoIndex.value] || null)
+const topPhoto = computed(() => photos.value[photoIndex.value] || photos.value[0] || null)
+const photoCaption = computed(
+  () => topPhoto.value?.description || formatDate(topPhoto.value?.takenAt || topPhoto.value?.createdAt) || t('warm.familyPhoto'),
+)
 const stackCards = computed(() => {
   const arr = photos.value
   const n = arr.length
@@ -1158,7 +1190,7 @@ const itemVoiceProcessing = ref(false)
 let itemVoiceTimer = null
 
 const defaultFloorOfHouse = (house) => pickDefaultFloor(house?.floorPlans)
-const loadItemFloorPlan = async (house) => {
+const applyItemFloorPlan = ({ house, floor, data }) => {
   itemHouse.value = house
   itemImgTransform.value = null
   itemImgSize.value = { w: 0, h: 0 }
@@ -1166,8 +1198,6 @@ const loadItemFloorPlan = async (house) => {
     itemFloorPlan.value = { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }
     return
   }
-  const floor = defaultFloorOfHouse(house)
-  const data = await itemApi.floorPlan(house.id, floor).catch(() => null)
   itemFloorPlan.value = data || { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }
   if (house.floorPlans) {
     try {
@@ -1178,6 +1208,7 @@ const loadItemFloorPlan = async (house) => {
   if (data?.imageUrl) {
     const img = new Image()
     img.onload = () => {
+      if (itemHouse.value?.id !== house.id || itemFloorPlan.value?.imageUrl !== data.imageUrl) return
       itemImgSize.value = { w: img.naturalWidth, h: img.naturalHeight }
     }
     img.src = data.imageUrl
@@ -1348,36 +1379,74 @@ const itemFloorPlanView = computed(() => {
   }
 })
 
-onMounted(async () => {
-  // 未登录(公开首页)只拉公开动态流:其余卡片数据都要登录态,直接跳过,
-  // 别打一批注定 401 的请求(与 Home.vue 的 loadXxx 登录态守卫一致)
-  const loggedIn = userStore.isLoggedIn
-  // 记账/理财数据只对账本可读的成员取(家长可把某成员设为不可见)
-  const canReadBook = loggedIn && userStore.canReadBook
-  // 分享落地(/?hid=xxx):动态流按链接里的家庭取,否则会回落到默认演示家庭
-  const { hid, homeId } = parseShareQuery(window.location.search)
-  const [feed, book, fin, it, task, wish, rem, houses] = await Promise.all([
-    publicApi.getFeed(20, homeId ?? undefined, hid || undefined).catch(() => []),
-    canReadBook ? bookApi.summary().catch(() => null) : Promise.resolve(null),
-    // 理财持仓:与收支卡同卡展示,失败不影响收支
-    canReadBook ? financeApi.list().catch(() => []) : Promise.resolve([]),
-    loggedIn ? itemApi.list({}).catch(() => []) : Promise.resolve([]),
-    loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
-    // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不受登录态限制
-    wishApi.list().catch(() => []),
-    loggedIn ? planApi.today().catch(() => null) : Promise.resolve(null),
-    loggedIn ? itemApi.houses().catch(() => []) : Promise.resolve([]),
-  ])
-  feeds.value = feed || []
-  if (book) bookSummary.value = book
-  financeList.value = Array.isArray(fin) ? fin : []
-  items.value = (it || []).slice(0, 8)
-  tasks.value = (Array.isArray(task) ? task : task?.records || []).filter((t) => t.status !== 'CANCELLED')
-  wishes.value = Array.isArray(wish) ? wish : []
-  reminders.value = buildAgenda(rem)
-  const h = Array.isArray(houses) ? houses : []
-  if (h.length) await loadItemFloorPlan(h[0])
-  startPhotoTimer()
+const visibleCard = (id) => displayWidgets.value.find((w) => w.id === id && !compact(w))
+const hasCard = (id) => () => Boolean(visibleCard(id))
+const hasMap = () => Boolean(visibleCard('item') && itemShowFloorPlan(visibleCard('item')))
+const hasItemList = () => Boolean(visibleCard('item') && !itemShowFloorPlan(visibleCard('item')))
+const bindCard = (visible, request, target, initial, transform = (value) => value ?? initial) =>
+  useHomeCardData(
+    visible,
+    scope,
+    request,
+    (data) => {
+      target.value = transform(data)
+    },
+    () => {
+      target.value = initial
+    },
+  )
+const itemListData = bindCard(hasItemList, () => itemApi.list({ limit: 5 }), items, [])
+const itemMapData = useHomeCardData(
+  hasMap,
+  scope,
+  async () => {
+    const [house] = await itemApi.houses()
+    if (!house) return {}
+    const floor = defaultFloorOfHouse(house)
+    return { house, floor, data: await itemApi.floorPlan(house.id, floor) }
+  },
+  applyItemFloorPlan,
+  () => applyItemFloorPlan({}),
+)
+const holdingData = bindCard(hasCard('finance'), () => financeApi.list(), financeList, [])
+const cardData = {
+  feed: bindCard(hasCard('feed'), fetchFeed, feeds, []),
+  reminder: bindCard(hasCard('reminder'), () => planApi.today(), reminders, [], buildAgenda),
+  finance: bindCard(hasCard('finance'), () => bookApi.summary(), bookSummary, {}),
+  wish: bindCard(hasCard('wish'), () => wishApi.list(), wishes, []),
+  task: bindCard(
+    hasCard('task'),
+    () => taskApi.list(),
+    tasks,
+    [],
+    (data) => (Array.isArray(data) ? data : data?.records || []).filter((task) => task.status !== 'CANCELLED'),
+  ),
+  get item() {
+    return hasMap() ? itemMapData : itemListData
+  },
+}
+watch(
+  hasCard('daily'),
+  (visible) => {
+    if (visible) loadDaily()
+  },
+  { immediate: true },
+)
+watch(
+  () => Boolean(visibleCard('photos') && photos.value.length > 1),
+  (visible) => {
+    if (visible) startPhotoTimer()
+    else stopPhotoTimer()
+  },
+  { immediate: true },
+)
+const retryCards = () => {
+  for (const data of [...Object.values(cardData), holdingData]) {
+    if (data.status.value === 'error') data.retry()
+  }
+}
+onMounted(() => {
+  window.addEventListener('online', retryCards)
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 60000)
@@ -1385,17 +1454,16 @@ onMounted(async () => {
   applyRemoteLayout()
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('online', retryCards)
+  clearTimeout(itemVoiceTimer)
   stopPhotoTimer()
   clearInterval(clockTimer)
   if (itemVoiceRecording.value) itemVoiceStop()
 })
 
 const weatherCity = computed(() => sunLight?.weather?.value?.city || appStore.familyName || '')
-const weatherTemp = computed(() => sunLight?.weather?.value?.temp ?? 24)
-const weatherText = computed(
-  () =>
-    sunLight?.weather?.value?.text || (sunLight?.weather?.value?.condition === 'cloud' ? t('warm.weatherCloudy') : t('warm.weatherSunny')),
-)
+const weatherTemp = computed(() => sunLight?.weather?.value?.temp ?? '—')
+const weatherText = computed(() => sunLight?.weather?.value?.text || '')
 const weatherSub = computed(() => {
   const temp = sunLight?.weather?.value?.temp
   if (temp != null) return temp >= 28 ? t('warm.weatherHot') : temp >= 15 ? t('warm.weatherMild') : t('warm.weatherCold')
@@ -1427,24 +1495,14 @@ const pm25Text = computed(() => {
 })
 
 const FEED_ICON = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
-const FEED_ROUTES = {
-  blog: '/blog',
-  diary: '/diary',
-  photo: '/album',
-  video: '/cinema',
-  wish: '/wish',
-  task: '/task',
-  recipe: '/kitchen',
-  book: '/library',
-}
 const feedIcon = (type) => FEED_ICON[type] || '✨'
 // 动态类型 → 图标芯片色相(博客陶土 / 影像暖沙 / 愿望鼠尾草 / 日记·任务暖木)
 const FEED_CHIP = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
 const feedChipStyle = (type) => ({ '--chip': `var(--blob-${FEED_CHIP[type] || 1})` })
 const feedSummary = (f) => feedSummaryOf(t, f)
 const goFeed = (f) => {
-  if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)
-  else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
+  const path = feedPath(f)
+  if (path) router.push(path)
 }
 const fmt = (n) => (Number(n) || 0).toFixed(2)
 
@@ -1505,6 +1563,13 @@ html.theme-warm.dark .gc-home {
   font-size: 12.5px;
   color: var(--color-text-tertiary);
   margin-top: 3px;
+}
+.gc-weather-link {
+  margin-inline-start: 10px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--color-line);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 .gc-head-btns {
   display: flex;
@@ -1849,6 +1914,36 @@ html.theme-warm.dark .gc-home {
 .gc-photo-stack:hover .gc-photo-meta {
   opacity: 1;
   transform: translateY(0);
+}
+.gc-featured .gc-photo-stack {
+  border-radius: 10px;
+  min-height: 180px;
+}
+.gc-photo-lead {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gc-featured .gc-photo-meta {
+  inset: auto 0 0;
+  opacity: 1;
+  transform: none;
+  padding: 48px 16px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+}
+.gc-featured .gc-photo-cap,
+.gc-featured .gc-photo-count {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+.gc-featured .gc-photo-cap {
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .gc-photo-cap {
   font-size: 12px;
@@ -2516,6 +2611,33 @@ html.dark .gc-glass::after {
 }
 .gc-list .gc-row > .gc-tag {
   margin-left: auto;
+}
+.gc-featured[data-wid='feed'],
+.gc-featured[data-wid='reminder'] {
+  display: flex;
+  flex-direction: column;
+}
+.gc-featured .gc-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+.gc-featured .gc-list .gc-row {
+  padding-block: 7px;
+}
+.gc-feed-entry {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  line-height: 1.4;
+}
+.gc-feed-title {
+  color: var(--color-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.gc-feed-entry small {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .gc-ic {
   width: 26px;

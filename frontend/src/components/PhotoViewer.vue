@@ -20,13 +20,21 @@
                 ref="liveVideoRef"
                 class="pv-live-video"
                 :src="current.liveVideoUrl"
-                :poster="current.url"
+                :poster="photoUrl"
                 autoplay
                 loop
                 playsinline
                 controls
               />
-              <img v-else :src="current.url" :alt="current.description || ''" draggable="false" @load="onImgLoad" />
+              <img
+                v-else-if="photoUrl"
+                :key="retryKey"
+                :src="photoUrl"
+                :alt="current.description || ''"
+                draggable="false"
+                @load="settleImage($event, false)"
+                @error="settleImage($event, true)"
+              />
               <button
                 v-if="current.liveVideoUrl && !livePlaying"
                 class="pv-live-badge"
@@ -41,6 +49,9 @@
           <!-- 加载指示 -->
           <div v-if="imgLoading" class="pv-loading">
             <div class="pv-spinner" />
+          </div>
+          <div v-else-if="imgFailed" class="pv-error" role="status">
+            {{ t('common.loadFailed') }} <el-button v-if="photoUrl" size="small" @click="retryImage">{{ t('common.retry') }}</el-button>
           </div>
         </div>
 
@@ -103,7 +114,7 @@
                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor" />
               </svg>
             </button>
-            <button class="pv-icon-btn" :title="t('photoViewer.play')" @click="togglePlay">
+            <button v-if="photos.length > 1" class="pv-icon-btn" :title="t('photoViewer.play')" @click="togglePlay">
               <svg v-if="!playing" viewBox="0 0 24 24" width="22" height="22"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
               <svg v-else viewBox="0 0 24 24" width="22" height="22"><path d="M6 5h4v14H6zm8 0h4v14h-4z" fill="currentColor" /></svg>
             </button>
@@ -176,7 +187,7 @@
           <!-- 缩略图条 -->
           <div v-if="photos.length > 1" ref="stripRef" class="pv-thumb-strip">
             <div v-a11y-click v-for="(p, i) in photos" :key="p.id" class="pv-thumb" :class="{ active: i === index }" @click="goTo(i)">
-              <img :src="p.url" :alt="p.description || ''" draggable="false" />
+              <AlbumThumbnail :url="p.url" :alt="p.description || ''" :size="24" />
             </div>
           </div>
         </div>
@@ -194,6 +205,8 @@ import { shareId } from '@/utils/shareId'
 import { useUserStore } from '@/stores/user'
 import { shareToChat } from '@/utils/chatShare'
 import { shareFiles } from '@/native/shareOut'
+import AlbumThumbnail from './AlbumThumbnail.vue'
+import { originalPhotoUrl } from '@/utils/albumImages'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -214,6 +227,8 @@ const playing = ref(false)
 const speed = ref(5) // seconds per slide
 const slideDir = ref('next')
 const imgLoading = ref(false)
+const imgFailed = ref(false)
+const retryKey = ref(0)
 const livePlaying = ref(false) // 实况照片短片播放中(替代静态图显示)
 const progressKey = ref(0) // force progress bar animation restart
 const speeds = [
@@ -242,6 +257,11 @@ watch(index, () => {
 })
 
 const current = computed(() => props.photos[index.value] || {})
+const photoUrl = computed(() => originalPhotoUrl(current.value.url))
+watch([() => props.visible, () => current.value.id, photoUrl], ([visible]) => {
+  imgFailed.value = visible && !photoUrl.value
+  imgLoading.value = visible && !!photoUrl.value
+})
 const hasMeta = computed(() => current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt)
 
 const canDeleteCurrent = computed(() => {
@@ -260,13 +280,26 @@ const formatDate = (d) => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
-const onImgLoad = () => {
+const settleImage = (event, failed) => {
+  if (event.currentTarget.getAttribute('src') !== photoUrl.value) return
   imgLoading.value = false
+  imgFailed.value = failed
+  if (failed) {
+    playing.value = false
+    stopPlay()
+  }
+}
+const retryImage = () => {
+  if (!photoUrl.value) return
+  imgFailed.value = false
+  imgLoading.value = true
+  retryKey.value++
 }
 
 // 播放实况照片短片(苹果 Live Photo):点击 LIVE 角标以内联视频替代静态图
 const playLive = () => {
   imgLoading.value = false
+  imgFailed.value = false
   livePlaying.value = true
 }
 
@@ -321,22 +354,21 @@ const download = () => {
 const next = () => {
   if (props.photos.length <= 1) return
   slideDir.value = 'next'
-  imgLoading.value = true
   index.value = (index.value + 1) % props.photos.length
 }
 const prev = () => {
   if (props.photos.length <= 1) return
   slideDir.value = 'prev'
-  imgLoading.value = true
   index.value = (index.value - 1 + props.photos.length) % props.photos.length
 }
 const goTo = (i) => {
+  if (i === index.value) return
   slideDir.value = i > index.value ? 'next' : 'prev'
-  imgLoading.value = true
   index.value = i
 }
 
 const togglePlay = () => {
+  if (props.photos.length < 2) return
   playing.value = !playing.value
   if (playing.value) startPlay()
   else stopPlay()
@@ -346,9 +378,7 @@ const startPlay = () => {
   stopPlay()
   progressKey.value++
   playTimer = setInterval(() => {
-    slideDir.value = 'next'
-    imgLoading.value = true
-    index.value = (index.value + 1) % props.photos.length
+    next()
     progressKey.value++ // restart progress bar
   }, speed.value * 1000)
 }
@@ -526,12 +556,22 @@ onBeforeUnmount(() => {
 }
 
 /* 加载指示 */
+.pv-error,
 .pv-loading {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 2;
+}
+.pv-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 .pv-spinner {
   width: 36px;

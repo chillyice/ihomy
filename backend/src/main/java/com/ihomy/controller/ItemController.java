@@ -167,8 +167,9 @@ public class ItemController {
     public Result<List<Map<String, Object>>> itemList(@RequestParam(required = false) String keyword,
                                                        @RequestParam(required = false) Long roomId,
                                                        @RequestParam(required = false) Long furnitureId,
-                                                       @RequestParam(required = false) String type) {
-        return Result.success(itemService.itemList(viewer(), keyword, roomId, furnitureId, type));
+                                                       @RequestParam(required = false) String type,
+                                                       @RequestParam(required = false) Integer limit) {
+        return Result.success(itemService.itemList(viewer(), keyword, roomId, furnitureId, type, limit));
     }
 
     @Operation(summary = "新增物品")

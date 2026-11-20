@@ -133,10 +133,7 @@
           @click="selectMode ? togglePickChild(c) : openChild(c)"
         >
           <div class="child-tile-cover">
-            <template v-if="c.cover">
-              <div class="child-tile-img" :style="{ backgroundImage: `url(${thumbUrl(c.cover)})` }"></div>
-            </template>
-            <AlbumDefaultCover v-else :size="56" />
+            <AlbumThumbnail :url="c.cover" :size="56" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11">
@@ -170,8 +167,8 @@
           :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
           @click="selectMode ? togglePickChild(c) : openChild(c)"
         >
-          <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${thumbUrl(c.cover)})` } : {}">
-            <AlbumDefaultCover v-if="!c.cover" :size="30" />
+          <div class="child-cover">
+            <AlbumThumbnail :url="c.cover" :size="30" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11">
@@ -234,7 +231,8 @@
               />
             </svg>
           </span>
-          <div class="rl-thumb" :style="{ backgroundImage: `url(${thumbUrl(p.url)})` }">
+          <div class="rl-thumb">
+            <AlbumThumbnail :url="p.url" :alt="p.description || ''" />
             <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
           </div>
           <div class="rl-main">
@@ -264,7 +262,7 @@
             @pointerleave="cancelPress"
             @contextmenu.prevent
           >
-            <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
+            <AlbumThumbnail :url="p.url" :alt="p.description || album.name" />
             <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11">
@@ -297,7 +295,13 @@
           </div>
         </div>
       </div>
-      <el-empty v-else-if="!children.length" :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
+      <div v-if="loadError" class="album-load-error" role="status">
+        {{ t('common.loadFailed') }} <el-button text @click="load">{{ t('common.retry') }}</el-button>
+      </div>
+      <el-empty
+        v-else-if="!loading && !photos.length && !children.length"
+        :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')"
+      />
     </div>
 
     <!-- 多选移动:把选中的照片挪到另一本相册 -->
@@ -361,7 +365,8 @@ import { Edit, Delete, Location, Clock, Share } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
-import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
+import AlbumThumbnail from '@/components/AlbumThumbnail.vue'
+import { albumMemoryKey } from '@/utils/albumImages'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { shareId } from '@/utils/shareId'
 import { isNativeApp } from '@/utils/platform'
@@ -389,6 +394,8 @@ const photos = ref([])
 const children = ref([])
 const refreshing = ref(false)
 const loading = ref(false)
+const loadError = ref(false)
+let loadSequence = 0
 const descEditor = reactive({ visible: false, value: '', currentId: null })
 const viewer = reactive({ visible: false, index: 0 })
 // 单张照片的分享范围(亲友圈):不选圈 = 只给自家人
@@ -431,15 +438,19 @@ const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/a
 
 // 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {
+  const sequence = ++loadSequence
   loading.value = true
+  loadError.value = false
   try {
     const data = currentShareToken.value ? await albumApi.shared(currentShareToken.value) : await albumApi.detail(currentAlbumId.value)
+    if (sequence !== loadSequence) return
     album.value = data.album || {}
     photos.value = data.photos || []
     children.value = data.children || []
     parents.value = data.parents || []
     sharedFrom.value = data.sharedFrom || null
     readOnly.value = !!data.readOnly
+    if (album.value.id && !currentShareToken.value) localStorage.setItem(albumMemoryKey(userStore.userInfo), String(album.value.id))
     // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页(仅整页分享模式;右栏嵌入不受 URL 旧参数影响)
     const p = props.inline ? null : route.query.p
     if (p) {
@@ -449,8 +460,10 @@ const load = async () => {
         viewer.visible = true
       }
     }
+  } catch {
+    if (sequence === loadSequence) loadError.value = true
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 
@@ -461,10 +474,6 @@ const breadcrumbItems = computed(() => [
   ...parents.value.map((p) => ({ label: p.name, to: `/album/${p.id}` })),
   { label: album.value.name || t('album.title') },
 ])
-
-// 网格用 480px 缓存缩略图:仅设备映射照片(签名URL,已带query)追加 &thumb=1;
-// 本地上传照片是 /files/ 静态直链(无query),拼参数会 404,原样返回;PhotoViewer 播放/下载用原图
-const thumbUrl = (url) => (url && url.includes('?') ? `${url}&thumb=1` : url)
 
 // 手动刷新映射相册(递归子树,后台执行)
 const onRefresh = async () => {
@@ -787,10 +796,18 @@ const onBatchMove = async () => {
 
 // ---------- 后台同步完成时自动刷新(停留在本页也能看到新照片) ----------
 const syncStore = useSyncStore()
-watch(syncStore.doneCount, () => load())
+watch(
+  () => syncStore.doneCount,
+  () => load(),
+)
 
 // 受控 id 变化(右栏换相册 / 路由参数变化)时重拉,并清掉上一本的选中与播放器状态
-watch(currentAlbumId, () => {
+watch([currentAlbumId, currentShareToken], () => {
+  album.value = {}
+  photos.value = []
+  children.value = []
+  parents.value = []
+  readOnly.value = true
   exit()
   selectedChildIds.value = []
   viewer.visible = false
@@ -821,6 +838,7 @@ const onHeaderCommand = (cmd) => {
 }
 
 onBeforeUnmount(() => {
+  loadSequence++
   dispose()
   window.removeEventListener('blur', clearDrop)
   clearDrop()
@@ -939,11 +957,10 @@ onBeforeUnmount(() => {
   position: relative;
   aspect-ratio: 4 / 3;
 }
-.child-tile-img {
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
+.album-load-error {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 .child-tile-cover .status-dot {
   position: absolute;

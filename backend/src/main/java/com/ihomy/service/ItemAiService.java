@@ -126,7 +126,7 @@ public class ItemAiService {
         List<String> keywords = parsed.isEmpty() ? List.of(q.trim()) : parsed; // AI 拆解失败回退原文
 
         List<Map<String, Object>> matches = itemMapper.selectItemByFamily(familyId, null, null, null, null,
-                        contentAccess.visibleFilter(viewer))
+                        contentAccess.visibleFilter(viewer), null)
                 .stream()
                 .filter(row -> type == null || type.equals(str(row.get("type"))))
                 .map(row -> Map.entry(score(row, keywords), row))
@@ -400,8 +400,7 @@ public class ItemAiService {
                 })
                 .toList());
         ctx.put("items", itemMapper.selectItemByFamily(familyId, null, null, null, null,
-                        contentAccess.visibleFilter(viewer)).stream()
-                .limit(CONTEXT_LIMIT)
+                        contentAccess.visibleFilter(viewer), CONTEXT_LIMIT).stream()
                 .map(row -> {
                     // 紧凑"名称(别名1/别名2)"文本:省 id(AI 无需回传物品 id,后端按名称/别名匹配)与 JSON 键名 token
                     String name = str(row.get("name"));

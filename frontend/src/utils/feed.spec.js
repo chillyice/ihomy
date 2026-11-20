@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { feedTypeLabel, feedSummary } from './feed'
+import { feedPath, feedTypeLabel, feedSummary } from './feed'
 import { pickDefaultFloor } from './floorPlanGeom'
 
 // 用简单 t 桩:替换 {n}/{title} 占位,便于断言
 const t = (key, params = {}) => key + JSON.stringify(params)
+
+it('opens recipes and blog entries by id, and grouped photo activity in the album', () => {
+  expect(feedPath({ type: 'recipe', id: 27 })).toBe('/kitchen/recipe/27')
+  expect(feedPath({ type: 'blog', id: 27 })).toBe('/blog/27')
+  expect(feedPath({ type: 'photo', id: 27 })).toBe('/album')
+})
 
 describe('feedTypeLabel', () => {
   it('已知类型返回 i18n key,未知返回空串', () => {

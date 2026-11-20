@@ -22,11 +22,7 @@
           @touchend="resumeCard(c)"
           @click.stop="openViewer(c)"
         >
-          <img
-            :src="c.photo.url && c.photo.url.includes('?') ? c.photo.url + '&thumb=1' : c.photo.url"
-            draggable="false"
-            :alt="c.photo.description || ''"
-          />
+          <AlbumThumbnail :url="c.photo.url" :alt="c.photo.description || ''" />
           <div v-if="c.hovered" class="photo-info">
             <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
             <div class="info-meta">
@@ -54,6 +50,7 @@ import { ref, watch, onBeforeUnmount } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { photoApi } from '@/api'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import AlbumThumbnail from '@/components/AlbumThumbnail.vue'
 
 const props = defineProps({ visible: { type: Boolean, default: false } })
 const emit = defineEmits(['update:visible'])

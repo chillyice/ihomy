@@ -174,7 +174,7 @@ public class StorageController {
             byte[] thumbBytes = thumbnailService.thumb(device, path, fsId);
             if (thumbBytes != null) {
                 HttpHeaders h = new HttpHeaders();
-                h.setContentType(MediaType.IMAGE_JPEG);
+                h.setContentType(thumbBytes.length > 0 && thumbBytes[0] == (byte) 0x89 ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG);
                 h.setCacheControl("private, max-age=86400");
                 h.setContentLength(thumbBytes.length);
                 return new ResponseEntity<>(thumbBytes, h, HttpStatus.OK);

@@ -460,12 +460,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, inject, nextTick, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount, onUnmounted, inject, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi, healthApi } from '@/api'
+import { taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi, healthApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
 import { usePullRefresh } from '@/composables/usePullRefresh'
@@ -479,10 +479,11 @@ import ElderHome from '@/components/ElderHome.vue'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import albumCoverUrl from '@/assets/album-cover.jpg'
-import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
+const FloorPlanCanvas = defineAsyncComponent(() => import('@/views/item/FloorPlanCanvas.vue'))
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
-import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { useHomeFeed } from '@/composables/useHomeFeed'
 import { formatYuan } from '@/utils/money'
 import { sleepText, formatMetric } from '@/utils/healthMetrics'
 import { summarizePortfolio } from '@/utils/finance'
@@ -494,7 +495,6 @@ import { showCoverBanner } from '@/utils/shareLanding'
 import { syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
-const route = useRoute()
 const userStore = useUserStore()
 const appStore = useAppStore()
 const { t } = useI18n()
@@ -571,15 +571,15 @@ const albumCoverW = (w) => {
 }
 
 // ========== 数据 ==========
-const family = ref({})
+const family = computed(() => appStore.family)
 const feeds = ref([])
 const tasks = ref([])
-const allPhotos = ref([])
+const allPhotos = computed(() => appStore.photos)
 const weather = computed(() => sunLight?.weather.value)
 const weatherDetail = computed(() => sunLight?.weatherDetail?.value)
 const todayHigh = computed(() => weatherDetail.value?.daily?.[0]?.tempMax ?? null)
 const todayLow = computed(() => weatherDetail.value?.daily?.[0]?.tempMin ?? null)
-const anniversaries = ref([])
+const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 const pointsStats = ref({})
 const reminders = ref([])
 const bookSummary = ref(null)
@@ -827,54 +827,37 @@ const onAlbumLeave = () => {
 const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedSummary = (f) => feedSummaryOf(t, f)
 const formatTime = (d) => formatRelativeTime(t, d)
-const FEED_ROUTES = {
-  diary: '/diary',
-  photo: '/album',
-  video: '/cinema',
-  wish: '/wish',
-  task: '/task',
-  recipe: '/kitchen',
-  book: '/library',
-}
 const goFeed = (f) => {
-  if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)
-  else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
+  const path = feedPath(f)
+  if (path) router.push(path)
 }
-const rewardIcon = (t) => (t === 1 ? '🎁' : t === 2 ? '📦' : '⭕')
+const rewardIcon = (type) => ({ POINTS: '🎁', ITEM: '📦' })[type] || '⭕'
 const taskStatusLabel = (s) => dictText(t, 'taskStatus', s)
 const weatherText = computed(() => weather.value?.text || '')
 
-const homeId = computed(() => route.query.home_id || '')
-const hid = computed(() => route.query.hid || '')
-const loadAll = async () => {
-  const homePromise = publicApi
-    .getHome(homeId.value || undefined, hid.value || undefined)
-    .then((pub) => {
-      family.value = pub.family || {}
-      anniversaries.value = (pub.stats || {}).upcomingEvents || []
-      return pub.photos || []
-    })
-    .catch(() => [])
-  const feedPromise = (
-    hid.value ? publicApi.getFeed(20, undefined, hid.value) : homeId.value ? publicApi.getFeed(20, homeId.value) : publicApi.getFeed(20)
-  )
+const { scope, fetchFeed } = useHomeFeed()
+const loadFeedAndTasks = async () => {
+  const current = scope.value
+  const feedPromise = fetchFeed()
     .then((r) => {
-      feeds.value = r || []
+      if (current === scope.value) feeds.value = r || []
     })
-    .catch(() => {
-      feeds.value = []
-    })
+    .catch(() => {})
   const taskPromise = userStore.isLoggedIn
     ? taskApi
         .list()
         .then((r) => {
-          tasks.value = (Array.isArray(r) ? r : r.records || []).filter((t) => t.status !== 'CANCELLED')
+          if (current === scope.value) tasks.value = (Array.isArray(r) ? r : r.records || []).filter((t) => t.status !== 'CANCELLED')
         })
         .catch(() => {})
     : Promise.resolve()
-  const [photos] = await Promise.all([homePromise, feedPromise, taskPromise])
-  allPhotos.value = photos
+  await Promise.all([feedPromise, taskPromise])
 }
+watch(scope, () => {
+  feeds.value = []
+  tasks.value = []
+  loadFeedAndTasks()
+})
 
 // ========== 布局状态 ==========
 // 默认布局沿用原排版(12 列 × 9 行视觉),再折算成画布比例坐标 x/y/w/h(0~1)
@@ -1477,7 +1460,8 @@ usePullRefresh({
   disabled: () => editMode.value,
   onRefresh: () =>
     Promise.all([
-      loadAll(),
+      appStore.init(true),
+      loadFeedAndTasks(),
       loadPoints(),
       loadReminders(),
       loadBookSummary(),
@@ -1489,7 +1473,7 @@ usePullRefresh({
 })
 
 onMounted(async () => {
-  loadAll()
+  loadFeedAndTasks()
   loadPoints()
   loadReminders()
   loadBookSummary()

@@ -63,7 +63,7 @@ public class ItemLocalParser {
         // 同义词变体:原文 + 把 query 中命中的别名替换为组内其它成员,任一叫法都能命中同一条
         List<String> variants = synonymService.expand(q);
         return itemMapper.selectItemByFamily(viewer.familyId(), null, null, null, null,
-                        contentAccess.visibleFilter(viewer)).stream()
+                        contentAccess.visibleFilter(viewer), null).stream()
                 .map(row -> Map.entry(maxScore(row, variants), row))
                 .filter(e -> e.getKey() > 0)
                 .sorted((a, b) -> b.getKey() - a.getKey())

@@ -20,7 +20,11 @@
     </div>
 
     <!-- 动态流:切换筛选项时整组淡出再淡入,避免列表内容硬切 -->
-    <div class="feed-list" v-loading="loading">
+    <div class="feed-list" v-loading="loading && !feeds.length">
+      <div v-if="loadError" role="status" class="feed-retry">
+        {{ $t('common.loadFailed') }}
+        <el-button text :disabled="loading" @click="load().catch(() => {})">{{ $t('common.retry') }}</el-button>
+      </div>
       <Transition name="feed-swap" mode="out-in">
         <div v-if="filteredFeeds.length" :key="activeFilter" class="feed-list-inner">
           <div
@@ -37,34 +41,36 @@
               <span class="feed-type-tag">{{ feedTypeLabel(f.type) }}</span>
               <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
             </div>
-            <div class="feed-card-body">
+            <div class="feed-card-body" :class="{ 'photo-story': f.type === 'photo' }">
               <div v-if="feedCover(f)" class="feed-cover">
                 <img :src="feedCover(f)" :alt="feedSummary(f)" loading="lazy" />
               </div>
               <div class="feed-text">
                 <div v-if="f.type === 'blog'" class="feed-title">{{ f.title }}</div>
-                <div class="feed-summary">{{ feedSummary(f) }}</div>
+                <div v-if="f.type !== 'blog' || (f.summary && f.summary !== f.title)" class="feed-summary">
+                  {{ f.type === 'blog' ? f.summary : feedSummary(f) }}
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <div v-else-if="!loading" key="empty" class="feed-empty">{{ $t('common.empty') }}</div>
+        <div v-else-if="!loading && !loadError" key="empty" class="feed-empty">{{ $t('common.empty') }}</div>
       </Transition>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
-import { publicApi, homeApi } from '@/api'
-import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { useHomeFeed } from '@/composables/useHomeFeed'
+import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'
-import { parseShareQuery, showCoverBanner } from '@/utils/shareLanding'
+import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 
 const router = useRouter()
@@ -74,6 +80,9 @@ const { t } = useI18n()
 const root = ref(null)
 const feeds = ref([])
 const loading = ref(true)
+const loadError = ref(false)
+const { scope, fetchFeed } = useHomeFeed()
+let latestRequest = 0
 const activeFilter = ref('all')
 // 分享落地门脸:别人家有封面才挂横幅,自己家不挂(判定见 utils/shareLanding)
 const showDoorSign = computed(() => showCoverBanner(appStore.family, userStore.userInfo?.familyId))
@@ -91,42 +100,40 @@ const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedCover = (f) => f.coverImage || (Array.isArray(f.urls) && f.urls.length ? f.urls[0] : '')
 const feedSummary = (f) => feedSummaryOf(t, f, 60)
 const formatTime = (d) => formatRelativeTime(t, d)
-const FEED_ROUTES = {
-  diary: '/diary',
-  photo: '/album',
-  video: '/cinema',
-  wish: '/wish',
-  task: '/task',
-  recipe: '/kitchen',
-  book: '/library',
-}
 const goFeed = (f) => {
-  if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)
-  else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
+  const path = feedPath(f)
+  if (path) router.push(path)
 }
 
 const load = async () => {
+  const request = ++latestRequest
   loading.value = true
   try {
-    if (userStore.isLoggedIn) {
-      feeds.value = await homeApi.getFeed(20)
-    } else {
-      // 分享落地(/?hid=xxx):动态流按链接里的家庭取,否则游客看到的是演示家庭
-      const { hid, homeId } = parseShareQuery(window.location.search)
-      feeds.value = await publicApi.getFeed(20, homeId ?? undefined, hid || undefined)
-    }
+    const data = await fetchFeed()
+    if (request !== latestRequest) return
+    feeds.value = data || []
+    loadError.value = false
   } catch (e) {
-    feeds.value = []
+    if (request !== latestRequest) return
+    loadError.value = true
     throw e
   } finally {
-    loading.value = false
+    if (request === latestRequest) loading.value = false
   }
 }
 
 // 手机首页是真正的「首页 Tab」:下拉刷新重拉动态流,失败由指示器统一提示
 usePullRefresh({ target: root, onRefresh: load })
 
-onMounted(() => load().catch(() => {}))
+watch(
+  scope,
+  () => {
+    feeds.value = []
+    loadError.value = false
+    load().catch(() => {})
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -215,6 +222,21 @@ html.dark .filter-chip::after {
 
 .feed-list {
   padding: 12px 16px 80px;
+}
+.feed-retry {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+}
+.photo-story {
+  flex-direction: column;
+}
+.photo-story .feed-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
 }
 
 /* 筛选切换:整组先淡出再淡入,不做逐卡删除/插入,避免列表抖动 */

@@ -35,7 +35,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         String location = Paths.get(uploadDir).toAbsolutePath().toUri().toString();
         registry.addResourceHandler(urlPrefix + "/**")
                 .addResourceLocations(location)
-                .setCacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePrivate().immutable());
+                .setCacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePrivate().immutable())
+                .resourceChain(false)
+                .addResolver(new AlbumThumbnailResolver());
     }
 
     /**

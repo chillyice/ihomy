@@ -246,10 +246,11 @@ public class ItemService {
     // ---------- 物品 ----------
 
     /** 物品列表/搜索:自家按可见性过滤,并混入分享给我家的物品(判定在 ContentAccessService) */
-    public List<Map<String, Object>> itemList(ViewerScope viewer, String keyword, Long roomId, Long furnitureId, String type) {
+    public List<Map<String, Object>> itemList(ViewerScope viewer, String keyword, Long roomId, Long furnitureId, String type, Integer limit) {
         return itemMapper.selectItemByFamily(viewer.familyId(),
                 keyword == null || keyword.isBlank() ? null : keyword.trim(),
-                roomId, furnitureId, type, contentAccess.visibleFilter(viewer));
+                roomId, furnitureId, type, contentAccess.visibleFilter(viewer),
+                limit == null ? null : Math.clamp(limit, 1, 100));
     }
 
     public Item itemCreate(Long userId, Long familyId, ItemDTO dto) {

@@ -1,13 +1,22 @@
 <!-- 统一新增/编辑弹窗:只问日期(可空)、循环、提醒三件事,顶部实时显示推导出的类型。
      保存按 utils/scheduleType.classify 路由到既有接口(计划/提醒/纪念日),后端不做分类推断。 -->
 <template>
-  <el-dialog v-model="visible" append-to-body :title="isEdit ? $t('schedule.dialog.edit') : $t('schedule.dialog.create')" width="480px">
+  <el-dialog
+    v-model="visible"
+    append-to-body
+    :title="isEdit ? $t('schedule.dialog.edit') : $t('schedule.dialog.create')"
+    :show-close="!saving"
+    :close-on-click-modal="!saving"
+    :close-on-press-escape="!saving"
+    width="480px"
+  >
     <div class="type-line">
       <span class="type-text">{{ $t('schedule.dialog.typeBadge', { type: typeText }) }}</span>
       <el-tag size="small">{{ typeText }}</el-tag>
     </div>
 
-    <el-form :model="form" label-position="top">
+    <el-alert v-if="pendingShare" :title="$t('audience.saveFailed')" type="warning" :closable="false" show-icon />
+    <el-form v-else :model="form" label-position="top" :disabled="saving">
       <el-form-item :label="$t('schedule.dialog.title')">
         <el-input v-model="form.title" maxlength="100" :placeholder="$t('schedule.dialog.titlePlaceholder')" />
       </el-form-item>
@@ -106,8 +115,10 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="visible = false">{{ $t('common.cancel') }}</el-button>
-      <el-button type="primary" :loading="saving" @click="onSave">{{ $t('common.save') }}</el-button>
+      <el-button :disabled="saving" @click="visible = false">{{ $t(pendingShare ? 'common.close' : 'common.cancel') }}</el-button>
+      <el-button type="primary" :loading="saving" @click="pendingShare ? submit() : onSave()">{{
+        $t(pendingShare ? 'common.retry' : 'common.save')
+      }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -115,7 +126,8 @@
 <script setup>
 // 表单始终只保留「标题/内容/日期/循环/提醒」这些原始开关,分类由 computed 推导;
 // 编辑态锁住循环与提醒方式的可选范围,避免跨表搬迁导致数据丢失
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
+import { useScheduleSave } from '@/composables/useScheduleSave'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { anniversaryApi, planApi, reminderApi } from '@/api'
@@ -140,7 +152,14 @@ const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
 })
-const saving = ref(false)
+const { saving, pendingShare, submit, reset } = useScheduleSave(
+  saveAudience,
+  (saved) => emit('saved', saved),
+  () => {
+    ElMessage.success(t('schedule.dialog.saved'))
+    visible.value = false
+  },
+)
 
 const pad2 = (n) => String(n).padStart(2, '0')
 
@@ -241,6 +260,7 @@ watch(
   () => props.modelValue,
   async (open) => {
     if (!open) return
+    reset()
     Object.assign(form, fill(props.item))
     // 编辑时载入该条已选的圈;新建只载圈列表(类型可能随表单变化,保存时再定)
     const editingType = !props.item ? 'reminder' : props.item.kind === 'ANNIVERSARY' ? 'anniversary' : 'reminder'
@@ -350,6 +370,7 @@ const anchorSolar = () => {
 }
 
 const onSave = async () => {
+  if (saving.value) return
   const k = kind.value
   if (!form.title?.trim()) return ElMessage.warning(t('schedule.dialog.fillTitle'))
   // 有周期就必须有起点(每年循环用月/日,不受此限)
@@ -375,8 +396,7 @@ const onSave = async () => {
     return ElMessage.warning(t('schedule.dialog.invalidDate'))
   }
 
-  saving.value = true
-  try {
+  return submit(async () => {
     let savedId = form.id
     if (k === 'PLAN' || k === 'ITEM') {
       const payload = {
@@ -387,7 +407,7 @@ const onSave = async () => {
         remindTime: null,
       }
       if (form.id) await planApi.update(form.id, payload)
-      else await planApi.create(payload)
+      else savedId = (await planApi.create(payload))?.id
     } else if (k === 'REMINDER' || k === 'TASK') {
       const yearly = form.repeat === REPEAT.YEARLY
       const lunar = yearly && form.calendar === 'lunar'
@@ -424,20 +444,15 @@ const onSave = async () => {
       if (form.id) await anniversaryApi.update(form.id, payload)
       else savedId = (await anniversaryApi.create(payload))?.id
     }
-    await saveAudience(k, savedId)
-    ElMessage.success(t('schedule.dialog.saved'))
-    visible.value = false
-    emit('saved', { kind: k, id: form.id })
-  } finally {
-    saving.value = false
-  }
+    return { kind: k, id: savedId }
+  })
 }
 
 /**
  * 保存分享范围:新建没勾圈就不发请求;编辑时按面板现状整体覆盖(勾选全取消=收回)。
  * 面板被判定为「不能分享」时不动已有分享,避免一次保存顺手清空。
  */
-const saveAudience = async (k, savedId) => {
+async function saveAudience(k, savedId) {
   if (!savedId || !audience.state.loaded || !audience.state.canShare) return
   if (!['ANNIVERSARY', 'REMINDER', 'TASK'].includes(k)) return
   if (!audience.state.selected.length && !isEdit.value) return

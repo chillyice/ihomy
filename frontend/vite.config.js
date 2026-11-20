@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
   // App 构建(--mode app,Copacitor 壳)不挂 PWA:壳内不需要 Service Worker,
   // 且旧 SW 预缓存的 index.html 会顶掉升级后新 APK 的壳(踩坑速查 §7.2 同类问题)
   const isApp = mode === 'app'
+  // 预缓存首页的静态依赖闭包。其它路由的哈希资源在访问时缓存。
+  const shellFiles = new Set()
   return {
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
@@ -37,6 +39,31 @@ export default defineConfig(({ mode }) => {
       ...(isApp
         ? []
         : [
+            {
+              name: 'ihomy-home-precache',
+              apply: 'build',
+              enforce: 'post',
+              generateBundle(_, bundle) {
+                shellFiles.clear()
+                const collect = (file) => {
+                  if (shellFiles.has(file)) return
+                  const chunk = bundle[file]
+                  if (chunk?.type !== 'chunk') return
+                  shellFiles.add(file)
+                  for (const style of chunk.viteMetadata?.importedCss || []) shellFiles.add(style)
+                  for (const dep of chunk.imports) collect(dep)
+                }
+                for (const chunk of Object.values(bundle)) {
+                  if (chunk.type !== 'chunk') continue
+                  const source = chunk.facadeModuleId?.replaceAll('\\', '/') || ''
+                  const homeView =
+                    /\/(HomeRoute|Home|ElderHome|WarmLayout|MobileLayout|AppSidebar|SunLightLayer|ChatFloat|CallOverlay|MorningOverlay|ScreensaverOverlay|ChangePasswordDialog)\.vue$/.test(
+                      source,
+                    )
+                  if (chunk.isEntry || homeView || source.endsWith('/i18n/en.js')) collect(chunk.fileName)
+                }
+              },
+            },
             VitePWA({
               registerType: 'autoUpdate',
               includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
@@ -55,15 +82,38 @@ export default defineConfig(({ mode }) => {
                 ],
               },
               workbox: {
-                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-                // 麻将/扑克牌面图集 2.3MB:只在牌类游戏页按需加载,不进预缓存
-                // (预缓存会让每个访客首装多下 2.3MB,workbox 默认也会因 >2MiB 直接构建失败)
-                globIgnores: ['ruffle/**', 'emulatorjs/**', 'mini-games/**'],
+                globPatterns: [
+                  'index.html',
+                  'registerSW.js',
+                  'pwa-*.png',
+                  'assets/*.{js,css}',
+                  'assets/qweather-icons-*.woff2',
+                  'demo/*.svg',
+                ],
+                manifestTransforms: [
+                  (entries) => ({
+                    manifest: entries.filter(
+                      ({ url }) =>
+                        !url.startsWith('assets/') || shellFiles.has(url) || /^assets\/qweather-icons-.*\.(css|woff2)$/.test(url),
+                    ),
+                    warnings: [],
+                  }),
+                ],
                 // iframe 里的静态小游戏是独立的页面导航,不能被 SPA 的离线兜底顶成 /index.html(会显示成首页)。
                 // /api/ 与 /files/ 同理:安装包下载走 /api/public/product/download → 302 到 /files/<page>/<包名>,
                 // 一旦被兜底成 index.html,前端路由找不到这个路径就跳回首页——用户看到的是「点下载却打开了 ihomy」。
                 navigateFallbackDenylist: [/^\/mini-games\//, /^\/api\//, /^\/files\//],
                 runtimeCaching: [
+                  {
+                    urlPattern: ({ url, sameOrigin }) =>
+                      sameOrigin && /^\/assets\/[^/]+\.(js|css|woff2?|ttf|svg|png|jpe?g|webp|wasm)$/.test(url.pathname),
+                    handler: 'CacheFirst',
+                    options: {
+                      cacheName: 'ihomy-page-assets',
+                      expiration: { maxEntries: 320, maxAgeSeconds: 60 * 60 * 24 * 30 },
+                      cacheableResponse: { statuses: [200] },
+                    },
+                  },
                   {
                     // 缓存 GET 接口(离线浏览/弱网);排除敏感接口:保险箱、认证、运维、个人资料
                     // 这些响应含明文密码/凭证/权限,不能落 Cache Storage(登出也无法保证清除)
@@ -107,7 +157,8 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             includeDependenciesRecursively: false,
             groups: [
-              { name: 'element-plus', test: /node_modules[\\/]element-plus[\\/]/ },
+              // 图片查看器也用 throttle，显式跟组件库打包，避免入口反向依赖首个使用 el-image 的工具页。
+              { name: 'element-plus', test: /node_modules[\\/](?:element-plus[\\/]|lodash-es[\\/]throttle\.js$)/ },
               { name: 'gsap', test: /node_modules[\\/]gsap[\\/]/ },
               { name: 'vue-i18n', test: /node_modules[\\/]vue-i18n[\\/]/ },
               { name: 'epubjs', test: /node_modules[\\/]epubjs[\\/]/ },
