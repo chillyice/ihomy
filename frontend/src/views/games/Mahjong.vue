@@ -282,6 +282,9 @@
                   aria-live="polite"
                 >
                   <template v-if="claimPrompt">
+                    <span v-if="claimSecondsLeft > 0" class="claim-countdown" :class="{ urgent: claimSecondsLeft <= 3 }" aria-hidden="true"
+                      >{{ claimSecondsLeft }}s</span
+                    >
                     <el-button
                       v-for="(pair, i) in activeChiOptions"
                       :key="i"
@@ -551,6 +554,30 @@ const lastDiscard = ref(null) // { kind, from }
 const drawnTileId = ref(null)
 const canSelfWin = ref(false)
 const localClaim = ref(null) // 房主/单机本座收到的询问:'win' | 'pong' | 'chi' | 'gang' | null
+// 询问倒计时(展示口径):本机(房主/单机)在 ask() 里起步,访客在收到 mj:claim 时按 ttl 起步;真实超时在房主端
+const claimSecondsLeft = ref(0)
+let claimTicker = null
+
+function startClaimCountdown(ms) {
+  if (!(ms > 0)) return
+  claimSecondsLeft.value = Math.max(1, Math.round(ms / 1000))
+  if (claimTicker) clearInterval(claimTicker)
+  claimTicker = setInterval(() => {
+    claimSecondsLeft.value = Math.max(0, claimSecondsLeft.value - 1)
+    if (claimSecondsLeft.value === 0 && claimTicker) {
+      clearInterval(claimTicker)
+      claimTicker = null
+    }
+  }, 1000)
+}
+
+function stopClaimCountdown() {
+  if (claimTicker) {
+    clearInterval(claimTicker)
+    claimTicker = null
+  }
+  claimSecondsLeft.value = 0
+}
 const guestClaim = ref(null) // 访客收到的询问
 const guestChiOptions = ref([]) // 访客收到的吃组合候选
 const guestGangKinds = ref([]) // 访客回合内可杠(来自 mj:hand)
@@ -903,6 +930,7 @@ async function startGame() {
   guestClaim.value = null
   localClaim.value = null
   claimChiOptions.value = []
+  stopClaimCountdown()
   selfGangKinds.value = []
   rulesPickerOpen.value = false
   rewardMsg.value = ''
@@ -991,9 +1019,12 @@ async function runGameLoop(mySession) {
     }
     let kind = action.kind != null ? action.kind : mahjongKind(action.tileId)
     if (kind == null || !hands.value[seat].some((tile) => mahjongKind(tile) === kind)) {
-      // 非法/过期操作:兜底让 AI 选一张,避免死循环
+      // 非法/过期操作:兜底让 AI 选一张,避免死循环;手牌异常选不出(理论不可达)就跳过出牌轮到下家,别把整局挂死
       kind = mahjongAiChooseDiscard(mahjongCounts(hands.value[seat]))
-      if (kind < 0) return
+      if (kind < 0) {
+        current = (seat + 1) % 4
+        continue
+      }
     }
     discardTile(seat, kind)
     publishAll()
@@ -1140,7 +1171,10 @@ function drawRinshan(seat) {
   handCounts.value = hands.value.map((h) => h.length)
 }
 
-/** 碰/杠/吃/胡询问:胡 > 杠 > 碰 > 吃;本机玩家用按钮,远端玩家发定向信令;吃碰杠不限时,没人应即视为都过 */
+/** 碰/杠/吃询问时限:到点视为过,别让没应答的询问把整局挂住(胡另有 8s) */
+const CLAIM_TIMEOUT = 10000
+
+/** 碰/杠/吃/胡询问:胡 > 杠 > 碰 > 吃;本机玩家用按钮,远端玩家发定向信令;都有倒计时,到点视为过 */
 function resolveClaims(fromSeat, kind, mySession) {
   return new Promise((resolve) => {
     const order = [1, 2, 3].map((i) => (fromSeat + i) % 4)
@@ -1167,6 +1201,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         const pending = new Set(seats)
         const cleanup = () => {
           if (timer) clearTimeout(timer)
+          stopClaimCountdown()
           for (const seat of seats) {
             claimWaiters.delete(seat)
             pendingPrompts.delete(seat)
@@ -1190,7 +1225,7 @@ function resolveClaims(fromSeat, kind, mySession) {
           if (!pending.delete(seat)) return
           if (!pending.size) finish(null)
         }
-        // timeoutMs>0 才计时(胡 8s 保留;吃碰杠按需求不限时,挂机靠托管/让位/离席转 AI 兜底)
+        // timeoutMs>0 才计时(胡 8s;碰/杠/吃 CLAIM_TIMEOUT):到点视为都过,询问绝不无限挂起
         if (timeoutMs > 0) {
           timer = setTimeout(() => finish(null), timeoutMs)
         }
@@ -1221,10 +1256,12 @@ function resolveClaims(fromSeat, kind, mySession) {
                 declined(seat)
               }
             })
-            pendingPrompts.set(seat, { kind: claimKind, options })
-            play.send('mj:claim', { to: st.userId, seat, kind: claimKind, options })
+            // deadline 供断线补发时折算剩余时限;ttl 随信令下发,访客本地滴答展示
+            pendingPrompts.set(seat, { kind: claimKind, options, deadline: timeoutMs > 0 ? Date.now() + timeoutMs : 0 })
+            play.send('mj:claim', { to: st.userId, seat, kind: claimKind, options, ttl: timeoutMs })
           }
         }
+        if (timeoutMs > 0 && seats.includes(mySeat.value)) startClaimCountdown(timeoutMs)
         if (!pending.size) finish(null)
       })
     }
@@ -1242,7 +1279,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         return resolve({ win: aiWin })
       }
       if (humanGang.length) {
-        const hit = await ask(humanGang, 'gang', 0)
+        const hit = await ask(humanGang, 'gang', CLAIM_TIMEOUT)
         if (mySession !== session) return resolve(null)
         if (hit && hit.seat != null) return resolve({ gang: hit.seat })
       }
@@ -1252,7 +1289,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         return resolve({ gang: aiGang })
       }
       if (humanPong.length) {
-        const hit = await ask(humanPong, 'pong', 0)
+        const hit = await ask(humanPong, 'pong', CLAIM_TIMEOUT)
         if (mySession !== session) return resolve(null)
         if (hit && hit.seat != null) return resolve({ pong: hit.seat })
       }
@@ -1267,7 +1304,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         return resolve({ chi: { seat: chiSeat, pair: aiChiPair } })
       }
       if (chiOptions.length && !isAiSeat(chiSeat)) {
-        const hit = await ask([chiSeat], 'chi', 0, chiOptions)
+        const hit = await ask([chiSeat], 'chi', CLAIM_TIMEOUT, chiOptions)
         if (mySession !== session) return resolve(null)
         if (hit && hit.seat != null && hit.extra) return resolve({ chi: { seat: chiSeat, pair: hit.extra } })
       }
@@ -1336,6 +1373,7 @@ function answerClaim(take, extra = null) {
   if (isGuest.value) {
     guestClaim.value = null
     guestChiOptions.value = []
+    stopClaimCountdown()
     sendToHost({ type: take ? kind : 'pass', chi: extra })
     return
   }
@@ -1389,13 +1427,14 @@ function publishAll({ force = false } = {}) {
   for (const o of outs) play.send('mj:hand', o)
 }
 
-/** 重连补发:吃碰杠询问只在发起那一刻推过一次,且吃/碰/杠不限时,访客重连拿不到就双方一起卡住 */
+/** 重连补发:吃碰杠询问只在发起那一刻推过一次,访客重连拿不到就双方一起卡住;时限按剩余时间重算 */
 function replayClaims() {
   if (!play.isHost) return
   for (const [seat, prompt] of pendingPrompts) {
     const st = seatList.value.find((s) => s.seat === seat)
     if (!st || st.ai || st.auto || !st.userId) continue
-    play.send('mj:claim', { to: st.userId, seat, kind: prompt.kind, options: prompt.options })
+    const remain = prompt.deadline > 0 ? Math.max(1000, prompt.deadline - Date.now()) : 0
+    play.send('mj:claim', { to: st.userId, seat, kind: prompt.kind, options: prompt.options, ttl: remain })
   }
 }
 
@@ -1444,6 +1483,9 @@ function onRoomSignal(data) {
     if (Number(data.seat) !== mySeat.value) return
     guestClaim.value = data.kind || null
     guestChiOptions.value = Array.isArray(data.options) ? data.options : []
+    // 访客按房主下发的 ttl 本地滴答展示;真实到点由房主判定,到时房主会补发 kind:null 清场
+    if (data.kind) startClaimCountdown(Number(data.ttl) || 0)
+    else stopClaimCountdown()
     return
   }
   if (data.event === 'mj:act' && play.isHost) {
@@ -1674,6 +1716,7 @@ function abortWaiters() {
   pendingPrompts.clear()
   localClaim.value = null
   guestClaim.value = null
+  stopClaimCountdown()
   busyAi.value = false
 }
 
@@ -2461,6 +2504,21 @@ html.dark .rules-chip {
 }
 .my-actions :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+/* 询问倒计时:到点自动按「过」处理;≤3s 变警示色催一下。纯展示,真实判定在房主端 */
+.claim-countdown {
+  min-width: 40px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(10, 30, 24, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.claim-countdown.urgent {
+  background: rgba(154, 52, 40, 0.62);
 }
 /* 吃按钮里内嵌的两张候选小牌 */
 .my-actions .tile.mini {

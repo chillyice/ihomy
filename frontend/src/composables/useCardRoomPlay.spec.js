@@ -130,4 +130,79 @@ describe('useCardRoomPlay', () => {
     expect(room.local({ type: 'pass' })).toBe(false)
     stop()
   })
+
+  it('回合倒计时:等待起步即显示并广播 turn-ttl,出手后清零', async () => {
+    vi.useFakeTimers()
+    try {
+      const play = makePlay({
+        active: true,
+        myId: 1,
+        hostId: 1,
+        members: [
+          { userId: 1, role: 'HOST', name: '房主' },
+          { userId: 3, role: 'PLAYER', name: '小B' },
+        ],
+      })
+      const { room, stop } = mountRoom(play)
+      const p = room.waitAct(1, 35000)
+      expect(room.actSeat).toBe(1)
+      expect(room.actSecondsLeft).toBe(35)
+      expect(play.send).toHaveBeenCalledWith('dz:turn-ttl', { seat: 1, ttl: 35000 })
+      vi.advanceTimersByTime(1000)
+      expect(room.actSecondsLeft).toBe(34)
+      // 该席位真出手(onSignal 走 handleAct):等待解除,倒计时清零
+      room.onSignal({ event: 'dz:act', from: 3, seat: 1, action: { type: 'pass' } })
+      expect(await p).toEqual({ type: 'pass' })
+      expect(room.actSecondsLeft).toBe(0)
+      expect(room.actSeat).toBe(-1)
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('回合超时返回 null 并清零倒计时;单机局不广播 turn-ttl', async () => {
+    vi.useFakeTimers()
+    try {
+      const play = makePlay({ active: false })
+      const { room, stop } = mountRoom(play)
+      const p = room.waitAct(0, 2000)
+      expect(room.actSecondsLeft).toBe(2)
+      expect(play.send).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(2100)
+      expect(await p).toBeNull()
+      expect(room.actSecondsLeft).toBe(0)
+      expect(room.actSeat).toBe(-1)
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('访客收到 turn-ttl 本地滴答展示,ttl=0 即清零', () => {
+    vi.useFakeTimers()
+    try {
+      const play = makePlay({
+        active: true,
+        myId: 3,
+        hostId: 1,
+        members: [
+          { userId: 1, role: 'HOST', name: '房主' },
+          { userId: 3, role: 'PLAYER', name: '小B' },
+        ],
+      })
+      const { room, stop } = mountRoom(play)
+      room.onSignal({ event: 'dz:turn-ttl', from: 1, seat: 1, ttl: 35000 })
+      expect(room.actSeat).toBe(1)
+      expect(room.actSecondsLeft).toBe(35)
+      vi.advanceTimersByTime(1000)
+      expect(room.actSecondsLeft).toBe(34)
+      room.onSignal({ event: 'dz:turn-ttl', from: 1, seat: 1, ttl: 0 })
+      expect(room.actSecondsLeft).toBe(0)
+      expect(room.actSeat).toBe(-1)
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

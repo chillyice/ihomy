@@ -1380,6 +1380,7 @@ export default {
       pass: 'Pass',
       hint: 'Hint',
       yourTurn: 'Your turn to play',
+      turnCountdown: '· the computer plays in {n}s',
       thinking: '{name} is thinking…',
       win: 'You win!',
       lose: 'You lose this round',

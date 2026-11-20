@@ -6,7 +6,7 @@
 //   xx:hand    房主 → 某人  该席位的私牌与"轮到你了"标记
 //   xx:act     访客 → 房主  出牌意图 {seat, action};房主按自己手里的牌复验后才落盘
 //   sync       访客 → 房主  重连补发全量(含各自的 xx:hand)
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { isSpectatorRole } from '@/utils/gameRoom'
 
 /** 轮到真人时的最长等待:超时交给电脑代打,别让一个人挂机把整桌拖住 */
@@ -140,6 +140,36 @@ export function useCardRoomPlay(play, opts) {
 
   // ---------- 轮次等待 ----------
 
+  // 回合倒计时:正在等谁(actSeat)与剩余秒数,裁判端随 waitAct 滴答;访客端吃 turn-ttl 广播自己滴答。
+  // 纯展示口径(各端起步有网络时差),真实超时仍以裁判端 waitAct 的 setTimeout 为准。
+  const actSeat = ref(-1)
+  const actSecondsLeft = ref(0)
+  let actTicker = null
+
+  function stopActCountdown() {
+    if (actTicker) {
+      clearInterval(actTicker)
+      actTicker = null
+    }
+    actSeat.value = -1
+    actSecondsLeft.value = 0
+  }
+
+  function startActCountdown(seat, timeoutMs) {
+    actSeat.value = seat
+    actSecondsLeft.value = Math.max(1, Math.round(timeoutMs / 1000))
+    if (actTicker) clearInterval(actTicker)
+    actTicker = setInterval(() => {
+      actSecondsLeft.value = Math.max(0, actSecondsLeft.value - 1)
+      if (actSecondsLeft.value === 0 && actTicker) {
+        clearInterval(actTicker)
+        actTicker = null
+      }
+    }, 1000)
+  }
+
+  onScopeDispose(stopActCountdown)
+
   /**
    * 房主等某席位出牌:真人点击(waiters 被 resolveLocal/远端意图解开)或超时返回 null。
    * 超时/托管/席位空出来都由调用方按 null 交给电脑。
@@ -153,12 +183,17 @@ export function useCardRoomPlay(play, opts) {
           timer = null
         }
         if (waiters.get(seat) === done) waiters.delete(seat)
+        stopActCountdown()
         resolve(action)
       }
       if (timeoutMs > 0) {
+        startActCountdown(seat, timeoutMs)
+        // 全房广播剩余时限:各端本地滴答展示「还剩几秒交电脑」,不用等公共盘面轮询
+        if (play.active) play.send(`${prefix}:turn-ttl`, { seat, ttl: timeoutMs })
         timer = setTimeout(() => {
           if (waiters.get(seat) === done) {
             waiters.delete(seat)
+            stopActCountdown()
             resolve(null)
           }
         }, timeoutMs)
@@ -251,6 +286,14 @@ export function useCardRoomPlay(play, opts) {
       }
       return
     }
+    if (data.event === `${prefix}:turn-ttl`) {
+      // 访客侧回合倒计时:房主等某真人席位时广播,各端自己滴答(展示口径,真实超时在裁判端)
+      if (!isGuest.value || !fromHost) return
+      const ttl = Number(data.ttl) || 0
+      if (ttl > 0) startActCountdown(Number(data.seat) || -1, ttl)
+      else stopActCountdown()
+      return
+    }
     if (data.event === `${prefix}:act`) {
       if (!play.isHost) return
       handleAct(data)
@@ -272,6 +315,8 @@ export function useCardRoomPlay(play, opts) {
     watching,
     authority,
     isGuest,
+    actSeat,
+    actSecondsLeft,
     seatAt,
     isAiSeat,
     isMySeat,

@@ -1373,6 +1373,7 @@ export default {
       pass: '不要',
       hint: '提示',
       yourTurn: '轮到你出牌',
+      turnCountdown: '· {n} 秒后交给电脑',
       thinking: '{name} 思考中…',
       win: '你赢了！',
       lose: '这局输了',

@@ -277,13 +277,20 @@ const infoChips = computed(() => {
 const statusText = computed(() => {
   if (phase.value === 'idle') return ''
   if (room.watching) return t('games.room.spectatorHint')
+  // 房间局回合倒计时(裁判端起步、各端本地滴答;单机不限时不显示)
+  const seconds = Number(room.actSecondsLeft) || 0
+  const countdown = seconds > 0 ? ` ${t('games.fight.turnCountdown', { n: seconds })}` : ''
   if (phase.value === 'bid') {
-    return bidTurn.value === mySeat.value ? t('games.doudizhu.bidHint') : t('games.doudizhu.bidWait', { name: seatName(bidTurn.value) })
+    const base =
+      bidTurn.value === mySeat.value ? t('games.doudizhu.bidHint') : t('games.doudizhu.bidWait', { name: seatName(bidTurn.value) })
+    return base + countdown
   }
   if (phase.value === 'ended') return ''
   if (room.autoOn) return t('games.room.botState')
-  if (myTurn.value) return lastCombo.value ? t('games.fight.yourTurn') : t('games.doudizhu.yourLead')
-  return t('games.fight.thinking', { name: seatName(turn.value) })
+  if (myTurn.value) {
+    return (lastCombo.value ? t('games.fight.yourTurn') : t('games.doudizhu.yourLead')) + countdown
+  }
+  return t('games.fight.thinking', { name: seatName(turn.value) }) + countdown
 })
 
 const myNote = computed(() => {
