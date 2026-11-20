@@ -230,36 +230,24 @@ watch(expanded, () => {
 })
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
-// 游戏页头部的静音键(utils/games/gameSound.js 那份全局状态)对 BGM 是「停」而不是「压低音量」:
-// 在游戏页按下就暂停,进度不再往前走;退出游戏页时也不会自己响回来 —— 早先绑 :muted 时声音听不见
-// 但照常播,一离开 /games 路由静音就被解除,用户看到的就是「静音了还停不下来」。
-// 只记下「这次是静音键停的」:在游戏里再按一次取消静音才接着放;自己按过播放键后就不再接管。
-const inGames = computed(() => route.path.startsWith('/games'))
-let pausedByMute = false
-watch(
-  [gameMuted, inGames],
-  ([muted, games]) => {
-    const el = audioEl.value
-    if (!el) return
-    if (muted && games) {
-      if (el.paused) return
-      pausedByMute = true
-      el.pause()
-      return
-    }
-    // muted 关掉之后才续播;离开游戏页(静音键还开着)保持停,别自己响
-    if (muted || !pausedByMute) return
-    pausedByMute = false
-    el.play()
-      .then(() => {
-        playing.value = true
-      })
-      .catch(() => {
-        playing.value = false
-      })
-  },
-  { immediate: true },
-)
+// 背景音乐只在「游戏里」放:进游戏从头播,离开游戏完全停止(暂停 + 进度归零,不留给回来接着放的余地);
+// 游戏列表和其它站内页都不接管播放状态。游戏页头部的静音键(utils/games/gameSound.js 那份全局状态)
+// 只负责「播 / 不播」,不背别的含义。
+const inGame = computed(() => route.path.startsWith('/games/'))
+// 本次进游戏还没起播成功(歌单、曲目或签名地址晚到):地址就绪后补一次
+let gameBgmArmed = false
+const startGameBgm = () => {
+  const el = audioEl.value
+  if (!el || !currentTrack.value.url) return
+  el.play()
+    .then(() => {
+      playing.value = true
+      gameBgmArmed = false
+    })
+    .catch(() => {
+      playing.value = false
+    })
+}
 const playedPct = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0))
 const bufferedPct = computed(() => (duration.value ? (buffered.value / duration.value) * 100 : 0))
 
@@ -287,6 +275,50 @@ watch(
   { immediate: true },
 )
 
+// 进出游戏:进游戏从头放(不留上次进度),离开游戏彻底停(暂停 + 归零),不留给「回来接着放」
+watch(
+  inGame,
+  (playingGame) => {
+    const el = audioEl.value
+    if (playingGame) {
+      if (el) el.currentTime = 0
+      gameBgmArmed = !gameMuted.value
+      if (gameBgmArmed) startGameBgm()
+      return
+    }
+    if (el) {
+      el.pause()
+      el.currentTime = 0
+    }
+    gameBgmArmed = false
+  },
+  { immediate: true },
+)
+
+// 静音键只管播/不播:静音就停,取消静音从当前位置接着放(游戏内才有这个键)
+watch(gameMuted, (muted) => {
+  if (!inGame.value) return
+  if (muted) {
+    audioEl.value?.pause()
+    return
+  }
+  gameBgmArmed = true
+  startGameBgm()
+})
+
+// 直接刷新落在游戏页:歌单、曲目、签名地址、<audio> 元素都比路由晚到,就绪后补一次起播
+watch([playSrc, () => playlist.value.length], async () => {
+  if (!inGame.value || !gameBgmArmed) return
+  await nextTick()
+  startGameBgm()
+})
+
+// 刷新落在游戏页时浏览器会拦掉自动播放:等页面里的第一次点按(真手势)再补一次
+const onFirstGesture = () => {
+  if (!inGame.value || !gameBgmArmed || gameMuted.value) return
+  startGameBgm()
+}
+
 const loadBackgroundPlaylist = async () => {
   if (!userStore.isLoggedIn) {
     playlist.value = []
@@ -308,8 +340,8 @@ const loadBackgroundPlaylist = async () => {
 
 const togglePlay = () => {
   if (!audioEl.value || !currentTrack.value.url) return
-  // 用户自己按了播放/暂停:之后静音键的「取消静音」不再替他续播
-  pausedByMute = false
+  // 用户自己按了播放/暂停:不再需要「地址就绪后补起播」这条兜底
+  gameBgmArmed = false
   if (playing.value) {
     audioEl.value.pause()
     playing.value = false
@@ -434,6 +466,9 @@ onMounted(() => {
   window.addEventListener('orientationchange', onViewportChange)
   window.addEventListener('visibilitychange', onVisibilityChange)
   window.visualViewport?.addEventListener('resize', onViewportChange)
+  // 捕获阶段先挂:手势解锁不受游戏页自己的点击处理影响
+  document.addEventListener('pointerdown', onFirstGesture, true)
+  window.addEventListener('keydown', onFirstGesture, true)
 })
 onBeforeUnmount(() => {
   clearTimeout(expandClampTimer)
@@ -443,6 +478,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('orientationchange', onViewportChange)
   window.removeEventListener('visibilitychange', onVisibilityChange)
   window.visualViewport?.removeEventListener('resize', onViewportChange)
+  document.removeEventListener('pointerdown', onFirstGesture, true)
+  window.removeEventListener('keydown', onFirstGesture, true)
   clearMediaSession('float')
 })
 </script>
