@@ -1,8 +1,6 @@
 <template>
   <div class="page room-page">
     <Breadcrumb :items="[{ label: $t('games.title'), to: '/games' }, { label: roomTitle }]" />
-    <!-- 房间临时聊天:等开局时也能聊,进对局后同一个房间共用一份消息 -->
-    <GameRoomChat v-if="room && room.status !== ROOM_STATUS.FINISHED" :room="room" />
 
     <div v-loading="loading" class="room-wrap">
       <div v-if="!room" class="room-empty card">
@@ -252,12 +250,12 @@ import { Monitor, Phone, Plus, Promotion, Switch, UserFilled, VideoCamera } from
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import RoomInvitePicker from '@/components/games/RoomInvitePicker.vue'
-import GameRoomChat from '@/components/games/GameRoomChat.vue'
 import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
 import { useRoomChatStore } from '@/stores/roomChat'
+import { useRoomChatHost } from '@/composables/useRoomChatHost'
 import { useUserStore } from '@/stores/user'
 import {
   ROOM_GAMES,
@@ -295,6 +293,9 @@ const board = ref(null)
 let entered = false
 let unsubscribe = null
 let pollTimer = null
+
+// 房间临时聊天复用全局聊天浮窗:大厅只登记房间,浮窗据此多出「房间」页(大厅页与对局页同一条会话)
+useRoomChatHost(room)
 
 const myId = computed(() => userStore.userInfo?.id)
 const isHost = computed(() => room.value?.hostId === myId.value)

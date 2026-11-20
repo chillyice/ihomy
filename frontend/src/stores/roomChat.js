@@ -20,10 +20,20 @@ let refs = 0
 const bubbleTimers = new Map()
 const syncTimers = new Set()
 
+/** 房间占用的凭据:token -> roomId(大厅与本局页可能短暂交接同一间房,按凭据而不是「谁后写谁清」) */
+let ownerSeq = 0
+const owners = new Map()
+
 const bubbleKey = (roomId, userId) => `${roomId}:${userId}`
+const roomMetaOf = (room) => ({
+  id: Number(room?.id) || 0,
+  members: (room?.members || []).map((m) => ({ userId: m.userId, name: m.name || '', avatar: m.avatar || '' })),
+})
 
 export const useRoomChatStore = defineStore('roomChat', {
   state: () => ({
+    /** 当前所在的房间:{ id, members:[{userId,name,avatar}] } —— 全局聊天浮窗(ChatFloat)按它渲染「房间」页 */
+    roomMeta: null,
     /** roomId -> msg[] */
     buckets: {},
     /** roomId -> 未读条数 */
@@ -41,6 +51,48 @@ export const useRoomChatStore = defineStore('roomChat', {
   },
 
   actions: {
+    /**
+     * 页面声明占用当前房间(返回凭据):聊天浮窗从这里取「房间」页的会话与成员名。
+     * 换房间自动重挂(旧房 detach、新房 attach);同一房间被多个页面先后占用时不重复挂载。
+     */
+    claimRoom(room) {
+      const meta = roomMetaOf(room)
+      if (!meta.id) return null
+      const prev = this.roomMeta?.id || 0
+      if (prev && prev !== meta.id) this.dropRoom(prev)
+      this.roomMeta = meta
+      if (prev !== meta.id) this.attach(meta.id)
+      const token = ++ownerSeq
+      owners.set(token, meta.id)
+      return token
+    },
+
+    /** 同一页面收到房间更新(成员增减):只刷新名单,不重复占用 */
+    refreshRoom(room) {
+      const meta = roomMetaOf(room)
+      if (!meta.id || this.roomMeta?.id !== meta.id) return
+      this.roomMeta = meta
+    },
+
+    /** 页面卸载/房间结束:交还凭据;这间房没人占了才真正下线 */
+    releaseRoom(token) {
+      const id = owners.get(token)
+      if (id == null) return
+      owners.delete(token)
+      if (this.roomMeta?.id !== id) return
+      for (const roomId of owners.values()) if (roomId === id) return
+      this.dropRoom(id)
+    },
+
+    /** 强制下线一间房(房间结束等),连同它的全部占用凭据一起作废 */
+    dropRoom(roomId) {
+      const id = Number(roomId) || 0
+      for (const [token, roomIdOf] of owners) if (roomIdOf === id) owners.delete(token)
+      if (this.roomMeta?.id !== id) return
+      this.roomMeta = null
+      this.detach(id)
+    },
+
     /** 进房挂载:引用计数 + 订阅 game-signal + 补拉最近消息 */
     attach(roomId) {
       const id = Number(roomId)
@@ -176,10 +228,17 @@ export const useRoomChatStore = defineStore('roomChat', {
     },
 
     reset() {
+      unsubscribe?.()
+      unsubscribe = null
+      statusWatch?.()
+      statusWatch = null
+      refs = 0
+      owners.clear()
       bubbleTimers.forEach((timer) => clearTimeout(timer))
       bubbleTimers.clear()
       syncTimers.forEach((t) => clearTimeout(t))
       syncTimers.clear()
+      this.roomMeta = null
       this.buckets = {}
       this.unread = {}
       this.bubbles = {}

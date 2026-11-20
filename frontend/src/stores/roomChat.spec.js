@@ -77,6 +77,34 @@ describe('stores/roomChat', () => {
     expect(sendSignal).toHaveBeenCalledWith({ type: 'game-signal', data: { roomId: 5, event: 'chat', text: '你 好' } })
   })
 
+  it('大厅与本局页交接同一房间:共用凭据,最后一个释放才下线', () => {
+    const lobby = store.claimRoom({ id: 5, members: [{ userId: 7, name: '我' }] })
+    expect(store.roomMeta).toMatchObject({ id: 5, members: [{ userId: 7, name: '我', avatar: '' }] })
+    // 对局页接手同一间房:名单按最新一份刷新
+    const game = store.claimRoom({
+      id: 5,
+      members: [
+        { userId: 7, name: '我' },
+        { userId: 8, name: '你' },
+      ],
+    })
+    expect(store.roomMeta.members).toHaveLength(2)
+    store.releaseRoom(lobby)
+    expect(store.roomMeta.id).toBe(5)
+    store.releaseRoom(game)
+    expect(store.roomMeta).toBeNull()
+  })
+
+  it('换房重挂,旧房凭据一并作废', () => {
+    const first = store.claimRoom({ id: 5, members: [] })
+    const second = store.claimRoom({ id: 6, members: [] })
+    expect(store.roomMeta.id).toBe(6)
+    store.releaseRoom(first)
+    expect(store.roomMeta.id).toBe(6)
+    store.releaseRoom(second)
+    expect(store.roomMeta).toBeNull()
+  })
+
   it('只保留当前房间的桶', () => {
     store.push(4, msg(1, 9))
     store.push(5, msg(1, 9))

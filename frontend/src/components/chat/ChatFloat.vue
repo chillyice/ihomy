@@ -18,23 +18,75 @@
           <span class="sheet-grip-bar" aria-hidden="true"></span>
         </div>
         <div class="sheet-head">
-          <span class="sheet-title">{{ $t('chat.title') }}</span>
+          <!-- 在「一起玩」房间里多一个房间页:同一扇浮窗承载两路会话,不再单独起房间聊天浮球 -->
+          <div v-if="roomActive" class="float-tabs" role="tablist">
+            <button
+              type="button"
+              class="float-tab"
+              :class="{ active: tab === 'family' }"
+              role="tab"
+              :aria-selected="tab === 'family'"
+              @click="tab = 'family'"
+            >
+              {{ $t('chat.title') }}
+              <span v-if="chatStore.totalUnread" class="float-tab-badge">{{ badgeText(chatStore.totalUnread) }}</span>
+            </button>
+            <button
+              type="button"
+              class="float-tab"
+              :class="{ active: tab === 'room' }"
+              role="tab"
+              :aria-selected="tab === 'room'"
+              @click="tab = 'room'"
+            >
+              {{ $t('games.roomChat.title') }}
+              <span v-if="roomUnread" class="float-tab-badge">{{ badgeText(roomUnread) }}</span>
+            </button>
+          </div>
+          <span v-else class="sheet-title">{{ $t('chat.title') }}</span>
           <el-button text circle size="small" @click="collapse">
             <el-icon><Close /></el-icon>
           </el-button>
         </div>
-        <ChatPanel />
+        <ChatPanel v-if="tab === 'family'" />
+        <RoomChatPanel v-else />
       </div>
 
       <!-- 桌面端:可拖拽缩放面板 -->
       <div v-else class="chat-float-panel" :style="panelStyle">
         <div class="panel-head" @pointerdown="onPanelDown">
-          <span class="panel-title">{{ $t('chat.title') }}</span>
+          <!-- 在「一起玩」房间里多一个房间页:同一扇浮窗承载两路会话,不再单独起房间聊天浮球 -->
+          <div v-if="roomActive" class="float-tabs" role="tablist">
+            <button
+              type="button"
+              class="float-tab"
+              :class="{ active: tab === 'family' }"
+              role="tab"
+              :aria-selected="tab === 'family'"
+              @click="tab = 'family'"
+            >
+              {{ $t('chat.title') }}
+              <span v-if="chatStore.totalUnread" class="float-tab-badge">{{ badgeText(chatStore.totalUnread) }}</span>
+            </button>
+            <button
+              type="button"
+              class="float-tab"
+              :class="{ active: tab === 'room' }"
+              role="tab"
+              :aria-selected="tab === 'room'"
+              @click="tab = 'room'"
+            >
+              {{ $t('games.roomChat.title') }}
+              <span v-if="roomUnread" class="float-tab-badge">{{ badgeText(roomUnread) }}</span>
+            </button>
+          </div>
+          <span v-else class="panel-title">{{ $t('chat.title') }}</span>
           <el-button text circle size="small" @click="collapse">
             <el-icon><Close /></el-icon>
           </el-button>
         </div>
-        <ChatPanel />
+        <ChatPanel v-if="tab === 'family'" />
+        <RoomChatPanel v-else />
         <!-- 四角和四边的透明缩放区 -->
         <div
           v-for="dir in RESIZE_DIRS"
@@ -55,7 +107,7 @@
       @pointerup="onBallUp"
       @click="onBallClick"
     >
-      <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
+      <el-badge :value="ballBadge" :hidden="!ballBadge" :max="99" class="ball-badge">
         <el-icon :size="22"><ChatDotRound /></el-icon>
       </el-badge>
     </button>
@@ -86,12 +138,14 @@ import { ElMessage } from 'element-plus'
 import { ChatDotRound, Close } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { useRoomChatStore } from '@/stores/roomChat'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useDragResize } from '@/utils/useDragResize'
 import { haptic } from '@/utils/haptics'
 import { useFloatDelete, FLOAT_DELETE_ZONE } from '@/composables/useFloatDelete'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import RoomChatPanel from '@/components/chat/RoomChatPanel.vue'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const FLOAT_POS_KEY = 'ihomy:chat:float:v1'
@@ -106,10 +160,21 @@ const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const chatStore = useChatStore()
+const roomChatStore = useRoomChatStore()
 const floatsStore = useFloatsStore()
 const { isMobile } = useDevice()
 
 const expanded = ref(false)
+/** 当前页分页:family=家庭聊天室(原浮窗) / room=「一起玩」房间临时聊天;没有房间时不显示分页 */
+const tab = ref('family')
+const roomActive = computed(() => !!roomChatStore.roomMeta)
+const roomUnread = computed(() => (roomChatStore.roomMeta ? roomChatStore.unreadOf(roomChatStore.roomMeta.id) : 0))
+const ballBadge = computed(() => chatStore.totalUnread + roomUnread.value)
+const badgeText = (n) => (n > 99 ? '99+' : String(n))
+// 进房间自动切到房间页(浮窗此时多半是收起的,展开即落在房间聊天);房间结束回到家庭聊天室
+watch(roomActive, (v) => {
+  tab.value = v ? 'room' : 'family'
+})
 
 /** 登录且非独立页才挂载(独立页自带配色接管,不套外壳);聊天室页开关可隐藏 */
 const show = computed(() => userStore.isLoggedIn && !route.meta.standalone && floatsStore.chat)
@@ -333,9 +398,10 @@ watch(
   },
 )
 
-// 展开=在看(推进已读),收起=交还未读计数;/chat 页经由 chatPageActive 与这里叠加
-watch(expanded, (v) => {
-  chatStore.floatOpen = v
+// 展开且在家庭聊天室页=在看(推进已读),收起或停在房间页=交还未读计数(房间页只看房间未读);
+// /chat 页经由 chatPageActive 与这里叠加
+watch([expanded, tab], ([open, on]) => {
+  chatStore.floatOpen = open && on === 'family'
 })
 watch(show, (v) => {
   if (!v) {
@@ -444,7 +510,46 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
 }
-.chat-float-panel :deep(.chat-panel) {
+/* 浮窗分页:家庭聊天室 / 房间聊天共用同一扇窗,进房间时多出第二页 */
+.float-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.float-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.float-tab.active {
+  color: var(--color-accent);
+  background: rgba(var(--color-brand-rgb), 0.12);
+  font-weight: 600;
+}
+.float-tab-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.chat-float-panel :deep(.chat-panel),
+.chat-float-panel :deep(.room-chat) {
   flex: 1;
   min-height: 0;
   padding: 6px 12px 10px;
@@ -564,7 +669,8 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
 }
-.chat-float-sheet :deep(.chat-panel) {
+.chat-float-sheet :deep(.chat-panel),
+.chat-float-sheet :deep(.room-chat) {
   flex: 1;
   min-height: 0;
 }

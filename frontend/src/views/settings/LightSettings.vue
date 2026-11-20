@@ -133,11 +133,11 @@ const enterLightTest = () => {
 // ihomy:chat:panel:v1(ChatFloat 面板位置/尺寸)、ihomy:chat:sheet:v1(手机抽屉高度)、
 // ihomy:chat:rail:v1(聊天对象列收起)、ihomy:chat:rail:w:v1(聊天对象列宽度)、ihomy:chat:text:v1(聊天字号/自己气泡颜色)、
 // ihomy:games:lastRoomGame(一起玩默认游戏)、ihomy:room:autoReady(自动准备)、
-// ihomy:room:chat:v1(房间聊天浮球位置)、
 // ihomy:mahjong3d:view(立体麻将视角偏好)、
 // ihomy:call:mini:v1(通话小窗位置)、ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
 // 是功能偏好不是布局,这里不清,要重新打开去聊天室 / 音乐页。
-// ihomy:panel:* 与 ihomy:vinyl:pos 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
+// ihomy:panel:*、ihomy:vinyl:pos 与 ihomy:room:chat:v1(房间聊天已并入全局浮窗)是历史键(现已无写入方),
+// 保留清理是为了清掉老浏览器里的残留。
 // 注意:光尘首页仪表盘(ihomy:dashboard:layout:v3)与暖居首页(ihomy:guangchen:home:v)布局
 // 各有页面内自带的「恢复默认」按钮,不在这里覆盖——新增可拖拽面板时记得回来补键。
 const resetPanelLayout = () => {

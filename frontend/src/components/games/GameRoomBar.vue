@@ -1,5 +1,5 @@
 <template>
-  <!-- 两根:横幅 + 横幅之外的聊天浮球(room-bar 是 inline-size 容器,会把 fixed 后代困在横幅里) -->
+  <!-- 房间临时聊天不再单独起浮球:这里只登记房间,聊天由全局聊天浮窗(ChatFloat 的「房间」页)承载 -->
   <template v-if="room">
     <div ref="rootEl" class="room-bar" :class="{ coop: isCoopMode, ended }">
       <div class="room-bar-inner">
@@ -67,7 +67,6 @@
         </div>
       </el-dialog>
     </div>
-    <GameRoomChat v-if="room.status !== 'FINISHED'" :room="room" />
   </template>
 </template>
 
@@ -82,8 +81,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { roomApi } from '@/api'
 import { canTakePlayerSeat, isSpectatorRole, resultKey, roomHasAi } from '@/utils/gameRoom'
 import { useRoomChatStore } from '@/stores/roomChat'
+import { useRoomChatHost } from '@/composables/useRoomChatHost'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
-import GameRoomChat from '@/components/games/GameRoomChat.vue'
 import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 
 const props = defineProps({
@@ -102,6 +101,9 @@ const emit = defineEmits(['submit', 'leave', 'auto'])
 const { t } = useI18n()
 const router = useRouter()
 const roomChat = useRoomChatStore()
+
+// 房间临时聊天复用全局聊天浮窗:横幅只登记当前房间,浮窗据此多出「房间」页
+useRoomChatHost(() => props.room)
 
 const isCoopMode = computed(() => props.room?.mode === 'COOP')
 const isSpectator = computed(() => isSpectatorRole((props.room?.members || []).find((m) => m.userId === props.myId)?.role))
