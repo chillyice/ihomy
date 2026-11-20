@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 // extract from chromium source code by @liuwayong
 'use strict'
+/** 外壳静音键的引擎侧开关:见 utils/games/gameSound.js,由 setTrexMuted 写入 */
+let soundMuted = false
 /**
  * T-Rex runner.
  * @param {string} outerContainerId Outer containing element id.
@@ -898,7 +900,7 @@ Runner.prototype = {
    * @param {SoundBuffer} soundBuffer
    */
   playSound: function (soundBuffer) {
-    if (soundBuffer) {
+    if (soundBuffer && !soundMuted) {
       var sourceNode = this.audioContext.createBufferSource()
       sourceNode.buffer = soundBuffer
       sourceNode.connect(this.audioContext.destination)
@@ -2740,4 +2742,9 @@ export function createTrexRunner(rootEl) {
 /** 音效 data URI 由调用方注入(见 assets/games/trex/sounds.js) */
 export function setTrexSounds(soundSources) {
   Runner.soundSources = soundSources
+}
+
+/** 静音开关:true 时 playSound 直接不出声(已解码的样本留着,取消静音立刻能响) */
+export function setTrexMuted(muted) {
+  soundMuted = !!muted
 }

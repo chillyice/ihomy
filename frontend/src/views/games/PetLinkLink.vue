@@ -8,6 +8,7 @@
     :new-game-confirm="screen === 'game' && !won && !lost"
     :room-mode="play.active"
     :default-wide="play.active"
+    sound
     @back="goBack"
     @new-game="onRestartClick"
   >
@@ -15,8 +16,9 @@
       <p>{{ $t('games.petlink.coverHint') }}</p>
     </template>
 
-    <!-- 提示/重排/暂停/静音:竖屏与桌面用棋盘下面那条(.game-bottombar),
-         手机横屏搬进外壳左栏头部以下(两条同时只露一条,见样式里的横屏档);封面不显示 -->
+    <!-- 提示/重排/暂停:竖屏与桌面用棋盘下面那条(.game-bottombar),
+         手机横屏搬进外壳左栏头部以下(两条同时只露一条,见样式里的横屏档);封面不显示。
+         静音键在外壳头部(一份状态同时压住音效与悬浮 BGM,见 utils/games/gameSound.js) -->
     <template #actions>
       <div v-if="screen === 'game'" class="pl-rail-actions">
         <el-button size="small" :disabled="frozen" @click="doHint">💡 {{ $t('games.petlink.hint') }}</el-button>
@@ -25,9 +27,6 @@
         </el-button>
         <el-button size="small" :disabled="won || lost" @click="togglePause">
           {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
-        </el-button>
-        <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
-          {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
         </el-button>
       </div>
     </template>
@@ -136,9 +135,6 @@
           <el-button size="small" :disabled="won || lost" @click="togglePause">
             {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
           </el-button>
-          <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
-            {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
-          </el-button>
         </div>
 
         <!-- 调试版(地址加 ?debug=1):跳关、自动消除、误消/奇数张体检;不读写玩家存档 -->
@@ -213,6 +209,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
+import { gameMuted } from '@/utils/games/gameSound'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import {
   PETLINK_CELLS,
@@ -525,7 +522,8 @@ function onPadQueryChange(e) {
 // 拖到一两百毫秒;点击音本身只有 21ms,听感就是「点了慢半拍」。BufferSource 一点即响,
 // 连点还能叠着响而不互相打断。样本没备好(解码失败或还没解完)或上下文拉不起来时一律退回
 // <audio>:多一两百毫秒可以接受,没声音不行 —— 所以这里没有「拿到空缓冲就 return」的静音路径。
-const muted = ref(localStorage.getItem('ihomy:game:petlink:muted') === '1')
+// 静音键在外壳头部:与悬浮 BGM、小恐龙等共用 utils/games/gameSound.js 那一份状态。
+const muted = gameMuted
 const SOUND_URLS = { click: clickUrl, match: matchUrl, win: winUrl }
 let audioCtx = null
 const soundBuffers = new Map()
@@ -627,10 +625,6 @@ function playSound(key) {
   }
 }
 
-function toggleMute() {
-  muted.value = !muted.value
-  localStorage.setItem('ihomy:game:petlink:muted', muted.value ? '1' : '0')
-}
 const playClick = () => playSound('click')
 const playMatch = () => playSound('match')
 const playWin = () => playSound('win')
@@ -1327,7 +1321,7 @@ html.dark .pl-shell {
 .pl-shell :deep(.gs-stats:empty) {
   display: none;
 }
-/* 手机横屏:提示/重排/暂停/静音搬进左栏(头部以下),横幅那条整条让位 */
+/* 手机横屏:提示/重排/暂停搬进左栏(头部以下),横幅那条整条让位;静音键在外壳头部 */
 @media (orientation: landscape) and (max-height: 520px) {
   .pl-shell :deep(.gs-controls) {
     display: flex;
@@ -1352,7 +1346,7 @@ html.dark .pl-shell {
   .pl-shell .game-bottombar {
     display: none;
   }
-  /* 四个操作键纵向排列:左栏窄,横着只能挤成两行两列还被压成半截 */
+  /* 三个操作键纵向排列:左栏窄,横着只能挤成两行两列还被压成半截 */
   .pl-rail-actions {
     flex-direction: column;
     align-items: stretch;

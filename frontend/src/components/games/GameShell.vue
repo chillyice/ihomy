@@ -29,6 +29,42 @@
           <el-tag v-if="gamepadConnected" size="small" type="success" effect="plain" class="gamepad-tag">
             {{ $t('games.gamepadReady') }}
           </el-tag>
+          <!-- 声音总开关:只给有声音的游戏出键(页面传 sound)。一份状态压住音效、iframe 游戏与悬浮 BGM,
+               见 utils/games/gameSound.js;静音态用主色键表示「已开启」 -->
+          <el-button
+            v-if="sound"
+            class="gs-icon-btn gs-mute"
+            size="small"
+            round
+            :type="muted ? 'primary' : 'default'"
+            :title="muted ? $t('games.unmute') : $t('games.mute')"
+            :aria-label="muted ? $t('games.unmute') : $t('games.mute')"
+            :aria-pressed="muted"
+            @click="toggleGameMuted"
+          >
+            <el-icon>
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 9.5h3l4.5-3.5v12L7 14.5H4z" />
+                <template v-if="muted">
+                  <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" />
+                </template>
+                <template v-else>
+                  <path d="M15.5 8.6a5 5 0 0 1 0 6.8" />
+                  <path d="M18.4 6.2a8.6 8.6 0 0 1 0 11.6" />
+                </template>
+              </svg>
+            </el-icon>
+          </el-button>
           <!-- 新游戏:主按钮配色(每局的主操作,和全屏/宽屏/规则那排玻璃键区分开),固定在规则键左侧 -->
           <el-button v-if="newGame" class="gs-new-game" type="primary" size="small" round :disabled="newGameDisabled" @click="onNewGame">
             {{ $t('games.newGame') }}
@@ -134,6 +170,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { ArrowLeft, FullScreen, Monitor, Reading } from '@element-plus/icons-vue'
 import { useGameView } from '@/composables/useGameView'
+import { gameMuted, toggleGameMuted } from '@/utils/games/gameSound'
 
 const props = defineProps({
   /** 游戏名(页面按对局状态拼好后传入,如「2048 · 一起玩」) */
@@ -161,10 +198,14 @@ const props = defineProps({
   defaultWide: { type: Boolean, default: false },
   /** 「一起玩」房间局:不出浏览器全屏键(全屏会把 App 层的聊天浮窗一起隐藏),撑满走「宽屏」 */
   roomMode: { type: Boolean, default: false },
+  /** 这款游戏有声音:头部出静音键(音效、iframe 音频与悬浮 BGM 共用一份状态) */
+  sound: { type: Boolean, default: false },
 })
 const emit = defineEmits(['back', 'newGame'])
 
 const { t } = useI18n()
+// 静音状态是全局单例,页面自己也可以 import 同一份(如引擎侧需要读当前值)
+const muted = gameMuted
 
 const rulesOpen = ref(false)
 const rulesPage = ref(0)

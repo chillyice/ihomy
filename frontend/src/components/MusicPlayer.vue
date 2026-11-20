@@ -75,6 +75,7 @@
     <audio
       ref="audioEl"
       :src="playSrc"
+      :muted="silencedByGame"
       @ended="next"
       @play="onPlayState"
       @pause="onPlayState"
@@ -94,12 +95,15 @@ import { useUserStore } from '@/stores/user'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useFloatDelete } from '@/composables/useFloatDelete'
+import { useRoute } from 'vue-router'
+import { gameMuted } from '@/utils/games/gameSound'
 import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition } from '@/utils/mediaSession'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 const userStore = useUserStore()
 const floatsStore = useFloatsStore()
 const audioEl = ref(null)
@@ -227,6 +231,9 @@ watch(expanded, () => {
 })
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
+// 游戏页头部的静音键连 BGM 一起压住(utils/games/gameSound.js):只在游戏路由内生效,
+// 离开游戏页恢复原音量,播放进度不受影响
+const silencedByGame = computed(() => gameMuted.value && route.path.startsWith('/games'))
 const playedPct = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0))
 const bufferedPct = computed(() => (duration.value ? (buffered.value / duration.value) * 100 : 0))
 

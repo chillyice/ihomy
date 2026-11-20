@@ -12,6 +12,7 @@
     :new-game="true"
     :new-game-disabled="!frameLoaded"
     :new-game-confirm="true"
+    :sound="isPinball"
     @back="router.push('/games')"
     @new-game="startNewGame"
   >
@@ -88,6 +89,7 @@ import { Close, Expand, Fold, Refresh, TopRight } from '@element-plus/icons-vue'
 import { defineAsyncComponent } from 'vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { findEmbeddedGame, embeddedGameSrc } from '@/utils/games/embeddedGames'
+import { gameMuted } from '@/utils/games/gameSound'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useIframeFit } from '@/composables/useIframeFit'
 
@@ -103,17 +105,27 @@ const frameKey = ref(0)
 const frameLoaded = ref(false)
 const pageFull = ref(false)
 
+/** 外壳静音键 → iframe:静态页监听 ihomy:pinball:mute 挂起/恢复 Emscripten 的 SDL 音频上下文 */
+const sendMute = () => {
+  frameEl.value?.contentWindow?.postMessage({ type: 'ihomy:pinball:mute', muted: gameMuted.value }, window.location.origin)
+}
+watch(gameMuted, sendMute)
+
 // 游戏内容比可视区高时等比缩小(useIframeFit 拉高 iframe 再 transform 缩回,不出游戏内滚动条)
 const { refit: refitFrame } = useIframeFit({ stage: stageEl, frame: frameEl })
 
 const onFrameLoad = () => {
   frameLoaded.value = true
   refitFrame()
+  // iframe 页刚挂上时可能已经处在静音态:载入后补发一次(与「新游戏」同一条同源通道)
+  sendMute()
 }
 
 const game = computed(() => findEmbeddedGame(String(route.params.slug || '')))
 const title = computed(() => (game.value ? t(game.value.titleKey) : t('games.title')))
 const src = computed(() => (game.value ? embeddedGameSrc(game.value.slug) : ''))
+/** 三维弹球自带机台音效:外壳出静音键,并把它转给 iframe */
+const isPinball = computed(() => game.value?.slug === 'space-cadet')
 
 // 已本地化的开源游戏:直接渲染 Vue 组件(不再 iframe),名单随 P9/P10 迁移扩大
 const LOCAL_EMBEDDED = {

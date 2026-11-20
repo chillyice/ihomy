@@ -1019,6 +1019,9 @@ export default {
     title: 'Games',
     rulesLabel: 'Rules',
     rulesAck: 'Got it',
+    /* Mute key in the shell header (only games with sound): one switch for SFX, iframe audio and BGM */
+    mute: 'Mute',
+    unmute: 'Unmute',
     /* Text "new game" button in the shell header, left of the rules button */
     newGame: 'New game',
     /* Confirmation before restarting while a round is still in progress */

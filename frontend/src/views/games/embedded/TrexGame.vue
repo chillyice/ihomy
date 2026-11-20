@@ -3,7 +3,14 @@
      本组件只负责外壳、画布容器、按外壳游戏区等比放大,以及卸载时收干净定时器与监听。
      规范见 docs/UI设计提示词.md §43;精灵图与音效走 src/assets ESM 导入(不再读 public/)。 -->
 <template>
-  <GameShell ref="shellEl" class="tx-shell" :title="$t('games.embedded.trex.title')" body-align="center" @back="router.push('/games')">
+  <GameShell
+    ref="shellEl"
+    class="tx-shell"
+    :title="$t('games.embedded.trex.title')"
+    body-align="center"
+    sound
+    @back="router.push('/games')"
+  >
     <template #rules>
       <p>{{ $t('games.embedded.trex.tip') }}</p>
     </template>
@@ -19,11 +26,12 @@
 </template>
 
 <script setup>
-import { inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GameShell from '@/components/games/GameShell.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import { createTrexRunner, setTrexSounds } from '@/utils/games/trexRunner'
+import { createTrexRunner, setTrexSounds, setTrexMuted } from '@/utils/games/trexRunner'
+import { gameMuted } from '@/utils/games/gameSound'
 import { TREX_SOUNDS } from '@/assets/games/trex/sounds'
 import sprite1x from '@/assets/games/trex/100-offline-sprite.png'
 import sprite2x from '@/assets/games/trex/200-offline-sprite.png'
@@ -34,6 +42,10 @@ const shellEl = ref(null)
 
 const areaEl = ref(null)
 const stageEl = ref(null)
+
+// 外壳静音键(与小恐龙音效、悬浮 BGM 共用一份状态):引擎在 playSound 里读这个开关,
+// 解码好的样本留着,取消静音下一声就能响
+watch(gameMuted, (value) => setTrexMuted(value), { immediate: true })
 
 /** 原版画布逻辑尺寸(引擎内 DEFAULT_WIDTH / HEIGHT,这里只用于算放大倍数) */
 const BASE_W = 600

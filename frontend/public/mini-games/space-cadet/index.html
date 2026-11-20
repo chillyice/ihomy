@@ -740,13 +740,41 @@
   })
 
   // 「新游戏」键搬到了站内外壳(GameShell)的头部、规则键左侧;
-  // 外框只发 postMessage,这里合成一次 F2 交回引擎
+  // 外框只发 postMessage,这里合成一次 F2 交回引擎。
+  // 静音键走同一条通道:挂起/恢复 Emscripten 的 SDL 音频上下文(音频是队列式的,
+  // 挂起时主循环照跑,不会把机台卡住)。
+  var audioMuted = false
+  var muteTries = 0
+  function applyMute() {
+    var ctx = window.Module && window.Module.SDL2 && window.Module.SDL2.audioContext
+    if (!ctx || typeof ctx.suspend !== 'function') return false
+    if (audioMuted) {
+      if (ctx.state === 'running') ctx.suspend().catch(function () {})
+    } else if (ctx.state === 'suspended') {
+      ctx.resume().catch(function () {})
+    }
+    return true
+  }
+  // 音频上下文要等引擎第一次开音频流才建出来:没建好就每 400ms 再看一眼(最多 60 秒)
+  function applyMuteSoon() {
+    if (applyMute() || muteTries >= 150) return
+    muteTries += 1
+    setTimeout(applyMuteSoon, 400)
+  }
   window.addEventListener('message', function (e) {
     if (e.source !== window.parent) return
-    const data = e.data
-    if (!data || data.type !== 'ihomy:pinball:new') return
-    pressKey(113, true)
-    pressKey(113, false)
+    var data = e.data
+    if (!data) return
+    if (data.type === 'ihomy:pinball:new') {
+      pressKey(113, true)
+      pressKey(113, false)
+      return
+    }
+    if (data.type === 'ihomy:pinball:mute') {
+      audioMuted = !!data.muted
+      muteTries = 0
+      applyMuteSoon()
+    }
   })
 
   // 点一下画面把焦点交给 canvas,否则外框里按键可能被父页面吃掉

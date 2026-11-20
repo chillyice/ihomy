@@ -1013,6 +1013,9 @@ export default {
     title: '小游戏',
     rulesLabel: '规则',
     rulesAck: '知道了',
+    /* 外壳头部的静音键(有声音的游戏才出):音效、iframe 游戏与悬浮 BGM 共用一个开关 */
+    mute: '静音',
+    unmute: '取消静音',
     /* 外壳头部的文字「新游戏」键(规则键左侧),各游戏自有的 newGame/restart 只留给结算遮罩 */
     newGame: '新游戏',
     /* 对局未结束时点「新游戏」的确认文案;确认后才进开局设置 */
