@@ -954,6 +954,41 @@ html.dark .rv-shell {
   display: none;
 }
 
+/* 手机竖屏:模式/难度/先手三项与返回、游戏名挤在同一行(原来整块宽 285px,
+   比第一行剩下的 276px 多出 9px,被折到第二行,头部白白多一行)。
+   只收窄留白与字号,不截断选项文字:「人机对战」在 88px + 4/8 内边距下仍放得下,
+   难度「普通」66px 够用;返回在手机档已只留图标,内边距再省 4px */
+@media (max-width: 768px) and (orientation: portrait) {
+  .rv-shell :deep(.gs-head) {
+    gap: 6px;
+  }
+  .rv-shell :deep(.gs-head .gs-back) {
+    padding: 0 8px;
+  }
+  .rv-shell :deep(.gs-head .el-select__wrapper) {
+    padding: 4px 8px;
+  }
+  .rv-mode {
+    width: 88px;
+  }
+  .rv-level {
+    width: 66px;
+  }
+  .rv-setup {
+    gap: 4px;
+  }
+  .rv-ai-first {
+    font-size: 12px;
+    margin-right: 4px;
+  }
+}
+/* 更窄的竖屏(iPhone SE 一类 320/375):游戏名再收一档,把余量留给设置项 */
+@media (max-width: 400px) and (orientation: portrait) {
+  .rv-shell :deep(.gs-title) {
+    font-size: 13px;
+  }
+}
+
 /* 手机横屏:HUD 整条让位,悔棋 + 棋子数 + 计分板进外壳左栏底边,棋盘独占右侧;
    对战模式与难度同处一行(见 .rv-setup),新游戏在外壳头部「规则」左边 */
 @media (orientation: landscape) and (max-height: 520px) {
