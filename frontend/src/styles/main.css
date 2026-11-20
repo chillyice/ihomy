@@ -2993,30 +2993,108 @@ html.dark .el-badge__content {
   flex: 1 1 auto;
   min-height: 0;
 }
-/* 对抗牌局:出牌/叫分键双摆放——竖屏与桌面在牌桌下方(FightTable 的 .ft-actions),
-   手机横屏进外壳左栏底边(宠物连连看排布,样式见横屏档);两份按档互斥,不同显 */
-.page.game-shell:has(.ft-root) .gs-actions {
-  display: none;
-}
+/* 出牌/叫分键只有牌桌里一份(FightTable 的 .ft-actions):竖屏在手下,
+   手机横屏排到手牌上方——左栏不再有第二摆放 */
+/* ===== 对抗牌局·手机横屏:整页铺成一块桌毡 =====
+ * 与麻将单机局同一套口径(见 Mahjong.vue 的横屏档):左栏取消,整页就是牌桌,
+ * 头部压成浮在左上角的一行,游戏区占满 1×1 网格。桌毡底色上到页面级(--gs-bg),
+ * .ft-table 只留中央高光与内阴影——手牌行与按钮行也落在毡面上,不再是「绿桌 + 浅底条」。
+ * 手牌因此拿到整屏宽度(20 张时每张 ~81px,原先左栏下只有 56px),出牌/提示/不要
+ * 由 FightTable 排到手牌正上方,视线不用再横跨左栏。 */
 @media (orientation: landscape) and (max-height: 520px) {
-  .page.game-shell:has(.ft-root) .gs-actions {
-    display: flex;
-  }
-}
-/* 对抗牌局(斗地主/够级/掼蛋/保皇共用 FightTable):手机横屏沉浸态牌桌毡面铺满整页——
-   外壳底色同化为桌毡渐变,中央牌桌自身底色让位(只留中央高光与内阴影),整页连成一块毡面;
-   手牌区文字换浅色(原先跟主题走,深色文字会压在绿毡上看不清) */
-@media (orientation: landscape) and (max-height: 520px) {
-  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) {
+  /* 沉浸态那条 padding 带 !important(叠 --gs-pad),这里同样要 !important 才盖得回;
+     只留安全区 → 桌毡贴边 */
+  .page.game-shell:has(.ft-root),
+  html.game-mobile-immersive .mobile-sub-content .page.game-shell:has(.ft-root) {
     --gs-bg: linear-gradient(160deg, #1f5c39, #123c26 62%, #0d2f1e);
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: 0;
+    row-gap: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
   }
-  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-table {
+  html.dark .page.game-shell:has(.ft-root) {
+    --gs-bg: linear-gradient(160deg, #17452c, #0d2f1e 62%, #08221a);
+  }
+  /* 头部浮在毯面左上角:没有玻璃底、没有描边,只有一层暗投影把字从绿底上托起来 */
+  .page.game-shell:has(.ft-root) .gs-rail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: var(--z-float);
+    max-width: calc(100% - 12px);
+    max-height: 100%;
+    overflow: visible;
+    padding: 2px 4px;
+    border-radius: 0;
+    color: #f6f2e4;
+    background: none;
+    box-shadow: none;
+  }
+  .page.game-shell:has(.ft-root) .gs-head {
+    flex-wrap: nowrap;
+    min-height: 0;
+    padding-bottom: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+  /* 外壳横屏档把「新游戏 + 规则」掰到第二行;这里空间够,拉回第一行 */
+  .page.game-shell:has(.ft-root) .gs-head .gs-end {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: 4px;
+    justify-content: flex-start;
+  }
+  .page.game-shell:has(.ft-root) .gs-title {
+    color: #f6f2e4;
+  }
+  /* 横屏这一行横向空间充裕,返回与规则恢复文字(与麻将同口径) */
+  .page.game-shell:has(.ft-root) .gs-back-label,
+  .page.game-shell:has(.ft-root) .gs-rules-label {
+    display: inline;
+  }
+  /* 头部次级键改白玻璃:暖居主题那条浅米底压在深绿上像贴了张纸;
+     主按钮「新游戏」保持品牌色,与玻璃键区分开 */
+  .page.game-shell:has(.ft-root) .gs-head .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #fff !important;
+  }
+  .page.game-shell:has(.ft-root) .gs-head .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+  }
+  /* 游戏区独占整页 */
+  .page.game-shell:has(.ft-root) .gs-body {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  /* 牌桌自己不再是一块「绿卡」:底色交给页面,只留中央高光与内阴影 */
+  .page.game-shell:has(.ft-root) .ft-table {
+    border-radius: 0;
     background: radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1), transparent 62%);
+    box-shadow: inset 0 26px 60px rgba(0, 0, 0, 0.18);
+    min-height: 0;
   }
-  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-my-head {
+  /* 浮起的头部只占左上角那一条(约 32px):座位整层往下让一段,名牌不钻到标题底下;
+     上排那几个位(五/六人局的 pos-2/3/4,牌桌高 12%~16% 在矮屏上只剩 5~15px)多让到 30px。
+     自己的座位(pos-0)在底边中线,只让 14px——再多就顶到「手牌上方那排按钮」了 */
+  .page.game-shell:has(.ft-root) .ft-seat {
+    transform: translate(-50%, calc(-50% + 14px));
+  }
+  .page.game-shell:has(.ft-root) .ft-seat.pos-2,
+  .page.game-shell:has(.ft-root) .ft-seat.pos-3,
+  .page.game-shell:has(.ft-root) .ft-seat.pos-4 {
+    transform: translate(-50%, calc(-50% + 30px));
+  }
+  .page.game-shell:has(.ft-root) .ft-center {
+    transform: translate(-50%, calc(-50% + 10px));
+  }
+  /* 手牌区文字换浅色(原先跟主题走,深色文字会压在绿毡上看不清) */
+  .page.game-shell:has(.ft-root) .ft-my-head {
     color: rgba(226, 240, 228, 0.78);
   }
-  html.app-native.game-mobile-immersive .page.game-shell:has(.ft-root) .ft-my-name {
+  .page.game-shell:has(.ft-root) .ft-my-name {
     color: #f2fff2;
   }
 }

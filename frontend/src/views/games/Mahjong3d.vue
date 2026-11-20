@@ -23,7 +23,7 @@
       <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
     </template>
 
-    <div class="mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
+    <div ref="cardEl" class="mahjong3d-card" @contextmenu.prevent @dblclick.prevent>
       <!-- 3D 舞台 -->
       <div ref="stageEl" class="m3-stage" />
 
@@ -183,6 +183,7 @@ const windName = (seat) => t(`games.mahjong.honor.${WIND_KEYS[((seat % 4) + 4) %
 
 const shellEl = ref(null)
 const stageEl = ref(null)
+const cardEl = ref(null)
 /** 全屏/宽屏由外壳持有;设置弹窗按它决定是否 teleport */
 const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 
@@ -238,6 +239,7 @@ const rulesLabel = computed(() => {
 
 let session = 0
 let table = null
+let stageRo = null
 let actionResolver = null
 let claimResolver = null
 
@@ -278,6 +280,15 @@ function renderTable() {
   }
   for (const seat of [0, 1, 2, 3]) table.setMelds(seat, meldViews(seat))
   table.setWall(wall.value.length)
+  syncHandHeight()
+}
+
+/** 按键避让手牌:把 3D 手牌整行的投影高度写进 --m3-hand-h。
+ *  手机横屏的动作键/询问条靠它抬到手牌上方(竖屏不读,仍是贴底那套);
+ *  纯投影、不进渲染循环,状态每变一次顺手更新一次 */
+function syncHandHeight() {
+  const rect = table?.handScreenRect?.()
+  cardEl.value?.style.setProperty('--m3-hand-h', `${Math.round(rect?.height || 0)}px`)
 }
 
 /** 副露渲染视图:暗杠整排牌背,吃按顺子序 */
@@ -688,6 +699,8 @@ async function grantReward() {
 function toggleView() {
   view.value = view.value === 'main' ? 'top' : 'main'
   table?.setView(view.value)
+  // 视角切换是 450ms 补间:机位落定后重新量一次手牌行(切换途中量到的是中间机位)
+  setTimeout(syncHandHeight, 520)
   try {
     localStorage.setItem('ihomy:mahjong3d:view', view.value)
   } catch {}
@@ -706,16 +719,24 @@ onMounted(async () => {
   stageEl.value.addEventListener('pointermove', onStageMove)
   // 牌桌内部靠 ResizeObserver 跟随舞台,个别 WebView(如安卓壳)RO 不派发,补 window resize 兜底
   window.addEventListener('resize', onWinResize)
+  // 舞台尺寸变了(全屏/宽屏/旋转)手牌行的屏幕位置也跟着变;下一帧再量,牌桌自己的 RO 已先 resize 过相机
+  stageRo = new ResizeObserver(() => requestAnimationFrame(syncHandHeight))
+  stageRo.observe(stageEl.value)
   renderTable()
 })
 
-const onWinResize = () => table?.resize?.()
+const onWinResize = () => {
+  table?.resize?.()
+  syncHandHeight()
+}
 
 onBeforeUnmount(() => {
   session += 1
   stageEl.value?.removeEventListener('click', onStageClick)
   stageEl.value?.removeEventListener('pointermove', onStageMove)
   window.removeEventListener('resize', onWinResize)
+  stageRo?.disconnect()
+  stageRo = null
   table?.dispose()
   table = null
 })
@@ -730,6 +751,9 @@ onBeforeUnmount(() => {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  /* 手牌整行的投影高度(JS 每帧不写,状态/尺寸变化时由 syncHandHeight 更新);
+     手机横屏的动作键与询问条按它抬到手牌上方 */
+  --m3-hand-h: 0px;
 }
 .m3-stage {
   position: relative;
@@ -941,6 +965,88 @@ onBeforeUnmount(() => {
 @media (max-width: 640px) {
   .m3-players {
     display: none;
+  }
+}
+
+/* ===== 手机横屏:3D 牌桌铺满整屏 =====
+ * 与平面麻将单机局同一套口径:左栏取消,整页就是画面(拍照/录屏里只剩牌桌),
+ * 头部压成贴左上角的一行浮层。舞台吃到整块游戏区后,相机沿预设机位自动拉近
+ * (fitCameraDistance),牌面与手牌自然变大;动作键/询问条按手牌整行的投影高度
+ * (--m3-hand-h)抬到手牌上方,不再从手牌上压过去。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  /* 沉浸态那条 padding 带 !important(叠 --gs-pad),这里同样要 !important 才盖得回;
+     只留安全区 → 画面贴边。页底取场景底色,画布与页底之间不留色差 */
+  .page.game-shell.m3-shell,
+  html.game-mobile-immersive .mobile-sub-content .page.game-shell.m3-shell {
+    --gs-bg: #22343c;
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: 0;
+    row-gap: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
+  }
+  /* 头部浮在画面左上角:没有玻璃底、没有描边,只有一层暗投影把字托起来 */
+  .page.game-shell.m3-shell :deep(.gs-rail) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: var(--z-float);
+    max-width: calc(100% - 12px);
+    max-height: 100%;
+    overflow: visible;
+    padding: 2px 4px;
+    border-radius: 0;
+    color: #f6f2e4;
+    background: none;
+    box-shadow: none;
+  }
+  .page.game-shell.m3-shell :deep(.gs-head) {
+    flex-wrap: nowrap;
+    min-height: 0;
+    padding-bottom: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+  /* 外壳横屏档把「新游戏 + 规则」掰到第二行;这里整条只有 200 出头,拉回第一行 */
+  .page.game-shell.m3-shell :deep(.gs-head .gs-end) {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: 4px;
+    justify-content: flex-start;
+  }
+  .page.game-shell.m3-shell :deep(.gs-title) {
+    color: #f6f2e4;
+  }
+  .page.game-shell.m3-shell :deep(.gs-back-label),
+  .page.game-shell.m3-shell :deep(.gs-rules-label) {
+    display: inline;
+  }
+  /* 次级键改白玻璃(暖居那条浅米底压在深色画面上像贴了张纸);主按钮「新游戏」保持品牌色 */
+  .page.game-shell.m3-shell :deep(.gs-head .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text)) {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #fff !important;
+  }
+  /* 画布独占整块游戏区(本页没有计分栏/页脚,一行一列就够) */
+  .page.game-shell.m3-shell :deep(.gs-body) {
+    grid-row: 1;
+    grid-column: 1;
+    margin-inline: 0;
+  }
+  /* 头部这一行占了左上角:信息条与名录各下移一行,四席名字不钻到标题底下 */
+  .m3-hud {
+    top: 32px;
+    left: 8px;
+    gap: 6px;
+  }
+  .m3-players {
+    top: 32px;
+    right: 8px;
+  }
+  /* 动作键与询问条:手牌上方(两只都读同一个投影高度,竖屏仍是贴底/76px 那套) */
+  .m3-actions,
+  .m3-claim {
+    bottom: calc(var(--m3-hand-h, 0px) + 6px);
   }
 }
 </style>

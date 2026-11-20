@@ -58,6 +58,8 @@
         <span v-if="myRoleLabel" class="ft-role my" :class="myTone">{{ myRoleLabel }}</span>
         <span class="ft-my-count">{{ $t('games.fight.cardsLeft', { n: hand.length }) }}</span>
         <span v-if="myNote" class="ft-my-note">{{ myNote }}</span>
+        <!-- 手机横屏把出牌/提示/不要排到手牌正上方,提示语跟过去(left 对齐),中心区那条同档隐藏 -->
+        <span v-if="statusText" class="ft-my-status">{{ statusText }}</span>
       </div>
       <div class="ft-hand" :style="{ '--fc-hand-n': Math.max(1, hand.length) }" role="group" :aria-label="$t('games.fight.myHand')">
         <button
@@ -530,6 +532,10 @@ const cardLabel = (card) => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 提示语:竖屏看中央区那条(默认不显示),手机横屏才挪到操键这一行 */
+.ft-my-status {
+  display: none;
+}
 .ft-hand {
   display: flex;
   align-items: flex-end;
@@ -689,11 +695,68 @@ const cardLabel = (card) => {
   }
 }
 
-/* 手机横屏:出牌/叫分键搬到外壳左栏底边(宠物连连看排布),牌桌下方这份让位;
-   两份摆放的互斥开关在 main.css 对抗牌局段(外壳那份按档显隐) */
+/* 手机横屏:整页只剩这一块桌毡(main.css 对抗牌局段把外壳左栏浮起来),
+   所以这里把牌桌自身的盒子抹掉、并把「出牌/提示/不要」排到手牌正上方。
+   手牌照整屏宽重新收敛:20 张也能到 84px 宽,点选/拖选都看得清。 */
 @media (orientation: landscape) and (max-height: 520px) {
+  .ft-root {
+    gap: 4px;
+  }
+  .ft-table {
+    flex: 1 1 120px;
+    min-height: 120px;
+    border-radius: 0;
+  }
+  .ft-my-area {
+    gap: 4px;
+  }
+  .ft-my-head {
+    order: 0;
+    min-height: 0;
+    font-size: 11px;
+  }
+  /* 操作键=手牌上方那一行(横屏只此一份摆放,外壳左栏那份已删) */
   .ft-actions {
+    order: 1;
+    display: flex;
+    flex-wrap: nowrap;
+    min-height: 28px;
+    gap: 8px;
+  }
+  .ft-hand {
+    order: 2;
+    --fc-pop: 9px;
+    --fc-step: clamp(7px, calc((100cqw - 12px) / (var(--fc-hand-n, 20) + 1.15)), 40px);
+    --fc-card-w: clamp(16px, calc(var(--fc-step) * 2.1), 84px);
+    padding: 10px 6px 0;
+  }
+  .ft-my-status {
+    display: block;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* 同样的提示语只在手上方留一处,中央区那条与空态隐藏 */
+  .ft-center .ft-status,
+  .ft-center-empty {
     display: none;
+  }
+  /* 上一手牌以小牌左压右叠成一摞(只留最近一手,不铺牌河) */
+  .ft-last-cards {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .ft-mini {
+    width: 32px;
+    margin-left: -16px;
+    border-radius: 4px;
+  }
+  .ft-mini:first-child {
+    margin-left: 0;
+  }
+  .ft-last-head {
+    font-size: 11px;
   }
 }
 </style>

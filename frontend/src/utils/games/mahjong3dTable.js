@@ -677,6 +677,42 @@ export function createMahjong3dTable(container, opts = {}) {
         dist: Number(camera.position.distanceTo(lookTarget).toFixed(2)),
       }
     },
+    /** 我方手牌整行在容器里的屏幕位置(CSS px):把整行的四角用当前相机投影,
+     *  取最高点。页面据此把动作键排到手牌上方(纯投影,不进渲染循环、不改场景) */
+    handScreenRect() {
+      const cache = rowCache[0]
+      const n = cache.hand.length
+      if (!n) return null
+      const plan = rowPlan(
+        n,
+        !!cache.drawn,
+        cache.melds.map((m) => m.kinds.length),
+      )
+      const w = container.clientWidth || 640
+      const h = container.clientHeight || 400
+      const scale = plan.pitch / TILE.PITCH
+      const uFrom = handTileU(0, n) * scale + plan.shift - TILE.W / 2
+      const uTo = cache.drawn ? drawnTileU(n) + plan.shift + TILE.W / 2 : handTileU(n - 1, n) * scale + plan.shift + TILE.W / 2
+      camera.updateMatrixWorld()
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert()
+      let top = Infinity
+      let left = Infinity
+      let right = -Infinity
+      const p = new THREE.Vector3()
+      for (const u of [uFrom, uTo]) {
+        for (const v of [-TILE.D / 2, TILE.D / 2]) {
+          for (const y of [TILE.H, 0]) {
+            const world = toWorld(0, u, v)
+            p.set(world.x, y, world.z).project(camera)
+            top = Math.min(top, ((1 - p.y) / 2) * h)
+            left = Math.min(left, ((p.x + 1) / 2) * w)
+            right = Math.max(right, ((p.x + 1) / 2) * w)
+          }
+        }
+      }
+      const topPx = Math.max(0, Math.min(h, top))
+      return { top: topPx, height: h - topPx, left, right, containerW: w, containerH: h }
+    },
     /** 渲染统计(冒烟/调试用:draw call 与三角数来自最近一帧) */
     stats() {
       return {
