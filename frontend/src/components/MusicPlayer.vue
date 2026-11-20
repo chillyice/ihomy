@@ -234,6 +234,8 @@ const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
 // 游戏列表和其它站内页都不接管播放状态。游戏页头部的静音键(utils/games/gameSound.js 那份全局状态)
 // 只负责「播 / 不播」,不背别的含义。
 const inGame = computed(() => route.path.startsWith('/games/'))
+// 一局游戏 = 一个页面:换游戏也当作「重新进游戏」,从这首的开头放(各游戏若自带曲目,换的就是曲目本身)
+const gamePageKey = computed(() => (inGame.value ? route.path : ''))
 // 本次进游戏还没起播成功(歌单、曲目或签名地址晚到):地址就绪后补一次
 let gameBgmArmed = false
 const startGameBgm = () => {
@@ -275,12 +277,12 @@ watch(
   { immediate: true },
 )
 
-// 进出游戏:进游戏从头放(不留上次进度),离开游戏彻底停(暂停 + 归零),不留给「回来接着放」
+// 进出游戏 / 游戏之间切换:每次都从开头放(不留上一次的进度),离开游戏彻底停(暂停 + 归零)
 watch(
-  inGame,
-  (playingGame) => {
+  gamePageKey,
+  (key) => {
     const el = audioEl.value
-    if (playingGame) {
+    if (key) {
       if (el) el.currentTime = 0
       gameBgmArmed = !gameMuted.value
       if (gameBgmArmed) startGameBgm()
