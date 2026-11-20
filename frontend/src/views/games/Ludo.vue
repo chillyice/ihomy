@@ -11,26 +11,11 @@
     readable
     :new-game="!play.active && state?.phase === 'playing'"
     :new-game-confirm="true"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onNewGame"
   >
-    <template #extras>
-      <GameRoomBar
-        v-if="play.active"
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="myFinished"
-        :reported="play.reported"
-        :ended="gameOver"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        exit-ends-room
-        @submit="submitRoomScore"
-        @leave="play.leave"
-        @auto="onAutoToggle"
-      />
-    </template>
-
     <!-- 新游戏:外壳确认后选人数(封面之外,进行中也能重开) -->
     <template #overlay>
       <GameSetupDialog v-model="setupOpen" :fields="setupFields" :append-to-body="!isFullscreen" @confirm="onSetupConfirm" />
@@ -159,12 +144,32 @@
             <span class="ludo-status-text">{{ statusText }}</span>
           </div>
 
+          <!-- 房间聊天:最新一句。玩家明细是 244px 窄栏(还要滚动),气泡贴头像会被裁掉,
+               改成在侧栏整行显示,名字在前,保证不越出游戏区 -->
+          <div v-if="ludoChat" class="ludo-chat" role="status" aria-live="polite">
+            <b v-if="ludoChat.name" class="ludo-chat-name">{{ ludoChat.name }}</b>
+            <span class="ludo-chat-text">{{ ludoChat.text }}</span>
+          </div>
+
           <div class="ludo-dice-box">
             <div class="ludo-dice" :class="{ rolling, live: canRoll }" role="img" :aria-label="`${diceFace}`">
               <span v-for="i in 9" :key="i" class="ludo-pip" :class="{ on: pipsOn.has(i - 1) }"></span>
             </div>
             <el-button class="ludo-roll-btn" type="primary" round :disabled="!canRoll" @click="onRollClick">
               {{ $t('games.ludo.roll') }}
+            </el-button>
+            <!-- 托管:房间局常驻在掷骰键下面;亮起时房主端 AI 替我掷骰走子 -->
+            <el-button
+              v-if="play.active && state && !play.isSpectator"
+              class="ludo-auto-btn"
+              :type="iAmAuto ? 'warning' : 'default'"
+              :plain="!iAmAuto"
+              size="small"
+              round
+              :aria-pressed="iAmAuto"
+              @click="onAutoToggle(!iAmAuto)"
+            >
+              {{ $t(iAmAuto ? 'games.room.autoOff' : 'games.room.autoOn') }}
             </el-button>
             <div class="ludo-roll-hint">{{ $t('games.ludo.rollHint') }}</div>
           </div>
@@ -181,11 +186,9 @@
             >
               <span class="lp-dot"></span>
               <span class="lp-name">{{ s.name }}</span>
-              <!-- 房间聊天气泡:贴在名字右侧;电脑席位没有头像也不弹气泡 -->
               <span v-if="s.userId != null" class="lp-avatar">
                 <img v-if="s.avatar" :src="s.avatar" :alt="s.name" />
                 <template v-else>{{ s.name.charAt(0) }}</template>
-                <RoomChatBubble :text="roomBubble(s.userId)" dir="right" />
               </span>
               <span class="lp-fin">{{ $t('games.ludo.finished', { n: s.finished }) }}</span>
               <span v-if="s.active" class="lp-live"></span>
@@ -270,11 +273,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { roomApi } from '@/api'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
-import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -393,8 +393,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
 const roomChat = useRoomChatStore()
 
-/** 玩家行上的房间聊天气泡(单机局没有房间,恒为空) */
-const roomBubble = (userId) => (play.active && userId != null ? roomChat.bubbleOf(play.room?.id, userId) : '')
+/** 房间最新一句聊天(侧栏整行显示;自己发的不重复弹) */
+const ludoChat = computed(() => {
+  const meta = roomChat.roomMeta
+  if (!play.active || !meta?.id) return null
+  const prefix = `${meta.id}:`
+  let best = null
+  for (const [key, value] of Object.entries(roomChat.bubbles)) {
+    if (!key.startsWith(prefix) || !value?.text) continue
+    const uid = Number(key.slice(prefix.length))
+    if (uid === play.myId) continue
+    if (!best || (value.at || 0) > (best.at || 0)) best = { text: value.text, at: value.at, uid }
+  }
+  if (!best) return null
+  return { text: best.text, name: (meta.members || []).find((m) => m.userId === best.uid)?.name || '' }
+})
 
 /** 渲染用状态:没开局时用预览盘面(棋子全在机场) */
 const viewState = computed(() => state.value || previewState)
@@ -424,11 +437,11 @@ const seatNameByColor = (color) => {
   return seat ? seatName(seat) : ''
 }
 
-const myFinished = computed(() => {
+/** 我的席位是否托管中(房间局):托管键亮起,骰子与走子由房主端 AI 代打 */
+const iAmAuto = computed(() => {
   const st = state.value
-  if (!st) return 0
-  const seat = st.seats.find((s) => !s.ai && String(s.userId) === String(play.myId))
-  return seat ? ludoFinishedCount(st, seat.color) : 0
+  const seat = st?.seats?.find((s) => !s.ai && String(s.userId) === String(play.myId))
+  return !!seat?.auto
 })
 
 const result = computed(() => {
@@ -627,8 +640,6 @@ function reportIfWinner(next) {
   if (String(seat.userId) !== String(play.myId)) return
   play.report(1)
 }
-
-const submitRoomScore = () => play.report(myFinished.value)
 
 /** 房主权威:把权威状态广播出去(其他人收到后按同一份 frames 播放) */
 function publishState(next = state.value) {
@@ -927,24 +938,8 @@ watch(
   },
 )
 
-async function goBack() {
-  if (!play.active || !play.room?.id) {
-    // 单机:固定回上一级(小游戏列表),不按浏览历史回到上一页
-    // (手机沉浸态的浮动返回键也走这里)
-    router.push('/games')
-    return
-  }
-  const roomId = play.room.id
-  // 实时权威对局:房主退出即结束(否则其他人等不到掷骰),访客退出则离房把人位交给 AI
-  if (play.room.status === 'PLAYING') {
-    try {
-      await (play.isHost ? roomApi.end(roomId) : roomApi.leave(roomId))
-    } catch {
-      // 房间已结束时忽略
-    }
-  }
-  router.push(play.isHost ? `/games/room/${roomId}` : '/games')
-}
+/** 返回:房间局回房间页(房主先确认结束本局,其他人先托管把席位交 AI),单机回游戏列表 */
+const goBack = () => play.exitToLobby({ aiGame: true })
 
 // 手机沉浸态:左上角浮动返回键优先走本页退出逻辑,房间局才会先退房/结束房间
 useGameExit(goBack)
@@ -1216,6 +1211,33 @@ html.dark .ludo-card {
   background: rgba(var(--color-brand-rgb), 0.14);
 }
 
+/* 房间聊天:一条常驻气泡(6s 自动消失),整行显示不越出侧栏 */
+.ludo-chat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.4;
+  min-width: 0;
+}
+.ludo-chat-name {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.ludo-chat-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
 .ludo-status-text {
   line-height: 1.35;
 }
@@ -1299,6 +1321,12 @@ html.dark .ludo-card {
 
 .ludo-roll-btn {
   width: 100%;
+}
+
+/* 托管键:与掷骰键同宽,矮一档放在下面,不抢主操作的分量 */
+.ludo-auto-btn {
+  width: 100%;
+  margin-top: 6px;
 }
 
 .ludo-roll-hint {

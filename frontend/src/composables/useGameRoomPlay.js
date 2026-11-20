@@ -3,11 +3,12 @@
 // PK:各端用同一 seed 独立跑,终局调 report();COOP:房主权威,房主广播快照、其他人只发操作意图。
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { useRoomChatHost } from '@/composables/useRoomChatHost'
 import { ROOM_STATUS, isCoop, isRoomGoneError, roomGame } from '@/utils/gameRoom'
 
 /**
@@ -148,17 +149,58 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
 
   const leave = async () => {
     try {
-      if (room.value && room.value.status !== ROOM_STATUS.FINISHED) await roomApi.leave(roomId.value)
+      // 已结束的房间也要走一次:后端物理删除成员行,下次进屋不会撞唯一键
+      if (room.value) await roomApi.leave(roomId.value)
     } catch {
-      // 房间已结束时离开失败无所谓
+      // 已被移除/房间被清掉:照常回列表
     }
     router.push('/games')
   }
+
+  /**
+   * 游戏页返回房间页的唯一出口(房间里不再放「退出对局」键)。
+   * aiGame=true 的玩法(麻将/飞行棋)房主端就是牌局引擎:房主离开必须结束本局;
+   * 其余人先把席位交 AI(托管)再走,别人继续打。
+   */
+  const exitToLobby = async ({ aiGame = false } = {}) => {
+    if (!active.value) {
+      router.push('/games')
+      return
+    }
+    if (playing.value && aiGame) {
+      if (isHost.value) {
+        try {
+          await ElMessageBox.confirm(t('games.room.hostLeaveConfirm'), t('games.room.leaveGame'), { type: 'warning' })
+        } catch {
+          return
+        }
+        try {
+          await roomApi.end(roomId.value)
+        } catch {
+          // 房间已结束/已解散:照常回房间页
+        }
+      } else {
+        send('auto', { to: room.value?.hostId, on: true })
+      }
+    }
+    router.push(`/games/room/${roomId.value}`)
+  }
+
+  // 房间临时聊天由全局聊天浮窗承载:页面进房即登记,离开/房间结束自动交还
+  useRoomChatHost(room)
 
   const connect = () => {
     chatStore.ensureConnected()
     unsubscribe = chatStore.onGameSignal((data) => {
       if (!data || Number(data.roomId) !== roomId.value) return
+      if (data.event === 'kicked') {
+        // 房主请人离开:对局页没有可刷的状态,回游戏列表
+        gone.value = true
+        stopPolling()
+        ElMessage.warning(t('games.room.kickedTip'))
+        router.push('/games')
+        return
+      }
       if (data.event === 'room') {
         applyRoom(data.room)
         return
@@ -222,5 +264,6 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
     requestSync,
     report,
     leave,
+    exitToLobby,
   })
 }

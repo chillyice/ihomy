@@ -402,7 +402,7 @@ public class GameRoomService {
         GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
         int minPlayers = spec != null && spec.ai() ? 1 : 2; // 有电脑玩家的游戏 1 名真人即可开局,空位由电脑补
         if (players.size() < minPlayers) {
-            throw new BizException(ResultCode.BAD_REQUEST, minPlayers < 2 ? "至少要有两名玩家才能开始" : "至少要有一名玩家才能开始");
+            throw new BizException(ResultCode.BAD_REQUEST, minPlayers < 2 ? "至少要有一名玩家才能开始" : "至少要有两名玩家才能开始");
         }
         boolean allReady = players.stream().allMatch(m -> Integer.valueOf(1).equals(m.getReady()));
         if (!allReady) {
@@ -523,7 +523,11 @@ public class GameRoomService {
         return get(familyId, id);
     }
 
-    /** 离开房间:未开赛直接移除;房主离开则结束/取消房间 */
+    /**
+     * 离开房间:成员行物理删除(再进屋时不会撞唯一键,已结束的房间也能真正退出)。
+     * 房主离开 = 房主端引擎关闭:WAITING→取消;PLAYING→按当前成绩结算;
+     * 已结束的房间房主保留成员行,否则「再来一局」回来时没有自己的席位。
+     */
     public Map<String, Object> leave(Long userId, Long familyId, Long id) {
         GameRoom room = require(familyId, id);
         GameRoomMember member = memberOf(id, userId);
@@ -536,7 +540,7 @@ public class GameRoomService {
         }
         boolean isHost = Objects.equals(room.getHostId(), userId);
         if (GameConst.ROOM_WAITING.equals(room.getStatus())) {
-            memberMapper.deleteById(member.getId());
+            memberMapper.hardDelete(member.getId());
             if (isHost) {
                 roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
                         .eq(GameRoom::getId, id)
@@ -545,13 +549,37 @@ public class GameRoomService {
                         .set(GameRoom::getFinishedAt, LocalDateTime.now()));
             }
         } else if (GameConst.ROOM_PLAYING.equals(room.getStatus())) {
-            memberMapper.deleteById(member.getId());
+            memberMapper.hardDelete(member.getId());
             if (isHost) {
                 GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
                 String result = spec == null ? GameConst.ROOM_RESULT_SCORE : spec.result();
                 settle(GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null));
             }
+        } else if (!isHost) {
+            // FINISHED/CANCELLED:局已结束,成员可以直接退出;房主留着当「再来一局」的锚点
+            memberMapper.hardDelete(member.getId());
         }
+        return get(familyId, id);
+    }
+
+    /** 房主请人离开房间(不能踢自己;对局中踢出后由房主决定是否结束本局) */
+    public Map<String, Object> kick(Long userId, Long familyId, Long id, Long targetUserId) {
+        GameRoom room = require(familyId, id);
+        if (!Objects.equals(room.getHostId(), userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "只有房主可以请成员离开房间");
+        }
+        if (targetUserId == null || targetUserId.equals(userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "不能请自己离开房间");
+        }
+        GameRoomMember target = memberOf(id, targetUserId);
+        if (target == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这个人已经不在房间里了");
+        }
+        Map<String, Long> swap = readSwap(id);
+        if (swap != null && (targetUserId.equals(swap.get("from")) || targetUserId.equals(swap.get("target")))) {
+            clearSwap(id);
+        }
+        memberMapper.hardDelete(target.getId());
         return get(familyId, id);
     }
 

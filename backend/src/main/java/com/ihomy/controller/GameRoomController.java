@@ -8,6 +8,7 @@ import com.ihomy.dto.GameRoomCreateDTO;
 import com.ihomy.dto.GameRoomFinishDTO;
 import com.ihomy.dto.GameRoomGameDTO;
 import com.ihomy.dto.GameRoomInviteDTO;
+import com.ihomy.dto.GameRoomKickDTO;
 import com.ihomy.dto.GameRoomReadyDTO;
 import com.ihomy.dto.GameRoomRoleDTO;
 import com.ihomy.dto.GameRoomSwapDTO;
@@ -242,6 +243,22 @@ public class GameRoomController {
         LoginUser user = current();
         Map<String, Object> room = roomService.leave(user.getUserId(), user.getFamilyId(), id);
         broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "房主请成员离开房间")
+    @OperationLog(module = "GAME", operationType = "DELETE", description = "请成员离开游戏房间")
+    @PostMapping("/{id}/kick")
+    public Result<Map<String, Object>> kick(@PathVariable Long id,
+                                            @RequestBody @jakarta.validation.Valid GameRoomKickDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.kick(user.getUserId(), user.getFamilyId(), id, dto.getTargetUserId());
+        broadcast(id, room);
+        // 被请走的人已经不在成员名单里,broadcast 送不到,单独通知他退出房间页
+        Map<String, Object> notice = new LinkedHashMap<>();
+        notice.put("roomId", id);
+        notice.put("event", "kicked");
+        wsHandler.sendToUsers(List.of(dto.getTargetUserId()), "game-signal", notice, null);
         return Result.success(room);
     }
 

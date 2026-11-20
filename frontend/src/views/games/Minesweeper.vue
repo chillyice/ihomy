@@ -8,6 +8,8 @@
     body-align="center"
     :new-game="!play.active"
     :new-game-confirm="board.status === 'PLAYING'"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onNewGameClick"
   >
@@ -63,20 +65,6 @@
       >
         <el-icon><Flag /></el-icon>
       </el-button>
-    </template>
-
-    <template #extras>
-      <GameRoomBar
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="elapsed"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        @submit="submitRoomScore"
-        @leave="play.leave"
-      />
     </template>
 
     <template #overlay>
@@ -178,7 +166,6 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Flag } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { gameApi } from '@/api'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -225,7 +212,6 @@ const goBack = () => {
   else router.push('/games')
 }
 const coopGuest = computed(() => play.active && play.coop && !play.isHost)
-const submitRoomScore = () => play.report(elapsed.value)
 
 const randFor = () => (play.active ? seededRng(Number(play.seed) || 1) : Math.random)
 

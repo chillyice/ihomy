@@ -44,16 +44,24 @@
             </button>
           </div>
           <span v-else class="sheet-title">{{ $t('chat.title') }}</span>
-          <el-button text circle size="small" @click="collapse">
-            <el-icon><Close /></el-icon>
-          </el-button>
+          <span class="float-head-actions">
+            <!-- 房间里通话就在聊天里:直接拉房间成员语音,不必再回大厅找人 -->
+            <RoomCallPicker
+              v-if="roomActive && tab === 'room'"
+              :members="roomChatStore.roomMeta?.members || []"
+              :my-id="userStore.userInfo?.id"
+            />
+            <el-button text circle size="small" @click="collapse">
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </span>
         </div>
         <ChatPanel v-if="tab === 'family'" />
         <RoomChatPanel v-else />
       </div>
 
       <!-- 桌面端:可拖拽缩放面板 -->
-      <div v-else class="chat-float-panel" :style="panelStyle">
+      <div v-else class="chat-float-panel" :class="{ pinned: pinnedRoom }" :style="panelStyle">
         <div class="panel-head" @pointerdown="onPanelDown">
           <!-- 在「一起玩」房间里多一个房间页:同一扇浮窗承载两路会话,不再单独起房间聊天浮球 -->
           <div v-if="roomActive" class="float-tabs" role="tablist">
@@ -81,15 +89,23 @@
             </button>
           </div>
           <span v-else class="panel-title">{{ $t('chat.title') }}</span>
-          <el-button text circle size="small" @click="collapse">
-            <el-icon><Close /></el-icon>
-          </el-button>
+          <span class="float-head-actions">
+            <!-- 房间里通话就在聊天里:直接拉房间成员语音,不必再回大厅找人 -->
+            <RoomCallPicker
+              v-if="roomActive && tab === 'room'"
+              :members="roomChatStore.roomMeta?.members || []"
+              :my-id="userStore.userInfo?.id"
+            />
+            <el-button text circle size="small" @click="collapse">
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </span>
         </div>
         <ChatPanel v-if="tab === 'family'" />
         <RoomChatPanel v-else />
-        <!-- 四角和四边的透明缩放区 -->
+        <!-- 四角和四边的透明缩放区(房间对局里是钉住的尺寸,不给缩放) -->
         <div
-          v-for="dir in RESIZE_DIRS"
+          v-for="dir in pinnedRoom ? [] : RESIZE_DIRS"
           :key="dir"
           class="chat-resize-zone"
           :class="'dir-' + dir"
@@ -101,6 +117,7 @@
       v-else
       type="button"
       class="chat-float-ball"
+      :class="{ pinned: pinnedRoom }"
       :style="ballStyle"
       :aria-label="$t('chat.title')"
       @pointerdown="onBallDown"
@@ -111,6 +128,14 @@
         <el-icon :size="22"><ChatDotRound /></el-icon>
       </el-badge>
     </button>
+
+    <!-- 房间对局里的最新一句聊天:没有座位头像的游戏(牌桌之外)挂在浮球下面,
+         压在游戏区内部、右缘与浮球对齐,不会挤出屏幕 -->
+    <Transition name="chat-bubble">
+      <div v-if="roomBubble && !expanded" class="chat-float-bubble" :style="bubbleStyle" role="status" aria-live="polite">
+        {{ roomBubble }}
+      </div>
+    </Transition>
 
     <!-- 拖到底部删除区:桌面端拖球/拖面板时出现,松手即隐藏浮窗(可在聊天室重新开启) -->
     <FloatDeleteDock :active="dockActive" :over="dockOver" />
@@ -145,6 +170,7 @@ import { useDragResize } from '@/utils/useDragResize'
 import { haptic } from '@/utils/haptics'
 import { useFloatDelete, FLOAT_DELETE_ZONE } from '@/composables/useFloatDelete'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import RoomChatPanel from '@/components/chat/RoomChatPanel.vue'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
@@ -203,12 +229,134 @@ const {
   storageKey: PANEL_POS_KEY,
 })
 
-const ballStyle = computed(() => ({ left: `${ball.pos.value.x}px`, top: `${ball.pos.value.y}px`, zIndex: 'var(--z-float)' }))
+// ---------- 房间对局:浮窗钉在游戏区右上角 ----------
+// 「一起玩」的游戏页(?room=)里球/面板固定在 .gs-body 的右上角,聊天随时可见且不挡手牌;
+// 钉住期间不拖不记位置,离开房间自动回到用户自己拖到的位置。
+const PIN_GAP = 12
+const pinnedRoom = computed(() => roomActive.value && !!route.query.room)
+/** 桌布类游戏自己显示房间聊天(麻将座位气泡 / 飞行棋侧栏一条),其他游戏用浮球下面那条 */
+const seatBubbles = computed(() => route.path === '/games/mahjong' || route.path === '/games/ludo')
+const bodyRect = ref(null)
+let bodyObserver = null
+let bodyEl = null
+let pinTimer = null
+/**
+ * 量游戏区盒子;返回是否量到了有效尺寸。
+ * 游戏页是懒加载的,浮窗挂载时页面上往往还没有 .gs-body 或它还是 0 高(沉浸态样式没铺完),
+ * 这时算出来的位置会把球丢到屏幕外,所以没量到就交给 retry 阶梯继续等。
+ */
+const measureBody = () => {
+  const el = typeof document === 'undefined' ? null : document.querySelector('.game-shell .gs-body')
+  if (!el) {
+    bodyRect.value = null
+    return false
+  }
+  const r = el.getBoundingClientRect()
+  if (!r.width || !r.height) {
+    bodyRect.value = null
+    return false
+  }
+  bodyRect.value = { left: r.left, right: r.right, top: r.top, width: r.width, height: r.height }
+  // 全屏/宽屏切换、规则面板开合都会改游戏区尺寸,直接跟这个盒子(只在钉住期间需要)
+  if (el !== bodyEl) {
+    bodyObserver?.disconnect()
+    bodyEl = el
+    if (typeof ResizeObserver !== 'undefined') {
+      bodyObserver = new ResizeObserver(() => measureBody())
+      bodyObserver.observe(el)
+    }
+  }
+  return true
+}
+const clearPinTimer = () => {
+  if (pinTimer) clearTimeout(pinTimer)
+  pinTimer = null
+}
+/** 游戏页刚挂载、规则面板展开、横竖屏切换都会改几何:量到就先钉住,没量到按阶梯等到页面铺开 */
+const syncPinned = () => {
+  clearPinTimer()
+  if (!pinnedRoom.value) {
+    bodyObserver?.disconnect()
+    bodyObserver = null
+    bodyEl = null
+    bodyRect.value = null
+    return
+  }
+  if (measureBody()) return
+  // 懒加载 chunk 冷启动可能几秒才铺完游戏区,阶梯给到 ~5s;中途量到立即停
+  const ladder = [60, 120, 240, 400, 700, 1000, 1400, 2000, 2600, 3400]
+  let i = 0
+  const retry = () => {
+    pinTimer = null
+    if (!pinnedRoom.value || measureBody()) return
+    if (i >= ladder.length) return
+    pinTimer = setTimeout(retry, ladder[i++])
+  }
+  pinTimer = setTimeout(retry, ladder[i++])
+}
+// 还没量到游戏区时先把球按视口右上角摆着(绝不使用上次拖动留下的屏幕外坐标)
+const VIEWPORT_FALLBACK = Object.freeze({ right: `${PIN_GAP}px`, top: `${PIN_GAP}px` })
+const pinnedBallStyle = computed(() => {
+  if (!pinnedRoom.value) return null
+  const r = bodyRect.value
+  if (!r) return { left: 'auto', ...VIEWPORT_FALLBACK }
+  return { left: `${Math.round(r.right - BALL_SIZE - PIN_GAP)}px`, top: `${Math.round(r.top + PIN_GAP)}px` }
+})
+const pinnedPanelStyle = computed(() => {
+  if (!pinnedRoom.value) return null
+  const r = bodyRect.value
+  if (!r) return { left: 'auto', width: `${PANEL_W}px`, height: `${PANEL_H}px`, ...VIEWPORT_FALLBACK }
+  const w = Math.max(240, Math.min(PANEL_W, r.width - PIN_GAP * 2))
+  const h = Math.max(240, Math.min(PANEL_H, r.height - PIN_GAP * 2))
+  return {
+    left: `${Math.round(Math.max(r.left + PIN_GAP, r.right - w - PIN_GAP))}px`,
+    top: `${Math.round(r.top + PIN_GAP)}px`,
+    width: `${Math.round(w)}px`,
+    height: `${Math.round(h)}px`,
+  }
+})
+
+/** 最新一条房间聊天(浮球下面那条):只算当前房间、别人发的 */
+const roomBubble = computed(() => {
+  const meta = roomChatStore.roomMeta
+  if (!pinnedRoom.value || seatBubbles.value || !meta?.id) return ''
+  const prefix = `${meta.id}:`
+  let best = null
+  for (const [key, value] of Object.entries(roomChatStore.bubbles)) {
+    if (!key.startsWith(prefix) || !value?.text) continue
+    const uid = Number(key.slice(prefix.length))
+    if (uid === userStore.userInfo?.id) continue
+    if (!best || (value.at || 0) > (best.at || 0)) best = { text: value.text, at: value.at, uid }
+  }
+  if (!best) return ''
+  const name = meta.members?.find((m) => m.userId === best.uid)?.name || ''
+  return name ? `${name}:${best.text}` : best.text
+})
+const bubbleStyle = computed(() => {
+  const r = bodyRect.value
+  // 还没量到游戏区:先贴着视口右上角(和球的兜底位置同源),量到后自动收回游戏区内
+  if (!r) {
+    return { right: `${PIN_GAP}px`, top: `${PIN_GAP + BALL_SIZE + 6}px`, zIndex: 'var(--z-float)' }
+  }
+  // 右缘与浮球对齐、往上顶到球下面:左边界再兜一层 max-width,窄屏也出不了游戏区
+  return {
+    right: `${Math.round(window.innerWidth - (r.right - PIN_GAP))}px`,
+    top: `${Math.round(r.top + PIN_GAP + BALL_SIZE + 6)}px`,
+    zIndex: 'var(--z-float)',
+  }
+})
+
+const ballStyle = computed(() => ({
+  ...(pinnedBallStyle.value || { left: `${ball.pos.value.x}px`, top: `${ball.pos.value.y}px` }),
+  zIndex: 'var(--z-float)',
+}))
 const panelStyle = computed(() => ({
-  left: `${panelPos.value.x}px`,
-  top: `${panelPos.value.y}px`,
-  width: `${panelSize.value.w}px`,
-  height: `${panelSize.value.h}px`,
+  ...(pinnedPanelStyle.value || {
+    left: `${panelPos.value.x}px`,
+    top: `${panelPos.value.y}px`,
+    width: `${panelSize.value.w}px`,
+    height: `${panelSize.value.h}px`,
+  }),
   zIndex: 'var(--z-float)',
 }))
 
@@ -274,6 +422,8 @@ const onSheetGripDown = (e) => {
 // 松手时记录拖动状态，拦住随拖动产生的 click，同时保留键盘激活。
 let ignoreBallClick = false
 const onBallDown = (e) => {
+  // 钉在游戏区右上角时不可拖(也不进删除区判定):位置由游戏区决定
+  if (pinnedRoom.value) return
   if (!ball.onDragStart(e)) return
   ignoreBallClick = false
   trackToDock(e)
@@ -282,6 +432,8 @@ const onBallUp = (e) => {
   if (e.isPrimary && e.button === 0) ignoreBallClick = ball.dragging.value
 }
 const onBallClick = (e) => {
+  // 钉住态每次点球都重量一次:布局在这之前变过(规则面板收起/旋转)也能立刻收回游戏区
+  if (pinnedRoom.value) syncPinned()
   if (e.detail === 0 || !ignoreBallClick) expand()
   ignoreBallClick = false
 }
@@ -341,8 +493,9 @@ const trackToDock = (e) => {
   window.addEventListener('pointercancel', onCancel)
 }
 
-// 面板只能从标题栏拖;拖动与 useDragResize 共用同一次 pointerdown
+// 面板只能从标题栏拖;拖动与 useDragResize 共用同一次 pointerdown(钉住时不给拖)
 const onPanelDown = (e) => {
+  if (pinnedRoom.value) return
   if (onDragStart(e)) trackToDock(e)
 }
 
@@ -430,7 +583,15 @@ watch(
 
 onMounted(() => {
   chatStore.ensureConnected()
+  window.addEventListener('resize', onViewportResize, { passive: true })
+  syncPinned()
 })
+
+// 房间对局页进/出、路由切换时重算钉住位置(游戏区尺寸靠 ResizeObserver 跟)
+watch([pinnedRoom, () => route.fullPath], syncPinned)
+const onViewportResize = () => {
+  if (pinnedRoom.value) measureBody()
+}
 
 // 手机端抽屉打开时给 <html> 挂个类:内容页按抽屉高度留出下边距,滚到底能看全(样式在 main.css)
 const sheetActive = computed(() => show.value && expanded.value && isMobile.value)
@@ -451,6 +612,10 @@ onBeforeUnmount(() => {
   detachTrack?.()
   detachSheetDrag()
   dockCancel()
+  clearPinTimer()
+  bodyObserver?.disconnect()
+  bodyObserver = null
+  window.removeEventListener('resize', onViewportResize)
   if (notifyTimer) clearTimeout(notifyTimer)
   if (typeof document !== 'undefined') {
     document.documentElement.classList.remove('chat-sheet-open')
@@ -479,8 +644,42 @@ onBeforeUnmount(() => {
 .chat-float-ball:hover {
   transform: translateY(-2px);
 }
+/* 房间对局:钉在游戏区右上角,不给「可拖」的手型暗示 */
+.chat-float-ball.pinned {
+  cursor: pointer;
+  touch-action: manipulation;
+}
 .ball-badge :deep(.el-badge__content) {
   z-index: 1;
+}
+
+/* 没有座位头像的游戏里,房间最新一句挂在浮球正下方:右缘与球对齐、限宽不越界 */
+.chat-float-bubble {
+  position: fixed;
+  max-width: min(240px, calc(100vw - 32px));
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow);
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.chat-bubble-enter-active,
+.chat-bubble-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.chat-bubble-enter-from,
+.chat-bubble-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .chat-float-panel {
@@ -505,6 +704,11 @@ onBeforeUnmount(() => {
 }
 .panel-head:active {
   cursor: grabbing;
+}
+/* 钉住时标题栏不再是拖拽把手 */
+.chat-float-panel.pinned .panel-head,
+.chat-float-panel.pinned .panel-head:active {
+  cursor: default;
 }
 .panel-title {
   font-size: 14px;
@@ -668,6 +872,13 @@ onBeforeUnmount(() => {
 .sheet-title {
   font-size: 14px;
   font-weight: 600;
+}
+/* 头部右侧:房间通话键 + 收起键(手机抽屉与桌面面板同一处) */
+.float-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 .chat-float-sheet :deep(.chat-panel),
 .chat-float-sheet :deep(.room-chat) {

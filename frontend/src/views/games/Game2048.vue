@@ -7,6 +7,8 @@
     body-align="center"
     :new-game="!matchId && !play.active"
     :new-game-confirm="!gameOver && !won && history.length > 0"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onNewGame"
   >
@@ -60,18 +62,6 @@
     </template>
 
     <template #extras>
-      <GameRoomBar
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="score"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        @submit="submitRoomScore"
-        @leave="play.leave"
-      />
-
       <!-- 对战横幅:同种子赛,对手信息与结算结果 -->
       <div v-if="matchId" class="match-banner">
         <span>{{ $t('games.match.vs', { opponent: opponentName }) }}</span>
@@ -173,7 +163,6 @@ import { gameApi, matchApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameScoreShare from '@/components/games/GameScoreShare.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -266,8 +255,6 @@ watch(gameOver, (over) => {
   if (matchId.value) reportMatchScore()
   if (play.active) play.report(score.value)
 })
-
-const submitRoomScore = () => play.report(score.value)
 
 // 4 列沿用旧键,其余列宽各用独立键
 const bestKey = () => (size.value === 4 ? 'ihomy:games:2048:best:v1' : `ihomy:games:2048:best:${size.value}:v1`)

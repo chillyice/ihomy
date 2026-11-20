@@ -7,6 +7,8 @@
     body-align="stretch"
     new-game
     :new-game-confirm="gameInProgress"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onNewGame"
   >
@@ -58,19 +60,6 @@
         </ol>
         <p class="sd-tech-foot">{{ $t('games.sudoku.teach.foot') }}</p>
       </template>
-    </template>
-    <template #extras>
-      <GameRoomBar
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="elapsed"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        @submit="submitRoomScore"
-        @leave="play.leave"
-      />
     </template>
 
     <!-- 开局选择:进页面先定模式与难度(上一局没下完时也能接着下);
@@ -307,7 +296,6 @@ import { RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
@@ -516,7 +504,6 @@ const goBack = () => {
   if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
   else router.push('/games')
 }
-const submitRoomScore = () => play.report(elapsed.value)
 
 function snapshotRoomState() {
   return {

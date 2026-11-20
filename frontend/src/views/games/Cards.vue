@@ -6,7 +6,9 @@
     body-align="stretch"
     :new-game="!inRoom"
     :new-game-confirm="board?.status === 'PLAYING'"
-    @back="router.push('/games')"
+    :room-mode="inRoom"
+    :default-wide="inRoom"
+    @back="goBack"
     @new-game="onNewGame"
   >
     <template #rules>
@@ -114,6 +116,8 @@ provide('gameFullscreen', isFullscreen)
 
 /** 房间对局:牌桌模式固定由房主定,不给重开、不改模式、不给撤销 */
 const inRoom = computed(() => !!route.query.room)
+/** 房间局返回 = 回房间页(牌桌本身没有要交接的席位);单人回游戏列表 */
+const goBack = () => router.push(inRoom.value ? `/games/room/${route.query.room}` : '/games')
 /** 当前挂着的牌桌(只挂一个,三桌共用一个 ref) */
 const board = ref(null)
 /** 翻牌数/难度由页面持有(头部有控件),棋盘用 v-model 同步 */

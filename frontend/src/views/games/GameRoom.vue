@@ -85,6 +85,14 @@
                 </el-button>
               </el-tooltip>
             </div>
+            <!-- 房主请人离开:只在大厅/局终可踢(对局中请先「结束本局」,免得牌桌与名单对不上) -->
+            <div v-if="canKick(m)" class="room-member-call">
+              <el-tooltip :content="$t('games.room.kick')" placement="top">
+                <el-button circle size="small" :disabled="busy" @click="kickMember(m)">
+                  <el-icon><CloseBold /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
           <!-- 空参战席:有电脑玩家的游戏自动补位,否则等加入 -->
           <div v-for="n in seatView.emptyPlayerSeats" :key="'bot' + n" class="room-member card" :class="gameSupportsAi ? 'bot' : 'empty'">
@@ -135,6 +143,13 @@
                 </el-button>
               </el-tooltip>
             </div>
+            <div v-if="canKick(m)" class="room-member-call">
+              <el-tooltip :content="$t('games.room.kick')" placement="top">
+                <el-button circle size="small" :disabled="busy" @click="kickMember(m)">
+                  <el-icon><CloseBold /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
           <!-- 空观战席:房间容量的剩余空位 -->
           <div v-for="n in seatView.emptySpectatorSeats" :key="'es' + n" class="room-member empty card">
@@ -169,6 +184,22 @@
           </template>
           <template v-else-if="room.status === 'PLAYING'">
             <el-button type="primary" size="default" round @click="enterGame">{{ $t('games.room.enterGame') }}</el-button>
+            <!-- 对局中让位:把自己的席位直接交给某位观战者(挂机/临时有事,不用下局再换) -->
+            <el-dropdown v-if="canYield" trigger="click" @command="yieldSeatTo">
+              <el-button size="default" round :loading="busy">
+                {{ $t('games.room.yieldSeat') }}
+                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item v-for="s in seatView.spectators" :key="s.userId" :command="s.userId">
+                    {{ $t('games.room.yieldTo', { name: s.name }) }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <!-- 对局中唯一的强制结束入口:房主关掉本局(按现在的成绩结算),卡住的局靠这个收尾 -->
+            <el-button v-if="isHost" size="default" round plain :loading="busy" @click="endNow">{{ $t('games.room.endNow') }}</el-button>
             <span class="room-hint">{{ myIsSpectator ? $t('games.room.spectatorHint') : $t('games.room.playingHint') }}</span>
           </template>
           <template v-else-if="room.status === 'FINISHED'">
@@ -188,11 +219,9 @@
             <el-button v-else-if="!isHost && canTakeSeat" size="default" round :loading="busy" @click="switchMyRole('PLAYER')">
               {{ $t('games.room.toPlayer') }}
             </el-button>
-            <el-button size="default" round @click="router.push('/games')">{{ $t('games.room.backGames') }}</el-button>
           </template>
           <template v-else>
             <span class="room-hint">{{ $t('games.room.cancelled') }}</span>
-            <el-button size="default" round @click="router.push('/games')">{{ $t('games.room.backGames') }}</el-button>
           </template>
           <!-- 换位申请条:目标玩家处理,发起者可撤回(对局中不展示,后端同样拒绝) -->
           <template v-if="pendingSwap && canSelfSwitch">
@@ -245,8 +274,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
-import { Monitor, Phone, Plus, Promotion, Switch, UserFilled, VideoCamera } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowDown, CloseBold, Monitor, Phone, Plus, Promotion, Switch, UserFilled, VideoCamera } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import RoomInvitePicker from '@/components/games/RoomInvitePicker.vue'
@@ -327,7 +356,7 @@ const canStart = computed(() => players.value.length >= (gameSupportsAi.value ? 
 const startHint = computed(() => {
   if (!room.value) return ''
   const min = gameSupportsAi.value ? 1 : 2
-  if (players.value.length < min) return t('games.room.needTwoPlayers')
+  if (players.value.length < min) return t(min === 1 ? 'games.room.needOnePlayer' : 'games.room.needTwoPlayers')
   const waiting = players.value.filter((m) => !m.ready).length
   return waiting ? t('games.room.waitPlayersReady', { n: waiting }) : t('games.room.allPlayersReady')
 })
@@ -354,6 +383,17 @@ const swapTargetName = computed(() => (room.value?.members || []).find((m) => m.
 /** 自己是观战且无待处理申请时,可向参战玩家(非房主)发换位申请 */
 const canOfferSwapTo = (m) =>
   !!room.value && canSelfSwitch.value && myIsSpectator.value && !pendingSwap.value && m.role === ROOM_ROLE.PLAYER && m.userId !== myId.value
+/** 对局中让位:我是参战玩家且有观战者在场 */
+const canYield = computed(
+  () => !!room.value && room.value.status === ROOM_STATUS.PLAYING && !myIsSpectator.value && seatView.value.spectators.length > 0,
+)
+
+/** 房主请人离开:对局中不开放(先「结束本局」),避免牌桌席位与成员名单对不上 */
+const canKick = (m) =>
+  !!room.value &&
+  isHost.value &&
+  m.userId !== myId.value &&
+  (room.value.status === ROOM_STATUS.WAITING || room.value.status === ROOM_STATUS.FINISHED)
 
 const switchMyRole = async (role) => {
   busy.value = true
@@ -567,14 +607,83 @@ const callMember = async (member, media) => {
 }
 
 const leave = async () => {
+  if (!room.value) {
+    router.push('/games')
+    return
+  }
+  // 房主在对局中离开 = 关掉本局(房主端就是引擎),先说清楚再走
+  if (isHost.value && room.value.status === ROOM_STATUS.PLAYING) {
+    try {
+      await ElMessageBox.confirm(t('games.room.hostLeaveConfirm'), t('games.room.leave'), { type: 'warning' })
+    } catch {
+      return
+    }
+  }
   leaving.value = true
   try {
-    if (room.value && room.value.status !== ROOM_STATUS.FINISHED) await roomApi.leave(roomId.value)
+    // 后端:房主对局中离开按当前成绩结算;已结束的房间也能真正退出(成员行物理删除)
+    await roomApi.leave(roomId.value)
   } catch {
-    // 已结束/已被移除时忽略
+    // 已被移出/房间被清掉时照常回列表
   } finally {
     leaving.value = false
     router.push('/games')
+  }
+}
+
+/** 房主结束本局:按现在的成绩结算(卡住/挂机的局靠这个收尾),之后可在房间里「再来一局」 */
+const endNow = async () => {
+  if (!room.value) return
+  try {
+    await ElMessageBox.confirm(t('games.room.endNowConfirm'), t('games.room.endNow'), { type: 'warning' })
+  } catch {
+    return
+  }
+  busy.value = true
+  try {
+    applyRoom(await roomApi.end(roomId.value))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 对局中让位:把席位交给指定观战者(系统消息由服务端广播),之后自己变成观战 */
+const yieldSeatTo = async (toUserId) => {
+  const target = seatView.value.spectators.find((s) => s.userId === toUserId)
+  if (!room.value || !target) return
+  try {
+    await ElMessageBox.confirm(t('games.room.yieldTo', { name: target.name }), t('games.room.yieldSeat'), { type: 'warning' })
+  } catch {
+    return
+  }
+  busy.value = true
+  try {
+    applyRoom(await roomApi.yieldSeat(roomId.value, toUserId))
+    ElMessage.success(t('games.room.yieldDone', { name: target.name }))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 房主请人离开房间(被请走的人会收到 kicked 事件并退出房间页) */
+const kickMember = async (m) => {
+  if (!room.value || !m) return
+  try {
+    await ElMessageBox.confirm(t('games.room.kickConfirm', { name: m.name }), t('games.room.kick'), { type: 'warning' })
+  } catch {
+    return
+  }
+  busy.value = true
+  try {
+    applyRoom(await roomApi.kick(roomId.value, m.userId))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
   }
 }
 
@@ -594,7 +703,14 @@ const again = async () => {
 onMounted(async () => {
   chatStore.ensureConnected()
   unsubscribe = chatStore.onGameSignal((data) => {
-    if (!data || Number(data.roomId) !== roomId.value || data.event !== 'room') return
+    if (!data || Number(data.roomId) !== roomId.value) return
+    // 被房主请出房间:这里没有房间状态可刷,直接回游戏列表
+    if (data.event === 'kicked') {
+      ElMessage.warning(t('games.room.kickedTip'))
+      router.push('/games')
+      return
+    }
+    if (data.event !== 'room') return
     applyRoom(data.room)
   })
   await load()

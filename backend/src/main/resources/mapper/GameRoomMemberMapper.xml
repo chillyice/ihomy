@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.GameRoomMemberMapper">
+
+    <!--
+      退出/踢出房间:成员行物理删除。
+      逻辑删(MP deleteById)会留下 deleted=1 的一行,撞 uk_room_user_deleted(room_id,user_id,deleted):
+      同一人第二次退出、或被踢后重新加入再退出都会报唯一键冲突。成员行的成绩已落 family_game_room_round,
+      本身没有留痕价值,所以进出房间一律物理删。
+    -->
+    <delete id="hardDelete">
+        DELETE FROM `family_game_room_member` WHERE `id` = #{id}
+    </delete>
+</mapper>

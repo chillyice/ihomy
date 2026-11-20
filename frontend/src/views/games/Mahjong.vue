@@ -6,33 +6,19 @@
   <GameShell
     ref="shellEl"
     class="mj-shell"
-    :class="{ 'mj-room': play.active, 'mj-live': feltTable, 'gs-on-dark': feltTable }"
+    :class="{ 'mj-live': feltTable, 'gs-on-dark': feltTable }"
     :title="$t('games.mahjong.title')"
     body-align="stretch"
     readable
     :new-game="!play.active && phase === 'playing'"
     :new-game-confirm="true"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onNewGame"
   >
     <template #rules>
       <p>{{ $t('games.mahjong.coverHint') }}</p>
-    </template>
-    <template #extras>
-      <GameRoomBar
-        v-if="play.active"
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="myScore"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        exit-ends-room
-        @submit="submitRoomScore"
-        @leave="play.leave"
-        @auto="onAutoToggle"
-      />
     </template>
 
     <!-- 新游戏:外壳确认后选规则(封面与房主规则面板之外,进行中也能换) -->
@@ -290,7 +276,11 @@
                     <span v-for="n in handBackFill" :key="'ph' + n" class="tile back hand" aria-hidden="true" />
                   </div>
                 </div>
-                <div v-if="!play.isSpectator && (claimPrompt || canSelfWin || myGangOptions.length)" class="my-actions" aria-live="polite">
+                <div
+                  v-if="!play.isSpectator && (claimPrompt || canSelfWin || myGangOptions.length || play.active)"
+                  class="my-actions"
+                  aria-live="polite"
+                >
                   <template v-if="claimPrompt">
                     <el-button
                       v-for="(pair, i) in activeChiOptions"
@@ -332,6 +322,19 @@
                       {{ $t(opt.type === 'angang' ? 'games.mahjong.anGang' : 'games.mahjong.buGang') }}
                     </el-button>
                   </template>
+                  <!-- 托管:房间局常驻(跟吃碰杠同一排);亮起时房主端 AI 代打我的牌 -->
+                  <el-button
+                    v-if="play.active && phase === 'playing'"
+                    class="mj-auto-btn"
+                    :type="iAmAuto ? 'warning' : 'default'"
+                    :plain="!iAmAuto"
+                    size="default"
+                    round
+                    :aria-pressed="iAmAuto"
+                    @click="toggleAuto"
+                  >
+                    {{ $t(iAmAuto ? 'games.room.autoOff' : 'games.room.autoOn') }}
+                  </el-button>
                 </div>
               </div>
 
@@ -413,10 +416,9 @@ import { computed, h, inject, nextTick, onBeforeUnmount, onMounted, ref, watch }
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { gameApi, roomApi } from '@/api'
+import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
@@ -533,8 +535,8 @@ const roomBubble = (userId) => (play.active && userId != null ? roomChat.bubbleO
 
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended
-/** 单机对局中:整页铺成绿桌布、头部走深底白字(封面与房间局不算,房间局有房间条仍按外壳两栏排) */
-const feltTable = computed(() => phase.value !== 'idle' && !play.active)
+/** 对局中(单机与「一起玩」同口径):整页铺成绿桌布、头部走深底白字;封面不算 */
+const feltTable = computed(() => phase.value !== 'idle')
 const turn = ref(0) // 0..3 座次
 const seatList = ref([]) // [{ seat, userId, name, ai }]
 const hands = ref([[], [], [], []]) // 暗手牌实例 id;访客只有自己那格
@@ -609,6 +611,8 @@ const mySeat = computed(() => {
 const myTurn = computed(() => phase.value === 'playing' && turn.value === mySeat.value)
 /** 我的席位对象(观战为 null):左下角头像与自己的聊天气泡挂在它上面 */
 const selfSeat = computed(() => (mySeat.value >= 0 ? seatList.value[mySeat.value] : null))
+/** 我的席位是否托管中(房间局):托管键亮起,牌由房主端 AI 代打 */
+const iAmAuto = computed(() => !!selfSeat.value?.auto)
 const myHandTiles = computed(() => (isGuest.value ? guestHand.value : hands.value[mySeat.value] || []))
 const claimPrompt = computed(() => guestClaim.value || localClaim.value)
 // 吃询问时给本机的组合候选(访客来自信令,房主/单机来自询问下发)
@@ -779,22 +783,8 @@ const DIE_PIPS = {
 const diePips = (n) => DIE_PIPS[Math.max(1, Math.min(6, Number(n) || 1))] || []
 const pipStyle = ([r, c]) => ({ gridArea: `${r + 1} / ${c + 1}` })
 
-const goBack = async () => {
-  if (!play.active || !play.room?.id) {
-    router.push('/games')
-    return
-  }
-  const roomId = play.room.id
-  // 实时权威牌局:房主退出即结束(否则其他人等不到出牌),访客退出则离房把人位交给 AI
-  if (play.room.status === 'PLAYING') {
-    try {
-      await (play.isHost ? roomApi.end(roomId) : roomApi.leave(roomId))
-    } catch {
-      // 房间已结束时忽略
-    }
-  }
-  router.push(play.isHost ? `/games/room/${roomId}` : '/games')
-}
+/** 返回:房间局回房间页(房主先确认结束本局,其他人先托管把席位交 AI),单机回游戏列表 */
+const goBack = () => play.exitToLobby({ aiGame: true })
 
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms))
@@ -1500,6 +1490,9 @@ function onAutoToggle(on) {
   }
 }
 
+/** 托管键:一键切换我自己的席位 */
+const toggleAuto = () => onAutoToggle(!iAmAuto.value)
+
 function onRoomChange(next) {
   if (!next || !play.active) return
   if ((next.status === 'FINISHED' || next.status === 'CANCELLED') && phase.value !== 'ended') {
@@ -1649,8 +1642,6 @@ function autoReport() {
   if (!play.active || play.reported || !result.value) return
   play.report(myScore.value)
 }
-
-const submitRoomScore = () => play.report(myScore.value)
 
 const onResultAction = () => {
   if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
@@ -2631,57 +2622,56 @@ html.dark .rules-chip {
 
 /* 本页整页就是一张绿桌布:外壳内边距只留安全区(沉浸态那条带 !important,这里同权压回),
    窄屏档给 game-surface 的 8px 边也去掉;头部自己留一点内边距,按钮不贴着屏幕边。
-   「一起玩」房间局不走这套(房间条与左栏仍按外壳常规排)。 */
-.page.game-shell.mj-shell:not(.mj-room) {
+   单机与「一起玩」房间局同一套口径(房间里不再有房间条,撑满由宽屏承载)。 */
+.page.game-shell.mj-shell {
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
 }
-.page.game-shell.mj-shell:not(.mj-room) > .gs-body {
+.page.game-shell.mj-shell > .gs-body {
   margin-inline: 0;
 }
-.page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
+.page.game-shell.mj-shell :deep(.gs-rail) {
   padding: 6px 8px 0;
 }
 
-/* ===== 单机对局:整块主区铺成一张绿桌布 =====
+/* ===== 对局中:整块主区铺成一张绿桌布 =====
  * 与「对抗牌局」同一套口径:桌毡底色上到页面级(--gs-bg),头部那一行也落在毡面上,牌桌的
  * 边界就是画面边界。手牌/牌河本来就把整块游戏区铺满,所以只需把 .mj-table 自绘的底色与
  * 桌沿让位,否则页面上会浮出一块矩形;头部同时挂 gs-on-dark(main.css 那段),否则浅色
  * 主题的深棕字与浅米按钮压在绿毡上几乎看不清(深色主题本来就是浅字,所以只有浅色才明显)。
- * 封面(选规则)与「一起玩」房间局不算:前者是浅底表单,后者有房间条与左栏。 */
-.page.game-shell.mj-shell.mj-live:not(.mj-room) {
+ * 封面(选规则、等房主开牌)不算:那是浅底表单。 */
+.page.game-shell.mj-shell.mj-live {
   --mj-felt-a: #3f7d5c;
   --mj-felt-b: #28553f;
   --gs-bg:
     radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.16) 0%, transparent 60%),
     linear-gradient(158deg, var(--mj-felt-a) 0%, var(--mj-felt-b) 100%);
 }
-html.dark .page.game-shell.mj-shell.mj-live:not(.mj-room) {
+html.dark .page.game-shell.mj-shell.mj-live {
   --mj-felt-a: #294f3f;
   --mj-felt-b: #16302a;
 }
 /* 全屏走 Fullscreen API 时外壳把底色换回内容页底,这里拉回桌布 */
-.page.game-shell.mj-shell.mj-live:not(.mj-room):fullscreen {
+.page.game-shell.mj-shell.mj-live:fullscreen {
   background: var(--gs-bg);
 }
 /* 桌布已由页面铺好:牌桌不再自绘底色/桌沿,只留中央高光(与页面同一个渐变,叠不出两层亮斑) */
-.page.game-shell.mj-shell.mj-live:not(.mj-room) .mj-table {
+.page.game-shell.mj-shell.mj-live .mj-table {
   background: none;
   box-shadow: none;
 }
-.page.game-shell.mj-shell.mj-live:not(.mj-room) .mj-table::after {
+.page.game-shell.mj-shell.mj-live .mj-table::after {
   display: none;
 }
 
 /* ===== 手机横屏:整块游戏区就是一张麻将桌 =====
  * 矮屏横屏最缺的正是高度,而外壳默认会在左边留一栏放头部,白白从毯面身边切走 150~200px。
- * 单机局改成盘面独占整页、绿桌布一直铺到画面边缘(内边距只留安全区,刘海与小白条不被盖住),
- * 返回/游戏名/新游戏/规则压成贴毯面的一行浮在左上角(那块毯面本来就不摆牌)。
- * 「一起玩」房间条一出现就有六七个按钮,浮在桌面上必然压住上家的副露,所以房间局仍走
- * 外壳的两栏横屏档(左栏放头与房间条),只把牌桌按同一套设计画布铺满右栏。 */
+ * 对局(单机/一起玩)改成盘面独占整页、绿桌布一直铺到画面边缘(内边距只留安全区,刘海与
+ * 小白条不被盖住),返回/游戏名/新游戏/规则压成贴毯面的一行浮在左上角(那块毯面本来就不摆牌)。
+ * 房间里聊天浮窗钉在右上、通话在浮窗里,所以这一行只剩外壳自己的键。 */
 @media (orientation: landscape) and (max-height: 520px) {
   /* 沉浸态那条 padding 带 !important(叠安全区),这里同样要 !important 才盖得回;
      只留安全区 → 桌布贴边 */
-  .page.game-shell.mj-shell:not(.mj-room) {
+  .page.game-shell.mj-shell {
     position: relative;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
@@ -2690,7 +2680,7 @@ html.dark .page.game-shell.mj-shell.mj-live:not(.mj-room) {
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
   }
   /* 头部一整行直接贴在毯面上:没有玻璃底、没有描边,只有一层暗投影把字从绿底上托起来 */
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rail) {
+  .page.game-shell.mj-shell :deep(.gs-rail) {
     position: absolute;
     top: 0;
     left: 0;
@@ -2704,29 +2694,29 @@ html.dark .page.game-shell.mj-shell.mj-live:not(.mj-room) {
     background: none;
     box-shadow: none;
   }
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-head) {
+  .page.game-shell.mj-shell :deep(.gs-head) {
     flex-wrap: nowrap;
     min-height: 0;
     padding-bottom: 0;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
   }
   /* 外壳横屏档把「新游戏 + 规则」掰到第二行;这里空间够,拉回第一行 */
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-head .gs-end) {
+  .page.game-shell.mj-shell :deep(.gs-head .gs-end) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     margin-left: 4px;
     justify-content: flex-start;
   }
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-title) {
+  .page.game-shell.mj-shell :deep(.gs-title) {
     color: #f6f2e4;
   }
   /* 横屏这一行横向空间充裕(整条才 200 出头),返回与规则恢复文字,「返回 · 麻将 · 新游戏 · 规则」读成一条 */
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-back-label),
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-rules-label) {
+  .page.game-shell.mj-shell :deep(.gs-back-label),
+  .page.game-shell.mj-shell :deep(.gs-rules-label) {
     display: inline;
   }
   /* 盘面独占整块游戏区(本页没有计分栏/页脚,一行一列就够) */
-  .page.game-shell.mj-shell:not(.mj-room) :deep(.gs-body) {
+  .page.game-shell.mj-shell :deep(.gs-body) {
     grid-row: 1;
     grid-column: 1;
   }

@@ -432,6 +432,8 @@ export const roomApi = {
   finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
   end: (id) => request.post(`/game/room/${id}/end`),
   leave: (id) => request.post(`/game/room/${id}/leave`),
+  // 房主请成员离开(不能踢自己;对局中走「结束本局」,大厅/局终才可踢)
+  kick: (id, targetUserId) => request.post(`/game/room/${id}/kick`, { targetUserId }),
 }
 
 // 愿望单(家庭共享愿望,分类/达成/放弃)

@@ -6,6 +6,8 @@
     body-align="start"
     :new-game="screen === 'game' && !play.active"
     :new-game-confirm="screen === 'game' && !won && !lost"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="onRestartClick"
   >
@@ -51,21 +53,6 @@
           ><b>{{ score }}</b></span
         >
       </template>
-    </template>
-
-    <template #extras>
-      <GameRoomBar
-        v-if="screen === 'game'"
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="score"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        @submit="submitRoomScore"
-        @leave="play.leave"
-      />
     </template>
 
     <div class="pl-layout" :style="{ '--pl-pad': padPx + 'px' }" @contextmenu.prevent @dblclick.prevent>
@@ -224,7 +211,6 @@ import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
 import { isSpectatorRole } from '@/utils/gameRoom'
@@ -439,8 +425,6 @@ function onRoomChange(next) {
   if (!next) return
   if (next.status === 'FINISHED' || next.status === 'CANCELLED') stopTicker()
 }
-
-const submitRoomScore = () => play.report(score.value)
 
 function onRestartClick() {
   if (play.ended) return

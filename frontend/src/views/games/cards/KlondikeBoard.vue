@@ -28,18 +28,6 @@
       </div>
     </div>
 
-    <GameRoomBar
-      :room="play.room"
-      :is-host="play.isHost"
-      :score="game.score"
-      :reported="play.reported"
-      :ended="play.ended"
-      :result="play.spec?.result"
-      :my-id="play.myId"
-      @submit="submitRoomScore"
-      @leave="play.leave"
-    />
-
     <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.solitaire.title')">
       <div class="sol-row sol-top">
         <div class="sol-pile-group sol-stock-waste">
@@ -178,7 +166,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { gameApi } from '@/api'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useCardDrag } from '@/composables/useCardDrag'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { formatClock } from '@/utils/games/gameClock'
@@ -442,8 +429,6 @@ const finishLose = () => {
   selected.value = null
   if (play.active) play.report(0)
 }
-
-const submitRoomScore = () => play.report(game.value.score)
 
 const commit = (next) => {
   if (!next || next === game.value) return false

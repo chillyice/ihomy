@@ -34,6 +34,7 @@
             {{ $t('games.newGame') }}
           </el-button>
           <el-button
+            v-if="!roomMode"
             class="gs-icon-btn gs-fullscreen"
             size="small"
             round
@@ -158,6 +159,8 @@ const props = defineProps({
   newGameConfirm: { type: Boolean, default: false },
   /** 进页默认开宽屏(隐藏侧栏、放开内容宽度);用户仍可用头部「宽屏」键切回 */
   defaultWide: { type: Boolean, default: false },
+  /** 「一起玩」房间局:不出浏览器全屏键(全屏会把 App 层的聊天浮窗一起隐藏),撑满走「宽屏」 */
+  roomMode: { type: Boolean, default: false },
 })
 const emit = defineEmits(['back', 'newGame'])
 

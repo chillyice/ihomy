@@ -6,6 +6,8 @@
     body-align="center"
     :new-game="!play.active"
     :new-game-confirm="game.status === 'PLAYING'"
+    :room-mode="play.active"
+    :default-wide="play.active"
     @back="goBack"
     @new-game="startNew"
   >
@@ -44,20 +46,6 @@
       >
         {{ paused ? '▶' : '⏸' }} {{ paused ? $t('games.tetris.resume') : $t('games.tetris.pause') }}
       </el-button>
-    </template>
-
-    <template #extras>
-      <GameRoomBar
-        :room="play.room"
-        :is-host="play.isHost"
-        :score="game.score"
-        :reported="play.reported"
-        :ended="play.ended"
-        :result="play.spec?.result"
-        :my-id="play.myId"
-        @submit="submitRoomScore"
-        @leave="play.leave"
-      />
     </template>
 
     <!-- 数据条贴棋盘:与棋盘+侧栏同宽的细条,左对齐排在棋盘上方;
@@ -170,7 +158,6 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
-import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { seededRng } from '@/utils/games/seededRng'
@@ -351,8 +338,6 @@ const startNew = () => {
   clearState()
   schedule()
 }
-
-const submitRoomScore = () => play.report(game.value.score)
 
 const togglePause = () => {
   if (game.value.status !== STATUS.PLAYING) return
