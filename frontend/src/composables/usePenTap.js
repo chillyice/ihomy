@@ -8,7 +8,7 @@
 // 不接管:手指/鼠标、长按(PEN_LONG_PRESS_MS 以上)、拖动(位移超阈值)、拖牌进行中(body.card-dragging)、
 // canvas 手写板与输入框(见 utils/penTap.js PEN_TAP_EXCLUDED_SELECTOR),需要例外的地方自己标 data-pen-tap="off"。
 import { onBeforeUnmount, onMounted } from 'vue'
-import { isPenTapCandidate, isPenTapExcluded, shouldSwallowPenClick } from '@/utils/penTap'
+import { isDisabledControl, isPenTapCandidate, isPenTapExcluded, resolvePenTapTarget, shouldSwallowPenClick } from '@/utils/penTap'
 
 export function usePenTap() {
   let down = null
@@ -31,8 +31,14 @@ export function usePenTap() {
     // 拖牌(useCardDrag)进行中由拖拽收尾,不能再补一次点击
     const busy = typeof document !== 'undefined' && document.body.classList.contains('card-dragging')
     if (!isPenTapCandidate({ pointerType: event.pointerType, distance, duration: Date.now() - start.at, busy })) return
-    const target = start.target && start.target.isConnected ? start.target : event.target
+    // 落点对齐原生 click:以「抬起时指针下」的命中测试为准;按下到抬起之间 DOM 会重排
+    // (摸牌插入手牌、碰吃胡询问条出现/消失),按按下时的旧元素补发会点到已经挪走的那张牌。
+    const upTarget =
+      Number.isFinite(event.clientX) && Number.isFinite(event.clientY) ? document.elementFromPoint(event.clientX, event.clientY) : null
+    const target = resolvePenTapTarget({ upTarget, downTarget: start.target, fallbackTarget: event.target })
     if (!target) return
+    // 原生语义:停在 disabled 控件上的点击不发生(如牌局还没轮到你时点手牌)
+    if (isDisabledControl(target)) return
     tapPoint = { at: Date.now(), x: event.clientX, y: event.clientY }
     const click = new MouseEvent('click', {
       bubbles: true,

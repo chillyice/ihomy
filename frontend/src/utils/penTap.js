@@ -64,3 +64,40 @@ export function isPenTapExcluded(target) {
   if (target.closest(PEN_TAP_EXCLUDED_SELECTOR)) return true
   return target.isContentEditable === true
 }
+
+// 原生 click 语义:disabled 表单控件不产生点击;补发点击同样跳过(比如牌局还没轮到你时点手牌)
+export const PEN_DISABLED_SELECTOR = [
+  'button[disabled]',
+  'input[disabled]',
+  'select[disabled]',
+  'textarea[disabled]',
+  'fieldset[disabled]',
+].join(', ')
+
+export function isDisabledControl(target) {
+  return !!(target && typeof target.closest === 'function' && target.closest(PEN_DISABLED_SELECTOR))
+}
+
+/**
+ * 补发点击的目标元素,对齐原生 click 的落点语义:
+ * 按下/抬起落在同一元素或互为祖先 → 该元素;落到不同元素(小幅漂移蹭到相邻元素)→ 最近公共祖先,
+ * 不会误点隔壁的牌/按钮;按下时的元素已被移除(询问条已关、手牌重排)→ 以抬起处命中的元素为准。
+ * 之所以不能按按下时的旧元素补发:按下→抬起之间 DOM 会重排(摸牌插入手牌、弹层出现/消失),
+ * 旧元素可能已经挪走或被移除,补发过去就是「点这里、别处响应」。
+ * @param {{ upTarget?: Node | null, downTarget?: Node | null, fallbackTarget?: Node | null }} opts
+ */
+export function resolvePenTapTarget({ upTarget, downTarget, fallbackTarget }) {
+  const down = downTarget && downTarget.isConnected ? downTarget : null
+  if (!upTarget && !down) return fallbackTarget || null
+  if (!upTarget) return down
+  if (!down) return upTarget
+  if (upTarget === down) return upTarget
+  if (down.contains(upTarget)) return down
+  if (upTarget.contains(down)) return upTarget
+  const ancestors = new Set()
+  for (let node = upTarget; node; node = node.parentElement) ancestors.add(node)
+  for (let node = down; node; node = node.parentElement) {
+    if (ancestors.has(node)) return node
+  }
+  return fallbackTarget || null
+}
