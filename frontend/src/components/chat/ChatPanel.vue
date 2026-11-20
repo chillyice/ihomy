@@ -3,21 +3,23 @@
 <template>
   <div class="chat-panel">
     <div ref="bodyEl" class="chat-panel-body">
-      <ChatContactRail v-if="railOpen" :style="railStyle" :narrow="railNarrow" />
-      <!-- 对象列宽度拖拽把手:最小缩到只剩头像,收起/展开仍走会话头那个按钮 -->
-      <div
-        v-if="railOpen"
-        class="rail-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        :title="$t('chat.rail.resize')"
-        @pointerdown="onRailResizeStart"
-      ></div>
+      <div class="rail-slot" :class="{ open: railOpen }" :style="railStyle" :inert="!railOpen">
+        <ChatContactRail v-if="railMounted" :narrow="railNarrow" />
+        <!-- 对象列宽度拖拽把手:最小缩到只剩头像,收起/展开仍走会话头那个按钮 -->
+        <div
+          class="rail-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          :title="$t('chat.rail.resize')"
+          @pointerdown="onRailResizeStart"
+        ></div>
+      </div>
       <div class="chat-main">
         <div class="chat-main-head">
           <button
             type="button"
             class="head-toggle"
+            :aria-expanded="railOpen"
             :title="railOpen ? $t('chat.rail.collapse') : $t('chat.rail.expand')"
             :aria-label="railOpen ? $t('chat.rail.collapse') : $t('chat.rail.expand')"
             @click="toggleRail"
@@ -106,10 +108,12 @@ onMounted(() => {
   }
 })
 
-const railStyle = computed(() => ({ width: `${Math.round(railWidth.value)}px` }))
+const railMounted = ref(railOpen.value)
+const railStyle = computed(() => ({ '--rail-width': `${Math.round(railWidth.value)}px` }))
 const railNarrow = computed(() => railWidth.value < RAIL_NARROW)
 
 const toggleRail = () => {
+  railMounted.value = true
   railOpen.value = !railOpen.value
 }
 watch(railOpen, (v) => {
@@ -180,9 +184,31 @@ if (!chatStore.ownFamily.name) {
 }
 .chat-panel-body {
   display: flex;
-  gap: 6px;
   flex: 1;
   min-height: 0;
+}
+.rail-slot {
+  display: flex;
+  flex: none;
+  width: 0;
+  overflow: clip;
+}
+.rail-slot.open {
+  width: calc(var(--rail-width) + 14px);
+}
+.rail-slot > .chat-rail {
+  width: var(--rail-width);
+}
+.rail-slot > .rail-resizer {
+  margin-left: 2px;
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .rail-slot {
+    transition: width var(--dur-fast) ease-out;
+  }
+  .rail-slot:has(.rail-resizer:active) {
+    transition: none;
+  }
 }
 .chat-main {
   display: flex;
