@@ -210,7 +210,7 @@
     <!-- 未登录:一次性登录卡(登录后本页只读;未登录时不显示任何家庭内容,演示家庭数据也不显示) -->
     <div v-if="!userStore.isLoggedIn" class="wp-login">
       <form class="wp-login-card" @submit.prevent="doLogin">
-        <div class="wp-login-title">ihomy</div>
+        <div class="wp-login-title"><IhomyWordmark /></div>
         <div class="wp-login-sub">{{ $t('wallpaper.loginSub') }}</div>
         <input v-model="form.email" class="wp-input" type="email" autocomplete="username" :placeholder="$t('wallpaper.email')" />
         <input
@@ -242,6 +242,7 @@
 </template>
 
 <script setup>
+import IhomyWordmark from '@/components/IhomyWordmark.vue'
 import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'

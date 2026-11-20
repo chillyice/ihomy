@@ -5,8 +5,7 @@
     <!-- 顶部:家庭封面 + 家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
       <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">
-        <!-- 门脸:与暖居顶栏同一张封面;无封面时只留文字 -->
-        <img v-if="familyCover" :src="familyCover" :alt="familyName || 'ihomy'" class="brand-cover" />
+        <img :src="familyCover || windowMark" alt="" class="brand-cover" />
         <span class="brand-text">{{ familyName || 'ihomy' }}</span>
       </span>
       <span
@@ -216,6 +215,7 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import windowMark from '@/assets/brand/ihomy-window-96.png'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'

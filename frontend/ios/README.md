@@ -94,9 +94,9 @@ App Group 统一 `group.top.ihomy.app`,三 target 共用同一份 `App/App.entit
 ## 图标与启动图
 
 `AppIcon.appiconset/AppIcon-512@2x.png`(1024×1024)与 `Splash.imageset/splash-2732x2732*.png`(2732×2732 ×3 档)
-都是按 `frontend/public/favicon.svg` 的品牌画的(`#1F3A5F` 底 + 白色「家」),**不是** Capacitor 模板默认图,也没走
-`@capacitor/assets` 生成:图标满幅、无圆角、无 alpha 通道(App Store 自己裁圆角,带 alpha 会被校验拒),
-启动图白底居中圆角图标(与 PWA `background_color:#ffffff` 同口径)。换品牌时按同样约束重出即可,
+均取自 `frontend/src/assets/brand/ihomy-window.png`（深青底、暖白窗框和杏黄色窗扇）。
+AppIcon 将深青底铺满方形画布并导出为 RGB，由 iOS 裁切圆角。
+启动图在白底中央使用圆角图标。换品牌时按同样约束重出即可，
 三档 splash 用同一张图(contentMode 是 scaleAspectFill,居中元素不会被裁)。
 
 ## 尚未验证(需真机 / macOS)

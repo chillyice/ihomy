@@ -11,12 +11,13 @@
       >鲁公网安备37010202700748号</a
     >
     <span class="footer-sep">·</span>
-    <span class="footer-version">ihomy {{ appVersion }}</span>
+    <span class="footer-version"><IhomyWordmark /> {{ appVersion }}</span>
   </footer>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import IhomyWordmark from '@/components/IhomyWordmark.vue'
 
 // 版本号唯一事实来源是根 VERSION:Web 端由构建注入 __APP_VERSION__,
 // 原生壳内改读安装包 versionName(gradle 同样从 VERSION 生成),两者展示一致。

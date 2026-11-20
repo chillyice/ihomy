@@ -7,7 +7,7 @@
       <div class="blob" style="background: #a8c9de; top: 15%; left: 70%; width: 280px; height: 280px"></div>
     </div>
     <div class="login-card">
-      <div class="login-title">ihomy</div>
+      <div class="login-title"><IhomyWordmark /></div>
       <div class="login-sub">{{ hasToken ? $t('passwordReset.resetTitle') : $t('passwordReset.forgotTitle') }}</div>
 
       <!-- 邮件链接进入:设置新密码 -->
@@ -58,6 +58,7 @@
 </template>
 
 <script setup>
+import IhomyWordmark from '@/components/IhomyWordmark.vue'
 import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'

@@ -8,7 +8,7 @@
       <div class="blob" style="background: #a8c9de; top: 15%; left: 70%; width: 280px; height: 280px"></div>
     </div>
     <div class="login-card">
-      <div class="login-title">ihomy</div>
+      <div class="login-title"><IhomyWordmark /></div>
       <div class="login-sub">{{ isRegister ? $t('login.registerTitle') : $t('login.welcome') }}</div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -68,6 +68,7 @@
 </template>
 
 <script setup>
+import IhomyWordmark from '@/components/IhomyWordmark.vue'
 import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
