@@ -1037,12 +1037,8 @@ html.theme-warm .gc-main .fp-page {
   border-radius: 9px;
 }
 
-@media (max-width: 880px) {
-  .gc-app {
-    grid-template-columns: 1fr;
-  }
-  .gc-side {
-    display: none;
-  }
-}
+/* 窄屏侧栏不收起(2026-11-20):暖居外壳只在「非移动布局」时挂载,而移动布局的判据是
+   `useDevice` 的 768px(平板短边够宽就走桌面外壳)。这里原先在 ≤880px 把侧栏 display:none,
+   769–880 这段就没有任何导航——iPad 竖屏(810/820/834)正好整段落在这里,只剩内容栏。
+   真窄到需要收起时,外壳本身已经换成 MobileLayout(底部 TabBar),所以这里不再做窄屏隐藏。 */
 </style>
