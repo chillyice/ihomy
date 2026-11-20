@@ -641,9 +641,12 @@ onBeforeUnmount(() => {
     display: none;
   }
   .ms-layout {
+    /* 旗标键贴在棋盘左侧,占掉一列按钮宽:宽度预算与格子边长都要先扣掉它,
+       否则「旗标 + 棋盘」比容器宽,居中裁切会把旗标左半截埋进边缘 */
+    --ms-cell-w: calc((100cqw - 24px - var(--gs-control-h) - (var(--ms-cols) - 1) * var(--ms-gap)) / var(--ms-cols));
     --ms-cell-h: calc((100cqh - 16px - (var(--ms-rows) - 1) * var(--ms-gap)) / var(--ms-rows));
     display: flex;
-    width: min(100%, calc(var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px));
+    width: min(100%, calc(var(--ms-cols) * var(--ms-cell) + (var(--ms-cols) - 1) * var(--ms-gap) + 16px + var(--gs-control-h)));
     max-height: 100%;
   }
   .ms-meta {
@@ -652,10 +655,13 @@ onBeforeUnmount(() => {
   .ms-board-wrap {
     min-width: 0;
     max-height: 100%;
-    /* 旗标键 + 棋盘作为一组居中,两者零间距贴靠 */
+    /* 旗标键 + 棋盘作为一组居中,两者零间距贴靠。
+       居中靠两端 auto 外边距而不是 justify-content —— 窄屏困难盘放不下要横向滚动时,
+       center 会把富余量摊到两侧并裁掉左端(旗标就埋了),auto 外边距在溢出时归零,
+       整组从左边起排,旗标始终整颗露在滚动起点 */
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
   }
   .ms-flag-side {
     display: inline-flex;
@@ -663,11 +669,16 @@ onBeforeUnmount(() => {
     width: var(--gs-control-h);
     height: var(--gs-control-h);
     padding: 0;
+    margin-left: auto;
     border-radius: var(--gs-radius) 0 0 var(--gs-radius);
+    /* 困难盘窄屏要横向滚动:旗标键粘在起点,格子从它下面滑过而不是把它推出视野 */
+    position: sticky;
+    left: 0;
+    z-index: var(--z-content);
   }
   .ms-board {
-    /* 组内居中由外层负责,棋盘不再自己用 auto 外边距,保证与旗标键贴死 */
-    margin-inline: 0;
+    /* 左侧与旗标键贴死,右侧 auto 与旗标的 margin-left:auto 平分富余量 = 整组居中 */
+    margin: 0 auto 0 0;
     border-radius: 0 10px 10px 0;
   }
   /* 外壳横屏档默认把居中棋盘改成贴左栏;扫雷格子边长按高度算,
