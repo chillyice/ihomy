@@ -1147,7 +1147,6 @@ export default {
         shots: 'Shots',
         progress: 'Drop in',
         best: 'Best',
-        newGame: 'New Game',
         start: 'Start Game',
         replay: 'Play Again',
         diffEasy: 'Easy',

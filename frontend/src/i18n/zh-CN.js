@@ -1140,7 +1140,6 @@ export default {
         shots: '发射',
         progress: '下压',
         best: '最佳',
-        newGame: '重开',
         start: '开始游戏',
         replay: '再玩一次',
         diffEasy: '简单',

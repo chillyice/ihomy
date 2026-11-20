@@ -8,6 +8,10 @@
     class="bb-shell gs-on-dark"
     :title="$t('games.embedded.bubble.title')"
     body-align="center"
+    :new-game="true"
+    :new-game-disabled="newDisabled"
+    :new-game-confirm="state === 'playing'"
+    @new-game="restart"
     @back="router.push('/games')"
   >
     <!-- 难度跟游戏名走(和象棋/黑白棋同一处),开局进行中锁定 -->
@@ -24,17 +28,11 @@
       <p>{{ $t('games.embedded.bubble.aimTip') }}</p>
     </template>
 
-    <!-- 计分芯片 + 操作贴画布:与画布同宽排在画布上方;手机横屏收成画布左侧一列 -->
+    <!-- 计分芯片贴画布:竖屏与画布同宽排在画布上方;手机横屏收成画布左侧一列,得分压到栏底 -->
     <div class="bb-layout" @contextmenu.prevent @dblclick.prevent>
       <div class="bb-meta gs-on-dark-surface">
-        <div class="bb-actions">
-          <!-- 本页的「新游戏」走自己的操作行(外壳头部那颗在泡泡龙不挂),配色跟全站一致走主按钮 -->
-          <el-button type="primary" size="small" round :disabled="newDisabled" @click="restart">
-            {{ $t('games.embedded.bubble.newGame') }}
-          </el-button>
-        </div>
         <div class="bb-chips">
-          <div class="bb-chip">
+          <div class="bb-chip bb-chip--score">
             <span>{{ $t('games.embedded.bubble.score') }}</span>
             <b>{{ score }}</b>
           </div>
@@ -116,8 +114,8 @@ const SHOOTER_X = FIELD_W / 2
 const SHOOTER_Y = FIELD_H - 22
 const SPEED = 7 // 每帧步长
 
-const PALETTE = ['#ef4444', '#f59e0b', '#facc15', '#22c55e', '#3b82f6', '#a855f7']
-const PALETTE_LIGHT = ['#fca5a5', '#fcd34d', '#fde68a', '#86efac', '#93c5fd', '#d8b4fe']
+const PALETTE = ['#ef4444', '#f59e0b', '#06b6d4', '#22c55e', '#3b82f6', '#a855f7']
+const PALETTE_LIGHT = ['#fca5a5', '#fcd34d', '#67e8f9', '#86efac', '#93c5fd', '#d8b4fe']
 
 /* 原版另有 MAX_ROWS=60 的硬上限常量,但从未参与任何逻辑,迁移时省略 */
 const DIFF = {
@@ -745,8 +743,9 @@ html.dark .bb-shell {
 
 /* 计分芯片 + 画布:竖屏自上而下、芯片横在画布上方;手机横屏收成画布左侧一列 */
 .bb-layout {
-  /* 画布宽 = min(容器宽, 440, 剩余高度 × 宽高比 406/600);84px 留给上方两行芯片与间隙 */
-  --bb-cv-w: min(100%, 440px, calc((100cqh - 84px) * 0.676667));
+  /* 画布宽 = min(容器宽, 440, 剩余高度 × 宽高比 406/600);44px 留给上方一行芯片与间隙
+     (「新游戏」在 V13.78 起交给外壳头部那颗,操作行随之取消) */
+  --bb-cv-w: min(100%, 440px, calc((100cqh - 44px) * 0.676667));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -761,17 +760,6 @@ html.dark .bb-shell {
   gap: 6px;
   width: var(--bb-cv-w);
   min-width: 0;
-}
-/* 按钮靠画布右端;横屏时挪到画布左上 */
-.bb-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-/* EP 给相邻按钮加 margin-left:12px,这里间距只走 gap */
-.bb-actions .el-button + .el-button {
-  margin-left: 0;
 }
 .bb-chips {
   display: flex;
@@ -802,7 +790,7 @@ html.dark .bb-shell {
 /* 窄屏竖屏:四个芯片挤一行会溢出(分数会长到 5~6 位),改 2×2;竖屏这里高度本来就有余量 */
 @media (max-width: 420px) and (orientation: portrait) {
   .bb-layout {
-    --bb-cv-w: min(100%, 440px, calc((100cqh - 112px) * 0.676667));
+    --bb-cv-w: min(100%, 440px, calc((100cqh - 78px) * 0.676667));
   }
   .bb-chips {
     display: grid;
@@ -870,7 +858,7 @@ html.dark .bb-shell {
   color: var(--bb-chip-ink);
 }
 
-/* 手机横屏:按钮 + 芯片收成画布左侧一列(按钮贴画布一侧靠上),画布独占右侧 */
+/* 手机横屏:芯片收成画布左侧一列,「得分」压到左栏底边(操作键已交给外壳头部的「新游戏」) */
 @media (orientation: landscape) and (max-height: 520px) {
   .bb-layout {
     --bb-meta-w: 132px;
@@ -883,19 +871,23 @@ html.dark .bb-shell {
     width: min(100%, calc(var(--bb-meta-w) + 10px + var(--bb-cv-w) + 14px));
     max-height: 100%;
   }
+  /* 左栏占满画布高度:得分芯片才能贴在画布底边那一侧 */
   .bb-meta {
     grid-area: meta;
-    align-self: start;
+    align-self: stretch;
     width: 100%;
     height: auto;
     gap: 8px;
   }
-  .bb-actions {
-    order: -1;
-  }
   .bb-chips {
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 6px;
+  }
+  /* 「得分」排到最末并顶到底边(发射/下压/最佳留在上面) */
+  .bb-chip--score {
+    order: 1;
+    margin-top: auto;
   }
   /* 横屏列里芯片压成一行:标签靠左、数值靠右(和黑白棋/扫雷左列同一读法) */
   .bb-chip {
