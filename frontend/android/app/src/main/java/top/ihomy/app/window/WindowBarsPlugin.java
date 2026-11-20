@@ -20,6 +20,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "IhomyWindowBars")
 public class WindowBarsPlugin extends Plugin {
 
+    /**
+     * 前端最近一次刷进来的页面根底色。系统/Capacitor 会在配置变化、窗口焦点恢复等时机
+     * 把窗口底色重刷成主题 windowBackground(华为深色模式不写 uiMode,主题停亮色=白),
+     * 这时要用它原样盖回去,否则深色页面顶部会留下一条白。
+     */
+    private static volatile Integer lastPageColor;
+
     @PluginMethod
     public void setBackgroundColor(PluginCall call) {
         String color = call.getString("color", "");
@@ -35,7 +42,15 @@ public class WindowBarsPlugin extends Plugin {
             call.reject("bad_color");
             return;
         }
+        lastPageColor = argb;
         activity.runOnUiThread(() -> activity.getWindow().getDecorView().setBackgroundColor(argb));
         call.resolve();
+    }
+
+    /** 用最近一次的页面底色重刷窗口;前端还没刷过则不动。 */
+    public static void reapplyLast(Activity activity) {
+        Integer color = lastPageColor;
+        if (color == null || activity == null) return;
+        activity.runOnUiThread(() -> activity.getWindow().getDecorView().setBackgroundColor(color));
     }
 }

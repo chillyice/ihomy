@@ -25,6 +25,7 @@ import top.ihomy.app.speech.SpeechPlugin;
 import top.ihomy.app.updater.AutoUpdateWorker;
 import top.ihomy.app.updater.UpdaterPlugin;
 import top.ihomy.app.widget.WidgetBridgePlugin;
+import top.ihomy.app.window.SystemInsetsForwarder;
 import top.ihomy.app.window.WindowBarsPlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -78,6 +79,9 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null && bridge.getWebView() != null) {
             CookieManager.getInstance().setAcceptThirdPartyCookies(bridge.getWebView(), true);
         }
+        // 安全区转发:接管 Capacitor SystemBars 的 insets 处理(配置里已 disable),
+        // 消掉华为 WebView 上 decorView padding 造成的横屏顶部空区,并注入真实安全区变量
+        SystemInsetsForwarder.install(bridge);
     }
 
     /**
@@ -89,6 +93,26 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         AppVisibility.setForeground(true);
+    }
+
+    /**
+     * 配置变化(旋转/深浅色/字体缩放)会把 Capacitor SystemBars 的窗口底色重刷成主题
+     * windowBackground——华为深色模式不写 uiMode、主题停亮色(白),深色页面顶部会留白条。
+     * super 先派发完插件回调,再原样盖回页面底色。
+     */
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        WindowBarsPlugin.reapplyLast(this);
+    }
+
+    /** 下拉/收起通知栏等系统交互恢复焦点时,部分 ROM 会重绘窗口底色,同样盖回页面底色 */
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            WindowBarsPlugin.reapplyLast(this);
+        }
     }
 
     @Override
