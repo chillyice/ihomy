@@ -155,6 +155,7 @@ MISSING_PATH="$(
       | while IFS= read -r p; do
           case "$p" in
             frontend/dist*|frontend/.env*|backend/target*) continue ;;  # 构建产物/本地凭证,不入库
+            docs/新人上手指南.md) continue ;;                         # 开发账号指南由维护者本地保管，见 .gitignore
             scripts/verify-release.mjs) continue ;;                     # 属 bit_pouch 独立仓,本仓没有
           esac
           [[ -e "$p" ]] || echo "        $doc: $p"
