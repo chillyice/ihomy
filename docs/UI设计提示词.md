@@ -23,6 +23,8 @@
 
 ## 全局约定(光影层全局化)
 
+- **品牌图形**：深青底上左扇为窄暖白空框，右扇为宽杏黄实面。相对的短边平行，斜边保留开窗角度，四角微圆。登录、页脚可配小写 `ihomy`，桌面图标只用窗扇。家庭门牌优先展示上传的封面。亲子叶片备用款由相依的两片叶构成，左小白叶代表孩子，右大杏黄叶代表家长。
+
 - 光影层(`SunLightLayer.vue`)+ 左侧导航栏(`AppSidebar.vue`)+ 右下角备案号(`SiteFooter.vue`)在 `App.vue` 全局挂载,所有页面共享。
 - 首页不再自带顶栏和光影层,只负责面板+相册+唱片机+光照测试控制台。
 - 全屏 `position: fixed` 布局,无滚动条。
@@ -667,6 +669,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 23. 移动端布局(MobileLayout,≤768px)
 
+- 外壳顶栏返回路由定义的上一级；从分享或跨模块进入详情也回到相应列表。宽度大于 768 像素时暖居侧栏可见。
+
 单代码库 + 运行时设备自适应(非子域名):`useDevice`(UA + matchMedia 768px 双信号)返回全局单例 `isMobile`,matchMedia change 监听横竖屏。移动端 → `<MobileLayout>`,桌面端 → AppSidebar + 光影层。
 
 ### 首页三 Tab 模式(`/` 路由)
@@ -953,6 +957,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 39. 聊天室与浮窗
 
+- 家庭 AI 助手占用对象列顶部入口。写操作展示待确认内容，语音转写先填入输入框，用户可编辑再发送。手机联系人列首次展开后保持挂载，由同一容器控制宽度过渡。
+
 1. **标题不重复**:房间名/家庭名在面板只出现一次——`chat.title`、`chat.roomTitle`、`chat.rail.family` 三处口径互斥,侧栏已显示家庭名时标题栏不再重复。
 2. **家人头像**:消息发送者统一用 `Sender(name, avatar)`(头像 `el-avatar :src`,取不到回退首字母);同一人连续消息只在首条显示头像与名字,后续行缩进对齐;头像尺寸沿用 `main.css` 标尺,不在组件里写 px。
 3. **表情**:`utils/chatEmoji.js` 定义 70 个表情;弹层 `:width="296"`,`.emoji-panel` 8 列 grid + `max-height:216px` 滚动,`.emoji-item` 18px 字号 + 圆角 8;表情插入到光标位置,不整段替换输入框内容。
@@ -991,6 +997,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 6. **批量操作文案**:跨类型选中时按钮文案区分实际动作(如映射相册显示「解除映射」),确认框给出数量;一次操作完成即退出选择态,不做持久记忆。
 
 ## 43. 小游戏统一外壳(GameShell)
+
+- 麻将询问条显示剩余秒数，最后 3 秒使用警示色。四种房间纸牌在行动状态后显示距电脑接管的时间；单机自由行动时隐藏这段文字。牌桌手牌和动作键在同一毡面上，浅色主题下仍依毡面亮度选白字；黑白棋手机竖屏的模式、难度和先手尽量与标题同排。
 
 2026-11-18 起,全部自研小游戏页与本地化的开源小游戏统一用 `components/games/GameShell.vue` 承载,**一页只填插槽**;外壳样式唯一来源是 `main.css` 的「统一游戏外壳」段(插槽内容跨作用域,scoped 管不到)。守门 `views/games/gameShellAdoption.spec.js`。
 

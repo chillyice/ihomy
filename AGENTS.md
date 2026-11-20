@@ -100,7 +100,7 @@ cd backend;  .\mvnw.cmd -B clean package -DskipTests   # 只求编译
 cd frontend; npm run dev                      # 5173,代理 /api → 8080
 cd frontend; npm run lint; npx vitest run; npm run build
 ```
-- **基线**:后端 483 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1458 passed / 125 文件** + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **48 chunk / 1653.65KB**(V13.79 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
+- **基线**:后端 512 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1572 passed / 141 文件** + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **43 chunk / 1481.00KiB**(V14.4 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
 - **冒烟**:`GET /api/auth/captcha` 取 id → `POST /api/auth/login {email,password,captchaId,captchaCode:'qwer'}`,code=0 即有 token。**健康检查** `/api/public/health`(UP→200 / DEGRADED→503)、`/api/ops/health`(OPS,含依赖耗时)。
 - **闸门(CI 最先跑)**:`doc-drift-check.sh` + `gen-code-map.sh --check` + `doc-index.sh --check`;随后前后端构建、起库导 schema、登录冒烟。
 - 本机 JDK 21、Node 24 LTS(最低 22.12)、MySQL 8;没装 mvn 用 `C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`,`JAVA_HOME=C:\Program Files\Java\jdk-21`;clean 被锁改跑 `-B test`。
