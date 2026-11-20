@@ -3120,6 +3120,32 @@ html.dark .el-badge__content {
   .page.game-shell:has(.ft-root) .ft-my-name {
     color: #f2fff2;
   }
+  /* 「不要 / 提示 / 出牌」也落在毡面上:浅色主题给的是「近透明暖灰底 + 深褐字」,
+   * 压在深绿上几乎读不出来(深色主题本来就是白玻璃,所以只有浅色挨刀)。
+   * 与上面头部次级键同一套白玻璃口径;主按钮「出牌」保持品牌色。
+   * 禁用档必须带满整串 :not(),否则压不过上面那条(浅色主题的禁用态本就被它盖成常态色)。 */
+  .page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #fff !important;
+  }
+  .page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+  }
+  .page.game-shell:has(.ft-root)
+    .ft-actions
+    .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text).is-disabled {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+  }
+  /* 主按钮「出牌」禁用:浅米底灰字在毡上像贴了张纸,同样退回低透明度白玻璃 */
+  .page.game-shell:has(.ft-root) .ft-actions .el-button--primary.is-disabled {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+  }
 }
 .fight-overlay {
   position: absolute;
