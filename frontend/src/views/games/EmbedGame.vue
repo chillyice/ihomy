@@ -3,18 +3,36 @@
      iframe 壳保留触控守卫与站内沉浸浮层;全屏由外壳统一提供 -->
 <template>
   <component :is="localGame" v-if="localGame" />
-  <GameShell v-else ref="shellEl" class="eg-shell" :title="title" body-align="stretch" @back="router.push('/games')">
+  <GameShell
+    v-else
+    ref="shellEl"
+    class="eg-shell"
+    :title="title"
+    body-align="stretch"
+    :new-game="true"
+    :new-game-disabled="!frameLoaded"
+    :new-game-confirm="true"
+    @back="router.push('/games')"
+    @new-game="startNewGame"
+  >
     <template #head>
       <el-button size="small" round :title="$t('games.web.reload')" :aria-label="$t('games.web.reload')" @click="reloadFrame">
         <el-icon><Refresh /></el-icon>
         <span class="wg-btn-label">{{ $t('games.web.reload') }}</span>
       </el-button>
-      <el-button size="small" round :title="$t('games.web.openExternal')" :aria-label="$t('games.web.openExternal')" @click="openExternal">
+      <el-button
+        class="wg-open-external"
+        size="small"
+        round
+        :title="$t('games.web.openExternal')"
+        :aria-label="$t('games.web.openExternal')"
+        @click="openExternal"
+      >
         <el-icon><TopRight /></el-icon>
         <span class="wg-btn-label">{{ $t('games.web.openExternal') }}</span>
       </el-button>
       <el-button
-        class="gt-pagefull"
+        class="wg-page-full"
         size="small"
         round
         :title="pageFull ? $t('games.web.exitPageFullscreen') : $t('games.web.pageFullscreen')"
@@ -116,6 +134,11 @@ const openExternal = () => {
   if (src.value) window.open(src.value, '_blank', 'noopener,noreferrer')
 }
 
+// 「新游戏」键已搬到外壳头部(规则键左侧):投递给 iframe,由静态页合成 F2 交给引擎
+const startNewGame = () => {
+  frameEl.value?.contentWindow?.postMessage({ type: 'ihomy:pinball:new' }, window.location.origin)
+}
+
 const onKeydown = (event) => {
   if (event.key === 'Escape' && pageFull.value) pageFull.value = false
 }
@@ -210,6 +233,14 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 768px) {
   .wg-btn-label {
+    display: none;
+  }
+}
+/* 手机上页面已是整屏(外壳的全屏/宽屏同样隐藏),「页面全屏」与「浏览器打开」没有意义,
+   直接让位;桌面仍保留。断点与 GameShell 的手机档一致(窄屏 + 手机横屏) */
+@media (max-width: 768px), (orientation: landscape) and (max-height: 520px) {
+  .wg-open-external,
+  .wg-page-full {
     display: none;
   }
 }

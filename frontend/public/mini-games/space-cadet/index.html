@@ -107,7 +107,8 @@
   .tk-flip .glyph { font-size: 22px; line-height: 1; }
   .tk-mid { display: flex; flex-direction: column; gap: 6px; }
   .tk-launch { height: clamp(52px, 7.5vh, 80px); border-radius: 16px; font-size: 13px; }
-  .tk-new { height: 26px; border-radius: 10px; font-size: 12px; font-weight: 500; opacity: 0.72; }
+  /* 震桌 = 引擎的 Bump Left 键(88),和挡板分开;比发球矮一档,按住即连续抖桌面 */
+  .tk-nudge { height: clamp(38px, 4.6vh, 48px); border-radius: 12px; font-size: 12px; font-weight: 500; opacity: 0.86; }
   @media (pointer: coarse) and (orientation: portrait) {
     #rig { width: 100%; height: 100%; justify-content: space-between; }
     #pad { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
@@ -139,7 +140,7 @@
       left: 14px;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     }
-    #pad [data-key='88'] {
+    #pad [data-key='191'] {
       right: 14px;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     }
@@ -252,9 +253,9 @@
       <button class="tk tk-flip" data-key="90" aria-label="左挡板"><span class="glyph">◀</span>左挡板</button>
       <div class="tk-mid">
         <button class="tk tk-launch" data-key="32" aria-label="发球">发球</button>
-        <button class="tk tk-new" data-key="113" aria-label="开新局">新局</button>
+        <button class="tk tk-nudge" data-key="88" aria-label="震动桌面">震动桌面</button>
       </div>
-      <button class="tk tk-flip" data-key="88" aria-label="右挡板">右挡板<span class="glyph">▶</span></button>
+      <button class="tk tk-flip" data-key="191" aria-label="右挡板">右挡板<span class="glyph">▶</span></button>
     </div>
   </div>
   <div id="status">载入中…</div>
@@ -264,6 +265,7 @@
     <div class="kb-row"><span>左挡板</span><button class="kb-key" data-slot="left"></button></div>
     <div class="kb-row"><span>右挡板</span><button class="kb-key" data-slot="right"></button></div>
     <div class="kb-row"><span>发球</span><button class="kb-key" data-slot="launch"></button></div>
+    <div class="kb-row"><span>震动桌面</span><button class="kb-key" data-slot="nudge"></button></div>
     <div class="kb-row"><span>开新局</span><button class="kb-key" data-slot="new"></button></div>
     <div class="kb-foot">
       <button id="kbReset">恢复默认</button>
@@ -570,21 +572,25 @@
   }
 
   // —— 按键设置:重绑定 + 翻译层 ——
-  // 四个动作各自绑一个物理键(code 匹配);SDL 内部只认默认键码,改绑靠
+  // 五个动作各自绑一个物理键(code 匹配);SDL 内部只认默认键码,改绑靠
   // 捕获阶段把用户的键翻译成默认键再转发给 SDL,原默认键始终直通。
+  // 默认键取自引擎自带键表:90 左挡板 / 191 右挡板 / 32 发球 / 88 震桌(Bump Left)/ 113 开新局。
   const SLOT_CANON = {
     left: { code: 'KeyZ', keyCode: 90 },
-    right: { code: 'KeyX', keyCode: 88 },
+    right: { code: 'Slash', keyCode: 191 },
     launch: { code: 'Space', keyCode: 32 },
+    nudge: { code: 'KeyX', keyCode: 88 },
     new: { code: 'F2', keyCode: 113 },
   }
   const DEFAULT_KEYS = {
     left: { code: 'KeyZ', key: 'z', keyCode: 90, label: 'Z' },
-    right: { code: 'KeyX', key: 'x', keyCode: 88, label: 'X' },
+    right: { code: 'Slash', key: '/', keyCode: 191, label: '/' },
     launch: { code: 'Space', key: ' ', keyCode: 32, label: '空格' },
+    nudge: { code: 'KeyX', key: 'x', keyCode: 88, label: 'X' },
     new: { code: 'F2', key: 'F2', keyCode: 113, label: 'F2' },
   }
-  const KB_STORE = 'ihomy:pinball:keys:v1'
+  // v2:旧版把 88 当成「右挡板」默认键存进 localStorage,升级后会和震桌抢同一个键
+  const KB_STORE = 'ihomy:pinball:keys:v2'
   let bindings = loadBindings()
   let listeningSlot = null
 
@@ -731,6 +737,16 @@
     btn.addEventListener('contextmenu', function (e) {
       e.preventDefault()
     })
+  })
+
+  // 「新游戏」键搬到了站内外壳(GameShell)的头部、规则键左侧;
+  // 外框只发 postMessage,这里合成一次 F2 交回引擎
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent) return
+    const data = e.data
+    if (!data || data.type !== 'ihomy:pinball:new') return
+    pressKey(113, true)
+    pressKey(113, false)
   })
 
   // 点一下画面把焦点交给 canvas,否则外框里按键可能被父页面吃掉
