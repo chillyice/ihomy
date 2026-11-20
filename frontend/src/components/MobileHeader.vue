@@ -3,7 +3,7 @@
     <span v-a11y-click class="back-btn" @click="goBack">
       <el-icon><ArrowLeft /></el-icon>
     </span>
-    <!-- 直达首页:功能页可能有多级历史(列表→详情→编辑),返回键逐级回退太深 -->
+    <!-- 直达首页:详情/编辑页的返回只上一级,想一步回首页走这个键 -->
     <span v-a11y-click class="home-btn" :title="$t('mobile.home')" @click="goHome">
       <el-icon><HomeFilled /></el-icon>
     </span>
@@ -16,14 +16,15 @@
 
 <script setup>
 import { ArrowLeft, HomeFilled } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { parentPathOf } from '@/utils/navParent'
 defineProps({ title: { type: String, default: '' } })
+const route = useRoute()
 const router = useRouter()
 const goBack = () => {
-  // vue-router 会在 history.state.back 记录应用内上一条路由;无记录说明是外链/PWA 直达深页,
-  // 此时 history.back() 会退出站点,改为直接回首页
-  if (window.history.state && window.history.state.back != null) router.back()
-  else router.push('/')
+  // 上一级而不是上一页:从首页卡片/聊天分享/通知深链直达详情时,浏览历史里的来路不是上级;
+  // 按路由表退一级,落点与从列表点进来的路径一致(见 utils/navParent.js)
+  router.push(parentPathOf(route.path, router.getRoutes()) || '/home')
 }
 const goHome = () => router.push('/')
 </script>

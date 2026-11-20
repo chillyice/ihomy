@@ -4479,7 +4479,7 @@ export default {
   },
   warm: {
     backHome: '返回首页',
-    backPrev: '返回上一页',
+    backPrev: '返回上一级',
     tagline: '一扇会呼吸的窗',
     personalSettings: '个人设置',
     addedBadge: '已在首页',

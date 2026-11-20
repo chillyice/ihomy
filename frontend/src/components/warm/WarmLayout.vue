@@ -168,6 +168,7 @@ import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
 import { nextScrolled } from '@/utils/warmToolbar'
+import { parentPathOf } from '@/utils/navParent'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import WarnTriangle from '@/components/WarnTriangle.vue'
@@ -501,13 +502,17 @@ watch(pinned, async (val) => {
   if (val) setTimeout(() => toolbar.classList.add('fused'), 200)
 })
 
-// 返回按钮:历史返回(无历史时隐藏)
+// 返回按钮:回「上一级」(路由层级),不按浏览历史倒回上一页;根级页面没有上级,不显示
+// (从首页卡片/聊天分享/通知深链直达详情时,历史里的来路不是上级;解析规则见 utils/navParent.js)
 const canBack = ref(false)
-const goBack = () => router.back()
+const goBack = () => {
+  const target = parentPathOf(route.path, router.getRoutes())
+  if (target) router.push(target)
+}
 watch(
   () => route.fullPath,
   () => {
-    canBack.value = window.history.state?.back !== null
+    canBack.value = !!parentPathOf(route.path, router.getRoutes())
   },
   { immediate: true },
 )

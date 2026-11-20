@@ -47,7 +47,8 @@ const routes = [
     path: '/health/shared/:token',
     name: 'HealthShared',
     component: () => import('@/views/health/HealthShared.vue'),
-    meta: { public: true },
+    // 公开分享快照:顶栏返回落到首页,别把游客的「上一级」指去要登录的 /health
+    meta: { public: true, parent: '/home' },
   },
   // 家谱已并入「家庭成员」页,旧书签/导航统一跳到图谱标签
   { path: '/tree', redirect: { path: '/member', query: { tab: 'tree' } } },
@@ -71,7 +72,13 @@ const routes = [
     meta: { public: true },
   },
   // 文件浏览:独立功能页,登录用户浏览/预览/下载存储设备文件(管理操作仅 OWNER)
-  { path: '/storage/files', name: 'FileBrowse', component: () => import('@/views/storage/FileBrowse.vue'), meta: { requiresAuth: true } },
+  // meta.parent:从设置页「存储」进入,顶栏返回按上一级回设置,而不是按历史回去
+  {
+    path: '/storage/files',
+    name: 'FileBrowse',
+    component: () => import('@/views/storage/FileBrowse.vue'),
+    meta: { requiresAuth: true, parent: '/settings' },
+  },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue'), meta: { public: true } },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
   { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue'), meta: { public: true } },
