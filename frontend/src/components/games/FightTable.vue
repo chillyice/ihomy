@@ -267,12 +267,19 @@ const cardLabel = (card) => {
 </script>
 
 <style scoped>
+/* 桌布铺满整块游戏区:牌桌 + 手牌 + 操作键都在同一张毡面上(手牌行不再露出页底色)。
+   毡底与 18px 圆角/1px 内描边挂在这里,.ft-table 只留中央高光与顶部内阴影。 */
 .ft-root {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
   gap: 8px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #1f5c39, #123c26 62%, #0d2f1e);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
   /* 座位定位的一半宽高(见 seatViews 的 clamp):max-width 132 / 头像 30 的座位大致一半 */
   --ft-seat-half: 66px;
   --ft-seat-half-h: 27px;
@@ -280,19 +287,15 @@ const cardLabel = (card) => {
 .ft-root:fullscreen {
   padding: clamp(8px, 2vw, 18px);
   overflow: auto;
-  background: var(--color-bg);
 }
 
 .ft-table {
   position: relative;
   flex: 1 1 300px;
   min-height: 300px;
-  border-radius: 18px;
-  background:
-    radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1), transparent 62%), linear-gradient(160deg, #1f5c39, #123c26 62%, #0d2f1e);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    inset 0 26px 60px rgba(0, 0, 0, 0.18);
+  /* 毡底已上到 .ft-root:这里只叠中央高光与顶部压暗,再画一层不透明底会把手牌那半张桌布盖回去 */
+  background: radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1), transparent 62%);
+  box-shadow: inset 0 26px 60px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   /* 容器查询锚点:中央出牌区的可用宽度按牌桌实际宽收敛(cqw),手机/桌面/全屏一套公式 */
   container-type: inline-size;
@@ -510,6 +513,8 @@ const cardLabel = (card) => {
   min-height: 0;
   flex-direction: column;
   gap: 4px;
+  /* 毡面是圆角面板:底下留 6px,操作键不贴着桌沿 */
+  padding-bottom: 6px;
 }
 .ft-my-head {
   display: flex;
@@ -517,11 +522,12 @@ const cardLabel = (card) => {
   gap: 8px;
   min-height: 20px;
   font-size: 12px;
-  color: var(--color-text-secondary, #666);
+  /* 这一行落在毡面上:字色固定浅色,不跟主题(浅色主题的深褐字压在深绿上读不出来) */
+  color: rgba(226, 240, 228, 0.78);
 }
 .ft-my-name {
   font-weight: 700;
-  color: var(--color-text, #222);
+  color: #f2fff2;
 }
 .ft-my-count {
   opacity: 0.8;
@@ -541,7 +547,8 @@ const cardLabel = (card) => {
   align-items: flex-end;
   justify-content: center;
   min-height: calc(var(--fc-card-w, 54px) * 1.4 + 20px);
-  padding: 20px 6px 2px;
+  /* 底下就是毡面了:留 8px 让手牌不贴着桌沿(操作键行在时会夹在手牌与按钮之间) */
+  padding: 20px 6px 8px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -709,6 +716,8 @@ const cardLabel = (card) => {
   }
   .ft-my-area {
     gap: 4px;
+    /* 横屏是整页毡面,底部安全区由外壳管,这里不再额外留白 */
+    padding-bottom: 0;
   }
   .ft-my-head {
     order: 0;

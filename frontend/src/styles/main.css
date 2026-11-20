@@ -3040,6 +3040,32 @@ html.dark .el-badge__content {
 }
 /* 出牌/叫分键只有牌桌里一份(FightTable 的 .ft-actions):竖屏在手下,
    手机横屏排到手牌上方——左栏不再有第二摆放 */
+/* 这排键落在毡面上(桌布铺到整块游戏区,见 FightTable 的 .ft-root):主题给次级键的
+ * 「近透明暖灰底 + 深褐字」在深绿底上读不出来,统一成与外壳头部同一套白玻璃口径;
+ * 主按钮「出牌」启用态仍是品牌色,禁用档退回低透明度白。
+ * 选择器要压过主题那两条带 !important 的按钮规则(暖居是 (0,7,1)),所以带满容器与 :not() 链;
+ * 禁用档还得再接 .is-disabled——漏了整串会被「非主按钮」那条刷成常态色。 */
+.page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+.page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+.page.game-shell:has(.ft-root)
+  .ft-actions
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text).is-disabled {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+.page.game-shell:has(.ft-root) .ft-actions .el-button--primary.is-disabled {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+}
 /* ===== 对抗牌局·手机横屏:整页铺成一块桌毡 =====
  * 与麻将单机局同一套口径(见 Mahjong.vue 的横屏档):左栏取消,整页就是牌桌,
  * 头部压成浮在左上角的一行,游戏区占满 1×1 网格。桌毡底色上到页面级(--gs-bg),
@@ -3135,38 +3161,12 @@ html.dark .el-badge__content {
   .page.game-shell:has(.ft-root) .ft-center {
     transform: translate(-50%, calc(-50% + 10px));
   }
-  /* 手牌区文字换浅色(原先跟主题走,深色文字会压在绿毡上看不清) */
-  .page.game-shell:has(.ft-root) .ft-my-head {
-    color: rgba(226, 240, 228, 0.78);
-  }
-  .page.game-shell:has(.ft-root) .ft-my-name {
-    color: #f2fff2;
-  }
-  /* 「不要 / 提示 / 出牌」也落在毡面上:浅色主题给的是「近透明暖灰底 + 深褐字」,
-   * 压在深绿上几乎读不出来(深色主题本来就是白玻璃,所以只有浅色挨刀)。
-   * 与上面头部次级键同一套白玻璃口径;主按钮「出牌」保持品牌色。
-   * 禁用档必须带满整串 :not(),否则压不过上面那条(浅色主题的禁用态本就被它盖成常态色)。 */
-  .page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
-    background: rgba(255, 255, 255, 0.14) !important;
-    border-color: rgba(255, 255, 255, 0.18) !important;
-    color: #fff !important;
-  }
-  .page.game-shell:has(.ft-root) .ft-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
-    background: rgba(255, 255, 255, 0.22) !important;
-    border-color: rgba(255, 255, 255, 0.28) !important;
-  }
-  .page.game-shell:has(.ft-root)
-    .ft-actions
-    .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text).is-disabled {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    color: rgba(255, 255, 255, 0.6) !important;
-  }
-  /* 主按钮「出牌」禁用:浅米底灰字在毡上像贴了张纸,同样退回低透明度白玻璃 */
-  .page.game-shell:has(.ft-root) .ft-actions .el-button--primary.is-disabled {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
-    color: rgba(255, 255, 255, 0.65) !important;
+  /* 毡面这一档已由页面铺满(--gs-bg):牌桌外壳自己那层毡底与圆角让位,
+     否则两层渐变在手牌处接出接缝、圆角还会在页面毡上切出一块 */
+  .page.game-shell:has(.ft-root) .ft-root {
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 }
 .fight-overlay {
