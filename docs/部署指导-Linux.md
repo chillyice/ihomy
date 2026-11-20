@@ -630,7 +630,37 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 3600s;   # 视频/电子书大文件下载别被默认 60s 掐断
+        proxy_buffering off;        # 大文件直接透传,不在本机落 nginx 临时文件
     }
+    # 固定文件名的安装包目录:内容会被新版本原地覆盖,必须摘掉后端给的 30 天 immutable,
+    # 否则用户更新后下载到的仍是旧包(kada.exe / bit_pouch 包 / ihomy-V<版本>.apk)。
+    location /files/kada/ {
+        proxy_pass http://127.0.0.1:8080/api/files/kada/;
+        proxy_set_header Host $host;
+        proxy_read_timeout 600s;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location /files/bit_pouch/ {
+        proxy_pass http://127.0.0.1:8080/api/files/bit_pouch/;
+        proxy_set_header Host $host;
+        proxy_read_timeout 600s;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location /files/app/ {
+        proxy_pass http://127.0.0.1:8080/api/files/app/;
+        proxy_set_header Host $host;
+        proxy_read_timeout 600s;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
 
     # 游戏/Flash 运行时(壳内从生产域名按需加载,不进 APK)
     # 壳内页面 origin 是 https://localhost,跨源 fetch 核心 .data / ruffle .wasm 需要 CORS;
