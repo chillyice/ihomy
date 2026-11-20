@@ -17,6 +17,7 @@ import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ContentAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -42,10 +43,11 @@ public class CommentService {
     private final PhotoMapper photoMapper;
     private final NotificationService notificationService;
     private final AudienceService audienceService;
+    private final ContentAccessService contentAccess;
 
     /** 评论列表:先校验内容可访问性(同家庭或公开),再按时间排好组装回复树 */
-    public List<Map<String, Object>> list(String contentType, Long contentId, Long familyId) {
-        checkContentAccessible(contentType, contentId, familyId);
+    public List<Map<String, Object>> list(String contentType, Long contentId, Long familyId, Long userId) {
+        checkContentAccessible(contentType, contentId, familyId, userId);
         LambdaQueryWrapper<Comment> qw = new LambdaQueryWrapper<>();
         qw.eq(Comment::getContentType, contentType)
           .eq(Comment::getContentId, contentId)
@@ -104,7 +106,7 @@ public class CommentService {
         if (dto.getContent() == null || dto.getContent().isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST);
         }
-        TargetContent target = validateTarget(dto.getContentType(), dto.getContentId(), user.getFamilyId());
+        TargetContent target = validateTarget(dto.getContentType(), dto.getContentId(), user);
         Comment comment = new Comment();
         comment.setContentType(dto.getContentType());
         comment.setContentId(dto.getContentId());
@@ -122,6 +124,9 @@ public class CommentService {
     public void delete(Long id, SysUser user, boolean isOwner) {
         Comment c = commentMapper.selectById(id);
         if (c == null) throw new BizException(ResultCode.NOT_FOUND);
+        if ("diary".equals(c.getContentType())) {
+            checkContentAccessible("diary", c.getContentId(), user.getFamilyId(), user.getId());
+        }
         if (!isOwner && !c.getAuthorId().equals(user.getId())) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
@@ -129,8 +134,8 @@ public class CommentService {
     }
 
     /** 校验内容可被当前调用方访问(同家庭、公开,或已分享给本家庭),否则 404 */
-    private void checkContentAccessible(String contentType, Long contentId, Long familyId) {
-        ContentInfo info = loadContent(contentType, contentId);
+    private void checkContentAccessible(String contentType, Long contentId, Long familyId, Long userId) {
+        ContentInfo info = loadContent(contentType, contentId, userId, familyId);
         if (Objects.equals(familyId, info.familyId())) return;
         if (DictConst.VIS_PUBLIC.equals(info.visibility())) return;
         if (DictConst.VIS_PRIVATE.equals(info.visibility())) throw new BizException(ResultCode.NOT_FOUND);
@@ -148,7 +153,7 @@ public class CommentService {
     }
 
     /** 载入评论目标内容;跨家庭能否互动看下面两处规则 */
-    private ContentInfo loadContent(String contentType, Long contentId) {
+    private ContentInfo loadContent(String contentType, Long contentId, Long userId, Long familyId) {
         if (contentId == null) throw new BizException(ResultCode.BAD_REQUEST);
         switch (contentType == null ? "" : contentType) {
             case "blog" -> {
@@ -159,6 +164,7 @@ public class CommentService {
             case "diary" -> {
                 Diary d = diaryMapper.selectById(contentId);
                 if (d == null) throw new BizException(ResultCode.NOT_FOUND);
+                contentAccess.assertDiaryPrivacy(d, userId, familyId);
                 return new ContentInfo(ContentKind.DIARY, d.getAuthorId(), d.getFamilyId(), d.getVisibility());
             }
             case "photo" -> {
@@ -171,9 +177,10 @@ public class CommentService {
     }
 
     /** 校验目标内容存在且可评论(同家庭 or 已分享给本家庭),返回作者与家庭 */
-    private TargetContent validateTarget(String contentType, Long contentId, Long familyId) {
+    private TargetContent validateTarget(String contentType, Long contentId, SysUser user) {
         if (contentId == null) return new TargetContent(null, null);
-        ContentInfo info = loadContent(contentType, contentId);
+        Long familyId = user.getFamilyId();
+        ContentInfo info = loadContent(contentType, contentId, user.getId(), familyId);
         if (!Objects.equals(familyId, info.familyId())) {
             boolean shared = !DictConst.VIS_PRIVATE.equals(info.visibility())
                     && audienceService.sharedTo(info.kind(), contentId, familyId);

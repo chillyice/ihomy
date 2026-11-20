@@ -24,7 +24,7 @@
           <template #default="{ openMenu }">
             <div v-a11y-click class="notify-item" :class="{ unread: !n.isRead }" @click="onClick(n)">
               <div class="notify-main">
-                <div class="notify-type">{{ typeText(n.type) }}</div>
+                <div class="notify-type">{{ t(notificationTypeKey(n.type)) }}</div>
                 <div class="notify-content">{{ n.content }}</div>
                 <div class="notify-time">{{ formatRelativeTime(t, n.createdAt) }}</div>
               </div>
@@ -57,6 +57,7 @@ import SwipeRow from '@/components/ui/SwipeRow.vue'
 import { notificationApi } from '@/api'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
+import { notificationTypeKey } from '@/utils/notificationType'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 
 const { t } = useI18n()
@@ -87,15 +88,6 @@ async function markAllRead() {
   } catch (e) {
     /* 失败保持原样,用户可重试 */
   }
-}
-
-function typeText(type) {
-  if (type === 'reply') return t('notify.typeReply')
-  if (type === 'system') return t('notify.typeSystem')
-  if (type === 'item_expiry') return t('notify.typeExpiry')
-  if (type === 'reminder') return t('notify.typeReminder')
-  if (type === 'anniversary') return t('notify.typeAnniversary')
-  return t('notify.typeComment')
 }
 
 // 标为已读:手势/菜单用,失败给提示但不打断后续跳转;行点击复用同一入口

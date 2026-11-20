@@ -1,4 +1,6 @@
 // V4.0 国际化:English。键结构与 zh-CN.js 完全一致(新增功能时两文件同步补齐)。
+import assistant from './assistant/en'
+
 export default {
   nav: {
     home: 'Home',
@@ -2410,6 +2412,7 @@ export default {
     },
   },
   chat: {
+    assistant,
     title: 'Chat',
     roomTitle: 'Family chat room',
     fromFamily: 'from {name}',
@@ -3568,7 +3571,9 @@ export default {
         WEATHER_IMAGE: 'Weather image',
         ASR: 'Speech recognition',
         OSS_UPGRADE_EVAL: 'Upgrade assessment',
+        ASSISTANT: 'AI assistant',
       },
+      assistantSwitch: 'Enable the AI assistant for this family',
       available: 'Available',
       unconfigured: 'Not configured',
       baseUrl: 'Base URL (OpenAI-compatible, no path)',
@@ -3868,6 +3873,7 @@ export default {
       WEATHER_IMAGE: 'Weather image',
       ASR: 'Speech',
       OSS_UPGRADE_EVAL: 'Upgrade assessment',
+      ASSISTANT: 'AI assistant',
     },
     apiType: {
       now: 'Current weather',
@@ -4541,6 +4547,7 @@ export default {
   notify: {
     typeReply: 'Reply',
     typeSystem: 'System',
+    typeFamily: 'Family notice',
     typeComment: 'Comment',
     typeExpiry: 'Expiry Alert',
     typeReminder: 'Reminder',

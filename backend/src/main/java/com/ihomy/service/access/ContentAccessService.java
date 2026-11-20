@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.entity.Diary;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.List;
  * <p>口径:
  * <ul>
  *   <li>游客:只读基准家庭(未登录时=默认演示家庭)里 {@code visibility=PUBLIC} 的内容;</li>
- *   <li>家长(OWNER):本家庭全部内容;</li>
+ *   <li>家长(OWNER):本家庭内容，私密日记仅作者可见;</li>
  *   <li>家庭成员:本家庭 + (自己创建的 OR 家庭/亲友圈/公开可见);PRIVATE 只对作者本人与家长可见;</li>
  *   <li>跨家庭:除 PUBLIC 外一律不可见,调用方抛 NOT_FOUND(不泄露存在性)。</li>
  * </ul>
@@ -57,7 +58,7 @@ public class ContentAccessService {
         }
         boolean shared = idCol != null && canReceiveShare(kind, viewer);
         String audienceSql = shared ? audienceInSql(kind, familyId) : null;
-        if (viewer.owner()) {
+        if (viewer.owner() && kind != ContentKind.DIARY) {
             if (audienceSql == null) {
                 qw.eq(familyCol, familyId); // 家长:本家庭全部
             } else {
@@ -73,7 +74,10 @@ public class ContentAccessService {
             w.eq(familyCol, familyId)
                     .and(i -> i.eq(authorCol, viewer.userId())
                             .or().in(visibilityCol, memberVisibilities()));
-            if (audienceSql != null) w.or().inSql(idCol, audienceSql);
+            if (audienceSql != null) {
+                w.or().and(a -> a.ne(kind == ContentKind.DIARY, visibilityCol, DictConst.VIS_PRIVATE)
+                        .inSql(idCol, audienceSql));
+            }
         });
     }
 
@@ -118,13 +122,21 @@ public class ContentAccessService {
         if (DictConst.VIS_PRIVATE.equals(visibility)) {
             boolean sameFamily = viewer.familyId() != null && viewer.familyId().equals(contentFamilyId);
             if (!sameFamily || viewer.guest()) return false;
-            return viewer.owner() || (viewer.userId() != null && viewer.userId().equals(authorId));
+            return (kind != ContentKind.DIARY && viewer.owner()) || viewer.userId().equals(authorId);
         }
         boolean sameFamily = viewer.familyId() != null && viewer.familyId().equals(contentFamilyId);
         if (sameFamily && !viewer.guest()) {
             return true;
         }
         return sharedToViewer && canReceiveShare(kind, viewer);
+    }
+
+    /** 日记的编辑、评论、点赞也须遵守私密日记仅作者可见的约定。 */
+    public void assertDiaryPrivacy(Diary diary, Long userId, Long familyId) {
+        if (DictConst.VIS_PRIVATE.equals(diary.getVisibility())) {
+            assertViewable(ContentKind.DIARY, diary.getFamilyId(), diary.getAuthorId(), diary.getVisibility(),
+                    ViewerScope.of(userId, familyId, false));
+        }
     }
 
     /** 同 {@link #canView},不可见时按项目惯例抛 NOT_FOUND(不泄露存在性) */

@@ -54,7 +54,7 @@ public class AiService {
         return out;
     }
 
-    private Map<String, Object> capability(Long familyId, String featureCode) {
+    public Map<String, Object> capability(Long familyId, String featureCode) {
         FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, featureCode);
         boolean available = familyAiConfigService.isAvailable(c);
         Map<String, Object> m = new LinkedHashMap<>();
@@ -103,6 +103,33 @@ public class AiService {
 
     private String doChat(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
                           List<Map<String, String>> messages, boolean jsonMode, Double temperature) {
+        return requestMessage(familyId, featureCode, c, messages, jsonMode, temperature, List.of(),
+                Integer.MAX_VALUE).path("content").asText();
+    }
+
+    /** 保留调用标识和参数,供助手将工具结果回传给同一轮对话。 */
+    public JsonNode chatWithTools(Long familyId, List<Map<String, Object>> messages,
+                                  List<Map<String, Object>> tools, long deadline) {
+        var chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ASSISTANT);
+        try {
+            return assistantMessage(familyId, chain.primary(), messages, tools, deadline);
+        } catch (BizException e) {
+            if (!chain.hasFallback() || e.getCode() == ResultCode.BAD_REQUEST.getCode()) throw e;
+            return assistantMessage(familyId, chain.fallback(), messages, tools, deadline);
+        }
+    }
+
+    private JsonNode assistantMessage(Long familyId, FamilyAiConfigService.AiConfig config,
+                                      List<Map<String, Object>> messages, List<Map<String, Object>> tools, long deadline) {
+        long remaining = deadline - System.currentTimeMillis();
+        if (remaining <= 0) throw new BizException(ResultCode.BAD_REQUEST, "这次对话已超时，请稍后再试");
+        return requestMessage(familyId, AiConst.FEATURE_ASSISTANT, config, messages, false, null, tools,
+                (int) Math.min(Integer.MAX_VALUE, remaining));
+    }
+
+    private JsonNode requestMessage(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
+                                    List<?> messages, boolean jsonMode, Double temperature,
+                                    List<Map<String, Object>> tools, int maxTimeout) {
         if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 服务未配置,请家长在设置-家庭 AI 配置中填写");
         }
@@ -115,6 +142,10 @@ public class AiService {
             body.put("model", c.model().trim());
             body.put("messages", messages);
             body.put("temperature", temperature == null ? 0.2 : temperature);
+            if (!tools.isEmpty()) {
+                body.put("tools", tools);
+                body.put("tool_choice", "auto");
+            }
             if (jsonMode) {
                 body.put("response_format", Map.of("type", "json_object"));
             }
@@ -122,7 +153,7 @@ public class AiService {
                     "Content-Type", "application/json",
                     "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers,
-                    mapper.writeValueAsBytes(body), c.timeoutMs());
+                    mapper.writeValueAsBytes(body), Math.min(c.timeoutMs(), maxTimeout));
             // 部分兼容端点不支持 response_format,400 且报文提到该字段时去掉重试一次
             if (resp.status() == 400 && jsonMode && resp.body() != null && resp.body().contains("response_format")) {
                 body.remove("response_format");
@@ -130,16 +161,20 @@ public class AiService {
                         mapper.writeValueAsBytes(body), c.timeoutMs());
             }
             if (!resp.ok()) {
-                log.warn("[AI] 服务返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
+                if (!tools.isEmpty() && resp.status() == 400 && resp.body() != null && resp.body().contains("tool")) {
+                    throw new BizException(ResultCode.BAD_REQUEST, "当前模型不支持工具调用，请在家庭 AI 设置中更换模型");
+                }
+                log.warn("[AI] 服务返回异常 status={}", resp.status());
                 throw new BizException(ResultCode.INTERNAL_ERROR, "AI 服务暂时不可用,请稍后重试");
             }
             JsonNode root = mapper.readTree(resp.body());
-            JsonNode content = root.path("choices").path(0).path("message").path("content");
-            if (!content.isTextual() || content.asText().isBlank()) {
+            JsonNode response = root.path("choices").path(0).path("message");
+            JsonNode content = response.path("content");
+            if ((!content.isTextual() || content.asText().isBlank()) && (tools.isEmpty() || response.path("tool_calls").isEmpty())) {
                 throw new BizException(ResultCode.INTERNAL_ERROR, "AI 返回内容为空");
             }
             success = true;
-            return content.asText();
+            return response;
         } catch (BizException e) {
             errorMsg = e.getMessage();
             throw e;
@@ -406,7 +441,7 @@ public class AiService {
             out.write(tail);
         }, c.timeoutMs());
         if (!resp.ok()) {
-            log.warn("[AI] 语音识别返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
+            log.warn("[AI] 语音识别返回异常 status={}", resp.status());
             throw new BizException(ResultCode.INTERNAL_ERROR, "语音识别服务暂时不可用,请稍后重试");
         }
         String text = mapper.readTree(resp.body()).path("text").asText("");

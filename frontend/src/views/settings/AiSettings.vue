@@ -4,6 +4,18 @@
     <div class="section-label">{{ $t('settings.ai.title') }}</div>
     <div class="share-tip">{{ $t('settings.ai.hint') }}</div>
 
+    <div class="ai-feature-row assistant-setting">
+      <label id="assistant-enabled-label" for="assistant-enabled">{{ $t('settings.ai.assistantSwitch') }}</label>
+      <el-switch
+        id="assistant-enabled"
+        aria-labelledby="assistant-enabled-label"
+        :model-value="assistantEnabled === true"
+        :disabled="assistantEnabled === null || assistantSaving"
+        :loading="assistantSaving"
+        @change="setAssistantEnabled"
+      />
+    </div>
+
     <div class="ai-sub-label">{{ $t('settings.ai.models') }}</div>
     <div class="ai-toolbar">
       <el-button type="primary" plain @click="openAiModel()">{{ $t('settings.ai.addModel') }}</el-button>
@@ -143,7 +155,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { aiApi } from '@/api'
+import { aiApi, assistantApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, CircleClose, Edit, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -171,6 +183,22 @@ const aiModelForm = reactive({
 })
 const aiSaving = ref(false)
 const aiLoading = ref(false)
+const assistantEnabled = ref(null)
+const assistantSaving = ref(false)
+
+async function setAssistantEnabled(enabled) {
+  if (assistantSaving.value) return
+  assistantSaving.value = true
+  try {
+    await assistantApi.setEnabled(enabled)
+    assistantEnabled.value = enabled
+    window.dispatchEvent(new Event('ihomy:assistant-settings'))
+  } catch {
+    // The request interceptor displays the server error.
+  } finally {
+    assistantSaving.value = false
+  }
+}
 
 // 切换模型类型:非语音模型强制回 OpenAI 协议(后端同口径),隐藏百度专属字段
 watch(
@@ -187,7 +215,8 @@ const loadAiConfig = async () => {
   if (!userStore.isLoggedIn || !canManageAi.value) return
   aiLoading.value = true
   try {
-    const [models, features] = await Promise.all([aiApi.models(), aiApi.features()])
+    const [models, features, status] = await Promise.all([aiApi.models(), aiApi.features(), assistantApi.status()])
+    assistantEnabled.value = status.enabled
     aiModels.value = models || []
     aiFeatures.value = (features || []).map((f) => ({ ...f, modelId: f.modelId ?? null, fallbackModelId: f.fallbackModelId ?? null }))
   } catch (e) {
@@ -291,6 +320,7 @@ const bindAiFeature = async (f) => {
   const fid = f.fallbackModelId == null || f.fallbackModelId === '' ? null : f.fallbackModelId
   try {
     await aiApi.bindFeature(f.featureCode, mid, fid)
+    if (['ASSISTANT', 'ASR'].includes(f.featureCode)) window.dispatchEvent(new Event('ihomy:assistant-settings'))
     ElMessage.success(t('settings.ai.saved'))
     await loadAiConfig()
   } catch (e) {
@@ -346,6 +376,9 @@ html.dark .share-tip {
   flex-shrink: 0;
   font-size: 13px;
   color: var(--color-text);
+}
+.assistant-setting {
+  justify-content: space-between;
 }
 .ai-feature-select {
   flex: 1;

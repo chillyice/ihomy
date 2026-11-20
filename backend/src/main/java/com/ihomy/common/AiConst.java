@@ -39,6 +39,7 @@ public final class AiConst {
     public static final String FEATURE_ITEM_FIND = "ITEM_FIND";
     public static final String FEATURE_ITEM_PUT = "ITEM_PUT";
     public static final String FEATURE_CHAT = "CHAT";
+    public static final String FEATURE_ASSISTANT = "ASSISTANT";
     public static final String FEATURE_IMAGE = "IMAGE";
     public static final String FEATURE_WEATHER_IMAGE = "WEATHER_IMAGE";
     public static final String FEATURE_ASR = "ASR";
@@ -50,6 +51,7 @@ public final class AiConst {
             FEATURE_ITEM_FIND, Set.of(TYPE_LOCAL, TYPE_LLM),
             FEATURE_ITEM_PUT, Set.of(TYPE_LOCAL, TYPE_LLM),
             FEATURE_CHAT, Set.of(TYPE_LLM),
+            FEATURE_ASSISTANT, Set.of(TYPE_LLM),
             FEATURE_IMAGE, Set.of(TYPE_IMAGE),
             FEATURE_WEATHER_IMAGE, Set.of(TYPE_IMAGE),
             FEATURE_ASR, Set.of(TYPE_ASR),
@@ -58,7 +60,7 @@ public final class AiConst {
     /** 功能展示顺序(设置页绑定区按此顺序渲染) */
     public static final List<String> FEATURES = List.of(
             FEATURE_ITEM_FIND, FEATURE_ITEM_PUT, FEATURE_CHAT, FEATURE_IMAGE, FEATURE_WEATHER_IMAGE, FEATURE_ASR,
-            FEATURE_OSS_UPGRADE_EVAL);
+            FEATURE_OSS_UPGRADE_EVAL, FEATURE_ASSISTANT);
 
     public static boolean isValidFeature(String code) {
         return FEATURE_ALLOWED_TYPES.containsKey(code);

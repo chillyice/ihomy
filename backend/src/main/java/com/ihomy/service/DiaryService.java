@@ -48,7 +48,7 @@ public class DiaryService {
         return diary;
     }
 
-    /** 分页查询:家长见全部,成员见自己的+家庭可见/公开,游客见演示家庭公开 */
+    /** 分页查询:私密日记仅作者可见，游客只见公开内容。 */
     public IPage<Diary> page(int current, int size, ViewerScope viewer) {
         LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
         contentAccess.applyVisible(qw, ContentKind.DIARY, viewer,
@@ -99,6 +99,7 @@ public class DiaryService {
         if (diary == null || familyId == null || !familyId.equals(diary.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+        contentAccess.assertDiaryPrivacy(diary, currentUserId, familyId);
         if (!diary.getAuthorId().equals(currentUserId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
@@ -122,6 +123,7 @@ public class DiaryService {
         if (diary == null || familyId == null || !familyId.equals(diary.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+        contentAccess.assertDiaryPrivacy(diary, currentUserId, familyId);
         if (!isOwner && !diary.getAuthorId().equals(currentUserId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }

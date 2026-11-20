@@ -47,8 +47,8 @@ class ContentAccessServiceTest {
     void private_isVisibleToAuthorOnly() {
         assertThat(service.canView(ContentKind.DIARY, FAMILY_A, AUTHOR, "PRIVATE",
                 ViewerScope.of(AUTHOR, FAMILY_A, false))).isTrue();
-        // 家长可代管家庭内容
-        assertThat(service.canView(ContentKind.DIARY, FAMILY_A, AUTHOR, "PRIVATE", ownerOfA())).isTrue();
+        assertThat(service.canView(ContentKind.DIARY, FAMILY_A, AUTHOR, "PRIVATE", ownerOfA(), true)).isFalse();
+        assertThat(service.canView(ContentKind.DIARY, FAMILY_A, AUTHOR, "FAMILY", ownerOfA())).isTrue();
         // 同家庭的其他成员看不到别人「仅自己可见」的内容
         assertThat(service.canView(ContentKind.DIARY, FAMILY_A, AUTHOR, "PRIVATE", memberOfA())).isFalse();
     }

@@ -7,6 +7,17 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BackupTableSpecTest {
+    @Test
+    void familyPackageExcludesPrivateDiariesAndAssistantData() {
+        assertThat(BackupTableSpec.familyFilter("content_diary", Set.of("family_id")).where())
+                .contains("visibility` <> 'PRIVATE'");
+        assertThat(BackupTableSpec.familyFilter("content_comment", Set.of("family_id")).where())
+                .contains("NOT EXISTS", "d.visibility = 'PRIVATE'");
+        for (String table : Set.of("sys_ai_conversation", "sys_ai_message", "sys_ai_action")) {
+            assertThat(BackupTableSpec.familyFilter(table, Set.of("family_id"))).isNull();
+        }
+    }
+
 
     @Test
     void contentPrefixClassification() {

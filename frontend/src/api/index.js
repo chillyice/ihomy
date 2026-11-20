@@ -692,6 +692,13 @@ export const itemApi = {
 }
 
 // AI 接入:能力状态/模型池/功能绑定/对话/图片生成/语音识别(按家庭模型池+功能绑定)
+function transcribeAudio(path, file, language) {
+  const form = new FormData()
+  form.append('file', file)
+  if (language) form.append('language', language)
+  return request.post(path, form, { timeout: 150000 })
+}
+
 export const aiApi = {
   status: () => request.get('/ai/status'),
   models: () => request.get('/ai/models'),
@@ -703,12 +710,20 @@ export const aiApi = {
     request.put(`/ai/features/${featureCode}`, { modelId, fallbackModelId: fallbackModelId ?? null }),
   chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
   image: (data, featureCode) => request.post(`/ai/image${featureCode ? `?featureCode=${featureCode}` : ''}`, data, { timeout: 180000 }),
-  transcribe: (file, language) => {
-    const form = new FormData()
-    form.append('file', file)
-    if (language) form.append('language', language)
-    return request.post('/ai/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 150000 })
-  },
+  transcribe: (file, language) => transcribeAudio('/ai/transcribe', file, language),
+}
+
+const assistantPath = '/ai/assistant'
+export const assistantApi = {
+  status: () => request.get(`${assistantPath}/status`),
+  setEnabled: (enabled) => request.put(`${assistantPath}/settings`, { enabled }),
+  conversation: (params) => request.get(`${assistantPath}/conversation`, { params }),
+  chat: (data) => request.post(`${assistantPath}/chat`, data, { timeout: 150000 }),
+  confirm: (id, data = {}) => request.post(`${assistantPath}/actions/${id}/confirm`, data),
+  cancel: (id) => request.post(`${assistantPath}/actions/${id}/cancel`),
+  clear: () => request.delete(`${assistantPath}/conversation`),
+  pending: () => request.get(`${assistantPath}/actions/pending`),
+  transcribe: (file, language) => transcribeAudio(`${assistantPath}/transcribe`, file, language),
 }
 
 export const kitchenApi = {

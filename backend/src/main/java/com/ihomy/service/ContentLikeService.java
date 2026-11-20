@@ -14,6 +14,7 @@ import com.ihomy.mapper.ContentLikeMapper;
 import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ContentAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,11 +38,12 @@ public class ContentLikeService {
     private final PhotoMapper photoMapper;
     private final AnniversaryMapper anniversaryMapper;
     private final AudienceService audienceService;
+    private final ContentAccessService contentAccess;
 
     /** 切换点赞:已赞则取消,未赞则插入(表 UNIQUE 防重复),返回最新状态与总数 */
     @Transactional
     public Map<String, Object> toggle(Long userId, Long familyId, String contentType, Long contentId) {
-        if (!validContent(contentType, contentId, familyId)) {
+        if (!validContent(contentType, contentId, familyId, userId)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         LambdaQueryWrapper<ContentLike> qw = new LambdaQueryWrapper<>();
@@ -86,7 +88,12 @@ public class ContentLikeService {
     }
 
     /** 查询某用户对内容的点赞状态与总数(游客未点赞) */
-    public Map<String, Object> state(Long userId, String contentType, Long contentId) {
+    public Map<String, Object> state(Long userId, Long familyId, String contentType, Long contentId) {
+        if ("diary".equals(contentType)) {
+            Diary diary = diaryMapper.selectById(contentId);
+            if (diary == null) throw new BizException(ResultCode.NOT_FOUND);
+            contentAccess.assertDiaryPrivacy(diary, userId, familyId);
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("liked", isLiked(userId, contentType, contentId));
         result.put("likeCount", likeMapper.countByContent(contentType, contentId));
@@ -103,7 +110,7 @@ public class ContentLikeService {
     }
 
     /** 目标内容必须存在,且与操作者同家庭或已分享给本家庭,否则视为资源不存在 */
-    private boolean validContent(String contentType, Long contentId, Long familyId) {
+    private boolean validContent(String contentType, Long contentId, Long familyId, Long userId) {
         if (contentId == null || familyId == null) return false;
         switch (contentType == null ? "" : contentType) {
             case "blog": {
@@ -116,6 +123,7 @@ public class ContentLikeService {
             case "diary": {
                 Diary d = diaryMapper.selectById(contentId);
                 if (d == null) return false;
+                contentAccess.assertDiaryPrivacy(d, userId, familyId);
                 if (d.getFamilyId().equals(familyId)) return true;
                 return !com.ihomy.common.DictConst.VIS_PRIVATE.equals(d.getVisibility())
                         && audienceService.sharedTo(ContentKind.DIARY, contentId, familyId);

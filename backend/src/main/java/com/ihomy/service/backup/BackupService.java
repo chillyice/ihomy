@@ -382,6 +382,17 @@ public class BackupService {
         return job;
     }
 
+    public void checkFamilyDiaryPrivacy(SysBackupJob job) throws IOException {
+        if (!BackupStatus.SUCCESS.name().equals(job.getStatus())) return;
+        Path metadata = backupRoot.resolve(job.getDirName()).resolve("meta.json");
+        if (Files.isRegularFile(metadata)) {
+            var meta = mapper.readTree(Files.readString(metadata, StandardCharsets.UTF_8));
+            if (meta.path("privateDiariesExcluded").asBoolean(false)
+                    || meta.path("database").path("tables").path("content_diary").asLong(-1) == 0) return;
+        }
+        throw new BizException(ResultCode.BAD_REQUEST, "请重新生成家庭数据包，以保护成员的私密日记");
+    }
+
     public void streamZip(Long id, OutputStream out) {
         SysBackupJob job = mustGet(id);
         if (!BackupStatus.SUCCESS.name().equals(job.getStatus())) {
@@ -548,6 +559,7 @@ public class BackupService {
         meta.put("version", appVersion());
         meta.put("kind", job.getKind());
         meta.put("scope", job.getScope());
+        if (BackupScope.FAMILY.name().equals(job.getScope())) meta.put("privateDiariesExcluded", true);
         meta.put("familyId", job.getFamilyId());
         meta.put("startedAt", job.getStartedAt().format(HUMAN));
         meta.put("finishedAt", finished.format(HUMAN));

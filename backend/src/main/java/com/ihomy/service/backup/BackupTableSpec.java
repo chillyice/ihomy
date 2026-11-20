@@ -63,6 +63,11 @@ public final class BackupTableSpec {
     public static FamilyFilter familyFilter(String table, Set<String> columns) {
         if (table == null || columns == null) return null;
         if (NEVER_DUMP.contains(table) || FAMILY_GLOBAL_SKIP.contains(table)) return null;
+        if (Set.of("sys_ai_conversation", "sys_ai_message", "sys_ai_action").contains(table)) return null;
+        if ("content_diary".equals(table)) return new FamilyFilter("`family_id` = ? AND `visibility` <> 'PRIVATE'", 1);
+        if ("content_comment".equals(table)) return new FamilyFilter(
+                "`family_id` = ? AND (`content_type` <> 'diary' OR NOT EXISTS "
+                        + "(SELECT 1 FROM content_diary d WHERE d.id = content_comment.content_id AND d.visibility = 'PRIVATE'))", 1);
         if ("sys_family_info".equals(table)) return new FamilyFilter("`id` = ?", 1);
         if ("sys_user_pref".equals(table)) {
             return new FamilyFilter("`user_id` IN (SELECT `id` FROM `sys_user` WHERE `family_id` = ?)", 1);

@@ -2,12 +2,27 @@
   <!-- 聊天对象列:本家(家庭头像入口+成员) + 亲友圈(圈内家庭→成员);点成员开私聊 -->
   <aside class="chat-rail" :class="{ narrow }">
     <div v-loading="loading" class="rail-scroll">
+      <button
+        v-if="assistant.eligible"
+        type="button"
+        class="rail-item rail-room"
+        :class="{ active: assistant.active }"
+        :aria-label="$t('chat.assistant.title')"
+        :title="$t('chat.assistant.title')"
+        @click="chatStore.openAssistant()"
+      >
+        <span class="rail-room-icon"
+          ><el-icon :size="16"><MagicStick /></el-icon
+        ></span>
+        <span class="rail-name">{{ $t('chat.assistant.title') }}</span>
+        <span v-if="assistant.pending" class="rail-badge" :title="$t('chat.assistant.pending')">{{ assistant.pending }}</span>
+      </button>
       <!-- 本家:与圈内家庭同构(分组头 + 家庭入口 + 成员),头像用家庭封面 -->
       <div class="rail-group-label">{{ ownFamilyName }}</div>
       <button
         type="button"
         class="rail-item rail-room rail-family"
-        :class="{ active: chatStore.activePeer == null && chatStore.activeRoomId == null }"
+        :class="{ active: chatStore.activeKey === null }"
         @click="chatStore.closeDm()"
       >
         <img v-if="chatStore.ownFamily.coverImage" class="rail-avatar" :src="chatStore.ownFamily.coverImage" :alt="ownFamilyName" />
@@ -85,9 +100,10 @@
 // 未读数读 store(dmUnread),WS 实时增量已由 store 维护。
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { HomeFilled } from '@element-plus/icons-vue'
+import { HomeFilled, MagicStick } from '@element-plus/icons-vue'
 import { circleApi, familyApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
+import { useAssistantStore } from '@/stores/assistant'
 import { useUserStore } from '@/stores/user'
 import { resolvePresence } from '@/utils/presence'
 import UserPresenceDot from '@/components/UserPresenceDot.vue'
@@ -96,6 +112,7 @@ import UserPresenceDot from '@/components/UserPresenceDot.vue'
 defineProps({ narrow: { type: Boolean, default: false } })
 
 const chatStore = useChatStore()
+const assistant = useAssistantStore()
 const userStore = useUserStore()
 const { t } = useI18n()
 
@@ -160,6 +177,7 @@ const load = async () => {
 }
 
 onMounted(load)
+onMounted(() => assistant.refreshPending())
 </script>
 
 <style scoped>

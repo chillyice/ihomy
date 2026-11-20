@@ -199,12 +199,23 @@ const buildPages = () => {
   pages.value = arr
 }
 
+let loadSequence = 0
 const load = async () => {
+  const sequence = ++loadSequence
+  const author = String(route.params.authorId)
+  const entryId = /^\d+$/.test(route.query.entry || '') ? String(route.query.entry) : ''
   loading.value = true
   try {
     // ponytail: 拉全量后客户端按作者过滤;单作者超 200 篇再改服务端按作者查询
     const data = await diaryApi.list({ current: 1, size: 200 })
-    entries.value = (data.records || []).filter((d) => String(d.authorId ?? 0) === String(route.params.authorId))
+    const records = (data.records || []).filter((d) => String(d.authorId ?? 0) === author)
+    if (entryId && !records.some((d) => String(d.id) === entryId)) {
+      // Older search hits may fall outside the newest 200 entries. The detail endpoint checks visibility.
+      const selected = await diaryApi.detail(entryId)
+      if (String(selected.authorId) === author) records.push(selected)
+    }
+    if (sequence !== loadSequence) return
+    entries.value = records
     entries.value.forEach((e) => {
       // 页数 = max(正文行数, 涂鸦高度) 折算的页数,防止涂鸦超出文本被裁掉
       const extent = doodleExtentY(parseDoodle(e.doodle))
@@ -212,9 +223,17 @@ const load = async () => {
     })
     buildPages()
     pos.value = 0
+    if (entryId) jumpToEntry(entries.value.findIndex((e) => String(e.id) === entryId))
     nextTick(syncSpreadScale)
+  } catch (e) {
+    if (sequence === loadSequence) {
+      entries.value = []
+      buildPages()
+      pos.value = 0
+      ElMessage.error(e.message)
+    }
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 
@@ -275,7 +294,13 @@ const onAction = async (action, page) => {
       })
       await diaryApi.remove(page.e.id)
       ElMessage.success(t('common.deleted'))
-      await load()
+      if (String(route.query.entry) === String(page.e.id)) {
+        const query = { ...route.query }
+        delete query.entry
+        await router.replace({ query })
+      } else {
+        await load()
+      }
       pos.value = Math.min(pos.value, maxPos.value)
     } catch (e) {
       if (e !== 'cancel') ElMessage.error(e.message || 'Failed')
@@ -295,6 +320,7 @@ watch(isMobile, (m) => {
 })
 // 翻页重挂载后重测高度(首页/空白页页眉高度略有差异)
 watch(pos, () => nextTick(syncScalerHeight))
+watch(() => [route.params.authorId, route.query.entry], load)
 
 onMounted(() => {
   load()

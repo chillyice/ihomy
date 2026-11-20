@@ -120,6 +120,8 @@
       :class="{ pinned: pinnedRoom }"
       :style="ballStyle"
       :aria-label="$t('chat.title')"
+      :title="assistant.eligible ? $t('chat.assistant.holdHint') : $t('chat.title')"
+      @contextmenu.prevent
       @pointerdown="onBallDown"
       @pointerup="onBallUp"
       @click="onBallClick"
@@ -163,6 +165,8 @@ import { ElMessage } from 'element-plus'
 import { ChatDotRound, Close } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { useAssistantStore } from '@/stores/assistant'
+import { trackAssistantHold } from '@/utils/assistantHold'
 import { useRoomChatStore } from '@/stores/roomChat'
 import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
@@ -186,6 +190,8 @@ const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const chatStore = useChatStore()
+const assistant = useAssistantStore()
+const floatVoiceOwner = Symbol()
 const roomChatStore = useRoomChatStore()
 const floatsStore = useFloatsStore()
 const { isMobile } = useDevice()
@@ -421,15 +427,35 @@ const onSheetGripDown = (e) => {
 
 // 松手时记录拖动状态，拦住随拖动产生的 click，同时保留键盘激活。
 let ignoreBallClick = false
+let cancelHold = null
 const onBallDown = (e) => {
-  // 钉在游戏区右上角时不可拖(也不进删除区判定):位置由游戏区决定
-  if (pinnedRoom.value) return
-  if (!ball.onDragStart(e)) return
+  if (e.isPrimary === false || e.button !== 0) return
   ignoreBallClick = false
-  trackToDock(e)
+  if (!pinnedRoom.value) {
+    if (!ball.onDragStart(e)) return
+    trackToDock(e)
+  }
+  cancelHold?.()
+  if (!assistant.eligible) return
+  cancelHold = trackAssistantHold(e, {
+    hold() {
+      if (ball.dragging.value || dockActive.value) return
+      ignoreBallClick = true
+      ball.cancelPendingDrag()
+      detachTrack?.()
+      dockCancel()
+      tab.value = 'family'
+      chatStore.openAssistant()
+      expand()
+      haptic('tap')
+      assistant.startVoice(t, floatVoiceOwner)
+    },
+    release: () => assistant.finishVoice(t, floatVoiceOwner),
+    cancel: () => assistant.discardVoice(floatVoiceOwner),
+  })
 }
 const onBallUp = (e) => {
-  if (e.isPrimary && e.button === 0) ignoreBallClick = ball.dragging.value
+  if (e.isPrimary && e.button === 0 && ball.dragging.value) ignoreBallClick = true
 }
 const onBallClick = (e) => {
   // 钉住态每次点球都重量一次:布局在这之前变过(规则面板收起/旋转)也能立刻收回游戏区
@@ -510,11 +536,13 @@ const removeFloat = () => {
 const expand = () => {
   // 浮窗与 /chat 页共用 stores/chat.js 的缓存:首次展开必须自己拉历史,
   // 否则消息区只会保留「加载中」转圈,等 /chat 页那样拉过一次才停
-  chatStore.loadHistory({ force: true })
+  chatStore.loadHistory({ force: true, markRead: !assistant.active })
   expanded.value = true
   clearToast()
 }
 const collapse = () => {
+  cancelHold?.()
+  assistant.discardVoice(floatVoiceOwner)
   expanded.value = false
 }
 
@@ -536,6 +564,12 @@ const clearToast = () => {
   }
 }
 const openFromToast = () => {
+  const message = notifyMsg.value
+  if (assistant.active && message) {
+    if (message.dm) chatStore.openDm(message.dm.userId, message.senderName)
+    else if (message.familyId && Number(message.familyId) !== Number(userStore.userInfo?.familyId)) chatStore.openRoom(message.familyId)
+    else chatStore.closeDm()
+  }
   clearToast()
   expand()
 }
@@ -609,6 +643,8 @@ watch(sheetH, applySheetH)
 
 // 卸载兜底:拖动中被隐藏/路由切走时不残留窗口级监听与删除条
 onBeforeUnmount(() => {
+  cancelHold?.()
+  assistant.discardVoice(floatVoiceOwner)
   detachTrack?.()
   detachSheetDrag()
   dockCancel()

@@ -417,6 +417,9 @@ public class AudienceService {
         if (content == null || viewer.familyId() == null || !viewer.familyId().equals(content.familyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+        if (kind == ContentKind.DIARY) {
+            contentAccess.assertViewable(kind, content.familyId(), content.authorId(), content.visibility(), viewer);
+        }
         return content;
     }
 

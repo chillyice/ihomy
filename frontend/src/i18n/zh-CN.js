@@ -2,6 +2,8 @@
 // 结构: nav(导航) / common(通用按钮/提示) / login / home / blog / diary / album /
 //        member / settings / family / anniversary / cinema / points / task /
 //        reminder / plan / wish / book / chat / ops / more
+import assistant from './assistant/zh-CN'
+
 export default {
   nav: {
     home: '首页',
@@ -2394,6 +2396,7 @@ export default {
     },
   },
   chat: {
+    assistant,
     title: '聊天室',
     roomTitle: '家庭聊天室',
     fromFamily: '来自 {name}',
@@ -3403,7 +3406,9 @@ export default {
         WEATHER_IMAGE: '天气生图',
         ASR: '语音识别',
         OSS_UPGRADE_EVAL: '升级评估',
+        ASSISTANT: 'AI 助手',
       },
+      assistantSwitch: '启用本家庭的 AI 助手',
       available: '可用',
       unconfigured: '未配置',
       baseUrl: '服务地址(OpenAI 兼容,不含路径)',
@@ -3833,6 +3838,7 @@ export default {
       WEATHER_IMAGE: '天气生图',
       ASR: '语音识别',
       OSS_UPGRADE_EVAL: '升级评估',
+      ASSISTANT: 'AI 助手',
     },
     apiType: {
       now: '实时天气',
@@ -4500,6 +4506,7 @@ export default {
   notify: {
     typeReply: '回复',
     typeSystem: '系统',
+    typeFamily: '家庭通知',
     typeComment: '评论',
     typeExpiry: '食材预警',
     typeReminder: '提醒',

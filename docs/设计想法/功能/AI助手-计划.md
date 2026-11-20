@@ -1,6 +1,7 @@
 # ihomy AI 助手（聊天室入口 + 长按语音） 跨会话实施计划
 
-> **状态**：已设计未开工（2026-11-19）。**版本号不预占**，开工时按根 `VERSION` +1。
+> **实施状态**：首版已完成。模型调用、私人会话、5 个只读工具、7 个写工具、确认卡、语音与家庭开关均已接入。§1 记录开工前的代码状态，§9 的 P2 是后续选项。
+> **落地差异**：聊天面板共用独立的助手状态。每轮持久化用户消息、助手回复和供前端查看的工具结果，待确认动作另表保存。语音复用原有 ASR，通过 `/ai/assistant/transcribe` 校验家庭开关。日记确认可选「仅自己」或「本家庭」，所有历史私密日记均仅作者可见。
 > **立项来源**：用户 2026-11-19 产品意见（原文）：「学习隔壁项目 atpf，增加一个 AI 助手，通过长按聊天室浮窗可以快捷语音输入内容，点击聊天室，本家庭上方就是 AI 助手，点击后可以与助手聊天。需要增加各功能的类似 MCP 的东西，目的是让 AI 知道该怎么用 ihomy 操作，比如写日志、记录日程、语音寻物等等，但是保证不能越权。要写一个计划文档，有序开发。」
 > **2026-11-19 已拍板**：① 引擎 = **后端内进程 Tool-Calling 闭环**，工具注册表按 MCP 形状设计（不引入 opencode/Node 子进程）；② 写操作 = **对话内确认卡**（模型只提方案，用户点了才落库）；③ 语音 = **录音 + 服务端 ASR**（复用 `useVoiceRecorder` + `/ai/transcribe`）；④ 首版能力 = **日程/提醒/待办、语音寻物（已有能力）、记账+愿望+通知家人、日记/博客、打开功能与找内容**。
 > **交接方式**：新会话先读 `AGENTS.md` → 本文 → 需求 §4.4.4（聊天室）/§4.6.9（AI API 对接）/§4.7.7（用户偏好）/§6.4（可见性），再按 §14 开工清单逐项执行。每阶段收尾走 `/archive` 轻量收尾。
@@ -295,7 +296,7 @@ CREATE TABLE `sys_ai_action` (
 | name | 落到哪 | 复用 | 前置/约束 |
 |---|---|---|---|
 | `create_reminder` | 提醒（可循环） | `ReminderService.create`（`:106`） | 时间必须解析成绝对日期；循环口径照 `repeatType`；缺时间就反问 |
-| `create_diary` | 日记 | `DiaryService.create`（`:80`） | 默认 `PRIVATE`；确认卡显示可见范围 |
+| `create_diary` | 日记 | `DiaryService.create`（`:80`） | 确认卡默认「仅自己可见」，保存前本人可改为「本家庭可见」。本次选择只作用于这一篇 |
 | `create_blog` | 博客 | `BlogService.create`（`:350`） | 默认 `DRAFT` + `FAMILY`；标题必填 |
 | `create_book_record` | 账本一笔 | `BookService.create`（`:159`）+ **必须** `BookPermissionService.requireWrite`（`:67-78`） | 金额、收支、分类、账户、日期；账户不存在就反问 |
 | `create_wish` | 愿望 | `WishService.create`（`:79`） | 标题必填 |
@@ -543,23 +544,23 @@ actions: openAssistant() / closeAssistant() / loadAssistant() / sendAssistant(te
 
 ### P0 骨架：能对话 + 只读工具（估 2–3 人日）
 
-- [ ] `schema.sql` + `migrations.sql` 三表（空库全量导入实测）
-- [ ] `AiConst` 加 `FEATURE_ASSISTANT` + 设置页 i18n 标签
-- [ ] 家庭助手总开关接入设置页、状态接口与服务端调用路径
-- [ ] `AiService.chatWithTools` + 解析 `tool_calls`（不动现有 `chat`）
-- [ ] 工具注册表 + 只读工具 5 个；`AssistantPromptBuilder`
-- [ ] `POST /ai/assistant/chat`、`GET /conversation`、`GET /status`
-- [ ] 前端：store 分支、对象列入口、输入区、消息渲染、空态建议
-- [ ] 语雀验收：问「今天有什么安排」→ 真实日程；问「身份证在哪」→ 真实物品；未配模型 → 引导文案
+- [x] `schema.sql` + `migrations.sql` 三表（空库全量导入实测）
+- [x] `AiConst` 加 `FEATURE_ASSISTANT` + 设置页 i18n 标签
+- [x] 家庭助手总开关接入设置页、状态接口与服务端调用路径
+- [x] `AiService.chatWithTools` + 解析 `tool_calls`（不动现有 `chat`）
+- [x] 工具注册表 + 只读工具 5 个；`AssistantTurn` 组装提示词
+- [x] `POST /ai/assistant/chat`、`GET /conversation`、`GET /status`
+- [x] 前端：store 分支、对象列入口、输入区、消息渲染、空态建议
+- [x] 接口冒烟：问「今天有什么安排」→ 真实日程；问「身份证在哪」→ 真实物品；未配模型 → 引导文案
 
 ### P1 写操作 + 语音 + 找内容/打开（估 3–4 人日）
 
-- [ ] `sys_ai_action` 全链路（生成/确认/取消/执行/失败）+ 幂等
-- [ ] 写工具 7 个（§5.2）+ 角色矩阵
-- [ ] `AssistantSearchService`（6 类）+ `search_content`；`open_page` 白名单
-- [ ] 前端确认卡 + 结果态 + 待确认角标
-- [ ] 长按浮球录音 → 转写 → 填输入框；输入区麦克风按钮
-- [ ] 限流 + 上限 + `@OperationLog` + 审计日志
+- [x] `sys_ai_action` 全链路（生成/确认/取消/执行/失败）+ 幂等
+- [x] 写工具 7 个（§5.2）+ 角色矩阵
+- [x] `AssistantSearchService`（6 类）+ `search_content`；`open_page` 白名单
+- [x] 前端确认卡 + 结果态 + 待确认角标
+- [x] 长按浮球录音 → 转写 → 填输入框；输入区麦克风按钮
+- [x] 限流 + 上限 + `@OperationLog` + 审计日志
 - [ ] §6.7 权限与开关验收用例全部通过
 
 ### P2 打磨（估 1–2 人日，按需）
@@ -635,9 +636,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 12. 待拍板（开工前需确认，不阻塞 P0）
 
-1. **谁能看助手写的日记**：现有日记编辑页新建时默认「仅自己可见」。助手拟沿用这个默认值，待定的是能否在点「保存」前直接把这篇日记改为「本家庭可见」。
-2. **语音转写后是否自动发送**：建议填输入框不自动发；是否需要「松手即发送」开关？
-3. **多会话**：P1 单会话够用，还是首版就要历史会话列表？
+1. **语音转写后是否自动发送**：建议填输入框不自动发；是否需要「松手即发送」开关？
+2. **多会话**：P1 单会话够用，还是首版就要历史会话列表？
 
 ---
 

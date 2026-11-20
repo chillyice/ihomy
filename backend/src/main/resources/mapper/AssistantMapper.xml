@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.AssistantMapper">
+    <select id="enabled" resultType="boolean">
+        SELECT assistant_enabled FROM sys_family_info WHERE id=#{fid} AND deleted=0
+        <if test="lock">FOR SHARE</if>
+    </select>
+    <update id="setEnabled">UPDATE sys_family_info SET assistant_enabled=#{enabled} WHERE id=#{fid} AND deleted=0</update>
+    <select id="conversation" resultType="long">SELECT id FROM sys_ai_conversation WHERE user_id=#{uid} AND family_id=#{fid}</select>
+    <insert id="ensureConversation">
+        INSERT INTO sys_ai_conversation (user_id,family_id) VALUES (#{uid},#{fid}) ON DUPLICATE KEY UPDATE id=id
+    </insert>
+    <update id="claimTurn">
+        UPDATE sys_ai_conversation SET turn_key=#{key},busy_until=DATE_ADD(NOW(),INTERVAL 3 MINUTE)
+        WHERE id=#{cid} AND (turn_key IS NULL OR busy_until &lt; NOW())
+    </update>
+    <update id="finishTurn">
+        UPDATE sys_ai_conversation SET turn_key=NULL,busy_until=NULL,last_at=NOW(),
+            title=IF(title='',LEFT(#{title},60),title)
+        WHERE id=#{cid} AND turn_key=#{key}
+    </update>
+    <update id="releaseTurn">
+        UPDATE sys_ai_conversation SET turn_key=NULL,busy_until=NULL WHERE id=#{cid} AND turn_key=#{key}
+    </update>
+    <update id="clearTurn">
+        UPDATE sys_ai_conversation SET turn_key=NULL,busy_until=NULL,title='' WHERE id=#{cid}
+    </update>
+    <insert id="insertMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_ai_message(conversation_id,role,content,payload) VALUES(#{cid},#{role},#{content},#{payload})
+    </insert>
+    <select id="messages" resultType="map">
+        SELECT id,role,content,payload,created_at AS createdAt FROM sys_ai_message WHERE conversation_id=#{cid}
+        <if test="before != null">AND id &lt; #{before}</if>
+        ORDER BY id DESC LIMIT #{limit}
+    </select>
+    <select id="pruneBefore" resultType="long">
+        SELECT id FROM sys_ai_message WHERE conversation_id=#{cid} ORDER BY id DESC LIMIT 200,1
+    </select>
+    <delete id="deleteMessages">DELETE FROM sys_ai_message WHERE conversation_id=#{cid} AND id &lt;= #{through}</delete>
+    <update id="cancelOld">
+        UPDATE sys_ai_action SET status='CANCELLED',decided_at=NOW()
+        WHERE conversation_id=#{cid} AND message_id &lt;= #{through} AND status='PENDING'
+    </update>
+    <insert id="insertAction" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_ai_action(conversation_id,message_id,user_id,family_id,tool_name,args_json,preview)
+        VALUES(#{cid},#{messageId},#{uid},#{fid},#{toolName},#{args},#{preview})
+    </insert>
+    <sql id="cardColumns">id,message_id AS messageId,tool_name AS toolName,args_json AS args,preview,status,result_json AS result,error</sql>
+    <select id="lockAction" resultType="map">
+        SELECT <include refid="cardColumns"/> FROM sys_ai_action
+        WHERE id=#{id} AND user_id=#{uid} AND family_id=#{fid} FOR UPDATE
+    </select>
+    <select id="actions" resultType="map">
+        SELECT <include refid="cardColumns"/> FROM sys_ai_action
+        WHERE conversation_id=#{cid} AND message_id BETWEEN #{lo} AND #{hi} ORDER BY message_id,id
+    </select>
+    <select id="pending" resultType="int">
+        SELECT count(*) FROM sys_ai_action WHERE user_id=#{uid} AND family_id=#{fid} AND status='PENDING'
+    </select>
+    <update id="decide">
+        UPDATE sys_ai_action SET status=#{status}, decided_at=NOW(),args_json=COALESCE(#{args},args_json),
+            result_json=#{result},error=#{error} WHERE id=#{id} AND status='PENDING'
+    </update>
+    <delete id="deleteExpired">DELETE FROM sys_ai_action WHERE created_at &lt; NOW() - INTERVAL 90 DAY</delete>
+</mapper>

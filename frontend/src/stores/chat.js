@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { watch } from 'vue'
 import { chatApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useAssistantStore } from '@/stores/assistant'
 import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
 import { serializePayload, mergeMessages } from '@/utils/chatMsg'
 import { useCallStore } from '@/stores/call'
@@ -83,9 +84,16 @@ export const useChatStore = defineStore('chat', {
   }),
   getters: {
     /** 聊天界面是否在前台(/chat 页或浮窗展开) */
-    viewing: (s) => s.chatPageActive || s.floatOpen,
+    viewing: (s) => !useAssistantStore().active && (s.chatPageActive || s.floatOpen),
     /** 当前会话键:null=本家 / p:<userId>=私聊 / f:<familyId>=亲友圈家庭房间 */
-    activeKey: (s) => (s.activePeer != null ? `p:${s.activePeer}` : s.activeRoomId != null ? `f:${s.activeRoomId}` : null),
+    activeKey: (s) =>
+      useAssistantStore().active
+        ? 'ai'
+        : s.activePeer != null
+          ? `p:${s.activePeer}`
+          : s.activeRoomId != null
+            ? `f:${s.activeRoomId}`
+            : null,
     /** 总未读 = 本家 + 全部私聊 + 亲友圈家庭房间(浮球/侧栏角标) */
     totalUnread: (s) =>
       s.unread +
@@ -358,6 +366,7 @@ export const useChatStore = defineStore('chat', {
      */
     async openDm(peerId, name = '') {
       if (peerId == null) return
+      useAssistantStore().leave()
       this.activePeer = Number(peerId)
       this.activePeerName = name || this.activePeerName || ''
       this.activeRoomId = null
@@ -377,6 +386,7 @@ export const useChatStore = defineStore('chat', {
      */
     async openRoom(familyId, name = '') {
       if (familyId == null) return
+      useAssistantStore().leave()
       const id = Number(familyId)
       this.activePeer = null
       this.activePeerName = ''
@@ -394,11 +404,21 @@ export const useChatStore = defineStore('chat', {
 
     /** 回到本家聊天室 */
     closeDm() {
+      useAssistantStore().leave()
       this.activePeer = null
       this.activePeerName = ''
       this.activeRoomId = null
       this.activeRoomName = ''
       this.unreadAnchor = null
+    },
+
+    openAssistant() {
+      const assistant = useAssistantStore()
+      if (!assistant.eligible) return
+      this.activePeer = this.activeRoomId = this.unreadAnchor = null
+      this.activePeerName = this.activeRoomName = ''
+      // The shared conversation component loads on mount, including when a closed float is reopened.
+      assistant.active = true
     },
 
     /** 拉某个私聊会话的历史(与本地缓存按 id 合并,幂等) */
@@ -496,6 +516,7 @@ export const useChatStore = defineStore('chat', {
      */
     share(card) {
       if (!card) return
+      useAssistantStore().leave()
       this.shareCard = card
     },
 
@@ -563,6 +584,7 @@ export const useChatStore = defineStore('chat', {
 
     /** 登出/清场:断开连接并清空全部会话数据(防串号) */
     reset() {
+      useAssistantStore().reset()
       historyGen += 1
       historyPromise = null
       wsEverOpened = false

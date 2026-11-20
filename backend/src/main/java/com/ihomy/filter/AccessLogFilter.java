@@ -59,9 +59,12 @@ public class AccessLogFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         boolean ws = isWebSocketUpgrade(request);
         // multipart/octet-stream 不捕获请求体(大二进制无日志价值)
-        boolean captureReq = !ws && isTextBody(request.getContentType());
+        String path = request.getServletPath();
+        boolean privateBody = path.startsWith("/ai/assistant/") || path.equals("/diary") || path.startsWith("/diary/")
+                || path.equals("/home/feed");
+        boolean captureReq = !ws && !privateBody && isTextBody(request.getContentType());
         CaptureRequestWrapper reqW = captureReq ? new CaptureRequestWrapper(request, MAX_REQ_CAPTURE) : null;
-        CaptureResponseWrapper resW = !ws ? new CaptureResponseWrapper(response, MAX_RESP_CAPTURE) : null;
+        CaptureResponseWrapper resW = !ws ? new CaptureResponseWrapper(response, privateBody ? 64 : MAX_RESP_CAPTURE) : null;
         HttpServletRequest reqToUse = reqW != null ? reqW : request;
         HttpServletResponse resToUse = resW != null ? resW : response;
 
@@ -69,12 +72,12 @@ public class AccessLogFilter extends OncePerRequestFilter {
         try {
             chain.doFilter(reqToUse, resToUse);
         } finally {
-            logAccess(reqToUse, resToUse, reqW, resW, System.currentTimeMillis() - start);
+            logAccess(reqToUse, resToUse, reqW, resW, System.currentTimeMillis() - start, privateBody);
         }
     }
 
     private void logAccess(HttpServletRequest req, HttpServletResponse res,
-                           CaptureRequestWrapper reqW, CaptureResponseWrapper resW, long cost) {
+                           CaptureRequestWrapper reqW, CaptureResponseWrapper resW, long cost, boolean privateBody) {
         try {
             String uri = req.getRequestURI()
                     + (req.getQueryString() == null ? "" : "?" + maskQuery(req.getQueryString()));
@@ -85,6 +88,10 @@ public class AccessLogFilter extends OncePerRequestFilter {
             String type = res.getContentType();
             if (resW != null && type != null && (type.contains("json") || type.contains("text"))) {
                 String captured = maskJson(resW.captured());
+                if (privateBody) {
+                    var code = RESP_CODE.matcher(captured);
+                    captured = code.find() ? "{\"code\":" + code.group(1) + "}" : "";
+                }
                 var m = RESP_CODE.matcher(captured);
                 if (m.find()) {
                     bizCode = Integer.valueOf(m.group(1));
@@ -101,7 +108,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
                     + " status=" + status
                     + " code=" + (bizCode == null ? "-" : bizCode)
                     + " cost=" + cost + "ms"
-                    + " req=" + requestBody(req, reqW)
+                    + " req=" + (privateBody ? "-" : requestBody(req, reqW))
                     + (resp == null || resp.isEmpty() ? "" : " resp=" + truncate(resp, MAX_LOG_FIELD));
             if (slow || fail) {
                 accessLog.warn(msg);

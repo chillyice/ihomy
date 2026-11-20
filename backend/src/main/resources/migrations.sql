@@ -3896,3 +3896,55 @@ SET @add_reminder_notified := (
 PREPARE add_reminder_notified_stmt FROM @add_reminder_notified;
 EXECUTE add_reminder_notified_stmt;
 DEALLOCATE PREPARE add_reminder_notified_stmt;
+
+-- 家庭助手:同一人每个家庭拥有独立对话。
+SET @assistant_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE sys_family_info ADD COLUMN assistant_enabled TINYINT NOT NULL DEFAULT 1 COMMENT ''本家庭助手总开关''',
+  'SELECT 1') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'sys_family_info' AND COLUMN_NAME = 'assistant_enabled');
+PREPARE assistant_setting FROM @assistant_ddl;
+EXECUTE assistant_setting;
+DEALLOCATE PREPARE assistant_setting;
+
+CREATE TABLE IF NOT EXISTS `sys_ai_conversation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL,
+  `family_id` BIGINT NOT NULL,
+  `title` VARCHAR(60) NOT NULL DEFAULT '',
+  `turn_key` VARCHAR(36) DEFAULT NULL COMMENT '进行中的请求标识,清空或超时后旧请求不能回写',
+  `busy_until` DATETIME DEFAULT NULL,
+  `last_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_family` (`user_id`,`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手会话';
+
+CREATE TABLE IF NOT EXISTS `sys_ai_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `conversation_id` BIGINT NOT NULL,
+  `role` VARCHAR(16) NOT NULL,
+  `content` MEDIUMTEXT NOT NULL,
+  `payload` MEDIUMTEXT COMMENT '供本人展开的工具摘要与提示',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_conv` (`conversation_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手消息';
+
+CREATE TABLE IF NOT EXISTS `sys_ai_action` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `conversation_id` BIGINT NOT NULL,
+  `message_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `family_id` BIGINT NOT NULL,
+  `tool_name` VARCHAR(64) NOT NULL,
+  `args_json` MEDIUMTEXT NOT NULL,
+  `preview` TEXT NOT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `result_json` TEXT,
+  `error` VARCHAR(500),
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `decided_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_message` (`conversation_id`,`message_id`),
+  KEY `idx_scope_status` (`user_id`,`family_id`,`status`,`id`),
+  KEY `idx_expire` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手确认卡与执行记录';

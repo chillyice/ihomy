@@ -33,7 +33,7 @@ public class CommentController {
     public Result<List<Map<String, Object>>> list(@RequestParam String contentType, @RequestParam Long contentId) {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(commentService.list(contentType, contentId, familyId));
+        return Result.success(commentService.list(contentType, contentId, familyId, user == null ? null : user.getId()));
     }
 
     @Operation(summary = "发表评论/回复")

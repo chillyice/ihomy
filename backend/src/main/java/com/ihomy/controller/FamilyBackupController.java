@@ -80,6 +80,7 @@ public class FamilyBackupController {
     @GetMapping("/jobs/{id}/download")
     public void download(@PathVariable Long id, HttpServletResponse response) throws IOException {
         SysBackupJob job = own(id);
+        backupService.checkFamilyDiaryPrivacy(job);
         response.setContentType("application/zip");
         String name = "ihomy-family-" + job.getId() + ".zip";
         response.setHeader("Content-Disposition", "attachment; filename=\"" + name + "\"");

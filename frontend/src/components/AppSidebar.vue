@@ -121,7 +121,7 @@
                 :class="{ unread: !n.isRead }"
                 @click="onNotifyClick(n)"
               >
-                <div class="notify-type">{{ notifyType(n.type) }}</div>
+                <div class="notify-type">{{ t(notificationTypeKey(n.type)) }}</div>
                 <div class="notify-content">{{ n.content }}</div>
                 <div class="notify-time">{{ notifyTime(n.createdAt) }}</div>
               </div>
@@ -226,6 +226,7 @@ import WarnTriangle from '@/components/WarnTriangle.vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
+import { notificationTypeKey } from '@/utils/notificationType'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 
 import { applyLocale } from '@/i18n'
@@ -359,18 +360,6 @@ const onNotifyClick = async (n) => {
     router.push({ path: '/plan', query: { date: day } })
   }
 }
-const notifyType = (type) =>
-  type === 'reply'
-    ? t('notify.typeReply')
-    : type === 'system'
-      ? t('notify.typeSystem')
-      : type === 'item_expiry'
-        ? t('notify.typeExpiry')
-        : type === 'reminder'
-          ? t('notify.typeReminder')
-          : type === 'anniversary'
-            ? t('notify.typeAnniversary')
-            : t('notify.typeComment')
 const notifyTime = (d) => formatRelativeTime(t, d)
 
 // 用户下拉

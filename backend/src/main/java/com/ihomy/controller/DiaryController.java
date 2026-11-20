@@ -40,7 +40,7 @@ public class DiaryController {
     }
 
     @Operation(summary = "新建日志")
-    @OperationLog(module = "DIARY", operationType = "CREATE", description = "写日记")
+    @OperationLog(module = "DIARY", operationType = "CREATE", description = "写日记", saveArgs = false)
     @PostMapping
     public Result<Diary> create(@RequestBody DiaryDTO dto) {
         SysUser user = securityHelper.currentUser();
@@ -48,7 +48,7 @@ public class DiaryController {
     }
 
     @Operation(summary = "更新日志")
-    @OperationLog(module = "DIARY", operationType = "UPDATE", description = "修改日记")
+    @OperationLog(module = "DIARY", operationType = "UPDATE", description = "修改日记", saveArgs = false)
     @PutMapping("/{id}")
     public Result<Diary> update(@PathVariable Long id, @RequestBody DiaryDTO dto) {
         return Result.success(diaryService.update(id, securityHelper.currentUserId(),

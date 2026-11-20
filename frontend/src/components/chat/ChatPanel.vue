@@ -27,22 +27,24 @@
             <el-icon :size="16"><Expand v-if="!railOpen" /><Fold v-else /></el-icon>
           </button>
           <span class="head-title">{{ conversationTitle }}</span>
-          <button
-            v-if="chatStore.activePeer != null || chatStore.activeRoomId != null"
-            type="button"
-            class="head-back"
-            @click="chatStore.closeDm()"
-          >
+          <button v-if="chatStore.activeKey != null" type="button" class="head-back" @click="chatStore.closeDm()">
             {{ $t('chat.rail.backFamily') }}
           </button>
           <!-- 连接状态挂在会话头(框体)上:圆点+短文案,不占消息区之外的独立一行 -->
-          <span class="conn-chip" :class="connected ? 'ok' : 'bad'">
+          <span v-if="assistant.active" class="conn-chip" :class="assistant.status?.available ? 'ok' : 'bad'">
+            <span class="conn-dot" aria-hidden="true"></span>
+            {{ $t(assistant.status?.available ? 'chat.assistant.ready' : 'chat.assistant.unavailable') }}
+          </span>
+          <span v-else class="conn-chip" :class="connected ? 'ok' : 'bad'">
             <span class="conn-dot" aria-hidden="true"></span>
             {{ connected ? $t('chat.connected') : connecting ? $t('chat.connecting') : $t('chat.reconnecting') }}
           </span>
         </div>
-        <ChatMessages />
-        <ChatComposer />
+        <AssistantConversation v-if="assistant.active" />
+        <template v-else>
+          <ChatMessages />
+          <ChatComposer />
+        </template>
       </div>
     </div>
   </div>
@@ -50,10 +52,11 @@
 
 <script setup>
 // 组装层:对象列收起/展开与宽度(都记本机)、会话标题;消息滚动/发送逻辑分别在 ChatMessages/ChatComposer
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Expand, Fold } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
+import { useAssistantStore } from '@/stores/assistant'
 import { familyApi } from '@/api'
 import { useDevice } from '@/composables/useDevice'
 import { SOCKET_STATUS } from '@/composables/useChatSocket'
@@ -71,6 +74,8 @@ const RAIL_NARROW = 104
 
 const { t } = useI18n()
 const chatStore = useChatStore()
+const assistant = useAssistantStore()
+const AssistantConversation = defineAsyncComponent(() => import('./AssistantConversation.vue'))
 const { isMobile } = useDevice()
 const connected = computed(() => chatStore.socketStatus === SOCKET_STATUS.OPEN)
 const connecting = computed(() => chatStore.socketStatus === SOCKET_STATUS.CONNECTING)
@@ -157,6 +162,7 @@ onBeforeUnmount(() => {
 
 // 会话标题:本家聊天室(显示本家家庭名) / 亲友圈家庭房间名 / 私聊对方名(打开会话时由对象列传入 store)
 const conversationTitle = computed(() => {
+  if (assistant.active) return t('chat.assistant.title')
   if (chatStore.activePeer != null) {
     return chatStore.activePeerName || t('chat.dm.fallbackTitle', { id: chatStore.activePeer })
   }

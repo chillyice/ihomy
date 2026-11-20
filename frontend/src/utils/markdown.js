@@ -23,7 +23,7 @@ marked.use({
 
 // DOMPurify 默认配置足够:<script>、on* 事件属性、javascript: 协议均被剥离;
 // 正文用到的表格/代码块/图片与标题 id(目录锚点依赖)都在默认白名单内。
-export function renderMarkdown(src) {
+export function renderMarkdown(src, sanitizeOptions) {
   if (!src) return ''
-  return DOMPurify.sanitize(marked.parse(src))
+  return DOMPurify.sanitize(marked.parse(src), sanitizeOptions)
 }

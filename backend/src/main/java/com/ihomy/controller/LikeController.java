@@ -41,7 +41,8 @@ public class LikeController {
     @Operation(summary = "点赞状态")
     @GetMapping("/state")
     public Result<Map<String, Object>> state(@RequestParam String contentType, @RequestParam Long contentId) {
-        Long userId = securityHelper.currentUserId();
-        return Result.success(likeService.state(userId, contentType, contentId));
+        var user = securityHelper.current();
+        return Result.success(likeService.state(user == null ? null : user.getUserId(), user == null ? null : user.getFamilyId(),
+                contentType, contentId));
     }
 }

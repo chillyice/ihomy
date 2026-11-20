@@ -98,6 +98,7 @@ public class OpsAccessFilter extends OncePerRequestFilter {
         }
         String path = request.getRequestURI();
         return path.startsWith("/api/ops")
+                || ("GET".equals(request.getMethod()) && path.equals("/api/ai/assistant/tools"))
                 || path.startsWith("/api/auth")
                 || path.equals("/api/profile/password");
     }

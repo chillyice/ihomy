@@ -70,6 +70,14 @@ public class BlogService {
         return page;
     }
 
+    /** 助手搜索只返回当前家庭的可见博客标题，沿用列表的草稿与隐藏规则。 */
+    public List<Blog> searchFamilyTitles(ViewerScope viewer, String keyword, int limit) {
+        return blogMapper.selectList(visibleQuery(viewer).eq(Blog::getFamilyId, viewer.familyId())
+                .like(Blog::getTitle, keyword).select(Blog::getId, Blog::getTitle)
+                .orderByDesc(Blog::getStatus, Blog::getCreatedAt)
+                .last("LIMIT " + Math.clamp(limit, 1, 10)));
+    }
+
     /** 批量回填「被分享」来源与只读标记(禁 N+1) */
     private void markShared(List<Blog> records, Long familyId) {
         if (records.isEmpty()) return;

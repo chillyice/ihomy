@@ -163,6 +163,7 @@ CREATE TABLE `sys_family_info` (
   `is_demo`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1演示家庭（展示软件效果，owner 不可变更）',
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '16位混淆分享ID（URL ?hid= 访问，防 ID 遍历）',
   `circle_enabled` TINYINT      NOT NULL DEFAULT 1 COMMENT '0=本家庭不参与亲友圈(加入也不生效)',
+  `assistant_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '本家庭助手总开关',
   `share_policy`   VARCHAR(20)  NOT NULL DEFAULT 'SELF_ONLY' COMMENT '外分享策略: SELF_ONLY只能分享自己创建的/OWNER_ONLY家长可分享家庭共有内容/OFF禁止外分享',
   `music_url`      VARCHAR(500) DEFAULT NULL COMMENT '家庭背景音乐 URL（旧字段,保留兼容）',
   `music_title`    VARCHAR(100) DEFAULT NULL COMMENT '背景音乐名称（旧字段,保留兼容）',
@@ -3327,4 +3328,50 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('health_workout_type', 'CARDIO',    '混合有氧'),
 ('health_workout_type', 'MIND_BODY', '身心训练'),
 ('health_workout_type', 'OTHER',     '其他运动');
+
+DROP TABLE IF EXISTS `sys_ai_conversation`;
+CREATE TABLE `sys_ai_conversation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL,
+  `family_id` BIGINT NOT NULL,
+  `title` VARCHAR(60) NOT NULL DEFAULT '',
+  `turn_key` VARCHAR(36) DEFAULT NULL COMMENT '进行中的请求标识,清空或超时后旧请求不能回写',
+  `busy_until` DATETIME DEFAULT NULL,
+  `last_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_family` (`user_id`,`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手会话';
+
+DROP TABLE IF EXISTS `sys_ai_message`;
+CREATE TABLE `sys_ai_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `conversation_id` BIGINT NOT NULL,
+  `role` VARCHAR(16) NOT NULL,
+  `content` MEDIUMTEXT NOT NULL,
+  `payload` MEDIUMTEXT COMMENT '供本人展开的工具摘要与提示',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_conv` (`conversation_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手消息';
+
+DROP TABLE IF EXISTS `sys_ai_action`;
+CREATE TABLE `sys_ai_action` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `conversation_id` BIGINT NOT NULL,
+  `message_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `family_id` BIGINT NOT NULL,
+  `tool_name` VARCHAR(64) NOT NULL,
+  `args_json` MEDIUMTEXT NOT NULL,
+  `preview` TEXT NOT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `result_json` TEXT,
+  `error` VARCHAR(500),
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `decided_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_message` (`conversation_id`,`message_id`),
+  KEY `idx_scope_status` (`user_id`,`family_id`,`status`,`id`),
+  KEY `idx_expire` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手确认卡与执行记录';
 

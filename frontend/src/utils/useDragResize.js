@@ -244,5 +244,9 @@ export function useDragResize(initial) {
     window.removeEventListener('visibilitychange', onVisibilityChange)
     window.visualViewport?.removeEventListener('resize', onViewportChange)
   })
-  return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, reset }
+  // A stationary long press may claim the pointer before a drag begins.
+  const cancelPendingDrag = () => {
+    if (!dragging.value && !resizing.value) stopListening()
+  }
+  return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, cancelPendingDrag, reset }
 }

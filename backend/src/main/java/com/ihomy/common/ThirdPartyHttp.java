@@ -51,6 +51,11 @@ public final class ThirdPartyHttp {
 
     private static final int MAX_BODY_LOG = 1024;
 
+    /** 模型回复和语音转写可能含本人日记或家庭资料。 */
+    private static String responseSummary(String service, String body) {
+        return "ai".equals(service) || "baidu-asr".equals(service) ? "(private)" : truncate(body);
+    }
+
     private ThirdPartyHttp() {
     }
 
@@ -105,7 +110,7 @@ public final class ThirdPartyHttp {
                 respBody = new String(bytes, StandardCharsets.UTF_8);
             }
             log.info("<<< {} {} status={} costMs={} body={}", method, maskedUrl, status,
-                    System.currentTimeMillis() - start, truncate(respBody));
+                    System.currentTimeMillis() - start, responseSummary(service, respBody));
             return new Resp(status, respBody);
         } catch (IOException e) {
             log.error("!!! {} {} failed costMs={}", method, maskedUrl, System.currentTimeMillis() - start, e);
@@ -204,7 +209,7 @@ public final class ThirdPartyHttp {
             int status = conn.getResponseCode();
             String respBody = readResponse(conn, status);
             log.info("<<< {} {} status={} costMs={} body={}", method, maskedUrl, status,
-                    System.currentTimeMillis() - start, truncate(respBody));
+                    System.currentTimeMillis() - start, responseSummary(service, respBody));
             return new Resp(status, respBody);
         } catch (IOException e) {
             log.error("!!! {} {} failed costMs={}", method, maskedUrl, System.currentTimeMillis() - start, e);

@@ -42,11 +42,12 @@ public class NotificationService {
      * 家庭内通知:先校验接收者确实在该家庭有角色绑定,否则丢弃。
      * 跨家庭内容不外泄(评论/回复/分享等带家庭上下文的通知一律走这里)。
      */
-    public void createInFamily(Long receiverId, Long familyId, String type, String content,
+    public boolean createInFamily(Long receiverId, Long familyId, String type, String content,
                                Long sourceId, String contentType, Long contentId) {
-        if (receiverId == null || familyId == null) return;
-        if (!isFamilyMember(receiverId, familyId)) return;
+        if (receiverId == null || familyId == null) return false;
+        if (!isFamilyMember(receiverId, familyId)) return false;
         create(receiverId, type, content, sourceId, contentType, contentId);
+        return true;
     }
 
     /** 用户是否是该家庭成员(查 sys_user_role,不以 sys_user.family_id 为准) */
