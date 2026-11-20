@@ -1,60 +1,74 @@
 <template>
-  <div v-if="room" ref="rootEl" class="room-bar" :class="{ coop: isCoopMode, ended }">
-    <div class="room-bar-inner">
-      <div class="room-bar-main">
-        <span class="room-bar-tag">{{ isCoopMode ? $t('games.room.modeCoop') : $t('games.room.modePk') }}</span>
-        <span v-if="isSpectator" class="room-bar-tag spectate">{{ $t('games.room.spectating') }}</span>
-        <span class="room-bar-players" :title="playerText">{{ playerText }}</span>
-        <span class="room-bar-hint" :title="hintText">{{ hintText }}</span>
-      </div>
-      <div class="room-bar-actions">
-        <RoomCallPicker v-if="!ended" :members="room.members" :my-id="myId" />
-        <!-- 托管:有电脑玩家的游戏,对局中把自己的席位交给电脑(再点恢复) -->
-        <el-button v-if="showAuto" size="small" round :type="autoOn ? 'warning' : 'default'" @click="toggleAuto">
-          {{ autoOn ? $t('games.room.autoOff') : $t('games.room.autoOn') }}
-        </el-button>
-        <!-- 让位:对局中把席位让给指定观战者 -->
-        <el-button v-if="showYield" size="small" round @click="yieldOpen = true">
-          {{ $t('games.room.yieldSeat') }}
-        </el-button>
-        <el-button v-if="canSubmit && !isSpectator" size="small" type="primary" round :disabled="reported" @click="$emit('submit')">
-          {{ reported ? $t('games.room.submitted') : $t('games.room.submitScore') }}
-        </el-button>
-        <!-- 房主收尾:有人挂机没交卷时不必干等,直接按当前成绩结算 -->
-        <el-button v-if="isHost && !ended" size="small" round type="danger" plain @click="endRoom">
-          {{ $t('games.room.endRoom') }}
-        </el-button>
-        <!-- 局终换位:参战随时可转观战;观战有空位可参战,满员回大厅申请换位 -->
-        <el-tooltip v-if="canToggleSeat && isSpectator && !canTakeSeat" :content="$t('games.room.seatFull')" placement="top">
-          <span class="room-bar-seat-wrap">
-            <el-button size="small" round disabled>{{ $t('games.room.toPlayer') }}</el-button>
+  <!-- 两根:横幅 + 横幅之外的聊天浮球(room-bar 是 inline-size 容器,会把 fixed 后代困在横幅里) -->
+  <template v-if="room">
+    <div ref="rootEl" class="room-bar" :class="{ coop: isCoopMode, ended }">
+      <div class="room-bar-inner">
+        <div class="room-bar-main">
+          <span class="room-bar-tag">{{ isCoopMode ? $t('games.room.modeCoop') : $t('games.room.modePk') }}</span>
+          <span v-if="isSpectator" class="room-bar-tag spectate">{{ $t('games.room.spectating') }}</span>
+          <!-- 成员头像:房间聊天气泡就弹在自己的头像上 -->
+          <span class="room-bar-members">
+            <span v-for="m in room.members" :key="m.userId" class="rb-member" :title="m.name">
+              <span class="rb-avatar" :class="{ me: m.userId === myId }">
+                <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
+                <template v-else>{{ m.name?.charAt(0) }}</template>
+              </span>
+              <RoomChatBubble :text="roomChat.bubbleOf(room.id, m.userId)" />
+            </span>
           </span>
-        </el-tooltip>
-        <el-button v-else-if="canToggleSeat" size="small" round :loading="switching" @click="toggleSeat">
-          {{ isSpectator ? $t('games.room.toPlayer') : $t('games.room.toSpectator') }}
-        </el-button>
-        <!-- 退出对局:回到房间大厅保留成员身份,不再留在牌桌上 -->
-        <el-button v-if="!ended" size="small" round @click="exitToHall">{{ $t('games.room.exitGame') }}</el-button>
-        <el-button v-if="ended" size="small" round @click="$emit('leave')">{{ $t('games.room.backGames') }}</el-button>
-        <!-- 结束自动回房:倒计时结束前也可直接点 -->
-        <el-button v-if="returnCountdown > 0" size="small" type="primary" round @click="goHall">
-          {{ $t('games.room.autoReturn', { n: returnCountdown }) }}
-        </el-button>
+          <span class="room-bar-players" :title="playerText">{{ playerText }}</span>
+          <span class="room-bar-hint" :title="hintText">{{ hintText }}</span>
+        </div>
+        <div class="room-bar-actions">
+          <RoomCallPicker v-if="!ended" :members="room.members" :my-id="myId" />
+          <!-- 托管:有电脑玩家的游戏,对局中把自己的席位交给电脑(再点恢复) -->
+          <el-button v-if="showAuto" size="small" round :type="autoOn ? 'warning' : 'default'" @click="toggleAuto">
+            {{ autoOn ? $t('games.room.autoOff') : $t('games.room.autoOn') }}
+          </el-button>
+          <!-- 让位:对局中把席位让给指定观战者 -->
+          <el-button v-if="showYield" size="small" round @click="yieldOpen = true">
+            {{ $t('games.room.yieldSeat') }}
+          </el-button>
+          <el-button v-if="canSubmit && !isSpectator" size="small" type="primary" round :disabled="reported" @click="$emit('submit')">
+            {{ reported ? $t('games.room.submitted') : $t('games.room.submitScore') }}
+          </el-button>
+          <!-- 房主收尾:有人挂机没交卷时不必干等,直接按当前成绩结算 -->
+          <el-button v-if="isHost && !ended" size="small" round type="danger" plain @click="endRoom">
+            {{ $t('games.room.endRoom') }}
+          </el-button>
+          <!-- 局终换位:参战随时可转观战;观战有空位可参战,满员回大厅申请换位 -->
+          <el-tooltip v-if="canToggleSeat && isSpectator && !canTakeSeat" :content="$t('games.room.seatFull')" placement="top">
+            <span class="room-bar-seat-wrap">
+              <el-button size="small" round disabled>{{ $t('games.room.toPlayer') }}</el-button>
+            </span>
+          </el-tooltip>
+          <el-button v-else-if="canToggleSeat" size="small" round :loading="switching" @click="toggleSeat">
+            {{ isSpectator ? $t('games.room.toPlayer') : $t('games.room.toSpectator') }}
+          </el-button>
+          <!-- 退出对局:回到房间大厅保留成员身份,不再留在牌桌上 -->
+          <el-button v-if="!ended" size="small" round @click="exitToHall">{{ $t('games.room.exitGame') }}</el-button>
+          <el-button v-if="ended" size="small" round @click="$emit('leave')">{{ $t('games.room.backGames') }}</el-button>
+          <!-- 结束自动回房:倒计时结束前也可直接点 -->
+          <el-button v-if="returnCountdown > 0" size="small" type="primary" round @click="goHall">
+            {{ $t('games.room.autoReturn', { n: returnCountdown }) }}
+          </el-button>
+        </div>
       </div>
-    </div>
 
-    <!-- 让位:选择一名观战成员接管我的席位 -->
-    <el-dialog v-model="yieldOpen" :title="$t('games.room.yieldSeat')" width="dialog-sm" append-to-body>
-      <el-empty v-if="!spectators.length" :description="$t('games.room.yieldNoSpectator')" :image-size="60" />
-      <div v-for="m in spectators" :key="m.userId" class="yield-row">
-        <el-avatar :size="30">{{ m.name?.charAt(0) }}</el-avatar>
-        <span class="yield-name">{{ m.name }}</span>
-        <el-button size="small" type="primary" round :loading="yielding" @click="yieldTo(m)">
-          {{ $t('games.room.yieldTo', { name: m.name }) }}
-        </el-button>
-      </div>
-    </el-dialog>
-  </div>
+      <!-- 让位:选择一名观战成员接管我的席位 -->
+      <el-dialog v-model="yieldOpen" :title="$t('games.room.yieldSeat')" width="dialog-sm" append-to-body>
+        <el-empty v-if="!spectators.length" :description="$t('games.room.yieldNoSpectator')" :image-size="60" />
+        <div v-for="m in spectators" :key="m.userId" class="yield-row">
+          <el-avatar :size="30">{{ m.name?.charAt(0) }}</el-avatar>
+          <span class="yield-name">{{ m.name }}</span>
+          <el-button size="small" type="primary" round :loading="yielding" @click="yieldTo(m)">
+            {{ $t('games.room.yieldTo', { name: m.name }) }}
+          </el-button>
+        </div>
+      </el-dialog>
+    </div>
+    <GameRoomChat v-if="room.status !== 'FINISHED'" :room="room" />
+  </template>
 </template>
 
 <script setup>
@@ -67,7 +81,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { roomApi } from '@/api'
 import { canTakePlayerSeat, isSpectatorRole, resultKey, roomHasAi } from '@/utils/gameRoom'
+import { useRoomChatStore } from '@/stores/roomChat'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
+import GameRoomChat from '@/components/games/GameRoomChat.vue'
+import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 
 const props = defineProps({
   room: { type: Object, default: null },
@@ -84,6 +101,7 @@ const emit = defineEmits(['submit', 'leave', 'auto'])
 
 const { t } = useI18n()
 const router = useRouter()
+const roomChat = useRoomChatStore()
 
 const isCoopMode = computed(() => props.room?.mode === 'COOP')
 const isSpectator = computed(() => isSpectatorRole((props.room?.members || []).find((m) => m.userId === props.myId)?.role))
@@ -335,6 +353,40 @@ onBeforeUnmount(stopReturn)
 }
 .room-bar-players {
   font-weight: 600;
+}
+/* 成员头像:24px 圆片,房间聊天气泡挂在这上面 */
+.room-bar-members {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.rb-member {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+}
+.rb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: rgba(var(--color-brand-rgb), 0.14);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+}
+.rb-avatar.me {
+  border-color: var(--color-accent);
+}
+.rb-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .room-bar-hint {
   color: var(--color-text-secondary);

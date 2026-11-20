@@ -1,6 +1,8 @@
 <template>
   <div class="page room-page">
     <Breadcrumb :items="[{ label: $t('games.title'), to: '/games' }, { label: roomTitle }]" />
+    <!-- 房间临时聊天:等开局时也能聊,进对局后同一个房间共用一份消息 -->
+    <GameRoomChat v-if="room && room.status !== ROOM_STATUS.FINISHED" :room="room" />
 
     <div v-loading="loading" class="room-wrap">
       <div v-if="!room" class="room-empty card">
@@ -55,6 +57,7 @@
             <div class="room-avatar">
               <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
               <el-icon v-else :size="22"><UserFilled /></el-icon>
+              <RoomChatBubble :text="roomChat.bubbleOf(room.id, m.userId)" />
             </div>
             <div class="room-member-main">
               <div class="room-member-name">
@@ -109,6 +112,7 @@
             <div class="room-avatar">
               <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
               <el-icon v-else :size="22"><UserFilled /></el-icon>
+              <RoomChatBubble :text="roomChat.bubbleOf(room.id, m.userId)" />
             </div>
             <div class="room-member-main">
               <div class="room-member-name">
@@ -248,9 +252,12 @@ import { Monitor, Phone, Plus, Promotion, Switch, UserFilled, VideoCamera } from
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import RoomInvitePicker from '@/components/games/RoomInvitePicker.vue'
+import GameRoomChat from '@/components/games/GameRoomChat.vue'
+import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
+import { useRoomChatStore } from '@/stores/roomChat'
 import { useUserStore } from '@/stores/user'
 import {
   ROOM_GAMES,
@@ -272,6 +279,7 @@ const router = useRouter()
 const { t } = useI18n()
 const chatStore = useChatStore()
 const callStore = useCallStore()
+const roomChat = useRoomChatStore()
 const userStore = useUserStore()
 
 const roomId = computed(() => Number(route.params.id) || 0)
@@ -730,13 +738,15 @@ watch(roomId, () => {
   background: rgba(var(--color-brand-rgb), 0.14);
   color: var(--color-accent);
   flex: none;
-  overflow: hidden;
+  /* 不能裁切:房间聊天气泡从头像上方弹出 */
+  position: relative;
 }
 .room-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 .room-member-main {
   min-width: 0;

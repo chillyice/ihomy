@@ -181,6 +181,12 @@
             >
               <span class="lp-dot"></span>
               <span class="lp-name">{{ s.name }}</span>
+              <!-- 房间聊天气泡:贴在名字右侧;电脑席位没有头像也不弹气泡 -->
+              <span v-if="s.userId != null" class="lp-avatar">
+                <img v-if="s.avatar" :src="s.avatar" :alt="s.name" />
+                <template v-else>{{ s.name.charAt(0) }}</template>
+                <RoomChatBubble :text="roomBubble(s.userId)" dir="right" />
+              </span>
               <span class="lp-fin">{{ $t('games.ludo.finished', { n: s.finished }) }}</span>
               <span v-if="s.active" class="lp-live"></span>
             </div>
@@ -268,10 +274,12 @@ import { roomApi } from '@/api'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
+import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
+import { useRoomChatStore } from '@/stores/roomChat'
 import {
   LUDO_HANGARS,
   LUDO_LANES,
@@ -383,6 +391,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // ---------- 「一起玩」房间(?room=<id>) ----------
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+const roomChat = useRoomChatStore()
+
+/** 玩家行上的房间聊天气泡(单机局没有房间,恒为空) */
+const roomBubble = (userId) => (play.active && userId != null ? roomChat.bubbleOf(play.room?.id, userId) : '')
 
 /** 渲染用状态:没开局时用预览盘面(棋子全在机场) */
 const viewState = computed(() => state.value || previewState)
@@ -460,6 +472,8 @@ const seatViews = computed(() => {
   return st.seats.map((seat, index) => ({
     color: seat.color,
     name: seatName(seat),
+    userId: seat.ai ? null : seat.userId,
+    avatar: seat.ai ? '' : seat.avatar || '',
     finished: ludoFinishedCount(st, seat.color),
     active: st.phase === 'playing' && st.turn === index,
     me: !seat.ai && !!seat.userId && String(seat.userId) === String(play.myId),
@@ -710,6 +724,7 @@ function startSolo() {
     color,
     userId: i === 0 ? play.myId : null,
     name: '',
+    avatar: '',
     ai: i !== 0,
   }))
   resetBoard(createLudoState(seats))
@@ -730,7 +745,7 @@ function startRoomGame() {
   const colors = ludoSeatColors(Math.max(2, Math.min(4, players.length || 1)))
   const seats = colors.map((color, i) => {
     const member = players[i]
-    return { color, userId: member?.userId ?? null, name: member?.name || '', ai: !member }
+    return { color, userId: member?.userId ?? null, name: member?.name || '', avatar: member?.avatar || '', ai: !member }
   })
   resetBoard(createLudoState(seats))
   lastSeq = -1
@@ -1354,6 +1369,28 @@ html.dark .ludo-card {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 头像小圆片:房间聊天气泡挂在它右侧 */
+.lp-avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--pc-soft);
+  color: var(--color-text);
+  font-size: 10px;
+  font-weight: 700;
+}
+.lp-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .lp-fin {

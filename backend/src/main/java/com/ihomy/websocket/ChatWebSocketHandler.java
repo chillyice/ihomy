@@ -33,6 +33,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ChatService chatService;
     private final com.ihomy.service.GameMatchService matchService;
     private final com.ihomy.service.GameRoomService roomService;
+    private final RoomChatBuffer roomChatBuffer;
     private final SysUserMapper sysUserMapper;
     private final PresenceRegistry presenceRegistry;
     private final ObjectMapper objectMapper;
@@ -196,6 +197,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 replyError(session, "BAD_SIGNAL");
                 return;
             }
+            String roomEvent = str(data.get("event"));
+            if ("chat".equals(roomEvent) || "chat:sync".equals(roomEvent)) {
+                onRoomChat(session, familyId, roomId, userId, roomEvent, data);
+                return;
+            }
             Map<String, Object> out = new java.util.LinkedHashMap<>();
             data.forEach((k, v) -> out.put(String.valueOf(k), v));
             out.put("from", userId);
@@ -233,6 +239,35 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         data.forEach((k, v) -> out.put(String.valueOf(k), v));
         out.put("from", userId);
         sendToUser(other, "game-signal", out);
+    }
+
+    /**
+     * 房间临时聊天(只存内存,散房/重启即失):
+     * - chat:落缓冲并发号,带 seq 广播给房间全部成员(含发送者,各端统一从服务器回声渲染);
+     * - chat:sync:只回本人最近 MAX_PER_ROOM 条,供进房/刷新补齐。
+     */
+    private void onRoomChat(WebSocketSession session, Long familyId, Long roomId, Long userId,
+                            String event, Map<?, ?> data) {
+        if ("chat:sync".equals(event)) {
+            Map<String, Object> init = new java.util.LinkedHashMap<>();
+            init.put("roomId", roomId);
+            init.put("event", "chat:init");
+            init.put("messages", roomChatBuffer.recent(roomId));
+            sendToUser(userId, "game-signal", init);
+            return;
+        }
+        String text = str(data.get("text"));
+        text = text == null ? "" : text.replaceAll("\\s+", " ").trim();
+        if (text.isEmpty() || text.length() > RoomChatBuffer.MAX_TEXT_LEN) {
+            replyError(session, "BAD_CHAT");
+            return;
+        }
+        RoomChatBuffer.Msg msg = roomChatBuffer.append(roomId, userId, text);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("roomId", roomId);
+        out.put("event", "chat");
+        out.put("msg", msg);
+        sendToUsers(roomService.memberIds(familyId, roomId), "game-signal", out, null);
     }
 
     /** 广播给同房间全部在线会话(本家) */

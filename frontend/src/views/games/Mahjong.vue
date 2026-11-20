@@ -105,6 +105,15 @@
               <!-- 对家(上):牌背横排 + 副露横排 -->
               <div v-if="topSeat" class="mj-edge mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
+                  <span class="seat-avatar-wrap">
+                    <span class="seat-avatar" :class="{ ai: topSeat.ai }">
+                      <img v-if="!topSeat.ai && topSeat.avatar" :src="topSeat.avatar" :alt="seatName(topSeat.seat)" />
+                      <template v-else-if="topSeat.ai">🤖</template>
+                      <template v-else>{{ seatName(topSeat.seat).charAt(0) }}</template>
+                    </span>
+                    <!-- 对家说话:气泡弹在头像下方 -->
+                    <RoomChatBubble :text="roomBubble(topSeat.userId)" dir="below" />
+                  </span>
                   <span class="seat-wind">{{ windName(topSeat.seat) }}</span>
                   <span class="mj-seat-name" :title="seatName(topSeat.seat)">{{ seatName(topSeat.seat) }}</span>
                   <span v-if="topSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
@@ -132,6 +141,15 @@
               <!-- 上家(左):侧向手牌是自上而下的一条,副露横排在手的上方(同一窄栏,不并排) -->
               <div v-if="leftSeat" class="mj-edge mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
+                  <span class="seat-avatar-wrap">
+                    <span class="seat-avatar" :class="{ ai: leftSeat.ai }">
+                      <img v-if="!leftSeat.ai && leftSeat.avatar" :src="leftSeat.avatar" :alt="seatName(leftSeat.seat)" />
+                      <template v-else-if="leftSeat.ai">🤖</template>
+                      <template v-else>{{ seatName(leftSeat.seat).charAt(0) }}</template>
+                    </span>
+                    <!-- 左侧玩家说话:气泡弹在头像右侧 -->
+                    <RoomChatBubble :text="roomBubble(leftSeat.userId)" dir="right" />
+                  </span>
                   <span class="seat-wind">{{ windName(leftSeat.seat) }}</span>
                   <span class="mj-seat-name" :title="seatName(leftSeat.seat)">{{ seatName(leftSeat.seat) }}</span>
                   <span v-if="leftSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
@@ -207,6 +225,15 @@
               <!-- 下家(右):侧向手牌是自上而下的一条,副露横排在手的上方(同一窄栏,不并排) -->
               <div v-if="rightSeat" class="mj-edge mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
                 <div class="seat-tag">
+                  <span class="seat-avatar-wrap">
+                    <span class="seat-avatar" :class="{ ai: rightSeat.ai }">
+                      <img v-if="!rightSeat.ai && rightSeat.avatar" :src="rightSeat.avatar" :alt="seatName(rightSeat.seat)" />
+                      <template v-else-if="rightSeat.ai">🤖</template>
+                      <template v-else>{{ seatName(rightSeat.seat).charAt(0) }}</template>
+                    </span>
+                    <!-- 右侧玩家说话:气泡弹在头像左侧 -->
+                    <RoomChatBubble :text="roomBubble(rightSeat.userId)" dir="left" />
+                  </span>
                   <span class="seat-wind">{{ windName(rightSeat.seat) }}</span>
                   <span class="mj-seat-name" :title="seatName(rightSeat.seat)">{{ seatName(rightSeat.seat) }}</span>
                   <span v-if="rightSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
@@ -307,6 +334,18 @@
                   </template>
                 </div>
               </div>
+
+              <!-- 我方头像:绝对定位在牌桌左下角,不进手牌流(手牌必须保持居中);
+                   自己说话时气泡弹在头像上方 -->
+              <div v-if="play.active && selfSeat" class="mj-self-chip">
+                <span class="seat-avatar-wrap">
+                  <span class="seat-avatar me">
+                    <img v-if="selfSeat.avatar" :src="selfSeat.avatar" :alt="seatName(mySeat)" />
+                    <template v-else>{{ seatName(mySeat).charAt(0) }}</template>
+                  </span>
+                  <RoomChatBubble :text="roomBubble(selfSeat.userId)" dir="above" />
+                </span>
+              </div>
             </div>
           </div>
         </template>
@@ -379,10 +418,12 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
 import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
+import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
+import { useRoomChatStore } from '@/stores/roomChat'
 import {
   MAHJONG_RULE_PRESETS,
   canMahjongBuGang,
@@ -408,6 +449,7 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const chatStore = useChatStore()
+const roomChat = useRoomChatStore()
 
 const HONOR_KEYS = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai']
 
@@ -486,6 +528,9 @@ watch(
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
 const isGuest = computed(() => play.active && !play.isHost)
 
+/** 席位头像上的房间聊天气泡(单机局没有房间,恒为空) */
+const roomBubble = (userId) => (play.active && userId != null ? roomChat.bubbleOf(play.room?.id, userId) : '')
+
 // ---------- 对局状态 ----------
 const phase = ref('idle') // idle | playing | ended
 /** 单机对局中:整页铺成绿桌布、头部走深底白字(封面与房间局不算,房间局有房间条仍按外壳两栏排) */
@@ -562,6 +607,8 @@ const mySeat = computed(() => {
   return play.isSpectator ? -1 : 0
 })
 const myTurn = computed(() => phase.value === 'playing' && turn.value === mySeat.value)
+/** 我的席位对象(观战为 null):左下角头像与自己的聊天气泡挂在它上面 */
+const selfSeat = computed(() => (mySeat.value >= 0 ? seatList.value[mySeat.value] : null))
 const myHandTiles = computed(() => (isGuest.value ? guestHand.value : hands.value[mySeat.value] || []))
 const claimPrompt = computed(() => guestClaim.value || localClaim.value)
 // 吃询问时给本机的组合候选(访客来自信令,房主/单机来自询问下发)
@@ -762,8 +809,8 @@ async function aiThink(mySession) {
 // ---------- 座次 ----------
 
 function buildSoloSeats() {
-  const seats = [{ seat: 0, userId: myId.value, name: '', ai: false }]
-  for (let i = 1; i < 4; i++) seats.push({ seat: i, userId: null, name: '', ai: true })
+  const seats = [{ seat: 0, userId: myId.value, name: '', avatar: '', ai: false }]
+  for (let i = 1; i < 4; i++) seats.push({ seat: i, userId: null, name: '', avatar: '', ai: true })
   return seats
 }
 
@@ -779,9 +826,9 @@ function buildRoomSeats() {
     })
   const seats = []
   for (const m of players.slice(0, 4)) {
-    seats.push({ seat: seats.length, userId: m.userId, name: m.name, ai: false })
+    seats.push({ seat: seats.length, userId: m.userId, name: m.name, avatar: m.avatar || '', ai: false })
   }
-  while (seats.length < 4) seats.push({ seat: seats.length, userId: null, name: '', ai: true })
+  while (seats.length < 4) seats.push({ seat: seats.length, userId: null, name: '', avatar: '', ai: true })
   return seats
 }
 
@@ -1471,6 +1518,7 @@ function onRoomChange(next) {
     if (players.some((m) => String(m.userId) === String(seat.userId))) continue
     seat.ai = true
     seat.auto = false
+    seat.avatar = ''
     changed = true
     freedSeats.push(seat)
     if (claimWaiters.has(seat.seat)) resolveClaim(seat.seat, 'pass')
@@ -1486,6 +1534,7 @@ function onRoomChange(next) {
     free.auto = false
     free.userId = m.userId
     free.name = m.name
+    free.avatar = m.avatar || ''
     changed = true
     seated.add(String(m.userId))
     if (claimWaiters.has(free.seat)) resolveClaim(free.seat, 'pass')
@@ -1817,6 +1866,8 @@ onBeforeUnmount(() => {
   height: var(--mj-h);
   transform: translate(-50%, -50%) scale(var(--mj-scale));
   transform-origin: center center;
+  /* 聊天气泡反缩放系数:整桌 scale 后牌面字还看得清(气泡尺寸按 1/scale 还原成屏幕尺寸) */
+  --rcb-k: calc(1 / var(--mj-scale, 1));
   display: grid;
   grid-template-areas:
     'top top top'
@@ -1935,6 +1986,45 @@ html.dark .mj-table {
   align-items: center;
   gap: 6px;
   max-width: 100%;
+}
+/* 席位头像:气泡的定位锚点(气泡挂在 .seat-avatar-wrap 上,四个方向由 dir 决定) */
+.seat-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.seat-avatar {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.seat-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.seat-avatar.ai {
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.seat-avatar.me {
+  border-color: rgba(239, 202, 131, 0.9);
+}
+/* 我方头像:钉在牌桌左下角,不进 .mj-bottom 的流,手牌保持居中 */
+.mj-self-chip {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
 }
 .seat-wind {
   flex: none;
