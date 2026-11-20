@@ -11,7 +11,7 @@
 
 | # | 软件 | 版本要求 | 用途 | 是否必须 |
 |---|------|----------|------|----------|
-| 1 | OpenJDK | 21 LTS（`pom.xml` 已对齐 21） | 运行后端 | ✅ 必须 |
+| 1 | OpenJDK | 21 LTS，**≥ 21.0.13.1**（`pom.xml` 已对齐 21；含 Java4Shell 修复，见 §2.2） | 运行后端 | ✅ 必须 |
 | 2 | Node.js | 18+（推荐 20 LTS） | 构建前端 | ✅ 必须（仅构建时） |
 | 3 | MySQL | 8.4.10（基线版本） | 主数据库 | ✅ 必须（本机部署） |
 | 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须（Docker 部署） |
@@ -59,8 +59,14 @@ sudo dnf install -y java-21-openjdk java-21-openjdk-devel
 验证：
 ```bash
 java -version
-# openjdk version "21.x"
+# openjdk version "21.0.13.1"   # 必须 >= 21.0.13.1（含 Java4Shell 修复）
 ```
+
+> **安全基线（2026-11-20 起）：必须含 Java4Shell（CVE-2026-114938）修复。**
+> 该漏洞在 OpenJDK **17.0.6 及以上全系**存在（Base64 解码器 AVX-512 VBMI 汇编路径堆溢出，预认证可 RCE），受影响构建如 `21.0.13.0.3`、`21.0.9`；修复版为 **`21.0.13.1+`**（Ubuntu 26.04 包 `21.0.13.1+2-1~26.04.1`，2026-11-17 发布）。
+> 升级：`sudo apt update && sudo apt install -y --only-upgrade openjdk-21-jre-headless openjdk-21-jre openjdk-21-jdk-headless openjdk-21-jdk`，随后 `sudo systemctl restart ihomy-backend`。
+> **触发有硬件门槛**：仅 x86-64 且 CPU 支持 AVX-512 VBMI（Intel Ice Lake / Sapphire Rapids 及更新 Xeon、AMD Zen 4+）；自查 `grep -m1 "^flags" /proc/cpuinfo | tr " " "\n" | grep -E "^(avx512f|avx512bw|avx512vbmi|bmi2)$"`，四条齐全才算暴露；ARM64 不受影响。
+> 未及升级时的应急缓解：`ExecStart` 追加 `-XX:-UseBASE64Intrinsics`（或 `-XX:UseAVX=2`，仅 x86-64——ARM 上该参数会让 JVM 起不来）。
 
 ### 2.3 安装 Node.js 20（NodeSource 源）
 
