@@ -80,9 +80,12 @@ public class LogAlertService implements LogAlertAppender.Sink {
     /** 预警记录保留天数 */
     @Value("${app.log-alert.retention-days:30}")
     private int retentionDays;
-    /** 是否在配好邮件通道时向 OPS 邮箱发提醒 */
+    /** 是否在配好邮件通道时发提醒邮件 */
     @Value("${app.log-alert.mail-enabled:true}")
     private boolean mailEnabled;
+    /** 预警邮件收件人(逗号分隔);为空时回退取系统级 OPS 角色的邮箱 */
+    @Value("${app.log-alert.mail-to:}")
+    private String mailTo;
     @Value("${spring.mail.host:}")
     private String mailHost;
     @Value("${spring.mail.username:}")
@@ -247,7 +250,7 @@ public class LogAlertService implements LogAlertAppender.Sink {
         if (sender == null) {
             return;
         }
-        List<String> to = sysRoleMapper.selectOpsEmails();
+        List<String> to = resolveMailTo();
         if (to == null || to.isEmpty()) {
             return;
         }
@@ -267,6 +270,17 @@ public class LogAlertService implements LogAlertAppender.Sink {
         } catch (Exception ex) {
             log.warn("异常预警邮件发送失败: {}", ex.getMessage());
         }
+    }
+
+    /** 收件人:优先 mail-to(逗号分隔),未配则取系统级 OPS 角色的邮箱 */
+    List<String> resolveMailTo() {
+        if (StringUtils.hasText(mailTo)) {
+            return Arrays.stream(mailTo.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.toList());
+        }
+        return sysRoleMapper.selectOpsEmails();
     }
 
     private String mailBody(ReportAlert a) {

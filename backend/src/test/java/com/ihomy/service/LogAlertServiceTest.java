@@ -34,6 +34,7 @@ class LogAlertServiceTest {
 
     private final List<ReportAlert> inserted = Collections.synchronizedList(new ArrayList<>());
     private ReportAlertMapper alertMapper;
+    private SysRoleMapper roleMapper;
     private LogAlertService service;
 
     /** 纯单测没有 MyBatis-Plus 启动扫描,先手动注册实体表信息,否则 LambdaWrapper 解析列名会报错 */
@@ -51,7 +52,7 @@ class LogAlertServiceTest {
         });
         when(alertMapper.selectCount(any())).thenReturn(0L);
         when(alertMapper.selectPage(any(), any())).thenReturn(new Page<>());
-        SysRoleMapper roleMapper = mock(SysRoleMapper.class);
+        roleMapper = mock(SysRoleMapper.class);
         when(roleMapper.selectOpsEmails()).thenReturn(List.of());
         @SuppressWarnings("unchecked")
         ObjectProvider<JavaMailSender> mailProvider = mock(ObjectProvider.class);
@@ -191,5 +192,15 @@ class LogAlertServiceTest {
         assertThat(service.summary()).containsKeys("open", "openError", "today", "total");
         assertThat(service.page(1, 20, "OPEN", null).getTotal()).isZero();
         assertThat(service.ack(1L, 9L)).isFalse();
+    }
+
+    /** 收件人:配了 mail-to 用 mail-to(容忍空白/尾逗号),没配回退 OPS 邮箱 */
+    @Test
+    void mailToOverridesOpsEmails() {
+        when(roleMapper.selectOpsEmails()).thenReturn(List.of("ops@ihomy.local"));
+        ReflectionTestUtils.setField(service, "mailTo", " a@x.com ,, b@y.com ,");
+        assertThat(service.resolveMailTo()).containsExactly("a@x.com", "b@y.com");
+        ReflectionTestUtils.setField(service, "mailTo", "");
+        assertThat(service.resolveMailTo()).containsExactly("ops@ihomy.local");
     }
 }
