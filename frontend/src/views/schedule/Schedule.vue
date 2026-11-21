@@ -401,7 +401,10 @@ const syncQuery = () => {
       ...(focusId.value ? { focus: focusId.value } : {}),
     }
   const same = ['date', 'tab', 'type', 'focus'].every((k) => String(route.query[k] ?? '') === String(query[k] ?? ''))
-  if (!same) router.replace({ path: '/plan', query })
+  if (!same) {
+    if (route.query.kind && route.query.id) Object.assign(query, { kind: route.query.kind, id: route.query.id })
+    router.replace({ path: '/plan', query })
+  }
 }
 
 // ---- 交互 ----
@@ -438,6 +441,19 @@ const openCreate = (date) => {
 const openReadOnlyDetail = (it) => {
   detailRef.value = { kind: it.kind === 'TASK' ? 'REMINDER' : it.kind, id: it.id }
   detailVisible.value = true
+}
+// A family-home link resolves only against the records this member can actually see.
+let listsReady = false
+const consumeDetailLink = () => {
+  const { kind, id } = route.query
+  if (!listsReady || !['PLAN', 'REMINDER', 'ANNIVERSARY'].includes(kind) || !/^\d+$/.test(String(id))) return
+  const event = { kind, id: Number(id) }
+  if (recordOf(event)) openReadOnlyDetail(event)
+  else ElMessage.warning(t('schedule.detail.noData'))
+  const query = { ...route.query }
+  delete query.kind
+  delete query.id
+  router.replace({ path: '/plan', query })
 }
 
 const openEdit = (it) => {
@@ -657,7 +673,10 @@ watch(selectedDate, (d) => {
 watch([view, filter, selectedDate, focusId], syncQuery)
 watch(
   () => route.fullPath,
-  () => applyQuery(),
+  () => {
+    applyQuery()
+    consumeDetailLink()
+  },
 )
 watch(
   [() => view.value, () => listGroups.value, () => focusId.value],
@@ -673,6 +692,8 @@ watch([() => showUndated.value, () => visibleUpcoming.value.length, () => loadin
 onMounted(async () => {
   applyQuery()
   await reloadAll()
+  listsReady = true
+  consumeDetailLink()
   scrollToFocus()
   await nextTick()
   remeasure()

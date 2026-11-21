@@ -96,7 +96,7 @@
         ref="inputRef"
         v-model="draft"
         :placeholder="$t('chat.placeholder')"
-        :disabled="!connected || uploading"
+        :disabled="uploading"
         :maxlength="DRAFT_MAX"
         show-word-limit
         @keyup.enter="onSend"
@@ -168,7 +168,7 @@
 <script setup>
 // 工具条与发送逻辑:图片走既有 /file/upload 通道(流式,不新增接口);
 // 卡片/游戏/链接的负载构造在 utils/chatMsg(与后端同口径校验)
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Brush, Check, CircleClose, FolderOpened, Link, Paperclip, Phone, Picture, Trophy } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -191,7 +191,14 @@ const { t } = useI18n()
 const chatStore = useChatStore()
 const { style: textStyle, setStyle, reset: resetTextStyle } = useChatTextStyle()
 
-const draft = ref('')
+const draft = computed({
+  get: () => chatStore.drafts[chatStore.draftKey] || '',
+  set: (value) => chatStore.setDraft(value),
+})
+let mounted = true
+onBeforeUnmount(() => {
+  mounted = false
+})
 const uploading = ref(false)
 const fileInput = ref(null)
 const inputRef = ref(null)
@@ -281,19 +288,22 @@ const sendImageFile = async (file) => {
     return
   }
   uploading.value = true
+  const recipient = chatStore.draftKey
+  const originalDraft = draft.value
   try {
     // request.js 拦截器已解包返回 data 字段(与其他 fileApi.upload 调用方同口径)
     const data = await fileApi.upload(file)
     const url = data?.url
     if (!url) throw new Error('no url')
     const size = await imageSize(url)
-    const caption = draft.value.trim()
+    if (!mounted || !recipient || recipient !== chatStore.draftKey) return
+    const caption = originalDraft.trim()
     const ok = chatStore.sendContent({
       msgType: 'IMAGE',
       content: caption,
       payload: { url, width: size.w, height: size.h },
     })
-    if (ok && caption) draft.value = ''
+    if (ok && caption && draft.value === originalDraft) draft.value = ''
     if (!ok) ElMessage.warning(t('chat.composer.sendFailed'))
   } catch {
     ElMessage.error(t('chat.composer.sendImageFailed'))

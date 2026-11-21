@@ -35,6 +35,7 @@ const KEEP_MESSAGES = 200
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
+    drafts: {},
     socketStatus: SOCKET_STATUS.IDLE,
     /** 家庭聊天流(默认会话) */
     messages: [],
@@ -83,6 +84,10 @@ export const useChatStore = defineStore('chat', {
     presenceMap: {},
   }),
   getters: {
+    draftKey() {
+      const { id, familyId } = useUserStore().userInfo || {}
+      return id && familyId && this.activeKey !== 'ai' ? [id, familyId, this.activeKey || 'home'].join('/') : ''
+    },
     /** 聊天界面是否在前台(/chat 页或浮窗展开) */
     viewing: (s) => !useAssistantStore().active && (s.chatPageActive || s.floatOpen),
     /** 当前会话键:null=本家 / p:<userId>=私聊 / f:<familyId>=亲友圈家庭房间 */
@@ -113,6 +118,11 @@ export const useChatStore = defineStore('chat', {
     },
   },
   actions: {
+    setDraft(text) {
+      if (!this.draftKey) return
+      if (text) this.drafts[this.draftKey] = text
+      else delete this.drafts[this.draftKey]
+    },
     /** 建连入口:已连接/连接中是幂等空转;登出态直接忽略 */
     ensureConnected() {
       const userStore = useUserStore()
@@ -196,6 +206,7 @@ export const useChatStore = defineStore('chat', {
     createSocket() {
       const s = createChatSocket({ url: () => this.buildUrl() })
       s.on('open', () => {
+        if (socket !== s) return
         const reconnected = wsEverOpened
         wsEverOpened = true
         this.socketStatus = SOCKET_STATUS.OPEN
@@ -206,11 +217,18 @@ export const useChatStore = defineStore('chat', {
       s.on('close', () => {
         if (socket === s) this.socketStatus = SOCKET_STATUS.CLOSED
       })
-      s.on('message', (data) => this.onIncoming(data))
+      s.on('message', (data) => {
+        if (socket === s) this.onIncoming(data)
+      })
       // 成员上下线/手动切换忙碌离开:同家庭房间广播,成员列表与聊天左列的头像点实时更新
-      s.on('presence', (data) => this.applyPresence(data))
-      s.on('call-signal', (data) => useCallStore().onSignal(data))
+      s.on('presence', (data) => {
+        if (socket === s) this.applyPresence(data)
+      })
+      s.on('call-signal', (data) => {
+        if (socket === s) useCallStore().onSignal(data)
+      })
       s.on('game-signal', (data) => {
+        if (socket !== s) return
         for (const fn of gameSignalListeners) fn(data)
       })
       return s
@@ -219,8 +237,6 @@ export const useChatStore = defineStore('chat', {
     buildUrl() {
       const userStore = useUserStore()
       const token = encodeURIComponent(userStore.token || '')
-      // @vite 开发代理不转发 WS,直连 8080 端口(与原 Chat.vue 直连口径一致)
-      if (import.meta.env.DEV) return `ws://localhost:8080/api/ws/chat?token=${token}`
       // 按 API 基址推导:套壳后页面 origin 是 https://localhost,用 location.host 会连到壳自己
       const apiBase = import.meta.env.VITE_API_BASE || `${location.origin}/api`
       const url = new URL(apiBase, location.href)
@@ -234,10 +250,18 @@ export const useChatStore = defineStore('chat', {
       wired = true
       this.installLifecycle()
       watch(
-        () => userStore.isLoggedIn,
-        (loggedIn) => {
-          if (!loggedIn) this.reset()
+        () => (userStore.isLoggedIn && userStore.userInfo?.familyId ? [userStore.userInfo.id, userStore.userInfo.familyId].join('/') : ''),
+        (scope, previous) => {
+          if (!previous) return
+          const wasOnPage = this.chatPageActive
+          this.reset()
+          if (scope) {
+            this.chatPageActive = wasOnPage
+            this.ensureConnected()
+            this.loadHistory({ force: true, markRead: false })
+          }
         },
+        { flush: 'sync' },
       )
       let rebuildTimer = null
       watch(
@@ -288,7 +312,7 @@ export const useChatStore = defineStore('chat', {
         this.messages.splice(0, this.messages.length - KEEP_MESSAGES)
       }
       this.lastIncoming = data
-      if (mine || this.viewing) {
+      if (mine || (this.viewing && this.activeKey == null)) {
         // 页面在看的消息直接推进已读游标(与原 Chat.vue 口径一致)
         chatApi.read(data.id).catch(() => {})
       } else {
@@ -367,13 +391,14 @@ export const useChatStore = defineStore('chat', {
     async openDm(peerId, name = '') {
       if (peerId == null) return
       useAssistantStore().leave()
+      const gen = historyGen
       this.activePeer = Number(peerId)
-      this.activePeerName = name || this.activePeerName || ''
+      this.activePeerName = name || ''
       this.activeRoomId = null
       this.activeRoomName = ''
       const unreadBefore = Number(this.dmUnread[String(peerId)]) || 0
       await this.loadDmHistory(this.activePeer)
-      if (this.viewing) {
+      if (gen === historyGen && this.viewing && this.activePeer === Number(peerId)) {
         chatApi.dmRead(Number(peerId)).catch(() => {})
         this.dmUnread[String(peerId)] = 0
         if (unreadBefore > 0) this.setUnreadAnchor(peerId, unreadBefore)
@@ -386,6 +411,7 @@ export const useChatStore = defineStore('chat', {
      */
     async openRoom(familyId, name = '') {
       if (familyId == null) return
+      const gen = historyGen
       useAssistantStore().leave()
       const id = Number(familyId)
       this.activePeer = null
@@ -395,7 +421,7 @@ export const useChatStore = defineStore('chat', {
       this.activeRoomName = name || meta?.alias || meta?.familyName || ''
       const unreadBefore = Number(this.roomUnread[String(id)]) || 0
       await this.loadRoomHistory(id)
-      if (this.viewing) {
+      if (gen === historyGen && this.viewing && this.activeRoomId === id) {
         chatApi.read(null, id).catch(() => {})
         this.roomUnread[String(id)] = 0
         if (unreadBefore > 0) this.setUnreadAnchor(`f:${id}`, unreadBefore)
@@ -423,10 +449,12 @@ export const useChatStore = defineStore('chat', {
 
     /** 拉某个私聊会话的历史(与本地缓存按 id 合并,幂等) */
     async loadDmHistory(peerId, { force = false } = {}) {
+      const gen = historyGen
       const key = String(peerId)
       if (this.dmLoaded[key] && !force) return
       try {
         const msgs = await chatApi.dmHistory(Number(peerId))
+        if (gen !== historyGen) return
         this.dmMessages[key] = mergeMessages(this.dmMessages[key], msgs, KEEP_MESSAGES)
         this.dmLoaded[key] = true
       } catch {
@@ -436,8 +464,10 @@ export const useChatStore = defineStore('chat', {
 
     /** 私聊未读基线(登录后/重连后拉一次;实时增量靠 WS onDmIncoming) */
     async loadDmUnread() {
+      const gen = historyGen
       try {
         const list = await chatApi.dmUnread()
+        if (gen !== historyGen) return
         const next = {}
         for (const row of list || []) {
           next[String(row.userId)] = Number(row.unread) || 0
@@ -450,10 +480,12 @@ export const useChatStore = defineStore('chat', {
 
     /** 拉某个亲友圈家庭房间的历史(与本地缓存按 id 合并,幂等) */
     async loadRoomHistory(familyId, { force = false } = {}) {
+      const gen = historyGen
       const key = String(familyId)
       if (this.roomLoaded[key] && !force) return
       try {
         const msgs = await chatApi.history({ familyId: Number(familyId) })
+        if (gen !== historyGen) return
         this.roomMessages[key] = mergeMessages(this.roomMessages[key], msgs, KEEP_MESSAGES)
         this.roomLoaded[key] = true
       } catch {
@@ -463,8 +495,10 @@ export const useChatStore = defineStore('chat', {
 
     /** 亲友圈家庭房间未读基线 + 房间概要(登录后/重连后拉一次;正在看的房间不被旧数据覆盖) */
     async loadRoomUnread() {
+      const gen = historyGen
       try {
         const list = await chatApi.rooms()
+        if (gen !== historyGen) return
         const nextUnread = {}
         const nextMeta = {}
         for (const row of list || []) {
@@ -545,7 +579,7 @@ export const useChatStore = defineStore('chat', {
           this.messages = mergeMessages(this.messages, msgs.value, KEEP_MESSAGES)
         }
         if (un.status === 'fulfilled') {
-          if (markRead) {
+          if (markRead && this.viewing && this.activeKey == null) {
             this.setUnreadAnchor(null, un.value?.unread)
             if (un.value?.lastMsgId) chatApi.read(un.value.lastMsgId).catch(() => {})
             this.unread = 0
@@ -558,7 +592,7 @@ export const useChatStore = defineStore('chat', {
         this.loadDmUnread()
         this.loadRoomUnread()
       })().finally(() => {
-        historyPromise = null
+        if (gen === historyGen) historyPromise = null
       })
       return historyPromise
     },
@@ -566,7 +600,7 @@ export const useChatStore = defineStore('chat', {
     /** 断线重连后补拉:正在看就顺手推进已读,否则只回正角标;正在看的亲友圈房间单独补拉 */
     resync() {
       if (this.activeRoomId != null) this.loadRoomHistory(this.activeRoomId, { force: true })
-      return this.loadHistory({ force: true, markRead: this.viewing && this.activeRoomId == null })
+      return this.loadHistory({ force: true, markRead: this.viewing && this.activeKey == null })
     },
 
     /** 通话/对战等协议信令上行(结构化 {type,data},由调用方组好) */
@@ -584,6 +618,8 @@ export const useChatStore = defineStore('chat', {
 
     /** 登出/清场:断开连接并清空全部会话数据(防串号) */
     reset() {
+      this.drafts = {}
+      this.shareCard = null
       useAssistantStore().reset()
       historyGen += 1
       historyPromise = null

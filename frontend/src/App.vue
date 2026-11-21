@@ -1,46 +1,33 @@
 <!-- 根组件:移动端 → MobileLayout;桌面端 → 光影层 + 左侧导航 + 页面内容 -->
 <template>
   <el-config-provider :locale="elLocale">
-    <!-- 移动端布局:特效开启时同样挂载光影层(全部 pointer-events:none 不挡触摸) -->
-    <template v-if="isMobile">
-      <router-view v-if="standalone" v-slot="{ Component, route }">
-        <component :is="Component" :key="route.path" />
-      </router-view>
-      <template v-else-if="routeReady">
-        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-        <MobileLayout />
-        <!-- 手机端空闲屏保(背景/看板):懒加载,触发判定与「点击不穿透」都在组件内 -->
-        <ScreensaverOverlay v-if="userStore.isLoggedIn" />
+    <router-view v-if="standalone" v-slot="{ Component, route }">
+      <component :is="Component" :key="route.path" />
+    </router-view>
+    <template v-else-if="routeReady">
+      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+      <WindowShell v-if="windowShell" />
+      <MobileLayout v-else-if="isMobile" />
+      <WarmLayout v-else-if="isWarm" />
+      <template v-else>
+        <AppSidebar v-if="!userStore.isPureOps && !immersive" />
+        <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
+          <router-view v-slot="{ Component, route }">
+            <transition :name="route.meta.transition || 'fade'" mode="out-in">
+              <component :is="Component" :key="route.path" />
+            </transition>
+          </router-view>
+        </main>
       </template>
-    </template>
-
-    <!-- 桌面端布局 -->
-    <template v-else>
-      <!-- 独立站点页(咔哒软件首页等):完全独立全屏,不套 ihomy 外壳/光影/侧栏/页脚 -->
-      <router-view v-if="standalone" v-slot="{ Component, route }">
-        <component :is="Component" :key="route.path" />
-      </router-view>
-      <template v-else-if="routeReady">
-        <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
-        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-        <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
-        <WarmLayout v-if="isWarm" />
-        <template v-else>
-          <AppSidebar v-if="!userStore.isPureOps && !immersive" />
-          <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
-            <router-view v-slot="{ Component, route }">
-              <transition :name="route.meta.transition || 'fade'" mode="out-in">
-                <component :is="Component" :key="route.path" />
-              </transition>
-            </router-view>
-          </main>
-        </template>
+      <template v-if="!isMobile || windowShell">
         <BackToTop v-if="!immersive" />
         <InstallPrompt />
-        <MusicPlayer v-if="!immersive && floatsStore.music" />
-        <LightTestConsole v-if="lightTestMode" />
-        <SiteFooter v-if="!immersive" />
       </template>
+      <WindowMusicPlayer v-if="windowShell && userStore.isLoggedIn" />
+      <MusicPlayer v-if="!isWindow && (isMobile || !immersive) && floatsStore.music" />
+      <LightTestConsole v-if="!isMobile && lightTestMode" />
+      <SiteFooter v-if="!isMobile && !immersive" />
+      <ScreensaverOverlay v-if="userStore.isLoggedIn && (isMobile || windowShell)" />
     </template>
     <div v-if="route.name === 'Home' && appStore.loadFailed && !userStore.mustChangePassword" class="home-load-error" role="status">
       <span>{{ $t('home.familyLoadFailed') }}</span>
@@ -85,6 +72,8 @@ import { usePenTap } from '@/composables/usePenTap'
 const SunLightLayer = defineAsyncComponent(() => import('@/components/SunLightLayer.vue'))
 const AppSidebar = defineAsyncComponent(() => import('@/components/AppSidebar.vue'))
 const WarmLayout = defineAsyncComponent(() => import('@/components/warm/WarmLayout.vue'))
+const WindowShell = defineAsyncComponent(() => import('@/components/window/WindowShell.vue'))
+const WindowMusicPlayer = defineAsyncComponent(() => import('@/components/WindowMusicPlayer.vue'))
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
@@ -99,7 +88,7 @@ const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOve
 // 命令面板(Ctrl/⌘+K):懒加载,内部只对精细指针显示,独立页/沉浸页不挂载
 const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette.vue'))
 const MobileLayout = defineAsyncComponent(() => import('@/layouts/MobileLayout.vue'))
-// 手机端空闲屏保:只在手机分支挂载并懒加载,桌面端不下载该 chunk
+// 手机与窗边的大屏待机共用覆盖层，是否自动进入由本机偏好决定。
 const ScreensaverOverlay = defineAsyncComponent(() => import('@/components/screensaver/ScreensaverOverlay.vue'))
 // 每日首屏早安页:全端共用,懒加载(天气动效与看板取数只在真正展示时才需要)
 const MorningOverlay = defineAsyncComponent(() => import('@/components/morning/MorningOverlay.vue'))
@@ -140,6 +129,25 @@ const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
 const isWarm = computed(() => themeStore.theme === 'warm' && !isMobile.value && !userStore.isPureOps)
+const isWindow = computed(() => themeStore.theme === 'window')
+const windowShell = computed(() => isWindow.value && !immersive.value && !userStore.isPureOps)
+
+// 站内窗边页面允许低视力成员双指放大，独立产品及旧主题沿用原来的视口约定。
+const viewport = document.querySelector('meta[name="viewport"]')
+const originalViewport = viewport?.content
+watch(
+  () => routeReady.value && !standalone.value && windowShell.value,
+  (active) => {
+    if (viewport)
+      viewport.content = active
+        ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
+        : originalViewport
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => {
+  if (viewport) viewport.content = originalViewport
+})
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight()

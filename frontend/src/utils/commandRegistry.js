@@ -41,6 +41,13 @@ export const COMMANDS = [
     hidden: (ctx) => ctx?.theme === 'guangchen',
   },
   {
+    id: 'action-theme-window',
+    group: 'action',
+    labelKey: 'command.action.themeWindow',
+    run: (ctx) => ctx?.setTheme?.('window'),
+    hidden: (ctx) => ctx?.theme === 'window',
+  },
+  {
     id: 'action-focus-search',
     group: 'action',
     labelKey: 'command.action.focusSearch',

@@ -1,7 +1,13 @@
 // V4.0 国际化:English。键结构与 zh-CN.js 完全一致(新增功能时两文件同步补齐)。
 import assistant from './assistant/en'
+import windowHome from './windowHome/en'
+import windowTools from './windowTools/en'
+import windowDisplay from './windowDisplay/en'
 
 export default {
+  windowHome,
+  windowTools,
+  windowDisplay,
   nav: {
     home: 'Home',
     logout: 'Log out',
@@ -241,6 +247,7 @@ export default {
   theme: {
     warm: 'Warm Dwelling',
     guangchen: 'Light & Dust',
+    window: 'By the Window',
     dawn: 'Dawn',
     dusk: 'Dusk',
     autoMode: 'Auto dawn/dusk colors',
@@ -7853,6 +7860,7 @@ export default {
     action: {
       themeWarm: 'Switch to Warm Dwelling theme',
       themeGuangchen: 'Switch to Light & Dust theme',
+      themeWindow: 'Switch to By the Window theme',
       focusSearch: 'Focus page search',
     },
     groupSearch: 'Results',

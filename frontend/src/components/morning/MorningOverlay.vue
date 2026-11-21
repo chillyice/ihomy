@@ -5,8 +5,18 @@
 <template>
   <Teleport to="body">
     <transition name="morning-fade">
-      <div v-if="visible" class="morning-overlay" role="dialog" aria-modal="true" :aria-label="$t('morning.overlayLabel')" @wheel.stop>
+      <div
+        v-if="visible"
+        ref="overlay"
+        class="morning-overlay"
+        :class="{ 'mo-window': windowTheme, 'mo-plain': windowTheme && !weather && !previewing }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="$t('morning.overlayLabel')"
+        @wheel.stop
+      >
         <MorningScene
+          v-if="!windowTheme || weather || previewing"
           :condition="sceneCondition"
           :night="sceneNight"
           :sun-scene="sunScene"
@@ -14,7 +24,7 @@
           :wind-deg="windDeg"
           :wind-dir="windDir"
           :precip-level="scenePrecipLevel"
-          :animated="prefs.animation"
+          :animated="prefs.animation && !quietScene"
         />
 
         <div class="mo-body">
@@ -59,18 +69,25 @@
                     @change="onToggle(it)"
                   />
                   <span v-else class="mo-dot" aria-hidden="true"></span>
-                  <span class="mo-row-title">{{ it.title }}</span>
+                  <span class="mo-row-title"
+                    ><small v-if="windowTheme && it.key === nextItem?.key" class="mo-next">{{ $t('windowDisplay.nextUp') }}</small
+                    >{{ it.title }}</span
+                  >
                   <span v-if="rowMeta(it)" class="mo-row-meta">{{ rowMeta(it) }}</span>
                 </li>
               </ul>
+              <div v-else-if="windowTheme && todoState === 'error'" class="mo-empty" role="status">
+                {{ $t('windowDisplay.loadFailed') }} <el-button text @click="loadTodos">{{ $t('common.retry') }}</el-button>
+              </div>
+              <div v-else-if="windowTheme && todoState === 'loading'" class="mo-empty" role="status">{{ $t('common.loading') }}</div>
               <div v-else class="mo-empty">{{ $t('morning.todoEmpty') }}</div>
               <div v-if="moreCount" class="mo-more">{{ $t('morning.more', { n: moreCount }) }}</div>
             </section>
           </main>
 
           <footer class="mo-foot">
-            <el-button type="primary" size="large" round class="mo-start" @click="close">
-              {{ $t('morning.start') }}
+            <el-button ref="startButton" type="primary" size="large" round class="mo-start" @click="close">
+              {{ windowTheme ? $t(manualPreview ? 'morning.close' : 'windowDisplay.enterHome') : $t('morning.start') }}
             </el-button>
             <el-button text class="mo-link" @click="openSchedule">{{ $t('morning.openSchedule') }}</el-button>
           </footer>
@@ -81,13 +98,14 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 import { useCallStore } from '@/stores/call'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -118,12 +136,21 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const themeStore = useThemeStore()
+const windowTheme = computed(() => themeStore.theme === 'window')
 const callStore = useCallStore()
 const { isChild } = useDisplayMode()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const prefs = reactive(loadPrefs())
 const visible = ref(false)
+const startButton = ref(null)
+const overlay = ref(null)
+const quietScene = ref(false)
+const manualPreview = ref(false)
+const todoState = ref('loading')
+let todoRequest = 0
+let returnFocus = null
 const now = ref(new Date())
 const agenda = ref([])
 const toggling = ref(false)
@@ -213,7 +240,12 @@ const greeting = computed(() => {
 const cardOn = (id) => prefs.cards[id] !== false
 // 组件大小档(sm/md/lg):落成 CSS 类,字号在样式里乘 --mo-scale
 const sizeClass = (id) => `mo-size-${prefs.sizes?.[id] || 'md'}`
-const todoRows = computed(() => agenda.value.slice(0, VISIBLE_TODOS))
+const nextItem = computed(() => agenda.value.find((row) => row.time && !row.done && !row.overdueDays && row.time >= clock.value.time))
+const todoRows = computed(() => {
+  const rows =
+    windowTheme.value && nextItem.value ? [nextItem.value, ...agenda.value.filter((row) => row !== nextItem.value)] : agenda.value
+  return rows.slice(0, VISIBLE_TODOS)
+})
 const moreCount = computed(() => Math.max(0, agenda.value.length - VISIBLE_TODOS))
 
 const canToggle = (it) => it.kind === 'reminder' || !!it.undated
@@ -239,20 +271,27 @@ const context = () => ({
   isChild: isChild.value,
   inCall: callStore.inCall,
   routeMeta: route.meta,
+  targetedEntry: windowTheme.value && (route.name !== 'Home' || !!route.hash || Object.keys(route.query).length > 0),
   busy: isBusyScreen(),
   hidden: typeof document !== 'undefined' && document.visibilityState !== 'visible',
 })
 
 const loadTodos = async () => {
+  const request = ++todoRequest
   if (!userStore.isLoggedIn) {
     agenda.value = []
     return
   }
+  todoState.value = 'loading'
   try {
     const data = await planApi.today()
+    if (request !== todoRequest) return
     agenda.value = buildAgenda(data)
+    todoState.value = 'ready'
   } catch (e) {
+    if (request !== todoRequest) return
     agenda.value = []
+    todoState.value = 'error'
   }
 }
 
@@ -273,9 +312,20 @@ const stopClock = () => {
 const show = (preview = false) => {
   if (visible.value) return
   if (!preview && !shouldShowMorning(context())) return
+  if (preview && windowTheme.value && (callStore.inCall || isChild.value || userStore.mustChangePassword || userStore.isPureOps)) return
   // 正常首屏一律用真实天气:清掉可能残留的预览场景
   if (!preview) clearPreviewScene()
   visible.value = true
+  manualPreview.value = preview
+  if (windowTheme.value) {
+    returnFocus = document.activeElement
+    quietScene.value = !!(
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      navigator.connection?.saveData ||
+      /2g/.test(navigator.connection?.effectiveType || '')
+    )
+    nextTick(() => startButton.value?.$el?.focus({ preventScroll: true }))
+  }
   if (typeof document !== 'undefined') document.documentElement.classList.add('morning-open')
   startClock()
   loadTodos()
@@ -291,6 +341,10 @@ const maybeShow = () => {
 const close = () => {
   if (!visible.value) return
   visible.value = false
+  todoRequest++
+  agenda.value = []
+  if (returnFocus?.isConnected) returnFocus.focus?.({ preventScroll: true })
+  returnFocus = null
   stopClock()
   clearPreviewScene()
   if (typeof document !== 'undefined') document.documentElement.classList.remove('morning-open')
@@ -322,7 +376,19 @@ const openSchedule = () => {
 }
 
 const onKeydown = (e) => {
-  if (e.key === 'Escape' && visible.value) close()
+  if (!visible.value) return
+  if (e.key === 'Escape') close()
+  if (windowTheme.value && e.key === 'Tab') {
+    const buttons = Array.from(overlay.value?.querySelectorAll('button:not(:disabled), input:not(:disabled)') || []).filter(
+      (el) => el.getClientRects().length,
+    )
+    if (!buttons.length) return
+    const target = e.shiftKey ? buttons.at(-1) : buttons[0]
+    if (document.activeElement === (e.shiftKey ? buttons[0] : buttons.at(-1))) {
+      e.preventDefault()
+      target.focus()
+    }
+  }
 }
 
 const onVisibility = () => {
@@ -357,8 +423,11 @@ watch(
   () => route.fullPath,
   () => {
     if (visible.value) close()
+    if (windowTheme.value) nextTick(maybeShow)
   },
 )
+
+watch(() => [userStore.userInfo?.id, userStore.userInfo?.familyId], close)
 
 watch(
   () => callStore.inCall,
@@ -652,6 +721,110 @@ onBeforeUnmount(() => {
   }
   .mo-start {
     flex: 1 1 auto;
+  }
+}
+.mo-window {
+  background: var(--color-bg);
+}
+.mo-window.mo-plain {
+  color: var(--color-text);
+}
+.mo-window.mo-plain .mo-close {
+  color: var(--color-text);
+}
+.mo-window .mo-next {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.mo-window .mo-body {
+  max-width: none;
+}
+.mo-window .mo-todo,
+.mo-window .mo-foot {
+  color: var(--color-text);
+  background: var(--color-card);
+  border-color: var(--color-border);
+}
+.mo-window .mo-todo {
+  border-radius: 14px;
+}
+.mo-window .mo-row {
+  border-color: var(--color-border);
+}
+.mo-window .mo-link {
+  color: var(--color-brand);
+}
+.mo-window .mo-foot {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+.mo-window .mo-start {
+  min-width: 0;
+}
+.mo-window .mo-main {
+  min-height: auto;
+}
+.mo-window .mo-row-title {
+  white-space: normal;
+}
+.mo-window .mo-row :deep(.el-checkbox__inner) {
+  border-color: var(--color-brand);
+}
+@media (orientation: landscape) and (min-width: 600px) {
+  .mo-window :deep(.ms) {
+    width: 48%;
+    right: auto;
+  }
+  .mo-window .mo-body {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+    grid-template-areas: 'head todo' 'weather todo' 'weather actions';
+    align-content: center;
+    gap: clamp(12px, 3vw, 40px);
+  }
+  .mo-window .mo-head {
+    grid-area: head;
+  }
+  .mo-window .mo-main {
+    display: contents;
+  }
+  .mo-window .mo-hero {
+    grid-area: weather;
+    align-content: start;
+  }
+  .mo-window .mo-todo {
+    grid-area: todo;
+    align-self: end;
+  }
+  .mo-window .mo-foot {
+    grid-area: actions;
+    align-self: start;
+  }
+  .mo-window .mo-time {
+    font-size: calc(clamp(38px, 7vw, 94px) * var(--mo-scale, 1));
+  }
+}
+@media (max-height: 490px) and (orientation: landscape) {
+  .mo-window .mo-body {
+    align-content: start;
+    padding: 12px 20px;
+  }
+  .mo-window .mo-hero {
+    gap: 8px;
+  }
+  .mo-window .mo-greeting {
+    font-size: 25px;
+  }
+  .mo-window .mo-temp {
+    font-size: 30px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mo-window {
+    transition: none;
   }
 }
 </style>

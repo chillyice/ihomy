@@ -9,10 +9,11 @@
       :class="{ 'is-active': themeStore.theme === s.id }"
       :style="{ '--sw-a': s.dawn, '--sw-b': s.dusk }"
       :title="s.label"
+      :aria-pressed="themeStore.theme === s.id"
       @click="themeStore.setTheme(s.id)"
     >
       <span class="ts-swatch">
-        <span class="ts-dot" :class="`ts-${s.id}`">
+        <span class="ts-dot">
           <!-- 光尘:迷你丁达尔体积光(光晕+自右上射向左下的光柱)+ 主题同款浮尘 -->
           <template v-if="s.id === 'guangchen'">
             <span class="ts-bloom"></span>
@@ -20,6 +21,7 @@
             <span v-for="n in 5" :key="n" class="ts-dust" :class="`d${n}`"></span>
           </template>
           <!-- 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒 -->
+          <img v-else-if="s.id === 'window'" class="ts-window-mark" :src="windowMark" alt="" />
           <template v-else>
             <span class="ts-glow"></span>
             <span class="ts-window"></span>
@@ -37,6 +39,7 @@
 import { computed } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useI18n } from 'vue-i18n'
+import windowMark from '@/assets/brand/ihomy-window-96.png'
 
 const themeStore = useThemeStore()
 const { t } = useI18n()
@@ -55,6 +58,7 @@ const swatches = computed(() =>
 <style scoped>
 .ts-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 22px;
 }
 
@@ -62,6 +66,13 @@ const swatches = computed(() =>
 .ts-swatch {
   position: relative;
   display: inline-flex;
+}
+.ts-window-mark {
+  position: absolute;
+  inset: 20%;
+  width: 60%;
+  height: 60%;
+  border-radius: 6px;
 }
 
 .ts-item {

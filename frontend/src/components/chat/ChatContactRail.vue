@@ -9,7 +9,7 @@
         :class="{ active: assistant.active }"
         :aria-label="$t('chat.assistant.title')"
         :title="$t('chat.assistant.title')"
-        @click="chatStore.openAssistant()"
+        @click="pickContact(chatStore.openAssistant)"
       >
         <span class="rail-room-icon"
           ><el-icon :size="16"><MagicStick /></el-icon
@@ -23,7 +23,7 @@
         type="button"
         class="rail-item rail-room rail-family"
         :class="{ active: chatStore.activeKey === null }"
-        @click="chatStore.closeDm()"
+        @click="pickContact(chatStore.closeDm)"
       >
         <img v-if="chatStore.ownFamily.coverImage" class="rail-avatar" :src="chatStore.ownFamily.coverImage" :alt="ownFamilyName" />
         <span v-else class="rail-room-icon"
@@ -110,6 +110,11 @@ import UserPresenceDot from '@/components/UserPresenceDot.vue'
 
 // narrow:对象列被拖到只剩头像宽时,名字/角标收起来(未读改成头像上的小红点)
 defineProps({ narrow: { type: Boolean, default: false } })
+const emit = defineEmits(['select'])
+function pickContact(open) {
+  open()
+  emit('select')
+}
 
 const chatStore = useChatStore()
 const assistant = useAssistantStore()
@@ -137,12 +142,16 @@ const roomUnread = (id) => chatStore.roomUnread[String(id)] || 0
 const statusOf = (m) => resolvePresence(m, chatStore.presenceMap)
 
 const openDm = async (id, name) => {
-  await chatStore.openDm(id, name)
+  const picked = chatStore.openDm(id, name)
+  emit('select')
+  await picked
 }
 
 /** 进亲友圈家庭聊天室(读历史 + 置已读);不动当前家庭的 WS 房间绑定 */
 const openRoom = async (f) => {
-  await chatStore.openRoom(f.familyId, f.alias || f.familyName || '')
+  const picked = chatStore.openRoom(f.familyId, f.alias || f.familyName || '')
+  emit('select')
+  await picked
 }
 
 // 圈内家庭成员:渲染前按需补拉(一次一个家庭,拉过就不再拉)
@@ -161,9 +170,11 @@ const ensureCircleMembers = async () => {
 }
 
 const load = async () => {
+  const scope = [myId.value, userStore.userInfo?.familyId].join('/')
   loading.value = true
   try {
     const [members, circleList, family] = await Promise.allSettled([memberApi.list(), circleApi.list(), familyApi.get()])
+    if (scope !== [myId.value, userStore.userInfo?.familyId].join('/')) return
     ownMembers.value = (members.status === 'fulfilled' ? members.value : []).filter((m) => m.id !== myId.value) || []
     circles.value = circleList.status === 'fulfilled' ? circleList.value || [] : []
     // 本家分组头/家庭头像与会话标题共用:名称取不到时回落 i18n 的「家庭」

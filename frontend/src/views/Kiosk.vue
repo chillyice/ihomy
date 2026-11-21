@@ -30,8 +30,11 @@
         <span class="kw-title">{{ topWarning.title || topWarning.typeName }}</span>
       </div>
 
-      <main class="kiosk-main">
-        <section class="kiosk-schedule">
+      <main
+        class="kiosk-main"
+        :class="{ 'kiosk-single': display.windowTheme.value && (!display.shared.value.schedule || !display.shared.value.albumId) }"
+      >
+        <section v-if="!display.windowTheme.value || display.shared.value.schedule" class="kiosk-schedule">
           <div class="section-label">{{ $t('kiosk.todayTodo') }}</div>
           <ul v-if="todayTodos.length" class="kiosk-list">
             <li
@@ -70,7 +73,7 @@
           <div v-else class="kiosk-muted">{{ $t('kiosk.noSchedule') }}</div>
         </section>
 
-        <section class="kiosk-photo">
+        <section v-if="!display.windowTheme.value || display.shared.value.albumId" class="kiosk-photo">
           <transition name="kiosk-fade">
             <img v-if="currentPhoto" :key="currentPhoto.id || currentPhoto.url" :src="currentPhoto.url" alt="" />
           </transition>
@@ -100,7 +103,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -109,10 +112,14 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
 import { planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { isNativeApp } from '@/utils/platform'
+import { useWindowDisplay } from '@/composables/useWindowDisplay'
 
 const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
+const display = useWindowDisplay()
+let generation = 0
+let alive = true
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const weather = computed(() => sunLight?.weather?.value || null)
 const weatherDetail = computed(() => sunLight?.weatherDetail?.value || null)
@@ -194,7 +201,7 @@ const toAgendaItem = (it) => ({
   id: it.id,
   date: it.date,
   done: !!it.done,
-  checkable: CHECKABLE_KINDS.includes(it.kind),
+  checkable: CHECKABLE_KINDS.includes(it.kind) && !it.shared && !it.readOnly,
   dayLabel: dayLabel(it.date),
   timeLabel: it.time ? String(it.time).slice(0, 5) : t('kiosk.allDay'),
   title: it.title || '',
@@ -225,24 +232,38 @@ const toggleItem = async (item) => {
 
 const loadHome = async () => {
   if (!userStore.isLoggedIn) return
+  const current = generation
   try {
+    if (display.windowTheme.value) {
+      const selected = await display.loadPhotos()
+      if (current === generation) {
+        photos.value = selected
+        if (photoIndex.value >= selected.length) photoIndex.value = 0
+      }
+      return
+    }
     const data = await publicApi.getHome()
+    if (current !== generation) return
     const list = Array.isArray(data?.photos) ? data.photos : []
     photos.value = list.filter((p) => p && p.url)
     if (photoIndex.value >= photos.value.length) photoIndex.value = 0
     if (data?.family?.name) familyName.value = data.family.name
   } catch (e) {
+    if (display.windowTheme.value && current === generation) photos.value = []
     // 看板不弹错误:网络抖动时保持上一轮内容
   }
 }
 
 const loadSchedule = async () => {
   if (!userStore.isLoggedIn) return
+  const current = generation
   try {
-    const data = await scheduleApi.upcoming(7)
+    const data = display.windowTheme.value ? await display.loadSchedule() : await scheduleApi.upcoming(7)
+    if (current !== generation) return
     const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
     scheduleItems.value = items.slice(0, 10)
   } catch (e) {
+    if (display.windowTheme.value && current === generation) scheduleItems.value = []
     // 同上:静默保留旧列表
   }
 }
@@ -250,6 +271,18 @@ const loadSchedule = async () => {
 const refreshAll = async () => {
   await Promise.all([loadHome(), loadSchedule()])
 }
+watch(
+  [display.scope, display.windowTheme, display.shared],
+  () => {
+    generation++
+    familyName.value = ''
+    photos.value = []
+    photoIndex.value = 0
+    scheduleItems.value = []
+    refreshAll()
+  },
+  { flush: 'sync' },
+)
 
 const goLogin = () => router.push('/login')
 
@@ -329,6 +362,7 @@ onMounted(async () => {
     shift.value = shiftFlip ? { x: -8, y: -6 } : { x: 8, y: 6 }
   }, SHIFT_INTERVAL_MS)
   await refreshAll()
+  if (!alive) return
   refreshTimer = setInterval(refreshAll, REFRESH_MS)
   // 常亮:壳内是 FLAG_KEEP_SCREEN_ON,网页端是 no-op
   screenNative()
@@ -337,6 +371,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  alive = false
+  generation++
   document.documentElement.classList.remove(KIOSK_CLASS)
   clearInterval(clockTimer)
   clearInterval(photoTimer)
@@ -614,6 +650,15 @@ onBeforeUnmount(() => {
   .kiosk-main {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.kiosk-main.kiosk-single {
+  grid-template-columns: 1fr;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kiosk,
+  .kiosk-photo img {
+    transition: none;
   }
 }
 </style>

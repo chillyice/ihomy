@@ -1,10 +1,17 @@
 <template>
   <!-- 顶栏 -->
   <PageToolbar root-class="fp-topbar" :holder-margin="0" always>
-    <el-select v-model="currentHouseId" :placeholder="$t('item.pickHouse')" class="fp-house" @change="onHouseChange">
+    <el-select
+      v-if="!focusedSearch || mapOpen"
+      v-model="currentHouseId"
+      :placeholder="$t('item.pickHouse')"
+      class="fp-house"
+      @change="onHouseChange"
+    >
       <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
     </el-select>
     <el-input
+      ref="searchInput"
       v-model="searchKeyword"
       :placeholder="$t('item.searchPh')"
       clearable
@@ -16,8 +23,12 @@
         ><el-icon><Search /></el-icon
       ></template>
     </el-input>
+    <el-button v-if="focusedSearch && userStore.isLoggedIn" type="primary" :disabled="!searchKeyword.trim()" @click="onSearch">{{
+      $t('windowTools.find')
+    }}</el-button>
     <el-button
       class="fp-voice"
+      :disabled="!userStore.isLoggedIn"
       :class="{ recording: voiceRecording }"
       :title="voiceRecording ? $t('item.voiceStop') : $t('item.voiceSearch')"
       :loading="voiceProcessing"
@@ -26,15 +37,36 @@
       <el-icon><Microphone /></el-icon>
     </el-button>
     <div class="fp-top-actions">
-      <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
-      <el-button v-if="!listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{
+      <el-button v-if="focusedSearch" @click="mapOpen ? returnToSearch() : showMap()">{{
+        $t(mapOpen ? 'windowTools.backResults' : 'windowTools.browseMap')
+      }}</el-button>
+      <el-button v-else @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
+      <el-button v-if="!focusedSearch && !listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{
         mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan')
       }}</el-button>
     </div>
   </PageToolbar>
 
+  <section v-if="focusedSearch" class="card search-summary" :class="{ 'showing-map': mapOpen }" aria-live="polite">
+    <strong
+      >{{ $t('item.searchResults') }}<template v-if="searchResults.length"> · {{ searchResults.length }}</template></strong
+    >
+    <p v-if="!userStore.isLoggedIn">{{ $t('item.guestEmpty') }}</p>
+    <p v-else-if="searchBusy">{{ $t('common.loading') }}</p>
+    <p v-else-if="searchFailure">
+      {{ $t('windowTools.searchFailed') }} <el-button text @click="onSearch">{{ $t('common.retry') }}</el-button>
+    </p>
+    <p v-else-if="!searchResults.length">{{ $t(searched ? 'item.noResults' : 'windowTools.query') }}</p>
+    <article v-for="it in searchResults" :key="it.id" :class="{ selected: searchMemory.selection === it.id }">
+      <strong>{{ it.name }}</strong>
+      <p>{{ [it.house_name, it.room_name, it.furniture_name, it.position].filter(Boolean).join(' › ') || $t('windowTools.noLocation') }}</p>
+      <el-button v-if="houses.some((h) => Number(h.id) === Number(it.house_id))" text @click="showMap(it)">{{
+        $t('windowTools.onMap')
+      }}</el-button>
+    </article>
+  </section>
   <!-- 户型图主视图 -->
-  <div v-if="!listMode" class="fp-main">
+  <div v-if="!listMode" class="fp-main" :class="{ 'search-map-preview': focusedSearch && !mapOpen }">
     <!-- 空态(游客:只提示登录,不给「+ 新建」入口,免得点进一个存不下的表单) -->
     <div v-a11y-click v-if="!houses.length" class="fp-empty" @click="userStore.isLoggedIn && openHouse()">
       <div v-if="userStore.isLoggedIn" class="fp-empty-plus">+</div>
@@ -442,7 +474,7 @@
       </div>
 
       <!-- 搜索结果 -->
-      <div v-if="searchResults.length" class="fp-results">
+      <div v-if="!focusedSearch && searchResults.length" class="fp-results">
         <div class="fp-results-title">
           {{ $t('item.searchResults') }} ({{ searchResults.length }})
           <span class="fp-src-tag" :class="{ ai: searchSource === 'ai' }">
@@ -460,13 +492,15 @@
           <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" :alt="it.name || ''" />
           <div class="fp-result-text">
             <span class="fp-result-name">{{ it.name }}</span>
-            <span class="fp-result-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name || it.position }}</span>
+            <span class="fp-result-path">{{
+              [it.house_name, it.room_name, it.furniture_name, it.position].filter(Boolean).join(' / ')
+            }}</span>
           </div>
         </div>
       </div>
       <!-- 关键词无命中 → AI 语义找物兜底(俗称/别名/自然语言) -->
-      <div v-else-if="aiSearching" class="fp-results fp-search-hint">✨ {{ $t('item.aiSearching') }}</div>
-      <div v-else-if="searched" class="fp-results fp-search-hint">{{ $t('item.noResults') }}</div>
+      <div v-else-if="!focusedSearch && aiSearching" class="fp-results fp-search-hint">✨ {{ $t('item.aiSearching') }}</div>
+      <div v-else-if="!focusedSearch && searched" class="fp-results fp-search-hint">{{ $t('item.noResults') }}</div>
     </template>
   </div>
 
@@ -490,6 +524,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useItemSearchStore } from '@/stores/itemSearch'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, CopyDocument, Delete, Edit, Microphone } from '@element-plus/icons-vue'
 import { itemApi, fileApi, aiApi } from '@/api'
@@ -543,7 +579,24 @@ const rulerPopVisible = ref(false) // 尺子角标列表弹层显隐
 const currentHouseId = ref(null)
 const currentFloor = ref(1)
 const floorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
-const searchKeyword = ref('')
+const route = useRoute()
+const router = useRouter()
+const searchMemory = useItemSearchStore()
+const focusedSearch = computed(() => route.query.focus === 'search')
+const mapOpen = computed(() => focusedSearch.value && route.query.view === 'map')
+const searchInput = ref(null)
+const plainQuery = ref('')
+const searchKeyword = computed({
+  get: () => (focusedSearch.value ? searchMemory.query : plainQuery.value),
+  set: (value) => {
+    if (focusedSearch.value) searchMemory.query = value
+    else plainQuery.value = value
+  },
+})
+const searchBusy = ref(false)
+const searchFailure = ref(false)
+let searchSeq = 0
+let alive = true
 let defaultFloorDone = false // 房间数据到位后的默认层兜底只执行一次
 const floorTouched = ref(false) // 用户/搜索已手动切层,不再自动覆盖默认层
 const searchResults = ref([])
@@ -1372,33 +1425,40 @@ const searched = ref(false)
 const searchSource = ref('') // 'keyword' | 'ai'
 const aiSearching = ref(false)
 const onSearch = async () => {
-  if (!searchKeyword.value) {
+  if (!userStore.isLoggedIn) return
+  const query = searchKeyword.value.trim()
+  if (!query) {
     clearSearch()
     return
   }
-  searched.value = true
-  searchSource.value = 'keyword'
-  searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
-  if (searchResults.value.length) {
-    await autoSwitchToHits()
-    await focusFirstHit()
-    return
-  }
-  // 关键词无命中 → AI 找物兜底(俗称/别名/自然语言描述);AI 不可用静默保持无结果
-  aiSearching.value = true
+  const seq = ++searchSeq
+  if (focusedSearch.value) searchMemory.submitted = query
+  searchResults.value = []
+  searched.value = false
+  searchBusy.value = true
+  searchFailure.value = aiSearching.value = false
   try {
-    const r = await itemApi.aiFind({ query: searchKeyword.value })
-    if (r.matches && r.matches.length) {
-      searchResults.value = r.matches
-      searchSource.value = 'ai'
+    let rows = await itemApi.list({ keyword: query })
+    if (seq !== searchSeq) return
+    searchSource.value = 'keyword'
+    if (!rows.length) {
+      aiSearching.value = true
+      const r = await itemApi.aiFind({ query }).catch(() => null)
+      if (seq !== searchSeq) return
+      rows = r?.matches || []
+      if (rows.length) searchSource.value = 'ai'
     }
-  } catch (e) {
-    // AI 未配置/调用失败:保持关键词搜索的无结果状态,不弹错误
+    searchResults.value = rows
+    searched.value = true
+    if (!focusedSearch.value && rows.length) {
+      await autoSwitchToHits()
+      if (seq === searchSeq) await focusFirstHit()
+    }
+  } catch {
+    if (seq === searchSeq) searchFailure.value = true
   } finally {
-    aiSearching.value = false
+    if (seq === searchSeq) aiSearching.value = searchBusy.value = false
   }
-  await autoSwitchToHits()
-  await focusFirstHit()
 }
 // 搜索命中后实时定位:切到第一个命中的房子+楼层(命中楼层里有 1 楼优先 1 楼,
 // 没有 1 楼取最高层),命中物品随即高亮+居中显示在户型图上,跨房子也直接切过去。
@@ -1434,6 +1494,12 @@ const focusFirstHit = async () => {
   if (hit) canvasRef.value?.focusItem(hit.id)
 }
 const clearSearch = () => {
+  searchSeq++
+  searchBusy.value = aiSearching.value = searchFailure.value = false
+  if (focusedSearch.value) {
+    searchMemory.submitted = ''
+    searchMemory.selection = null
+  }
   searchKeyword.value = ''
   searchResults.value = []
   searched.value = false
@@ -1452,6 +1518,28 @@ const locateItem = async (it) => {
   // 放大居中到命中物品(物品无锚点时画布内回退家具/房间中心)
   canvasRef.value?.focusItem(it.id)
 }
+
+const showMap = async (item) => {
+  searchMemory.selection = item?.id ?? null
+  if (!mapOpen.value) await router.push({ path: route.path, query: { ...route.query, view: 'map' } })
+  if (item) await locateItem(item)
+}
+const returnToSearch = () => {
+  if (window.history.state?.back === '/item?focus=search') router.back()
+  else router.replace({ path: route.path, query: { ...route.query, view: undefined } })
+}
+watch(
+  () => [focusedSearch.value, mapOpen.value],
+  async () => {
+    if (focusedSearch.value && !mapOpen.value && userStore.isLoggedIn) {
+      listMode.value = false
+      mode.value = 'view'
+      await nextTick()
+      searchInput.value?.focus()
+    }
+  },
+  { immediate: true },
+)
 
 // ---- AI 智能登记(自然语言放物:已有同名/别名物品更新位置,否则新增) ----
 const aiDlg = ref(false)
@@ -1505,6 +1593,10 @@ const toggleVoicePut = async () => {
 const beginVoice = async (mode) => {
   try {
     await voiceStart()
+    if (!alive) {
+      await voiceStop()
+      return
+    }
     clearTimeout(voiceTimer)
     // 短语音场景 10s 自动结束兜底,防误触长时间录音
     voiceTimer = setTimeout(() => {
@@ -1522,6 +1614,7 @@ const finishVoice = async (mode) => {
     const blob = await voiceStop()
     const file = new File([blob], 'voice.wav', { type: 'audio/wav' })
     const r = await aiApi.transcribe(file, null)
+    if (!alive) return
     const text = (r.text || '').trim()
     if (!text) {
       ElMessage.warning(t('item.voiceEmpty'))
@@ -1706,10 +1799,18 @@ const onKeydown = (e) => {
   undo()
 }
 onMounted(() => {
-  loadHouses()
+  loadHouses().then(async () => {
+    if (!alive || !focusedSearch.value || !searchMemory.submitted || searchMemory.query.trim() !== searchMemory.submitted) return
+    await onSearch()
+    const item = searchResults.value.find((row) => row.id === searchMemory.selection)
+    if (alive && mapOpen.value && item && houses.value.some((h) => Number(h.id) === Number(item.house_id))) await locateItem(item)
+  })
   window.addEventListener('keydown', onKeydown)
 })
 onBeforeUnmount(() => {
+  alive = false
+  searchSeq++
+  clearTimeout(voiceTimer)
   window.removeEventListener('keydown', onKeydown)
   if (voiceRecording.value) voiceStop()
 })
@@ -1743,6 +1844,45 @@ defineExpose({
 </script>
 
 <style scoped>
+.search-summary {
+  padding: 18px;
+  align-self: start;
+  color: var(--color-text);
+}
+.search-summary article {
+  margin-top: 12px;
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--color-border);
+}
+.search-summary p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+}
+.search-summary article.selected strong {
+  color: var(--color-brand);
+}
+.search-summary .el-button {
+  padding-left: 0;
+}
+@media (max-width: 899px) {
+  .search-map-preview,
+  .search-summary.showing-map {
+    display: none !important;
+  }
+}
+@media (min-width: 900px) {
+  :global(.fp-search-layout > .fp-topbar) {
+    grid-column: 1 / -1;
+  }
+  :global(.fp-search-layout > .toolbar-holder) {
+    display: none;
+  }
+  .search-summary {
+    max-height: 65dvh;
+    overflow: auto;
+  }
+}
 .fp-topbar {
   display: flex;
   align-items: center;

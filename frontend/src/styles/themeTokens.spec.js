@@ -107,13 +107,20 @@ describe('主题配色守门', () => {
     expect(offenders, `引用了未定义的 CSS 变量(运行时会静默取 fallback 或继承父色):\n${offenders.join('\n')}`).toEqual([])
   })
 
-  it('main.css 四态都定义了语义色 token(danger/warning/tertiary/green)', () => {
+  it('每个主题的晨暮色板都定义语义色 token(danger/warning/tertiary/green)', () => {
     const css = normalize(readFileSync(join(SRC, 'styles/main.css'), 'utf8'))
     const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
       selectors: m[1].split(',').map((s) => s.trim().split(/\r?\n/).pop().trim()),
       body: m[2],
     }))
-    for (const selector of [':root', 'html.dark', 'html.theme-warm', 'html.theme-warm.dark']) {
+    for (const selector of [
+      ':root',
+      'html.dark',
+      'html.theme-warm',
+      'html.theme-warm.dark',
+      'html.theme-window',
+      'html.theme-window.dark',
+    ]) {
       const body = blocks
         .filter((b) => b.selectors.includes(selector))
         .map((b) => b.body)

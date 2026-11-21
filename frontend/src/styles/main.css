@@ -3434,6 +3434,150 @@ body.dragging-files * {
   cursor: grabbing !important;
 }
 
+/* 窗边：保留窗扇标志本色，通用页面、弹窗及传送到 body 的菜单共用晨暮色板。 */
+html.theme-window {
+  --color-bg: #f5f2e9;
+  --color-bg-2: #ebe8de;
+  --color-card: #fffdf6;
+  --color-card-2: #ecece2;
+  --color-card-rgb: 255, 253, 246;
+  --color-text: #332f29;
+  --color-text-secondary: #665f53;
+  --color-text-tertiary: #71695d;
+  --color-brand: #075749;
+  --color-brand-hover: #06483d;
+  --color-brand-text: #fffdf6;
+  --color-brand-rgb: 7, 87, 73;
+  --color-border: #d7d4c8;
+  --color-danger: #a63e39;
+  --color-danger-rgb: 166, 62, 57;
+  --color-warning: #85591c;
+  --color-green: #426d51;
+  --window-honey: #febb66;
+  --window-honey-text: #392b17;
+  --shadow: 0 3px 12px rgb(52 47 37 / 7%);
+  --shadow-hover: 0 5px 16px rgb(52 47 37 / 10%);
+  --shadow-inset: 0 0 transparent;
+  --overlay-scrim: rgb(39 44 36 / 40%);
+  --light-glass-bg: transparent;
+  --blob-1: 182, 199, 177;
+  --blob-2: 244, 219, 170;
+  --blob-3: 221, 204, 178;
+  --blob-4: 211, 221, 195;
+  --blob-5: 225, 209, 182;
+  --color-accent: var(--color-brand);
+  --color-primary: var(--color-text);
+  --color-surface: var(--color-card);
+  --color-line: var(--color-border);
+  --el-bg-color: var(--color-card);
+  --el-bg-color-page: var(--color-bg);
+  --el-bg-color-overlay: var(--color-card);
+  --el-fill-color-blank: var(--color-card);
+  --el-fill-color: var(--color-card-2);
+  --el-fill-color-light: var(--color-card-2);
+  --el-fill-color-lighter: var(--color-bg);
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border);
+  --el-border-color-lighter: var(--color-border);
+  --el-disabled-bg-color: var(--color-card-2);
+  --el-disabled-border-color: var(--color-border);
+}
+html.theme-window.dark {
+  --color-bg: #262824;
+  --color-bg-2: #2a2e28;
+  --color-card: #30332d;
+  --color-card-2: #3a4037;
+  --color-card-rgb: 48, 51, 45;
+  --color-text: #f6f0df;
+  --color-text-secondary: #cbc3b4;
+  --color-text-tertiary: #b6b1a3;
+  --color-brand: #a4d6bd;
+  --color-brand-hover: #bfebd3;
+  --color-brand-text: #1b332a;
+  --color-brand-rgb: 164, 214, 189;
+  --color-border: #50554a;
+  --color-danger: #f59b93;
+  --color-danger-rgb: 245, 155, 147;
+  --color-warning: #ebb168;
+  --color-green: #a5cca6;
+  --window-honey: #ebb168;
+  --shadow: 0 3px 12px rgb(0 0 0 / 14%);
+  --shadow-hover: 0 5px 16px rgb(0 0 0 / 22%);
+  --overlay-scrim: rgb(18 23 19 / 60%);
+}
+/* 窗边把环境光留在窗口边缘，照片和阅读区保留原色。 */
+html.theme-window .sun-light-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-atmos);
+  opacity: 0.18;
+  mask-image: linear-gradient(110deg, #000, transparent 27%, transparent 76%, #000);
+}
+html.theme-window
+  :is(.mobile-tabbar, .mobile-header, .el-drawer, .el-overlay-dialog .el-dialog, .el-overlay.is-message-box .el-message-box) {
+  background: var(--color-card) !important;
+  border-color: var(--color-border);
+}
+html.theme-window .mobile-tabbar .tab-item.active,
+html.theme-window .mobile-header :is(.back-btn, .home-btn) {
+  color: var(--color-brand);
+}
+html.theme-window .mobile-tabbar .capture-btn {
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+  border-color: var(--color-card);
+}
+html.theme-window.window-player-visible .window-content {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+html.theme-window.window-player-visible {
+  scroll-padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+html.theme-window .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn),
+html.theme-window .ghost-btn {
+  background: var(--color-card) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+html.theme-window .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.is-disabled):hover,
+html.theme-window .ghost-btn:not(:disabled):hover {
+  background: var(--color-card-2) !important;
+  color: var(--color-brand) !important;
+}
+html.theme-window .el-button.is-disabled,
+html.theme-window .el-button.is-loading {
+  opacity: 0.6;
+}
+html.theme-window :is(.el-dialog, .el-message-box) :is(.el-textarea__inner, .el-input__wrapper) {
+  background: var(--color-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--color-border) !important;
+}
+html.theme-window :is(.el-dialog, .el-message-box) :is(.el-textarea__inner:focus, .el-input__wrapper.is-focus) {
+  box-shadow: inset 0 0 0 2px var(--color-brand) !important;
+}
+html.theme-window .site-footer {
+  position: static;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  text-shadow: none;
+}
+html.theme-window :focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-window,
+  html.theme-window body,
+  html.theme-window #app,
+  html.theme-window .ts-dot {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* ===== 显示模式(老人 / 儿童)=====
    只由 useDisplayMode 在 html 根上切类,不改组件内写死的字号档位:
    老人模式抬高基准字号与主文字对比度,并去掉半透明表面(高对比);

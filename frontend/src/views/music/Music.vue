@@ -123,7 +123,10 @@
                   <span v-if="!t.coverUrl">🎵</span>
                 </div>
                 <div class="rl-main">
-                  <span class="rl-name">{{ t.title }}</span>
+                  <span class="rl-name"
+                    >{{ t.title }}
+                    <small v-if="isCurrent(t)">{{ $t(music.playing ? 'music.playerPlaying' : 'music.playerPaused') }}</small></span
+                  >
                   <span class="rl-meta">
                     <template v-if="t.artist">{{ t.artist }}</template
                     ><template v-if="t.album"> · {{ t.album }}</template
@@ -169,7 +172,10 @@
                   </span>
                 </div>
                 <div class="music-info">
-                  <div class="music-title" :title="t.title">{{ t.title || $t('music.unknownTrack') }}</div>
+                  <div class="music-title" :title="t.title">
+                    {{ t.title || $t('music.unknownTrack') }}
+                    <small v-if="isCurrent(t)">{{ $t(music.playing ? 'music.playerPlaying' : 'music.playerPaused') }}</small>
+                  </div>
                   <div class="music-sub">
                     <span v-if="t.artist" class="music-artist">{{ t.artist }}</span>
                     <span v-if="t.album" class="music-album">{{ t.album }}</span>
@@ -282,7 +288,7 @@
                   <div class="album-tracks">
                     <div v-for="(t, i) in al.tracks" :key="t.id || i" class="album-track-item">
                       <span class="track-idx">{{ i + 1 }}</span>
-                      <span v-a11y-click class="track-name" @click="play(t)">{{ t.title || $t('music.unknownTrack') }}</span>
+                      <span v-a11y-click class="track-name" @click="play(t, al.tracks)">{{ t.title || $t('music.unknownTrack') }}</span>
                       <span v-if="t.duration" class="track-dur">{{ formatDuration(t.duration) }}</span>
                     </div>
                   </div>
@@ -418,6 +424,7 @@
               <div v-if="t.artist" class="pl-detail-artist">{{ t.artist }}</div>
             </div>
             <span v-if="t.duration" class="pl-detail-dur">{{ formatDuration(t.duration) }}</span>
+            <el-button v-if="isWindow" size="small" text @click="playFromPlaylist(t)">{{ $t('music.playAction') }}</el-button>
             <el-button v-if="userStore.isLoggedIn" size="small" text type="danger" @click="removeFromPlaylist(t)">{{
               $t('common.remove')
             }}</el-button>
@@ -539,6 +546,8 @@ import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { useFloatsStore } from '@/stores/floats'
+import { useThemeStore } from '@/stores/theme'
+import { useWindowMusicStore } from '@/stores/windowMusic'
 import { usePickSelect } from '@/composables/usePickSelect'
 import { useViewMode } from '@/composables/useViewMode'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -565,6 +574,13 @@ const playlistLoading = ref(false)
 const tracks = ref([])
 const playlists = ref([])
 const player = reactive({ visible: false, track: null, url: '' })
+const theme = useThemeStore()
+const isWindow = computed(() => theme.theme === 'window')
+const music = useWindowMusicStore()
+const isCurrent = (track) => isWindow.value && music.current?.id === track.id
+watch(isWindow, () => {
+  player.visible = false
+})
 const singleUploadRef = ref(null)
 const syncVisible = ref(false)
 const refreshing = ref(false)
@@ -663,21 +679,25 @@ const albums = computed(() => {
 
 const load = async () => {
   // 家庭音乐库是私有内容(接口需登录):游客不打注定 401 的请求,直接空态
-  if (!userStore.isLoggedIn) return
+  const scope = music.scope
+  if (!scope) return
   loading.value = true
   try {
-    tracks.value = await musicApi.list()
+    const data = await musicApi.list()
+    if (scope === music.scope) tracks.value = data
   } finally {
-    loading.value = false
+    if (scope === music.scope) loading.value = false
   }
 }
 const loadPlaylists = async () => {
-  if (!userStore.isLoggedIn) return
+  const scope = music.scope
+  if (!scope) return
   playlistLoading.value = true
   try {
-    playlists.value = await musicApi.playlistList()
+    const data = await musicApi.playlistList()
+    if (scope === music.scope) playlists.value = data
   } finally {
-    playlistLoading.value = false
+    if (scope === music.scope) playlistLoading.value = false
   }
 }
 
@@ -705,13 +725,14 @@ const resolvePlayUrl = async (t) => {
     return ''
   }
 }
-const play = async (t) => {
+const play = async (t, queue = filteredTracks.value) => {
+  if (isWindow.value) return music.choose(queue, t.id)
   player.track = t
   player.url = ''
   player.visible = true
   player.url = await resolvePlayUrl(t)
 }
-const playAlbum = (al) => play(al.tracks[0])
+const playAlbum = (al) => play(al.tracks[0], al.tracks)
 
 // 页内试听也接系统媒体会话:锁屏能看到曲名并能暂停/拖动;关闭弹窗立刻清掉,
 // 避免锁屏还显示一首已经关掉的曲子(浮窗播放器的会话按 owner 隔离,不会被误清)。
@@ -874,15 +895,21 @@ const createPlaylist = async () => {
 
 const plDetail = reactive({ visible: false, playlist: null, tracks: [], loading: false })
 const viewPlaylist = async (p) => {
+  const scope = music.scope
   plDetail.playlist = p
   plDetail.visible = true
   plDetail.loading = true
   plDetail.tracks = []
   try {
-    plDetail.tracks = await musicApi.playlistTracks(p.id)
+    const data = await musicApi.playlistTracks(p.id)
+    if (scope === music.scope && p.id === plDetail.playlist?.id) plDetail.tracks = data
   } finally {
-    plDetail.loading = false
+    if (scope === music.scope && p.id === plDetail.playlist?.id) plDetail.loading = false
   }
+}
+function playFromPlaylist(track) {
+  play(track, plDetail.tracks)
+  plDetail.visible = false
 }
 const removeFromPlaylist = async (t) => {
   await musicApi.removeTrack(plDetail.playlist.id, t.id)
@@ -979,6 +1006,21 @@ const delPlaylist = async (p) => {
   await loadPlaylists()
 }
 
+watch(
+  () => music.scope,
+  () => {
+    tracks.value = []
+    playlists.value = []
+    plDetail.visible = player.visible = addTracksDialog.visible = false
+    plDetail.playlist = null
+    plDetail.tracks = []
+    exitSelect()
+    loading.value = playlistLoading.value = false
+    load()
+    loadPlaylists()
+  },
+  { flush: 'sync' },
+)
 onMounted(() => {
   load()
   loadPlaylists()

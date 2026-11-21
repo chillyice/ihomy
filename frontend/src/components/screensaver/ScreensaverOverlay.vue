@@ -8,17 +8,17 @@
   <Teleport to="body">
     <div
       v-if="visible"
-      v-a11y-click
       class="ss"
-      :class="isBoard ? 'ss-board' : 'ss-photo-mode'"
+      ref="overlay"
+      tabindex="-1"
+      :class="[isBoard ? 'ss-board' : 'ss-photo-mode', { 'ss-window': windowTheme, 'clock-only': !currentPhoto }]"
       role="dialog"
       aria-modal="true"
       :aria-label="$t('screensaver.overlayLabel')"
       @click.stop="wake"
       @pointerdown.stop
-      @keydown.stop="wake"
-      @wheel.prevent
-      @touchmove.prevent
+      @wheel.stop.prevent
+      @touchmove.stop.prevent
       @contextmenu.prevent
     >
       <!-- 背景模式 -->
@@ -89,7 +89,7 @@
               <li v-for="(ev, i) in events.slice(0, 4)" :key="`${ev.label}-${i}`" class="ss-row">
                 <span class="ss-time">{{ ev.days === 0 ? $t('screensaver.today') : ev.date }}</span>
                 <span class="ss-title">{{ ev.label }}</span>
-                <span v-if="ev.days !== 0" class="ss-source">{{ $t('screensaver.daysLeft', { n: ev.days }) }}</span>
+                <span v-if="ev.days != null && ev.days !== 0" class="ss-source">{{ $t('screensaver.daysLeft', { n: ev.days }) }}</span>
               </li>
             </ul>
           </section>
@@ -109,13 +109,17 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useCallStore } from '@/stores/call'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { useIdle } from '@/composables/useIdle'
+import { useDevice } from '@/composables/useDevice'
+import { useWindowDisplay } from '@/composables/useWindowDisplay'
+import { isVoiceCaptureActive } from '@/composables/useVoiceRecorder'
+import { activeStandbyTask, protectedStandbyRoute } from '@/utils/windowStandby'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { publicApi, scheduleApi } from '@/api'
 import { isBusyScreen, loadPrefs, MODES, prefsTick, previewTick, shouldSuppress } from '@/utils/screensaver'
@@ -132,8 +136,16 @@ const PHOTO_INTERVAL_MS = 8000
 const REFRESH_MS = 600000
 const DATA_TTL_MS = 300000
 
-const prefs = reactive(loadPrefs())
+const display = useWindowDisplay()
+const { windowTheme } = display
+const { isMobile } = useDevice()
+const wide = computed(() => windowTheme.value && !isMobile.value)
+const prefs = reactive(loadPrefs(wide.value))
 const visible = ref(false)
+const overlay = ref(null)
+let previousFocus = null
+let keyToRelease = null
+let loadSequence = 0
 const clock = ref({ time: '', date: '', week: '' })
 const todayStr = ref('')
 const familyName = ref('')
@@ -143,7 +155,10 @@ const events = ref([])
 const scheduleItems = ref([])
 
 const isBoard = computed(() => prefs.mode === MODES.BOARD)
-const cardOn = (id) => prefs.board[id] !== false
+const cardOn = (id) => {
+  if (windowTheme.value && id === 'clock' && !photos.value.length && !scheduleItems.value.length) return true
+  return prefs.board[id] !== false
+}
 
 // 取数缓存:屏保反复进出不重复打接口(5 分钟内拿缓存)
 const cache = { at: 0, photos: [], familyName: '', events: [], schedule: [] }
@@ -204,12 +219,27 @@ const applyCache = () => {
 
 const loadData = async (force = false) => {
   if (!userStore.isLoggedIn) return
+  const sequence = ++loadSequence
+  if (windowTheme.value) {
+    const [pictures, schedule] = await Promise.all([
+      !isBoard.value || cardOn('photos') ? display.loadPhotos().catch(() => []) : [],
+      isBoard.value ? display.loadSchedule().catch(() => []) : [],
+    ])
+    if (sequence !== loadSequence || !visible.value) return
+    photos.value = pictures
+    scheduleItems.value = schedule
+    events.value = schedule.filter((it) => it.kind === 'ANNIVERSARY').map((it) => ({ label: it.title, date: it.date }))
+    familyName.value = ''
+    photoIndex.value = 0
+    return
+  }
   if (!force && cache.at && Date.now() - cache.at < DATA_TTL_MS) {
     applyCache()
     return
   }
   // 两个接口互不依赖:并行;任一失败不拖垮整个屏保(照片/日程各自留空)
   const [home, upcoming] = await Promise.all([publicApi.getHome().catch(() => null), scheduleApi.upcoming(7).catch(() => null)])
+  if (sequence !== loadSequence || !visible.value) return
   const list = Array.isArray(upcoming) ? upcoming : Array.isArray(upcoming?.items) ? upcoming.items : []
   cache.photos = Array.isArray(home?.photos) ? home.photos.filter((p) => p && p.url) : []
   cache.familyName = home?.family?.name || ''
@@ -239,12 +269,14 @@ const stopTimers = () => {
   stopPhoto()
 }
 
-const syncPrefs = () => Object.assign(prefs, loadPrefs())
+const syncPrefs = () => Object.assign(prefs, loadPrefs(wide.value))
 
 // 进入屏保:时钟/照片轮播/数据刷新一起起来,退出时统一 stopTimers
 const enter = () => {
   stopTimers()
   visible.value = true
+  previousFocus = document.activeElement
+  nextTick(() => overlay.value?.focus({ preventScroll: true }))
   syncClock()
   clockTimer = setInterval(syncClock, 1000)
   syncPhotoTimer()
@@ -261,7 +293,10 @@ const show = () => {
 const hide = () => {
   if (!visible.value) return
   visible.value = false
+  loadSequence++
   stopTimers()
+  if (previousFocus?.isConnected && !callStore.inCall) previousFocus.focus?.({ preventScroll: true })
+  previousFocus = null
 }
 
 // 轻点任意处唤醒:该次 click 已被根节点吞下,背后页面收不到
@@ -276,7 +311,14 @@ const context = () => ({
   isChild: isChild.value,
   inCall: callStore.inCall,
   routeMeta: route.meta,
-  busy: isBusyScreen(),
+  busy:
+    isBusyScreen() ||
+    (windowTheme.value &&
+      (isVoiceCaptureActive() ||
+        protectedStandbyRoute(route.path) ||
+        activeStandbyTask(document) ||
+        userStore.mustChangePassword ||
+        userStore.isPureOps)),
   hidden: typeof document !== 'undefined' && document.visibilityState !== 'visible',
 })
 
@@ -305,11 +347,22 @@ watch(isIdle, (idle) => {
 // 设置页「预览」:立即展示(会照常吞点击,点一下即退出)
 watch(previewTick, () => {
   syncPrefs()
-  if (!visible.value) enter()
+  if (!visible.value && !callStore.inCall && !isChild.value && !userStore.mustChangePassword && !userStore.isPureOps) enter()
 })
 
 // 设置页改了时长/模式/卡片:重读偏好,useIdle 会按时长变化重新武装计时
-watch(prefsTick, () => syncPrefs())
+const resetDisplay = () => {
+  loadSequence++
+  cache.at = 0
+  photos.value = []
+  events.value = []
+  scheduleItems.value = []
+  familyName.value = ''
+  hide()
+  poke()
+  syncPrefs()
+}
+watch([prefsTick, wide, windowTheme, display.scope], resetDisplay, { flush: 'sync' })
 
 // 关闭条件:离开普通页面、登出、进通话、切儿童模式
 watch(
@@ -345,11 +398,27 @@ const onVisibility = () => {
   hide()
 }
 
-if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
+const onWakeKey = (event) => {
+  if (!visible.value && event.code !== keyToRelease) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  if (event.type === 'keyup') keyToRelease = null
+  else {
+    keyToRelease = event.code
+    wake()
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('keydown', onWakeKey, true)
+  window.addEventListener('keyup', onWakeKey, true)
+}
 
 onBeforeUnmount(() => {
   stopTimers()
   if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+  window.removeEventListener('keydown', onWakeKey, true)
+  window.removeEventListener('keyup', onWakeKey, true)
 })
 </script>
 
@@ -576,5 +645,77 @@ onBeforeUnmount(() => {
 }
 .ss-board .ss-hint {
   color: var(--color-text-secondary);
+}
+.ss-window.ss-photo-mode {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.ss-window .ss-photo {
+  top: 42%;
+}
+.ss-window .ss-photo-scrim {
+  display: none;
+}
+.ss-window .ss-photo-info {
+  top: 7%;
+  bottom: auto;
+}
+.ss-window.ss-photo-mode .ss-hint {
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  width: max-content;
+  margin: auto;
+  border-radius: 12px;
+  padding: 6px 14px;
+  opacity: 1;
+}
+.ss-window .ss-clock {
+  animation: ss-shift 4min steps(1, end) infinite;
+}
+@keyframes ss-shift {
+  25% {
+    transform: translateX(4px);
+  }
+  50% {
+    transform: translate(4px, 4px);
+  }
+  75% {
+    transform: translateY(4px);
+  }
+}
+@media (orientation: landscape) {
+  .ss-window .ss-photo {
+    top: 0;
+    left: 44%;
+  }
+  .ss-window .ss-photo-info {
+    top: 50%;
+    left: 5%;
+    right: 57%;
+    transform: translateY(-50%);
+  }
+  .ss-window .ss-clock {
+    font-size: clamp(42px, 10vw, 140px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-window .ss-clock,
+  .ss-window .ss-photo img {
+    animation: none;
+    transition: none;
+  }
+}
+.ss-window.ss-photo-mode.clock-only .ss-photo {
+  display: none;
+}
+.ss-window.ss-photo-mode.clock-only .ss-photo-info {
+  top: 50%;
+  left: 5%;
+  right: 5%;
+  transform: translateY(-50%);
+  text-align: center;
+}
+.ss-window.ss-photo-mode.clock-only .ss-weather {
+  justify-content: center;
 }
 </style>

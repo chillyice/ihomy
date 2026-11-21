@@ -128,6 +128,7 @@ export function requestPreview() {
 export function shouldShowMorning(ctx = {}) {
   const c = isObj(ctx) ? ctx : {}
   if (!c.enabled || !c.isLoggedIn || c.isPureOps || c.mustChangePassword) return false
+  if (c.targetedEntry) return false
   if (!c.today || c.lastShown === c.today) return false
   return !shouldSuppress(c)
 }

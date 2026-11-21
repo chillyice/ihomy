@@ -3,15 +3,15 @@
 <template>
   <div class="card settings-card">
     <div class="section-label">{{ $t('screensaver.settingsTitle') }}</div>
-    <p class="share-tip ss-lead">{{ $t('screensaver.lead') }}</p>
+    <p class="share-tip ss-lead">{{ $t(windowTheme ? 'windowDisplay.standbyHint' : 'screensaver.lead') }}</p>
 
     <el-form label-position="top" class="settings-form">
       <el-form-item>
         <div class="setting-row">
-          <el-switch v-model="prefs.enabled" @change="persist" />
-          <span class="setting-label">{{ $t('screensaver.enable') }}</span>
+          <el-switch v-model="prefs.enabled" :aria-label="$t('screensaver.enable')" @change="persist" />
+          <span class="setting-label">{{ $t(wide ? 'windowDisplay.enableWide' : 'screensaver.enable') }}</span>
         </div>
-        <div class="share-tip">{{ $t('screensaver.enableHint') }}</div>
+        <div v-if="!windowTheme" class="share-tip">{{ $t('screensaver.enableHint') }}</div>
       </el-form-item>
 
       <el-form-item :label="$t('screensaver.mode')">
@@ -19,7 +19,7 @@
           <el-radio :value="MODES.PHOTO">{{ $t('screensaver.modePhoto') }}</el-radio>
           <el-radio :value="MODES.BOARD">{{ $t('screensaver.modeBoard') }}</el-radio>
         </el-radio-group>
-        <div class="share-tip">
+        <div v-if="!windowTheme" class="share-tip">
           {{ prefs.mode === MODES.BOARD ? $t('screensaver.modeBoardHint') : $t('screensaver.modePhotoHint') }}
         </div>
       </el-form-item>
@@ -39,8 +39,35 @@
         <div class="share-tip">{{ $t('screensaver.cardsHint') }}</div>
       </el-form-item>
 
+      <template v-if="windowTheme">
+        <el-form-item :label="$t('windowDisplay.source')">
+          <el-select
+            :model-value="shared.albumId"
+            clearable
+            :placeholder="$t('windowDisplay.clockOnly')"
+            :loading="loadingAlbums"
+            @visible-change="openAlbums"
+            @update:model-value="(id) => setShared({ albumId: id })"
+          >
+            <el-option v-for="album in albums" :key="album.id" :label="album.name" :value="Number(album.id)" />
+          </el-select>
+          <span v-if="albumError" role="status"
+            >{{ $t('common.loadFailed') }} <el-button text @click="openAlbums(true)">{{ $t('common.retry') }}</el-button></span
+          >
+        </el-form-item>
+        <el-form-item>
+          <el-switch
+            :model-value="shared.schedule"
+            :aria-label="$t('windowDisplay.scheduleConsent')"
+            @update:model-value="(schedule) => setShared({ schedule })"
+          />
+          <span class="setting-label">{{ $t('windowDisplay.scheduleConsent') }}</span>
+        </el-form-item>
+      </template>
+
       <el-form-item>
         <el-button @click="onPreview">{{ $t('screensaver.preview') }}</el-button>
+        <el-button v-if="windowTheme" @click="$router.push('/kiosk')">{{ $t('windowDisplay.openBoard') }}</el-button>
         <div class="share-tip">{{ $t('screensaver.previewHint') }}</div>
       </el-form-item>
     </el-form>
@@ -48,7 +75,11 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { albumApi } from '@/api'
+import { useDevice } from '@/composables/useDevice'
+import { useWindowDisplay } from '@/composables/useWindowDisplay'
+import { displayableAlbum } from '@/utils/windowStandby'
 import { BOARD_CARDS, IDLE_MAX, IDLE_MIN, loadPrefs, MODES, requestPreview, savePrefs } from '@/utils/screensaver'
 
 const CARD_LABELS = {
@@ -59,10 +90,43 @@ const CARD_LABELS = {
   photos: 'screensaver.cardPhotos',
 }
 
-const prefs = reactive(loadPrefs())
+const { windowTheme, scope, shared, setShared } = useWindowDisplay()
+const { isMobile } = useDevice()
+const wide = computed(() => windowTheme.value && !isMobile.value)
+const prefs = reactive(loadPrefs(wide.value))
+watch(wide, () => Object.assign(prefs, loadPrefs(wide.value)))
+const albums = ref([])
+const loadingAlbums = ref(false)
+const albumError = ref(false)
+let albumRequest = 0
+async function openAlbums(open) {
+  if (!open || !scope.value) return
+  const request = ++albumRequest
+  loadingAlbums.value = true
+  albumError.value = false
+  try {
+    const list = await albumApi.list()
+    if (request === albumRequest) albums.value = (list || []).filter(displayableAlbum)
+  } catch {
+    if (request === albumRequest) albumError.value = true
+  } finally {
+    if (request === albumRequest) loadingAlbums.value = false
+  }
+}
+watch(
+  [scope, windowTheme],
+  () => {
+    albumRequest++
+    albums.value = []
+    albumError.value = false
+    loadingAlbums.value = false
+    if (windowTheme.value && shared.value.albumId) openAlbums(true)
+  },
+  { immediate: true },
+)
 
 const persist = () => {
-  savePrefs({ enabled: prefs.enabled, mode: prefs.mode, idleMinutes: prefs.idleMinutes, board: { ...prefs.board } })
+  savePrefs({ enabled: prefs.enabled, mode: prefs.mode, idleMinutes: prefs.idleMinutes, board: { ...prefs.board } }, wide.value)
 }
 
 // 看板卡片是「勾选=显示」;取消勾选写回 false(空数组即全关,由用户自己决定)

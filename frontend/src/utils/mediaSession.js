@@ -69,11 +69,15 @@ export function bindMediaSession(audioEl, track, handlers = {}, owner = 'default
     return false
   }
 
-  setHandler('play', () => {
-    const p = audioEl.play?.()
-    if (p && typeof p.catch === 'function') p.catch(() => {})
-  })
-  setHandler('pause', () => audioEl.pause?.())
+  setHandler(
+    'play',
+    handlers.play ||
+      (() => {
+        const p = audioEl.play?.()
+        if (p && typeof p.catch === 'function') p.catch(() => {})
+      }),
+  )
+  setHandler('pause', handlers.pause || (() => audioEl.pause?.()))
   setHandler('previoustrack', handlers.prev)
   setHandler('nexttrack', handlers.next)
   setHandler('seekto', (details) => {
@@ -93,7 +97,8 @@ export function bindMediaSession(audioEl, track, handlers = {}, owner = 'default
     updatePosition(audioEl, true)
   })
   setHandler('stop', () => {
-    audioEl.pause?.()
+    if (handlers.pause) handlers.pause()
+    else audioEl.pause?.()
     audioEl.currentTime = 0
     syncPlaybackState(audioEl)
   })

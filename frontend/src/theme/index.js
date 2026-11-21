@@ -1,5 +1,5 @@
 // 主题系统:两轴矩阵——主题(theme,装修风格)× 晨暮(mode,时间光照档)
-// theme ∈ 'warm'(暖居,暖木/陶土·独立外壳)| 'guangchen'(光尘,奶油/夜色·侧栏);mode ∈ 'dawn'(晨/浅)| 'dusk'(暮/深)
+// 主题注册表与晨暮两档独立，外观设置与浏览器主题色共用此目录。
 // 应用方式:html.theme-{id} + html.dark(=dusk,驱动 Element Plus 暗色 css-vars)
 // 持久化 key 沿用 'ihomy-theme',做旧 {dark, autoMode} → {theme, mode, autoMode} 迁移
 
@@ -15,6 +15,11 @@ export const THEMES = {
     id: 'guangchen',
     label: { zh: '光尘', en: 'Light & Dust' },
     meta: { dawn: '#EDE4D3', dusk: '#0F1A2E' },
+  },
+  window: {
+    id: 'window',
+    label: { zh: '窗边', en: 'By the Window' },
+    meta: { dawn: '#F5F2E9', dusk: '#262824' },
   },
 }
 

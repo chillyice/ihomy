@@ -11,7 +11,7 @@
           <el-switch v-model="prefs.enabled" @change="persist" />
           <span class="setting-label">{{ $t('morning.enable') }}</span>
         </div>
-        <div class="share-tip">{{ $t('morning.enableHint') }}</div>
+        <div class="share-tip">{{ $t(themeStore.theme === 'window' ? 'windowDisplay.welcomeHint' : 'morning.enableHint') }}</div>
       </el-form-item>
 
       <el-form-item>
@@ -21,7 +21,7 @@
   </div>
 
   <!-- 编辑早安页:显示什么组件 / 显示什么内容 / 组件大小,附场景预览 -->
-  <el-dialog v-model="editorVisible" :title="$t('morning.editorTitle')" width="dialog-md" append-to-body>
+  <el-dialog v-model="editorVisible" :title="$t('morning.editorTitle')" width="dialog-md" append-to-body @closed="afterEditorClose">
     <el-form label-position="top" class="settings-form">
       <el-form-item :label="$t('morning.greetingLabel')">
         <el-input
@@ -80,6 +80,7 @@
 </template>
 
 <script setup>
+import { useThemeStore } from '@/stores/theme'
 import { computed, reactive, ref } from 'vue'
 import {
   loadPrefs,
@@ -128,13 +129,21 @@ const cardList = computed({
   },
 })
 
+const themeStore = useThemeStore()
+let previewAfterClose = false
+const afterEditorClose = () => {
+  if (!previewAfterClose) return
+  previewAfterClose = false
+  requestPreview()
+}
 const onPreview = () => {
   persist()
   // 选了「跟随实况」就不覆盖;时段选白天/夜间才覆盖昼夜
   const condition = sceneCondition.value === 'live' ? '' : sceneCondition.value
   const night = scenePeriod.value === 'live' ? null : scenePeriod.value === 'night'
   setPreviewScene(condition, night)
-  requestPreview()
+  previewAfterClose = true
+  editorVisible.value = false
 }
 </script>
 

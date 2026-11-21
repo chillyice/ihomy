@@ -164,6 +164,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Close } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
+import { useWindowPanel } from '@/utils/windowPanel'
 import { useChatStore } from '@/stores/chat'
 import { useAssistantStore } from '@/stores/assistant'
 import { trackAssistantHold } from '@/utils/assistantHold'
@@ -189,6 +191,7 @@ const RESIZE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
+const theme = useThemeStore()
 const chatStore = useChatStore()
 const assistant = useAssistantStore()
 const floatVoiceOwner = Symbol()
@@ -196,7 +199,25 @@ const roomChatStore = useRoomChatStore()
 const floatsStore = useFloatsStore()
 const { isMobile } = useDevice()
 
-const expanded = ref(false)
+const legacyExpanded = ref(false)
+const windowExpanded = useWindowPanel('chat')
+const expanded = computed({
+  get: () => (theme.theme === 'window' ? windowExpanded.value : legacyExpanded.value),
+  set(value) {
+    if (theme.theme === 'window') windowExpanded.value = value
+    else legacyExpanded.value = value
+  },
+})
+watch(
+  () => theme.theme,
+  () => {
+    windowExpanded.value = false
+    legacyExpanded.value = false
+  },
+)
+watch(windowExpanded, (open) => {
+  if (!open) assistant.discardVoice(floatVoiceOwner)
+})
 /** 当前页分页:family=家庭聊天室(原浮窗) / room=「一起玩」房间临时聊天;没有房间时不显示分页 */
 const tab = ref('family')
 const roomActive = computed(() => !!roomChatStore.roomMeta)
@@ -353,7 +374,10 @@ const bubbleStyle = computed(() => {
 })
 
 const ballStyle = computed(() => ({
-  ...(pinnedBallStyle.value || { left: `${ball.pos.value.x}px`, top: `${ball.pos.value.y}px` }),
+  ...(pinnedBallStyle.value || {
+    left: `${ball.pos.value.x}px`,
+    top: theme.theme === 'window' ? `min(${ball.pos.value.y}px, calc(100dvh - var(--chat-ball-clearance, 48px)))` : `${ball.pos.value.y}px`,
+  }),
   zIndex: 'var(--z-float)',
 }))
 const panelStyle = computed(() => ({
@@ -553,6 +577,7 @@ let notifyTimer = null
 const toastPreview = computed(() => {
   const m = notifyMsg.value
   if (!m) return ''
+  if (theme.theme === 'window') return t('windowTools.newMessage')
   if (m.msgType && m.msgType !== 'TEXT') return t('chat.toastRich')
   return String(m.content || '').slice(0, 60)
 })
@@ -565,7 +590,8 @@ const clearToast = () => {
 }
 const openFromToast = () => {
   const message = notifyMsg.value
-  if (assistant.active && message) {
+  if (message) {
+    tab.value = 'family'
     if (message.dm) chatStore.openDm(message.dm.userId, message.senderName)
     else if (message.familyId && Number(message.familyId) !== Number(userStore.userInfo?.familyId)) chatStore.openRoom(message.familyId)
     else chatStore.closeDm()
@@ -573,6 +599,13 @@ const openFromToast = () => {
   clearToast()
   expand()
 }
+watch(
+  () => [userStore.userInfo?.id, userStore.userInfo?.familyId].join('/'),
+  () => {
+    clearToast()
+    collapse()
+  },
+)
 watch(
   () => chatStore.lastIncoming,
   (m) => {
@@ -661,6 +694,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+@media (max-width: 768px) {
+  :global(html.window-player-visible) .chat-float-ball {
+    --chat-ball-clearance: calc(180px + env(safe-area-inset-bottom));
+  }
+}
 .chat-float-ball {
   position: fixed;
   width: 48px;

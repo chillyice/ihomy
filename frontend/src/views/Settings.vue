@@ -60,7 +60,7 @@
           <div id="settings-light"><LightSettings /></div>
           <div id="settings-display"><ModeSettings /></div>
           <div id="settings-morning"><MorningSettings /></div>
-          <div v-if="isMobile" id="settings-screensaver"><ScreensaverSettings /></div>
+          <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
         </div>
         <div v-show="activeId === 'client'"><AppSettings /></div>
       </div>
@@ -73,6 +73,7 @@ import { computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { useDevice } from '@/composables/useDevice'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import StorageView from '@/views/storage/Storage.vue'
@@ -93,6 +94,7 @@ import AppSettings from './settings/AppSettings.vue'
 import { isNativeApp } from '@/utils/platform'
 
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const route = useRoute()
 const router = useRouter()
 const { isMobile } = useDevice()

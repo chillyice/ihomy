@@ -37,22 +37,28 @@ export function normalizePrefs(raw) {
 
 // 偏好变更广播:设置页写盘后自增,屏保组件据此重读一遍(改了时长/模式不必等下次进页面)
 export const prefsTick = ref(0)
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', ({ key }) => {
+    if (key === null || key === SS_KEY || key === SS_KEY + ':wide' || key.startsWith('ihomy:window:display:')) prefsTick.value++
+  })
+}
 
-export function loadPrefs() {
+export function loadPrefs(wide = false) {
+  const defaults = wide ? { enabled: false } : {}
   try {
-    const raw = localStorage.getItem(SS_KEY)
-    return normalizePrefs(raw ? JSON.parse(raw) : null)
+    const raw = localStorage.getItem(wide ? SS_KEY + ':wide' : SS_KEY)
+    return normalizePrefs({ ...defaults, ...(raw ? JSON.parse(raw) : {}) })
   } catch (e) {
-    return normalizePrefs(null)
+    return normalizePrefs(defaults)
   }
 }
 
-export function savePrefs(patch = {}) {
-  const cur = loadPrefs()
+export function savePrefs(patch = {}, wide = false) {
+  const cur = loadPrefs(wide)
   const p = isObj(patch) ? patch : {}
   const next = normalizePrefs({ ...cur, ...p, board: { ...cur.board, ...(isObj(p.board) ? p.board : {}) } })
   try {
-    localStorage.setItem(SS_KEY, JSON.stringify(next))
+    localStorage.setItem(wide ? SS_KEY + ':wide' : SS_KEY, JSON.stringify(next))
   } catch (e) {}
   prefsTick.value += 1
   return next
@@ -82,11 +88,9 @@ const BUSY_SELECTORS = ['.el-overlay', '.photo-viewer', '.chat-float-sheet', '.c
 export function isBusyScreen() {
   if (typeof document === 'undefined' || !document.querySelector) return false
   return BUSY_SELECTORS.some((sel) => {
-    const el = document.querySelector(sel)
-    if (!el) return false
-    if (typeof window === 'undefined' || !window.getComputedStyle) return true
-    const style = window.getComputedStyle(el)
-    return style.display !== 'none' && style.visibility !== 'hidden'
+    return Array.from(document.querySelectorAll(sel)).some(
+      (el) => el.getClientRects().length && window.getComputedStyle(el).visibility !== 'hidden',
+    )
   })
 }
 

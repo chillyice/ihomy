@@ -654,7 +654,7 @@ const doLogin = async () => {
 // 只做一次、且在挂载时执行:属性本身就是页面加载时一次性送达的,后续改面板需重启预览。
 const applyQueryPrefs = () => {
   const q = route.query
-  if (q.theme === 'warm' || q.theme === 'guangchen') themeStore.setTheme(q.theme)
+  if (themeStore.themes.some((theme) => theme.id === q.theme)) themeStore.setTheme(q.theme)
   if (q.mode === 'auto') themeStore.setAutoMode(true)
   else if (q.mode === 'dawn' || q.mode === 'dusk') themeStore.setMode(q.mode)
   // WE 的 CEF 语言是 en-us,i18n 默认跟随浏览器语言 → 壁纸在 WE 里会走英文,故用属性显式指定

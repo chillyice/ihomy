@@ -103,7 +103,10 @@ export function useIdle({ idleMs, canTrigger = () => true, onIdle } = {}) {
 
   const onVisibility = () => {
     if (document.visibilityState === 'hidden') controller.suspend()
-    else poke()
+    else {
+      isIdle.value = false
+      controller.resume()
+    }
   }
 
   onMounted(() => {

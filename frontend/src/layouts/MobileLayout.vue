@@ -1,5 +1,5 @@
 <template>
-  <div class="mobile-layout" :class="{ 'has-tabbar': showTabBar }">
+  <div class="mobile-layout" :class="{ 'has-tabbar': showTabBar, 'window-wide-host': windowHost && !isMobile }">
     <!-- 首页路由:三 Tab 模式 -->
     <template v-if="isHomeRoute">
       <!-- KeepAlive 保住三个 Tab 的组件状态(筛选/输入),切换只做轻量过渡,不重新拉数据 -->
@@ -12,7 +12,7 @@
       >
         <Transition :name="tabTransition" mode="out-in" @after-enter="restoreTabScroll">
           <KeepAlive>
-            <component :is="tabComponent" :key="activeTab === 'home' && isElder ? 'elder-home' : activeTab" />
+            <component :is="tabComponent" :key="displayedTab === 'home' && isElder ? 'elder-home' : displayedTab" />
           </KeepAlive>
         </Transition>
       </div>
@@ -21,7 +21,7 @@
     <!-- 子页面:顶部返回栏 + router-view(页面切换带方向感的淡入) -->
     <template v-else>
       <!-- 游戏沉浸态:页头与底栏全部收起,整屏交给游戏;返回键由左上角浮动按钮提供 -->
-      <MobileHeader v-if="!isGameRoute" :title="pageTitle">
+      <MobileHeader v-if="!isGameRoute && (!windowHost || isMobile)" :title="pageTitle">
         <template #right>
           <slot name="header-right" />
         </template>
@@ -41,9 +41,8 @@
 
     <MobileGameChrome v-if="isGameRoute" @back="exitGame" />
 
-    <BackToTop />
-    <InstallPrompt />
-    <MusicPlayer v-if="floatsStore.music" />
+    <BackToTop v-if="!windowHost" />
+    <InstallPrompt v-if="!windowHost" />
   </div>
 </template>
 
@@ -62,7 +61,6 @@ import MobileMoreGrid from '@/components/MobileMoreGrid.vue'
 import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
-import MusicPlayer from '@/components/MusicPlayer.vue'
 import { isMobileGamePath, isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
 import { isNativeApp } from '@/utils/platform'
 import { useDevice } from '@/composables/useDevice'
@@ -72,15 +70,14 @@ import { quickCapture, resetQuickAlbumCache } from '@/utils/quickCapture'
 import { resetPrefCache } from '@/utils/userPref'
 import { useMobileTabs, resetMobileTabsSync } from '@/composables/useMobileTabs'
 import { useUserStore } from '@/stores/user'
-import { useFloatsStore } from '@/stores/floats'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const floatsStore = useFloatsStore()
 const userStore = useUserStore()
+const props = defineProps({ windowHost: Boolean })
 // 只有真手机(判据在 useDevice)才自动进浏览器全屏:窄窗桌面端不抢窗口
-const { isPhone } = useDevice()
+const { isPhone, isMobile } = useDevice()
 const activeTab = ref('home')
 
 const { tabs, editorOpen, openEditor, ensureSynced } = useMobileTabs()
@@ -88,8 +85,13 @@ const { tabs, editorOpen, openEditor, ensureSynced } = useMobileTabs()
 // 三个 Tab 常驻缓存,切换时只换当前组件;KeepAlive 保证筛选/输入等状态不丢
 const { isElder } = useDisplayMode()
 const ElderHome = defineAsyncComponent(() => import('@/components/ElderHome.vue'))
+const WindowHome = defineAsyncComponent(() => import('@/components/window/WindowHome.vue'))
+const displayedTab = computed(() => (props.windowHost && !isMobile.value ? 'home' : activeTab.value))
 const tabComponent = computed(
-  () => ({ home: isElder.value ? ElderHome : MobileHomeFeed, more: MobileMoreGrid, me: MobileMePage })[activeTab.value],
+  () =>
+    ({ home: isElder.value ? ElderHome : props.windowHost ? WindowHome : MobileHomeFeed, more: MobileMoreGrid, me: MobileMePage })[
+      displayedTab.value
+    ],
 )
 
 // ========== 左右滑动切 Tab ==========
@@ -149,6 +151,7 @@ const canStartSwipe = (target) => {
 
 const onTouchStart = (e) => {
   touchState = null
+  if (props.windowHost && !isMobile.value) return
   // 多指(缩放/双指滑动)与屏幕最左右 24px(Safari 前进后退手势区)都不接
   if (e.touches.length !== 1) return
   const t = e.touches[0]
@@ -190,11 +193,13 @@ const onTouchEnd = (e) => {
 const isHomeRoute = computed(() => isMobileHomePath(route.path))
 
 // 游戏沉浸态:进游戏就收起页头/底栏,整屏让给游戏;判据是纯函数(utils/mobileNav.js)
-const isGameRoute = computed(() => isMobileGamePath(route.path))
+const isGameRoute = computed(() => (!props.windowHost || isMobile.value) && isMobileGamePath(route.path))
 
 // 沉浸页(阅读器/游戏等)与登录类页面不挂底栏:这些页面需要整屏或本就无站内导航
 const HIDE_TABBAR_PATHS = ['/login', '/reset-password']
-const showTabBar = computed(() => !route.meta.immersive && !isGameRoute.value && !HIDE_TABBAR_PATHS.includes(route.path))
+const showTabBar = computed(
+  () => (!props.windowHost || isMobile.value) && !route.meta.immersive && !isGameRoute.value && !HIDE_TABBAR_PATHS.includes(route.path),
+)
 
 // 房间局(飞行棋等)退出前要退房/结束房间:页面注册自己的退出逻辑,浮动返回键优先走它
 const gameExit = createGameExitRegistry()
@@ -369,6 +374,11 @@ onMounted(ensureSynced)
 /* 子页面也常驻底栏:留出与首页同一份高度,避免最后一行被加号挡住 */
 .has-tabbar .mobile-sub-content {
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+.window-wide-host .mobile-sub-content,
+.window-wide-host .mobile-tab-content {
+  padding: 0;
+  min-height: 100dvh;
 }
 /* 回顶按钮让开底栏:底栏高 56px,再留 14px 呼吸位,避免压住「我的」Tab 的点击区 */
 .mobile-layout :deep(.back-to-top) {

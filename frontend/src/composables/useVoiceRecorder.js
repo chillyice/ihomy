@@ -1,7 +1,9 @@
-import { ref } from 'vue'
+import { ref, shallowReactive } from 'vue'
 
 // 百度短语音要求 16kHz/16bit/单声道;浏览器麦克风默认 44.1k/48k 浮点,这里采集后降采样为 16k PCM 并封装成 WAV
 const TARGET_RATE = 16000
+const activeCaptures = shallowReactive(new Set())
+export const isVoiceCaptureActive = () => activeCaptures.size > 0
 
 /**
  * 麦克风录音组合式:start() 开始采集,stop() 返回 16kHz 单声道 WAV Blob。
@@ -15,7 +17,7 @@ export function useVoiceRecorder() {
   let processor = null
   let pcm = []
 
-  const start = async () => {
+  const capture = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('unsupported')
     }
@@ -51,10 +53,21 @@ export function useVoiceRecorder() {
     processor.connect(ctx.destination)
     recording.value = true
   }
+  const start = async () => {
+    activeCaptures.add(recording)
+    try {
+      await capture()
+    } catch (error) {
+      activeCaptures.delete(recording)
+      stream?.getTracks().forEach((track) => track.stop())
+      throw error
+    }
+  }
 
   const stop = () =>
     new Promise((resolve) => {
       recording.value = false
+      activeCaptures.delete(recording)
       try {
         processor && processor.disconnect()
       } catch (e) {

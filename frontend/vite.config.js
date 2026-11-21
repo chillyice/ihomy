@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
                   if (chunk.type !== 'chunk') continue
                   const source = chunk.facadeModuleId?.replaceAll('\\', '/') || ''
                   const homeView =
-                    /\/(HomeRoute|Home|ElderHome|WarmLayout|MobileLayout|AppSidebar|SunLightLayer|ChatFloat|CallOverlay|MorningOverlay|ScreensaverOverlay|ChangePasswordDialog)\.vue$/.test(
+                    /\/(HomeRoute|Home|ElderHome|WarmLayout|MobileLayout|WindowShell|WindowHome|WindowDirectory|WindowMusicPlayer|AppSidebar|SunLightLayer|ChatFloat|CallOverlay|MorningOverlay|ScreensaverOverlay|ChangePasswordDialog)\.vue$/.test(
                       source,
                     )
                   if (chunk.isEntry || homeView || source.endsWith('/i18n/en.js')) collect(chunk.fileName)
@@ -120,11 +120,27 @@ export default defineConfig(({ mode }) => {
                     // 安装包下载接口也排除:8MB 级的二进制不配进 api-cache(且它本来就不该被导航缓存命中)
                     urlPattern: ({ url }) =>
                       url.pathname.startsWith('/api/') &&
-                      !/^\/api\/(vault|auth|ops|profile)(\/|$)/.test(url.pathname) &&
+                      !/^\/api\/(vault|auth|ops|profile|ai\/assistant|chat)(\/|$)/.test(url.pathname) &&
                       !url.pathname.startsWith('/api/public/product/download'),
                     handler: 'NetworkFirst',
                     options: {
                       cacheName: 'api-cache',
+                      // 同一设备切换家庭后，离线读取只能命中当前会话。缓存键不保留凭证明文。
+                      plugins: [
+                        {
+                          cacheKeyWillBeUsed: async ({ request }) => {
+                            const url = new URL(request.url)
+                            const authorization = request.headers.get('Authorization')
+                            let scope = 'guest'
+                            if (authorization) {
+                              const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(authorization))
+                              scope = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+                            }
+                            url.searchParams.set('__ihomy_session', scope)
+                            return url.href
+                          },
+                        },
+                      ],
                       expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
                       cacheableResponse: { statuses: [0, 200] },
                     },
@@ -174,6 +190,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 5173,
       proxy: {
+        '/api/ws/': { target: 'ws://localhost:8080', ws: true },
         '/api': {
           target: 'http://localhost:8080',
           changeOrigin: true,
@@ -190,6 +207,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       port: 4173,
       proxy: {
+        '/api/ws/': { target: 'ws://localhost:8080', ws: true },
         '/api': {
           target: 'http://localhost:8080',
           changeOrigin: true,

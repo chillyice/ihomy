@@ -3,8 +3,8 @@
 <template>
   <div class="chat-panel">
     <div ref="bodyEl" class="chat-panel-body">
-      <div class="rail-slot" :class="{ open: railOpen }" :style="railStyle" :inert="!railOpen">
-        <ChatContactRail v-if="railMounted" :narrow="railNarrow" />
+      <div v-if="!singlePane" class="rail-slot" :class="{ open: railOpen }" :style="railStyle" :inert="!railOpen">
+        <ChatContactRail v-if="railMounted" :key="familyScope" :narrow="railNarrow" @select="emit('select')" />
         <!-- 对象列宽度拖拽把手:最小缩到只剩头像,收起/展开仍走会话头那个按钮 -->
         <div
           class="rail-resizer"
@@ -16,7 +16,9 @@
       </div>
       <div class="chat-main">
         <div class="chat-main-head">
+          <button v-if="singlePane" type="button" class="head-back" @click="emit('contacts')">{{ $t('windowTools.contacts') }}</button>
           <button
+            v-else
             type="button"
             class="head-toggle"
             :aria-expanded="railOpen"
@@ -26,8 +28,14 @@
           >
             <el-icon :size="16"><Expand v-if="!railOpen" /><Fold v-else /></el-icon>
           </button>
-          <span class="head-title">{{ conversationTitle }}</span>
-          <button v-if="chatStore.activeKey != null" type="button" class="head-back" @click="chatStore.closeDm()">
+          <span class="head-title"
+            >{{ conversationTitle
+            }}<template v-if="theme.theme === 'window' && assistant.active && chatStore.ownFamily.name">
+              · {{ chatStore.ownFamily.name }}</template
+            ></span
+          >
+          <span v-if="theme.theme === 'window'" class="recipient-kind">{{ $t('windowTools.' + recipientKind) }}</span>
+          <button v-if="chatStore.activeKey != null && !singlePane" type="button" class="head-back" @click="returnHomeChat">
             {{ $t('chat.rail.backFamily') }}
           </button>
           <!-- 连接状态挂在会话头(框体)上:圆点+短文案,不占消息区之外的独立一行 -->
@@ -43,7 +51,7 @@
         <AssistantConversation v-if="assistant.active" />
         <template v-else>
           <ChatMessages />
-          <ChatComposer />
+          <ChatComposer :key="chatStore.draftKey" />
         </template>
       </div>
     </div>
@@ -57,6 +65,8 @@ import { useI18n } from 'vue-i18n'
 import { Expand, Fold } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
 import { useAssistantStore } from '@/stores/assistant'
+import { useThemeStore } from '@/stores/theme'
+import { useUserStore } from '@/stores/user'
 import { familyApi } from '@/api'
 import { useDevice } from '@/composables/useDevice'
 import { SOCKET_STATUS } from '@/composables/useChatSocket'
@@ -72,9 +82,21 @@ const RAIL_MAX = 280
 /** 窄于这个宽度就只留头像,隐藏名字/角标文字 */
 const RAIL_NARROW = 104
 
+defineProps({ singlePane: Boolean })
+const emit = defineEmits(['contacts', 'select'])
 const { t } = useI18n()
+const user = useUserStore()
+const familyScope = computed(() => [user.userInfo?.id, user.userInfo?.familyId].join('/'))
 const chatStore = useChatStore()
+function returnHomeChat() {
+  chatStore.closeDm()
+  emit('select')
+}
 const assistant = useAssistantStore()
+const theme = useThemeStore()
+const recipientKind = computed(() =>
+  assistant.active ? 'privateChat' : chatStore.activePeer != null ? 'direct' : chatStore.activeRoomId != null ? 'circleChat' : 'familyChat',
+)
 const AssistantConversation = defineAsyncComponent(() => import('./AssistantConversation.vue'))
 const { isMobile } = useDevice()
 const connected = computed(() => chatStore.socketStatus === SOCKET_STATUS.OPEN)
@@ -171,17 +193,27 @@ const conversationTitle = computed(() => {
 })
 
 // 对象列收起时它不会加载本家资料:标题缺家庭名就补一次(幂等,有名字就不拉)
-if (!chatStore.ownFamily.name) {
-  familyApi
-    .get()
-    .then((f) => {
-      if (f?.name) chatStore.ownFamily = { name: f.name, coverImage: f.coverImage || '' }
-    })
-    .catch(() => {})
-}
+watch(
+  familyScope,
+  (scope) => {
+    if (chatStore.ownFamily.name || !user.userInfo?.familyId) return
+    familyApi
+      .get()
+      .then((f) => {
+        if (scope === familyScope.value && f?.name) chatStore.ownFamily = { name: f.name, coverImage: f.coverImage || '' }
+      })
+      .catch(() => {})
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
+.recipient-kind {
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 600;
+}
 .chat-panel {
   display: flex;
   flex-direction: column;

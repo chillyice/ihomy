@@ -3,8 +3,14 @@
 //        member / settings / family / anniversary / cinema / points / task /
 //        reminder / plan / wish / book / chat / ops / more
 import assistant from './assistant/zh-CN'
+import windowHome from './windowHome/zh-CN'
+import windowTools from './windowTools/zh-CN'
+import windowDisplay from './windowDisplay/zh-CN'
 
 export default {
+  windowHome,
+  windowTools,
+  windowDisplay,
   nav: {
     home: '首页',
     logout: '退出登录',
@@ -243,6 +249,7 @@ export default {
   theme: {
     warm: '暖居',
     guangchen: '光尘',
+    window: '窗边',
     dawn: '晨',
     dusk: '暮',
     autoMode: '日出日落自动切换晨幕色彩',
@@ -7730,6 +7737,7 @@ export default {
     action: {
       themeWarm: '切换到暖居主题',
       themeGuangchen: '切换到光尘主题',
+      themeWindow: '切换到窗边主题',
       focusSearch: '聚焦本页搜索',
     },
     groupSearch: '搜索结果',

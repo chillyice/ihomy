@@ -1,7 +1,8 @@
 <template>
-  <div class="page fp-page">
+  <div class="page fp-page" :class="{ 'fp-search-layout': $route.query.focus === 'search' }">
     <!-- 户型图主面板(常驻:工具栏 + 画布 + 编辑侧栏 + 弹窗) -->
     <FloorPlanPanel
+      :key="[user.userInfo?.id, user.userInfo?.familyId, user.userInfo?.role].join('/')"
       ref="panelRef"
       v-model:list-mode="listMode"
       :tab="tab"
@@ -61,6 +62,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useUserStore } from '@/stores/user'
 import HousesTab from './tabs/HousesTab.vue'
 import RoomsTab from './tabs/RoomsTab.vue'
 import FurnituresTab from './tabs/FurnituresTab.vue'
@@ -68,6 +70,7 @@ import ItemsTab from './tabs/ItemsTab.vue'
 import FloorPlanPanel from './panels/FloorPlanPanel.vue'
 
 // 户型图面板常驻并持有共享数据/CRUD,列表模式经模板 ref + defineExpose 取其数据/方法
+const user = useUserStore()
 const panelRef = ref(null)
 const listMode = ref(false)
 const tab = ref('houses')
@@ -112,6 +115,15 @@ const togglePick = (it) => panelRef.value?.togglePick(it)
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+@media (min-width: 900px) {
+  .fp-page.fp-search-layout {
+    display: grid;
+    grid-template-columns: minmax(230px, 1fr) minmax(0, 2fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    height: calc(100dvh - 100px);
+  }
 }
 /* 暖居外壳为户型图全出血把 gc-main/.page 的留白清零(见 main.css item 段),
  * 列表模式只是普通内容页,补回与其它内容页一致的 24px 留白,表格不再顶到容器边界 */
