@@ -8,6 +8,7 @@
 //   sync       访客 → 房主  重连补发全量(含各自的 xx:hand)
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { isSpectatorRole } from '@/utils/gameRoom'
+import { createWakeTimers } from '@/utils/games/wakeTimers'
 
 /** 轮到真人时的最长等待:超时交给电脑代打,别让一个人挂机把整桌拖住 */
 export const CARD_ACT_TIMEOUT = 35000
@@ -37,6 +38,8 @@ export function useCardRoomPlay(play, opts) {
   const autoOn = ref(false)
 
   const waiters = new Map()
+  // 35s 超时登记:房主切后台时 setTimeout 被节流,整桌会跟着干等,回前台时到期的立即补跑
+  const wakeTimers = createWakeTimers()
   let lastPublishKey = ''
 
   const mySeat = computed(() => {
@@ -168,7 +171,10 @@ export function useCardRoomPlay(play, opts) {
     }, 1000)
   }
 
-  onScopeDispose(stopActCountdown)
+  onScopeDispose(() => {
+    stopActCountdown()
+    wakeTimers.destroy()
+  })
 
   /**
    * 房主等某席位出牌:真人点击(waiters 被 resolveLocal/远端意图解开)或超时返回 null。
@@ -179,7 +185,7 @@ export function useCardRoomPlay(play, opts) {
       let timer = null
       const done = (action) => {
         if (timer) {
-          clearTimeout(timer)
+          wakeTimers.cancel(timer)
           timer = null
         }
         if (waiters.get(seat) === done) waiters.delete(seat)
@@ -190,7 +196,7 @@ export function useCardRoomPlay(play, opts) {
         startActCountdown(seat, timeoutMs)
         // 全房广播剩余时限:各端本地滴答展示「还剩几秒交电脑」,不用等公共盘面轮询
         if (play.active) play.send(`${prefix}:turn-ttl`, { seat, ttl: timeoutMs })
-        timer = setTimeout(() => {
+        timer = wakeTimers.schedule(() => {
           if (waiters.get(seat) === done) {
             waiters.delete(seat)
             stopActCountdown()

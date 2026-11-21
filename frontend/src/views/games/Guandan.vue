@@ -113,6 +113,7 @@ import { useChatStore } from '@/stores/chat'
 import { useRoomChatStore } from '@/stores/roomChat'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { CARD_ACT_TIMEOUT, useCardRoomPlay } from '@/composables/useCardRoomPlay'
+import { createWakeTimers } from '@/utils/games/wakeTimers'
 import { seededRng } from '@/utils/games/seededRng'
 import {
   GD_LEVELS,
@@ -161,6 +162,7 @@ const passStreak = ref([0, 0, 0, 0])
 
 let session = 0
 let aiTimer = null
+const wakeTimers = createWakeTimers() // 电脑停顿登记:后台标签页节流 setTimeout,回前台时到期的立即补跑
 
 // ---------- 「一起玩」房间(?room=<id>) ----------
 
@@ -296,7 +298,7 @@ const resultMeta = computed(() => {
 })
 
 const clearTimer = () => {
-  clearTimeout(aiTimer)
+  wakeTimers.cancel(aiTimer)
   aiTimer = null
 }
 
@@ -435,11 +437,25 @@ function drive(seat) {
     if (phase.value !== 'playing' || turn.value !== seat) return
     seatAction(seat, action)
   }
+  // 引擎异常兜底:记日志后按电脑口径续跑本步,别把整局冻在「电脑思考中」
+  const runStep = (fn) => {
+    try {
+      fn()
+    } catch (e) {
+      console.error(`[guandan] 回合引擎异常 seat=${seat} phase=${phase.value},按电脑兜底续跑`, e)
+      try {
+        if (mySession === session && !play.ended && turn.value === seat) seatAction(seat, null)
+      } catch (e2) {
+        console.error('[guandan] 兜底仍失败,本局中止', e2)
+        clearTimer()
+      }
+    }
+  }
   if (isAiSeat(seat)) {
-    aiTimer = setTimeout(() => apply(null), AI_DELAY)
+    aiTimer = wakeTimers.schedule(() => runStep(() => apply(null)), AI_DELAY)
     return
   }
-  room.waitAct(seat, play.active ? CARD_ACT_TIMEOUT : 0).then(apply)
+  room.waitAct(seat, play.active ? CARD_ACT_TIMEOUT : 0).then((action) => runStep(() => apply(action)))
 }
 
 /** 裁判端落一个出牌意图:电脑的(null)走 AI,真人的先按自己手里的牌复验再落盘 */
@@ -677,5 +693,6 @@ watch(
 onBeforeUnmount(() => {
   session += 1
   clearTimer()
+  wakeTimers.destroy()
 })
 </script>

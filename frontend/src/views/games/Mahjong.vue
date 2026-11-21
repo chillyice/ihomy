@@ -426,6 +426,7 @@ import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import RoomChatBubble from '@/components/games/RoomChatBubble.vue'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
+import { createWakeTimers } from '@/utils/games/wakeTimers'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
 import { useRoomChatStore } from '@/stores/roomChat'
@@ -622,6 +623,7 @@ const rulesLabel = computed(() => {
 })
 
 let session = 0 // 会话令牌:重开/离开时旧循环自行退出
+const wakeTimers = createWakeTimers() // 回合计时登记:后台标签页节流 setTimeout,回前台时到期的立即补跑
 const turnWaiters = new Map() // seat -> resolve(action)
 const claimWaiters = new Map() // seat -> resolve('claim' | 'pass')
 // seat -> 正在等待的询问(断线重连后房主据此补发,否则询问只发过一次就丢了)
@@ -814,7 +816,7 @@ const pipStyle = ([r, c]) => ({ gridArea: `${r + 1} / ${c + 1}` })
 const goBack = () => play.exitToLobby({ aiGame: true })
 
 function sleep(ms) {
-  return new Promise((res) => setTimeout(res, ms))
+  return new Promise((res) => wakeTimers.schedule(res, ms))
 }
 
 /** 电脑应答(吃碰杠胡)前的思考停顿:0.7~1.6s,操作有可感延迟不显机器手速 */
@@ -955,7 +957,11 @@ async function startGame() {
   turn.value = mahjongDiceFirstSeat(dice.value[0], dice.value[1])
   rounds.value += 1
   publishAll()
-  runGameLoop(mySession)
+  runGameLoop(mySession).catch((e) => {
+    // 引擎异常兜底:宁可按流局收尾,也别把整局冻在「电脑思考中」(主循环本身零 catch)
+    console.error('[mahjong] 回合引擎异常,兜底流局', e)
+    if (mySession === session && phase.value === 'playing') endDraw(mySession)
+  })
 }
 
 /** 主循环:回合制驱动;轮到人时挂起等操作(房间局超时由 AI 代打),碰/杠/吃后不摸牌直接出牌 */
@@ -1062,14 +1068,14 @@ function waitSeat(seat, timeoutMs) {
     let timer = null
     const done = (action) => {
       if (timer) {
-        clearTimeout(timer)
+        wakeTimers.cancel(timer)
         timer = null
       }
       if (turnWaiters.get(seat) === done) turnWaiters.delete(seat)
       resolve(action)
     }
     if (timeoutMs > 0) {
-      timer = setTimeout(() => {
+      timer = wakeTimers.schedule(() => {
         if (turnWaiters.get(seat) === done) {
           turnWaiters.delete(seat)
           resolve({ type: 'timeout' })
@@ -1200,7 +1206,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         let timer = null
         const pending = new Set(seats)
         const cleanup = () => {
-          if (timer) clearTimeout(timer)
+          if (timer) wakeTimers.cancel(timer)
           stopClaimCountdown()
           for (const seat of seats) {
             claimWaiters.delete(seat)
@@ -1227,7 +1233,7 @@ function resolveClaims(fromSeat, kind, mySession) {
         }
         // timeoutMs>0 才计时(胡 8s;碰/杠/吃 CLAIM_TIMEOUT):到点视为都过,询问绝不无限挂起
         if (timeoutMs > 0) {
-          timer = setTimeout(() => finish(null), timeoutMs)
+          timer = wakeTimers.schedule(() => finish(null), timeoutMs)
         }
         for (const seat of seats) {
           if (seat === mySeat.value) {
@@ -1309,7 +1315,11 @@ function resolveClaims(fromSeat, kind, mySession) {
         if (hit && hit.seat != null && hit.extra) return resolve({ chi: { seat: chiSeat, pair: hit.extra } })
       }
       resolve(null)
-    })()
+    })().catch((e) => {
+      // 裁决链任何一环抛异常都 resolve,别让主循环在 await resolveClaims 上永久挂起
+      console.error('[mahjong] 应答裁决异常,按全部过处理', e)
+      resolve(null)
+    })
   })
 }
 
@@ -1727,6 +1737,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   session += 1
   abortWaiters()
+  wakeTimers.destroy()
   if (linkTimer) {
     clearTimeout(linkTimer)
     linkTimer = null

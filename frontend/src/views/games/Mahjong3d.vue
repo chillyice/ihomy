@@ -152,6 +152,7 @@ import GameShell from '@/components/games/GameShell.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
 import { createMahjong3dTable } from '@/utils/games/mahjong3dTable'
+import { createWakeTimers } from '@/utils/games/wakeTimers'
 import {
   MAHJONG_RULE_PRESETS,
   canMahjongBuGang,
@@ -238,6 +239,7 @@ const rulesLabel = computed(() => {
 })
 
 let session = 0
+const wakeTimers = createWakeTimers() // 回合计时登记:后台标签页节流 setTimeout,回前台时到期的立即补跑
 let table = null
 let stageRo = null
 let actionResolver = null
@@ -345,7 +347,7 @@ function aiShouldPong(seat, kind) {
 }
 
 function sleep(ms) {
-  return new Promise((res) => setTimeout(res, ms))
+  return new Promise((res) => wakeTimers.schedule(res, ms))
 }
 /** 电脑思考停顿(1.2~2.4s),出牌与应答都有可感延迟 */
 async function aiThink(mySession) {
@@ -392,7 +394,11 @@ async function startGame() {
   table?.setDice(dice.value[0], dice.value[1], true)
   table?.setWinds(0)
   renderTable()
-  runGameLoop(mySession)
+  runGameLoop(mySession).catch((e) => {
+    // 引擎异常兜底:宁可按流局收尾,也别把整局冻在「电脑思考中」(主循环本身零 catch)
+    console.error('[mahjong3d] 回合引擎异常,兜底流局', e)
+    if (mySession === session && phase.value === 'playing') endDraw(mySession)
+  })
 }
 
 async function runGameLoop(mySession) {
@@ -618,7 +624,11 @@ function resolveClaims(fromSeat, kind, mySession) {
         if (hit && hit.extra) return resolve({ chi: { seat: chiSeat, pair: hit.extra } })
       }
       resolve(null)
-    })()
+    })().catch((e) => {
+      // 裁决链任何一环抛异常都 resolve,别让主循环在 await resolveClaims 上永久挂起
+      console.error('[mahjong3d] 应答裁决异常,按全部过处理', e)
+      resolve(null)
+    })
   })
 }
 
@@ -732,6 +742,7 @@ const onWinResize = () => {
 
 onBeforeUnmount(() => {
   session += 1
+  wakeTimers.destroy()
   stageEl.value?.removeEventListener('click', onStageClick)
   stageEl.value?.removeEventListener('pointermove', onStageMove)
   window.removeEventListener('resize', onWinResize)
