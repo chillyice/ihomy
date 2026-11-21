@@ -1708,13 +1708,14 @@ html.dark .pl-shell {
   cursor: default;
 }
 
+/* 暂停遮罩必须完全不透明:半透明能透看牌面记位置,暂停就失去意义 */
 .pause-mask {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  background: #05070d;
   border-radius: 8px;
 }
 .pause-label {

@@ -87,25 +87,13 @@
     <div ref="layoutEl" v-loading="generating" class="sd-layout" :class="{ 'has-hint': !!hint }" @contextmenu.prevent @dblclick.prevent>
       <!-- 用时贴棋盘:与棋盘同宽的一条,左对齐排在棋盘左上方;冲突与提示次数不再占位,
            冲突直接画在格子上,提示次数只在通关结果里报。
-           撤销放在这条的右端(棋盘右上角),新游戏在头部规则键左侧。
-           手机横屏时这条整条隐去:用时进外壳左栏底边,撤销挪进右侧工具列(保存/加载旁边) -->
+           撤销不再是这条右端的图标键:统一改文字键放进工具区(擦除之后、保存/加载之前)。
+           手机横屏时这条整条隐去:用时进外壳左栏底边 -->
       <div class="sd-meta">
         <span class="gh-chip"
           ><span>{{ $t('games.sudoku.time') }}</span
           ><b>{{ timeText }}</b></span
         >
-        <div class="sd-meta-actions">
-          <el-button
-            size="small"
-            class="gs-icon-btn"
-            :disabled="!history.length"
-            :title="$t('games.sudoku.undo')"
-            :aria-label="$t('games.sudoku.undo')"
-            @click="undo"
-          >
-            <el-icon><RefreshLeft /></el-icon>
-          </el-button>
-        </div>
       </div>
       <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
         <template v-if="variant === 'SKYSCRAPER'">
@@ -234,6 +222,9 @@
             {{ $t('games.sudoku.quickFill') }}
           </button>
           <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
+          <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
+            {{ $t('games.sudoku.undo') }}
+          </button>
           <button type="button" class="sd-tool" :disabled="!canSnap" :title="$t('games.sudoku.snapshot.saveTip')" @click="takeSnapshot">
             {{ $t('games.sudoku.snapshot.save') }}
           </button>
@@ -246,11 +237,10 @@
           >
             {{ $t('games.sudoku.snapshot.load') }}
           </button>
-          <!-- 撤销的文字键:手机横屏(棋子右上角那条整条隐去)与手机竖屏(右上角图标撤销隐去)时进这行,
-               位置固定在加载右侧、提示左侧;桌面/平板仍用棋盘右上角的图标撤销,这一颗隐藏 -->
-          <button type="button" class="sd-tool sd-tool-undo" :disabled="!history.length" @click="undo">
-            {{ $t('games.sudoku.undo') }}
-          </button>
+        </div>
+        <!-- 提示单独一行:工具区只留笔记/快填/擦除/撤销/保存/加载,
+             提示键在它们下面独占一行(宽屏时横跨数字盘与工具列两列) -->
+        <div class="sd-hint-row">
           <button type="button" class="sd-tool" :disabled="won" @click="useHint">{{ $t('games.sudoku.hint') }}</button>
         </div>
         <div v-if="hint" class="sd-hint-note" role="status" aria-live="polite">
@@ -292,7 +282,6 @@ import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } fr
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import GameShell from '@/components/games/GameShell.vue'
@@ -1578,25 +1567,13 @@ onBeforeUnmount(() => {
   height: var(--gs-control-h);
   min-width: 0;
 }
-/* 这条上只有一项读数,不参与等分:标签与用时贴在一起,撤销留在右端 */
+/* 这条上只有一项读数,不参与等分:标签与用时贴在一起 */
 .sd-meta .gh-chip {
   flex: 0 1 auto;
 }
-/* 撤销/新游戏靠这条的右端;横屏时这条在棋盘左上,按钮会按容器查询挪到用时上面 */
-.sd-meta-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  margin-left: auto;
-}
 /* 外壳里的用时芯片是棋盘上方那条(.sd-meta)的第二摆放:竖屏与平板整行不占位,
-   只在手机横屏时撑出来 —— 芯片贴外壳左栏底边,同时 .sd-meta 整条隐去,
-   撤销键也从那条挪进右侧工具列(.sd-tool-undo) */
+   只在手机横屏时撑出来 —— 芯片贴外壳左栏底边,同时 .sd-meta 整条隐去 */
 .sd-shell :deep(.gs-stats) {
-  display: none;
-}
-.sd-tool-undo {
   display: none;
 }
 @media (orientation: landscape) and (max-height: 520px) {
@@ -1605,9 +1582,6 @@ onBeforeUnmount(() => {
   }
   .sd-meta {
     display: none;
-  }
-  .sd-tool-undo {
-    display: block;
   }
   /* 模式与难度并排一行:左栏只有 180 上下,main.css 的横屏档为了让下拉文字区不被压成 0
      把每个选择器都撑成整行,两个就吃掉两行;这里提权改回同一行各占一半(抬到 0,4,0,
@@ -2092,6 +2066,13 @@ onBeforeUnmount(() => {
   gap: 8px;
   width: 100%;
 }
+/* 提示键单独一行:不与笔记/快填等挤在一起;宽屏档会拉成通栏大键 */
+.sd-hint-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
 .sd-tool {
   padding: 7px 14px;
   border-radius: 999px;
@@ -2324,14 +2305,6 @@ html.dark .sd-cell.conflict {
 
 /* 窄窗(手机竖):数字盘与工具键压一档,棋盘仍是通栏最大尺寸 */
 @container (max-width: 549px) {
-  /* 手机竖屏:撤销变文字键进工具行(加载右侧、提示左侧),棋盘右上角的图标撤销隐去;
-     用时条因此只剩一颗芯片,按单行算高 */
-  .sd-tool-undo {
-    display: block;
-  }
-  .sd-meta-actions {
-    display: none;
-  }
   .sd-tool {
     padding: 6px 11px;
     font-size: 12px;
@@ -2363,25 +2336,15 @@ html.dark .sd-cell.conflict {
    必须放在最后:上面 .sd-numpad/.sd-tools/.sd-num/.sd-tool 的基础声明会按书写顺序覆盖同权重的容器规则 */
 @container (min-aspect-ratio: 6/5) {
   .sd-layout {
-    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感 */
+    /* 右列按比例给(手机横屏时收窄让棋盘吃满高度),上限 232px 保持平板/电脑上的手感;
+       第一行第二列留空:面板只跟棋盘同一行,顶边与棋盘对齐,高度也就是棋盘行的确定高度 */
     grid-template-columns: minmax(0, 1fr) clamp(148px, 30%, 232px);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      'meta panel'
+      'meta .'
       'board panel';
     gap: clamp(12px, 3cqi, 30px);
-    /* 这条在棋盘左上:按钮独占一行落到用时上面,所以高度按两行算 */
-    --sd-meta-h: calc(var(--gs-control-h) * 2 + 16px);
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
-  }
-  .sd-meta {
-    flex-wrap: wrap;
-    height: auto;
-  }
-  .sd-meta-actions {
-    order: -1;
-    flex: 0 0 100%;
-    margin-left: 0;
   }
   .sd-panel {
     max-height: 100%;
@@ -2406,18 +2369,72 @@ html.dark .sd-cell.conflict {
   }
 }
 
+/* 空间足够的横屏(电脑/大平板,游戏区高 > 520):数字盘收成一列贴在棋盘右侧,
+   工具键(笔记/快填/擦除/撤销/保存/加载)同样一列排在数字盘右侧,
+   提示键独占一行横跨两列;手机横屏(高 ≤ 520)仍用上面的 3×2 紧凑排布 */
+@container (min-aspect-ratio: 6/5) and (min-height: 521px) {
+  .sd-layout {
+    /* 两列按钮(数字 + 文字)比 3×2 略宽:棋盘上限 560 封顶,宽出来的都会还给棋盘 */
+    grid-template-columns: minmax(0, 1fr) clamp(176px, 24%, 224px);
+  }
+  .sd-panel {
+    /* 拉伸到棋盘那行的高度:max-height 百分比对网格行不保证解析,
+       拉伸得到的高度必然确定,提示说明撑高时才能可靠地走面板滚动条 */
+    align-self: stretch;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* 全 auto 行:面板超高时要靠滚动,fr 行会被压瘪 */
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      'numpad tools'
+      'hintrow hintrow'
+      'note note'
+      'tip tip';
+    align-content: start;
+  }
+  .sd-numpad {
+    grid-area: numpad;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(9, minmax(0, 1fr));
+    align-self: stretch;
+  }
+  .sd-tools {
+    grid-area: tools;
+    grid-template-columns: minmax(0, 1fr);
+    /* 六颗工具键均分数字盘那列的高度:两列底边对齐,不留半截空当 */
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    align-self: stretch;
+  }
+  .sd-hint-row {
+    grid-area: hintrow;
+  }
+  .sd-hint-row .sd-tool {
+    width: 100%;
+  }
+  .sd-hint-note {
+    grid-area: note;
+  }
+  .sd-variant-tip {
+    grid-area: tip;
+  }
+}
+
 /* 手机横屏(游戏区高 ≤ 520):用时条已经隐去(外壳左栏里的控件行顶替它),
    这里只留棋盘 + 右列两条:棋盘按高度铺满,数字盘与工具键在右一列
    (数字盘在上、笔记/快填等工具在下),键位放大到触控尺寸,两者底边与棋盘贴齐 */
 @container (min-aspect-ratio: 6/5) and (max-height: 520px) {
+  /* 手机横屏之外,桌面矮窗也会落进这档(宽高比 ≥ 6/5 且游戏区高 ≤ 520)。
+     用时条保留合法网格位:手机横屏由媒体查询隐去(整行塌成 0),
+     桌面矮窗没有媒体查询兜底,芯片就地显示在棋盘上方,容器查询管不到外壳头部,别指望芯片顶替 */
   .sd-layout {
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: 'board panel';
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'meta panel'
+      'board panel';
     /* 三栏外壳把数据栏挪走后右列只剩棋盘 + 数字盘:右列下限收到 132(3 列数字键仍够拇指),
        间距压到 10,多出来的宽度全给棋盘 */
     grid-template-columns: minmax(0, 1fr) clamp(132px, 26%, 232px);
     gap: 10px;
-    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
+    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
   }
   /* 棋盘按可用高铺满并垂直居中:上、下到游戏区的距离相等(窄屏被宽度卡住时
      不再「贴底、上面空一截」);数字盘底边仍与棋盘底边贴齐 */
@@ -2441,9 +2458,21 @@ html.dark .sd-cell.conflict {
   .sd-tool {
     padding: 8px 8px;
   }
+  /* 提示键也拉成通栏,两列工具下面正好一行大触点 */
+  .sd-hint-row .sd-tool {
+    width: 100%;
+  }
   /* 提示条排到右列最上面:一屏放不下时先露要点的那条,滚动只留给工具键 */
   .sd-hint-note {
     order: -1;
+  }
+}
+
+/* 手机横屏兜底(放在容器档之后才能覆盖同一权重的容器规则):
+   用时条已由媒体查询隐去,网格首行塌成 0,棋盘尺寸不必扣用时条那一行 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sd-layout {
+    --sd-frame-size: min(calc(100% - 8px), calc(100cqh - 8px), 560px);
   }
 }
 </style>
