@@ -2343,8 +2343,14 @@ html.dark .sd-cell.conflict {
     grid-template-areas:
       'meta .'
       'board panel';
-    gap: clamp(12px, 3cqi, 30px);
+    /* 行距收到 8:用时条必须贴着棋盘上缘;列距保持按宽度给 */
+    column-gap: clamp(12px, 3cqi, 30px);
+    row-gap: 8px;
     --sd-frame-size: min(calc(100% - 8px), calc(100cqh - var(--sd-meta-h) - 8px), 560px);
+  }
+  /* 棋盘顶对齐:高窗口里棋盘被 560 封顶,若行内居中会漂离用时条(缝隙随窗口变高变大) */
+  .sd-frame {
+    align-self: start;
   }
   .sd-panel {
     max-height: 100%;
