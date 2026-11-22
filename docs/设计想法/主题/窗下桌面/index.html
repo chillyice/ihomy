@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="zh-CN" data-mode="dawn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>窗下桌面 · ihomy</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        --bg: #f4efe4;
+        --card: #f9f5ed;
+        --ink: #383b2d;
+        --sub: #68695a;
+        --line: #c9c4b3;
+        --leaf: #58683b;
+        --active: #e1e5d0;
+        --paper: #e9dfc5;
+        --shadow: rgba(62, 48, 29, 0.22);
+        color-scheme: light;
+      }
+      html[data-mode="dusk"] {
+        --bg: #28251f;
+        --card: #302d25;
+        --ink: #efeadc;
+        --sub: #c0bcab;
+        --line: #555347;
+        --leaf: #bdcda2;
+        --active: #414635;
+        --paper: #453d30;
+        --shadow: rgba(12, 9, 5, 0.36);
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.5 system-ui,
+          "Microsoft YaHei",
+          sans-serif;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+      button:focus-visible,
+      select:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--leaf);
+        outline-offset: 3px;
+      }
+      a {
+        color: var(--leaf);
+      }
+      .mast,
+      .tools,
+      .styles {
+        max-width: 1750px;
+        margin: auto;
+        padding-inline: clamp(16px, 3.8vw, 72px);
+      }
+      .mast {
+        padding-block: 26px 18px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 22px;
+      }
+      .word {
+        font-weight: 760;
+        letter-spacing: -0.06em;
+        font-size: 15px;
+        line-height: 1;
+        color: var(--leaf);
+        margin-bottom: 6px;
+      }
+      h1 {
+        font-size: clamp(24px, 2.1vw, 36px);
+        line-height: 1.24;
+        letter-spacing: 0.03em;
+        font-weight: 650;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .switch,
+      .btn {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        font-size: 13px;
+      }
+      .switch {
+        display: inline-flex;
+        padding: 2px;
+        gap: 2px;
+      }
+      .switch button,
+      .btn {
+        padding: 6px 12px;
+      }
+      .switch button {
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+      }
+      .switch [aria-pressed="true"] {
+        background: var(--active);
+        color: var(--leaf);
+        font-weight: 650;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--leaf);
+      }
+      .stage {
+        position: relative;
+        width: 100%;
+        height: clamp(445px, 62vh, 640px);
+        isolation: isolate;
+        overflow: hidden;
+        border-block: 1px solid var(--line);
+        background: var(--paper);
+      }
+      iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      .gutter {
+        position: absolute;
+        top: 44px;
+        bottom: 40px;
+        pointer-events: none;
+        overflow: hidden;
+        --space: 0px;
+        width: var(--space);
+      }
+      .gutter.left {
+        left: 0;
+      }
+      .gutter.right {
+        right: 0;
+      }
+      .thing {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        aspect-ratio: 1;
+        width: min(145px, calc(100% - 14px));
+        pointer-events: auto;
+        color: inherit;
+        transform: translate(-50%, -50%) rotate(var(--angle));
+        border-radius: 12px;
+        transition:
+          filter 0.15s,
+          scale 0.15s;
+        background: transparent;
+        text-decoration: none;
+      }
+      .thing:hover {
+        filter: brightness(1.05);
+        scale: 1.035;
+      }
+      .thing:focus-visible {
+        outline-offset: 0;
+      }
+      .thing img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(1px 3px 2px var(--shadow));
+      }
+      .steam {
+        position: absolute;
+        top: 35%;
+        left: 49%;
+        width: 11%;
+        height: 16%;
+        transform: rotate(8deg);
+        pointer-events: none;
+      }
+      .steam i {
+        position: absolute;
+        left: 15%;
+        bottom: 0;
+        height: 100%;
+        width: 65%;
+        border-left: 2px solid rgba(255, 251, 232, 0.82);
+        border-radius: 65% 0;
+        opacity: 0;
+        filter: blur(0.6px);
+        animation: vapor 5s ease-out infinite;
+      }
+      .steam i:nth-child(2) {
+        left: 42%;
+        animation-delay: 2.4s;
+      }
+      @keyframes vapor {
+        0%,
+        100% {
+          opacity: 0;
+          transform: translateY(0);
+        }
+        24% {
+          opacity: 0.7;
+        }
+        76% {
+          opacity: 0;
+          transform: translate(1px, -80%) rotate(9deg);
+        }
+      }
+      .desk-polaroid {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        width: 82%;
+        height: 93%;
+        padding: 5% 5% 3%;
+        gap: 4%;
+        background: #e9e3ce;
+        color: #665a44;
+        box-shadow: 1px 3px 4px var(--shadow);
+      }
+      .thing .desk-polaroid img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: none;
+      }
+      .desk-photo-caption {
+        font-size: clamp(8px, 0.72vw, 12px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .paper-note,
+      .envelope {
+        position: relative;
+        display: block;
+        width: 83%;
+        filter: drop-shadow(1px 3px 2px var(--shadow));
+      }
+      .paper-note {
+        aspect-ratio: 1.13;
+        color: #554b35;
+        background: linear-gradient(125deg, #ede9cb, var(--stock, #e4d494) 85%, #baa976);
+        padding: 19% 9% 10%;
+        clip-path: polygon(0 1%, 98% 0, 100% 83%, 88% 100%, 1% 98%);
+        font-size: clamp(10px, 0.8vw, 13px);
+        line-height: 1.32;
+      }
+      .paper-note::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 32%;
+        width: 36%;
+        height: 15%;
+        transform: rotate(-4deg);
+        background: #d9c6a194;
+      }
+      .paper-note::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 16%;
+        height: 19%;
+        background: linear-gradient(135deg, #a59664, #faf5dd);
+        clip-path: polygon(7% 9%, 100% 0, 0 100%);
+      }
+      .paper-note small {
+        display: block;
+        font-size: 0.74em;
+        margin-top: 8%;
+        color: #74684e;
+      }
+      .envelope {
+        aspect-ratio: 1.47;
+        overflow: hidden;
+        border: 1px solid #bca783;
+        background: #e8d7b6;
+        box-shadow: inset 0 0 12px #cdaf7f70;
+      }
+      .envelope::before {
+        content: "";
+        position: absolute;
+        top: 14%;
+        right: 10%;
+        width: 19%;
+        height: 33%;
+        border: 2px dotted #e8d9b8;
+        background: linear-gradient(160deg, #a6ac80 46%, #596744 47%, #9fa379 75%);
+      }
+      .envelope::after {
+        content: "";
+        position: absolute;
+        top: 19%;
+        right: 16%;
+        width: 25%;
+        aspect-ratio: 1;
+        border: 2px double #8b5e49a8;
+        border-radius: 50%;
+        transform: rotate(-13deg);
+      }
+      .address {
+        position: absolute;
+        left: 12%;
+        bottom: 25%;
+        width: 44%;
+        border-top: 1px solid #967b5f;
+        border-bottom: 1px solid #967b5f;
+        height: 11%;
+        transform: rotate(-4deg);
+      }
+      .paper-note {
+        background:
+          radial-gradient(ellipse at 42% 25%, transparent 30%, rgba(112, 67, 22, var(--wear, 0.12)) 100%),
+          linear-gradient(125deg, #ede9cb, var(--stock, #e4d494) 85%, #baa976);
+      }
+      .paper-note::after {
+        width: var(--curl, 12%);
+        height: var(--curl, 12%);
+      }
+      .trail {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .paw {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        height: 15px;
+        width: 16px;
+        opacity: 0;
+        rotate: var(--rot);
+        color: #75624b;
+        animation: foot 3.8s var(--delay) ease-in-out both;
+      }
+      .paw::after,
+      .paw i {
+        position: absolute;
+        content: "";
+        background: currentColor;
+      }
+      .paw::after {
+        left: 21%;
+        bottom: 0;
+        width: 61%;
+        height: 50%;
+        border-radius: 55% 60% 40% 40%;
+      }
+      .paw i {
+        width: 21%;
+        height: 31%;
+        border-radius: 50%;
+      }
+      .paw i:nth-child(1) {
+        top: 24%;
+        left: 0;
+        rotate: -27deg;
+      }
+      .paw i:nth-child(2) {
+        top: 0;
+        left: 25%;
+      }
+      .paw i:nth-child(3) {
+        top: 0;
+        right: 24%;
+      }
+      .paw i:nth-child(4) {
+        top: 27%;
+        right: 0;
+        rotate: 27deg;
+      }
+      html[data-mode="dusk"] .paw {
+        color: #d7c9a9;
+      }
+      @keyframes foot {
+        0%,
+        100% {
+          opacity: 0;
+        }
+        15%,
+        55% {
+          opacity: 0.62;
+        }
+      }
+      .tools {
+        padding-block: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        border-bottom: 1px solid var(--line);
+        color: var(--sub);
+        font-size: 13px;
+      }
+      .tools label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tools select {
+        font-size: 13px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 3px 7px;
+      }
+      .styles {
+        padding-block: 22px 40px;
+      }
+      .styles h2 {
+        font-weight: 620;
+        font-size: 20px;
+        margin-bottom: 12px;
+      }
+      .samples {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 13px;
+      }
+      .sample {
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+        padding: 0 12px 12px;
+        border-radius: 12px;
+        text-align: left;
+        overflow: hidden;
+      }
+      .sample[aria-pressed="true"] {
+        border-color: var(--leaf);
+        box-shadow: inset 0 0 0 1px var(--leaf);
+      }
+      .sample img {
+        display: block;
+        width: 100%;
+        height: clamp(125px, 14vw, 200px);
+        object-fit: contain;
+        padding: 7px;
+      }
+      .cap {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .mark {
+        width: 10px;
+        height: 10px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+      }
+      .sample[aria-pressed="true"] .mark {
+        border-color: var(--leaf);
+        background: var(--leaf);
+      }
+      .sample small {
+        display: block;
+        color: var(--sub);
+        font-size: 12px;
+        margin: 3px 0 0 17px;
+      }
+      .mobile-msg {
+        display: none;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      body[data-pause="true"] .steam i {
+        animation-play-state: paused;
+      }
+      @media (max-width: 1059px) {
+        .stage,
+        .desktop-tools,
+        .tools {
+          display: none;
+        }
+        .mobile-msg {
+          display: block;
+          font-size: 13px;
+          color: var(--sub);
+          margin-bottom: 15px;
+        }
+        .mast {
+          border-bottom: 1px solid var(--line);
+        }
+        .styles {
+          padding-top: 18px;
+        }
+      }
+      @media (max-width: 600px) {
+        .mast {
+          align-items: center;
+        }
+        .samples {
+          grid-template-columns: 1fr;
+        }
+        .sample {
+          display: grid;
+          grid-template-columns: 42% 1fr;
+          align-content: center;
+          align-items: center;
+          gap: 0 9px;
+          padding: 0 12px;
+        }
+        .sample img {
+          grid-row: span 2;
+          height: 116px;
+        }
+        .sample .cap {
+          align-self: end;
+        }
+        .sample small {
+          align-self: start;
+          margin: 5px 0 0 17px;
+        }
+        .styles {
+          padding-bottom: 20px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+        .steam {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mast">
+      <div>
+        <div class="word">ihomy</div>
+        <h1>窗下桌面</h1>
+      </div>
+      <div class="controls">
+        <div class="switch" aria-label="桌面光线">
+          <button type="button" data-light="dawn" aria-pressed="true">晨光</button
+          ><button type="button" data-light="dusk" aria-pressed="false">暮色</button>
+        </div>
+        <button class="btn desktop-tools" id="shuffle" type="button">换一次摆放</button>
+        <button class="btn desktop-tools" id="cat" type="button">看看猫经过</button>
+      </div>
+    </header>
+    <main>
+      <div class="stage" aria-label="真实 ihomy 页面与桌面边缘摆放示例">
+        <iframe title="ihomy 站内页·桌面实景" id="page"></iframe>
+        <aside class="gutter left" aria-label="左侧桌面"></aside>
+        <aside class="gutter right" aria-label="右侧桌面"></aside>
+      </div>
+      <div class="tools">
+        <span id="hint" role="status">桌面示例 · 点击物品进入对应功能</span>
+        <label
+          >站内主题<select id="theme">
+            <option value="warm">暖居</option>
+            <option value="guangchen">光尘</option>
+            <option value="window">窗边</option>
+          </select></label
+        >
+        <label
+          >点击杯子打开<select id="cup-target">
+            <option value="/weather">天气</option>
+            <option value="/library">书架</option>
+          </select></label
+        >
+      </div>
+      <section class="styles" aria-labelledby="sample-title">
+        <h2 id="sample-title">同一只咖啡杯，三种画风</h2>
+        <p class="mobile-msg">宽屏可以试摆物品。这里可以比较三种画风。</p>
+        <div class="samples" aria-label="选择咖啡杯画风">
+          <button class="sample" data-style="photo" aria-pressed="false">
+            <img src="cup-photo.webp" alt="写实陶瓷杯与奶油色碟" /><span class="cap"
+              ><span class="mark"></span>陶瓷实拍感</span
+            ><small>看釉面反光和杯壁的细斑</small>
+          </button>
+          <button class="sample" data-style="gouache" aria-pressed="true">
+            <img src="cup-gouache.webp" alt="水粉绘制的牛油果绿咖啡杯" /><span class="cap"
+              ><span class="mark"></span>旧画册水粉</span
+            ><small>看干笔边缘和哑光颜料</small>
+          </button>
+          <button class="sample" data-style="sticker" aria-pressed="false">
+            <img src="cup-sticker.webp" alt="带米白裁切边的咖啡杯贴纸" /><span class="cap"
+              ><span class="mark"></span>丝印贴纸</span
+            ><small>看套色轮廓和奶油色纸边</small>
+          </button>
+        </div>
+      </section>
+    </main>
+    <script src="photos.js"></script>
+    <script>
+      const frame = document.querySelector("#page"),
+        stage = document.querySelector(".stage"),
+        hint = document.querySelector("#hint");
+      const sides = [...document.querySelectorAll(".gutter")],
+        catButton = document.querySelector("#cat");
+      const base = location.protocol === "file:" ? "http://127.0.0.1:4196" : location.origin;
+      const desktop = matchMedia("(min-width:1060px)"),
+        reduced = matchMedia("(prefers-reduced-motion: reduce)");
+      const rand = (a, b) => a + Math.random() * (b - a);
+      let light = "dawn",
+        theme = "warm",
+        style = "gouache",
+        currentPath = "/plan",
+        cupTarget = "/weather",
+        positions = [],
+        blocked = false;
+      let autoTimer,
+        trailTimer,
+        trailSide = -1,
+        watcher = null,
+        geometryObserver = null,
+        scheduledFrame = 0;
+      const initial = () => [
+        { kind: "cup", side: 0, y: 0.63, x: 0.5, angle: -3 },
+        { kind: "note", side: 1, y: 0.3, x: 0.53, angle: 4, age: 4, stock: 0 },
+      ];
+      positions = initial();
+      function setPreference() {
+        if (location.protocol === "file:") return;
+        localStorage.setItem("ihomy-theme", JSON.stringify({ theme, mode: light, autoMode: false }));
+        localStorage.setItem("ihomy:morning:v1", JSON.stringify({ enabled: false }));
+      }
+      function openPage(path) {
+        currentPath = path;
+        if (!desktop.matches) return;
+        setPreference();
+        frame.src = new URL(path, base);
+      }
+      function hostDocument() {
+        try {
+          return frame.contentDocument?.querySelector("#app")?.ownerDocument;
+        } catch {
+          return null;
+        }
+      }
+      function removeWatchers() {
+        watcher?.disconnect();
+        geometryObserver?.disconnect();
+      }
+      function measure() {
+        scheduledFrame = 0;
+        const width = stage.clientWidth,
+          doc = hostDocument();
+        const inner = doc?.querySelector(
+          ".gc-studio, .app-main > .page, .window-content .mobile-sub-content > .page",
+        );
+        const nav = doc?.querySelector(".app-sidebar,.window-rail")?.getBoundingClientRect();
+        const navEnd = Math.max(0, nav?.right || 0);
+        const usableWidth = doc?.documentElement.clientWidth || width;
+        const floor = Math.max(0, (width - 1140) / 2);
+        let bounds = inner?.getBoundingClientRect();
+        blocked =
+          !!doc &&
+          (!bounds ||
+            doc.documentElement.matches(".game-wide,.fp-edit-focus") ||
+            !!doc.querySelector(".game-shell, .is-game-stage") ||
+            !!doc.fullscreenElement ||
+            [".el-overlay", ".el-popper[role=dialog]"].some((sel) =>
+              [...doc.querySelectorAll(sel)].some(
+                (el) => el.getClientRects().length && getComputedStyle(el).visibility !== "hidden",
+              ),
+            ));
+        if (bounds && bounds.width <= 0) bounds = null;
+        let gaps = bounds ? [bounds.left - navEnd, usableWidth - bounds.right] : [floor, floor];
+        sides.forEach((side, i) => {
+          const w = Math.min(245, Math.max(0, gaps[i] - 8));
+          side.style.setProperty(
+            i === 0 ? "left" : "right",
+            (i === 0 ? navEnd + 3 : width - usableWidth + 3) + "px",
+          );
+          side.style.setProperty("--space", w + "px");
+          side.hidden = blocked || !desktop.matches || w < 60;
+        });
+        if (blocked) removeTrail();
+        draw();
+      }
+      function scheduleMeasure() {
+        if (!scheduledFrame) scheduledFrame = requestAnimationFrame(measure);
+      }
+      function observePage() {
+        removeWatchers();
+        const doc = hostDocument();
+        if (doc) {
+          geometryObserver = new ResizeObserver(scheduleMeasure);
+          geometryObserver.observe(doc.documentElement);
+          const watchStudio = () => {
+            doc
+              .querySelectorAll(
+                ".app-main > .page,.window-content .mobile-sub-content > .page,.app-sidebar,.window-rail",
+              )
+              .forEach((el) => geometryObserver.observe(el));
+            doc
+              .querySelectorAll(".gc-studio, .el-overlay, .el-popper[role=dialog]")
+              .forEach((el) => geometryObserver.observe(el));
+          };
+          watcher = new MutationObserver(() => {
+            watchStudio();
+            scheduleMeasure();
+          });
+          watcher.observe(doc.body, { childList: true, subtree: true });
+          doc.addEventListener("fullscreenchange", scheduleMeasure);
+          watchStudio();
+        }
+        scheduleMeasure();
+      }
+      const propInfo = {
+        cup: () => ({
+          title: "咖啡杯 · " + (cupTarget === "/weather" ? "天气" : "书架"),
+          path: cupTarget,
+          html:
+            '<img src="cup-' +
+            style +
+            '.webp" alt=""><span aria-hidden="true" class="steam"><i></i><i></i></span>',
+        }),
+        note: (p) => ({
+          title: "便签示例 · 已搁置 " + p.age + " 天 · 查看日程待办",
+          path: "/plan?tab=plan",
+          html:
+            '<span class="paper-note" style="--stock:' +
+            ["#ddd4a3", "#e0ccb4", "#c8d1b3"][p.stock] +
+            ";--wear:" +
+            Math.min(0.43, 0.025 + p.age * 0.028) +
+            ";--curl:" +
+            Math.min(23, 7 + p.age * 1.1) +
+            '%">待办<small>已搁置 ' +
+            p.age +
+            " 天</small></span>",
+        }),
+        mail: () => ({
+          title: "信封示例 · 查看站内通知",
+          path: "/notification",
+          html: '<span class="envelope"><span class="address"></span></span>',
+        }),
+      };
+      const artFiles = { mail: "envelope-gouache.webp", note: "note-gouache.webp" };
+      const readyArt = new Set();
+      let recentPhotos = [];
+      function preloadPaperArt() {
+        for (const [kind, file] of Object.entries(artFiles)) {
+          const img = new Image();
+          img.onload = () => {
+            readyArt.add(kind);
+            draw();
+          };
+          img.src = file;
+        }
+      }
+      function draw() {
+        const canShow = sides.map((side) => !side.hidden);
+        const shown = positions.filter((p) => canShow[p.side]);
+        const sizes = sides.map((side) => ({ w: side.clientWidth, h: side.clientHeight }));
+        const id = JSON.stringify([shown, style, cupTarget, canShow, sizes, [...readyArt]]);
+        if (stage.dataset.layout !== id) {
+          stage.dataset.layout = id;
+          for (const side of sides) for (const child of [...side.querySelectorAll(".thing")]) child.remove();
+          shown.forEach((p) => {
+            const info = p.kind === "photo" ? p : propInfo[p.kind](p),
+              el = document.createElement("a");
+            el.className = "thing " + p.kind;
+            el.href = new URL(info.path, base);
+            el.title = info.title;
+            el.setAttribute("aria-label", info.title);
+            const { w, h } = sizes[p.side];
+            const sideItems = shown.filter((other) => other.side === p.side).sort((a, b) => a.y - b.y);
+            const lane = h / sideItems.length;
+            const size = Math.min(145, (w - 8) / 1.18, (lane - 12) / 1.18);
+            // Rotated square plus the small hover lift stay inside their lane.
+            const margin = size * 0.59 + 3;
+            const cx = margin + (w - margin * 2) * p.x;
+            const cy = sideItems.indexOf(p) * lane + margin + (lane - margin * 2) * p.y;
+            el.style.cssText =
+              "left:" + cx + "px;top:" + cy + "px;width:" + size + "px;--angle:" + p.angle + "deg";
+            if (p.kind === "photo") {
+              el.append(window.DeskPhotos.createPhoto(p));
+            } else if (readyArt.has(p.kind)) {
+              const art = new Image();
+              art.src = artFiles[p.kind];
+              art.alt = "";
+              if (p.kind === "note") {
+                art.style.filter =
+                  "drop-shadow(1px 3px 2px var(--shadow)) sepia(" +
+                  Math.min(0.5, p.age * 0.032) +
+                  ") brightness(" +
+                  (1 - Math.min(0.12, p.age * 0.008)) +
+                  ") hue-rotate(" +
+                  [-3, 9, -14][p.stock] +
+                  "deg)";
+              }
+              el.append(art);
+            } else {
+              el.innerHTML = info.html;
+            }
+            el.addEventListener("click", (e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              openPage(info.path);
+            });
+            sides[p.side].append(el);
+          });
+        }
+        hint.textContent = blocked
+          ? "桌面示例 · 当前页面收起边缘物品"
+          : !canShow.some(Boolean)
+            ? "桌面示例 · 当前留白较窄，物品已收起"
+            : shown.length
+              ? "桌面示例 · 点击物品进入对应功能"
+              : "桌面示例 · 这次桌边留空";
+        catButton.disabled = reduced.matches || blocked || !canShow.some(Boolean) || shown.length >= 3;
+        catButton.title = reduced.matches
+          ? "已按系统偏好减少动态效果"
+          : shown.length >= 3
+            ? "桌面已有三件物品，可先换一次摆放"
+            : "查看一次临时足迹";
+      }
+      function shuffle() {
+        removeTrail();
+        const kinds = [{ kind: "cup" }, { kind: "note" }, { kind: "mail" }, ...recentPhotos];
+        for (let i = kinds.length - 1; i > 0; i--) {
+          const j = Math.floor(rand(0, i + 1));
+          [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
+        }
+        const r = Math.random(),
+          count = r < 0.15 ? 0 : r < 0.43 ? 1 : r < 0.83 ? 2 : 3;
+        const first = Math.random() < 0.5 ? 0 : 1,
+          phase = Math.random() < 0.5;
+        positions = kinds.slice(0, count).map((candidate, i) => ({
+          ...candidate,
+          side: (first + i) % 2,
+          y:
+            i === 2
+              ? phase
+                ? rand(0.18, 0.23)
+                : rand(0.77, 0.82)
+              : i === 0
+                ? phase
+                  ? rand(0.74, 0.8)
+                  : rand(0.2, 0.26)
+                : rand(0.25, 0.7),
+          x: rand(0.32, 0.68),
+          angle: rand(-7, 7),
+          age: Math.ceil(rand(1, 13)),
+          stock: Math.floor(rand(0, 3)),
+        }));
+        draw();
+      }
+      function removeTrail() {
+        clearTimeout(trailTimer);
+        document.querySelectorAll(".trail").forEach((el) => el.remove());
+        trailSide = -1;
+      }
+      function cats() {
+        if (document.hidden || reduced.matches || catButton.disabled || trailSide !== -1 || !desktop.matches)
+          return;
+        const candidates = [];
+        for (let i = 0; i < 2; i++)
+          if (!sides[i].hidden)
+            for (const y of [0.13, 0.38, 0.64, 0.84]) {
+              const edge = sides[i].getBoundingClientRect();
+              const top = edge.top + (y - 0.06) * edge.height - 5;
+              const bottom = edge.top + (y + 0.03) * edge.height + 22;
+              const free = [...sides[i].querySelectorAll(".thing")].every((el) => {
+                const item = el.getBoundingClientRect();
+                return bottom < item.top || top > item.bottom;
+              });
+              if (free) candidates.push({ i, y });
+            }
+        if (!candidates.length) return;
+        const { i, y } = candidates[Math.floor(rand(0, candidates.length))],
+          trail = document.createElement("div");
+        trailSide = i;
+        trail.className = "trail";
+        trail.setAttribute("aria-hidden", "true");
+        for (let n = 0; n < 4; n++) {
+          const p = document.createElement("span");
+          p.className = "paw";
+          p.style.cssText =
+            "--x:" +
+            (25 + n * 8 + (n % 2) * 7) +
+            "%;--y:" +
+            ((y - 0.06) * 100 + n * 3) +
+            "%;--rot:150deg;--delay:" +
+            n * 0.3 +
+            "s";
+          p.innerHTML = "<i></i><i></i><i></i><i></i>";
+          trail.append(p);
+        }
+        sides[i].append(trail);
+        trailTimer = setTimeout(removeTrail, 4800);
+        return true;
+      }
+      function armCats() {
+        clearTimeout(autoTimer);
+        if (!document.hidden && !reduced.matches && desktop.matches)
+          autoTimer = setTimeout(
+            () => {
+              const last = Number(sessionStorage.getItem("desk-last-natural-trail") || 0);
+              if (Date.now() - last >= 600000 && Math.random() < 0.55 && cats())
+                sessionStorage.setItem("desk-last-natural-trail", String(Date.now()));
+              armCats();
+            },
+            rand(150000, 300000),
+          );
+      }
+      frame.addEventListener("load", observePage);
+      function reloadCurrentPage() {
+        try {
+          const url = new URL(frame.contentWindow.location.href);
+          if (url.origin === base) currentPath = url.pathname + url.search + url.hash;
+        } catch {}
+        openPage(currentPath);
+      }
+      document.querySelector("#theme").addEventListener("change", (e) => {
+        theme = e.target.value;
+        reloadCurrentPage();
+      });
+      for (const btn of document.querySelectorAll("[data-light]"))
+        btn.addEventListener("click", () => {
+          light = btn.dataset.light;
+          document.documentElement.dataset.mode = light;
+          document
+            .querySelectorAll("[data-light]")
+            .forEach((x) => x.setAttribute("aria-pressed", String(x === btn)));
+          reloadCurrentPage();
+        });
+      for (const btn of document.querySelectorAll("[data-style]"))
+        btn.addEventListener("click", () => {
+          style = btn.dataset.style;
+          document
+            .querySelectorAll("[data-style]")
+            .forEach((x) => x.setAttribute("aria-pressed", String(x === btn)));
+          if (!positions.some((p) => p.kind === "cup")) {
+            removeTrail();
+            positions = initial();
+          }
+          draw();
+        });
+      document.querySelector("#cup-target").addEventListener("change", (e) => {
+        cupTarget = e.target.value;
+        draw();
+      });
+      document.querySelector("#shuffle").addEventListener("click", shuffle);
+      catButton.addEventListener("click", cats);
+      new ResizeObserver(scheduleMeasure).observe(stage);
+      desktop.addEventListener("change", () => {
+        if (desktop.matches && !frame.hasAttribute("src")) openPage(currentPath);
+        if (!desktop.matches) removeTrail();
+        scheduleMeasure();
+        armCats();
+      });
+      reduced.addEventListener("change", () => {
+        if (reduced.matches) removeTrail();
+        draw();
+        armCats();
+      });
+      document.addEventListener("visibilitychange", () => {
+        document.body.dataset.pause = document.hidden;
+        if (document.hidden) removeTrail();
+        armCats();
+      });
+      preloadPaperArt();
+      if (window.DeskPhotos && desktop.matches)
+        window.DeskPhotos.load()
+          .then((entries) => {
+            recentPhotos = entries;
+          })
+          .catch(() => {});
+      openPage(currentPath);
+      measure();
+      armCats();
+    </script>
+  </body>
+</html>
