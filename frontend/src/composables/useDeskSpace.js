@@ -6,10 +6,11 @@ const CENTER =
   '.gc-studio,.app-main > .page,.window-content :is(.mobile-tab-content,.mobile-sub-content) > .page,.elder-home,.login-card,.kada > .kwrap,.bp > .bpwrap'
 const NAV = '.app-sidebar,.window-rail'
 const BOARD = '.app-main > .home-page'
+const TABLET_PAGE = '.mobile-layout,.app-main'
+const MODAL = '[aria-modal="true"],dialog[open],.el-overlay'
+const CONTROL =
+  'button,a[href],label,input,select,textarea,[role="button"],[role="tab"],[role="link"],[tabindex="0"],[contenteditable="true"]'
 const BUSY = [
-  '[aria-modal="true"]',
-  'dialog[open]',
-  '.el-overlay',
   '.photo-viewer',
   '.el-image-viewer__wrapper',
   '.morning-overlay',
@@ -24,6 +25,8 @@ const EDITHOST = '.gc-home,.home-page,.gc-weatherbg'
 const FLOATS = [
   '.gc-topbar',
   '.window-top',
+  '.mobile-header',
+  '.mobile-tabbar',
   '.site-footer',
   '.back-to-top',
   '.install-prompt',
@@ -43,7 +46,7 @@ const FLOATS = [
   '.home-page .door-sign',
   '.el-popper',
 ].join(',')
-const LANDMARKS = [CENTER, NAV, BOARD, BUSY, EDITHOST, FLOATS].join(',')
+const LANDMARKS = [CENTER, NAV, BOARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, FLOATS, '.gc-side'].join(',')
 const cooldown = 10 * 60_000
 let visitPlan,
   lastPawAt = 0
@@ -58,21 +61,25 @@ function samePlacements(left, right) {
     left.length === right.length &&
     left.every((p, i) => {
       const q = right[i]
-      return p.item === q.item && p.x === q.x && p.y === q.y && p.size === q.size && p.angle === q.angle
+      return p.item === q.item && p.x === q.x && p.y === q.y && p.size === q.size && p.angle === q.angle && p.edge === q.edge
     })
   )
 }
 
 // 只在整页结构发生变化时收集边界元素。滚动、尺寸和浮窗的拖动复用已收集的元素。
-export function useDeskSpace(items, enabled = true, arrangement) {
+export function useDeskSpace(items, arrangement) {
   const placements = shallowRef([])
   const pawTrail = shallowRef([])
-  const { isMobile } = useDevice()
+  const { isTablet } = useDevice()
+  const modalOpen = shallowRef(false)
   let running = false,
     refresh = true,
     frame = 0
   let nodes, scene, resize, attributes, tree, reduced
-  let catTimer, fadeTimer, stopActive
+  let controlObserver
+  let controls = new Set()
+  const visibleControls = new Set()
+  let catTimer, fadeTimer
   visitPlan ??= sampleDeskPlan()
 
   function clearTrail() {
@@ -92,9 +99,23 @@ export function useDeskSpace(items, enabled = true, arrangement) {
       centers: matching(CENTER),
       nav: matching(NAV),
       board: matching(BOARD),
+      tabletPages: matching(TABLET_PAGE),
+      tabletNav: matching(NAV + ',.gc-side'),
+      modals: matching(MODAL),
       busy: matching(BUSY),
       editHosts: matching(EDITHOST),
       floats: matching(FLOATS),
+    }
+    if (controlObserver) {
+      const current = new Set([...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],' + MODAL)))
+      for (const node of controls) {
+        if (!current.has(node)) {
+          controlObserver.unobserve(node)
+          visibleControls.delete(node)
+        }
+      }
+      for (const node of current) if (!controls.has(node)) controlObserver.observe(node)
+      controls = current
     }
     resize.disconnect()
     attributes.disconnect()
@@ -109,6 +130,7 @@ export function useDeskSpace(items, enabled = true, arrangement) {
   function measure() {
     frame = 0
     if (refresh) collect()
+    modalOpen.value = nodes.modals.some(visibleRect)
     if (
       document.fullscreenElement ||
       document.documentElement.matches('.game-wide,.fp-edit-focus') ||
@@ -119,15 +141,34 @@ export function useDeskSpace(items, enabled = true, arrangement) {
       return
     }
     const center = nodes.centers.map(visibleRect).find(Boolean)
-    if (!center && !nodes.board.some(visibleRect)) {
+    if (!center && !nodes.board.some(visibleRect) && !(isTablet.value && nodes.tabletPages.some(visibleRect))) {
       clearScene()
       return
     }
     const navRight = Math.max(0, ...nodes.nav.map((node) => visibleRect(node)?.right || 0))
-    const lanes = deskLanes(document.documentElement.clientWidth, window.innerHeight, navRight, center)
+    const width = document.documentElement.clientWidth
+    const height = window.innerHeight
+    const lanes = deskLanes(width, height, navRight, center)
     const obstacles = nodes.floats.map(visibleRect).filter(Boolean)
     scene = { lanes, obstacles }
-    const next = placeDeskItems(toValue(items), visitPlan, lanes, obstacles)
+    let objectObstacles = obstacles
+    if (isTablet.value) {
+      // 平板物件压在普通卡面上。桌边浮窗、导航和独立操作控件始终留给原页面。
+      objectObstacles = nodes.floats
+        .filter((node) => !node.matches('.home-page .dash-card'))
+        .concat(nodes.tabletNav)
+        .map(visibleRect)
+        .filter(Boolean)
+      for (const node of visibleControls) {
+        const rect = node.getBoundingClientRect()
+        if (rect.left > 68 && rect.right < width - 68) continue
+        // 大张可点击的卡片可从中部打开；角落的独立图标和输入区需要完整的点击范围。
+        const largeCard = rect.width > width / 2 || (rect.width >= 160 && rect.height >= 96)
+        if (largeCard && !node.matches('input,textarea,select,[contenteditable="true"]')) continue
+        if (rect.width && rect.height) objectObstacles.push(rect)
+      }
+    }
+    const next = placeDeskItems(toValue(items), visitPlan, lanes, objectObstacles, isTablet.value ? { width, height } : null)
     if (!samePlacements(placements.value, next)) placements.value = next
     if (pawTrail.value.length && !pawTrailFits(pawTrail.value, next, lanes, obstacles)) clearTrail()
   }
@@ -136,7 +177,11 @@ export function useDeskSpace(items, enabled = true, arrangement) {
   }
   function onTreeChange(records) {
     if (refresh) return schedule()
-    const relevant = (node) => node.nodeType === 1 && (nodes.tracked.has(node) || node.matches(LANDMARKS) || node.querySelector(LANDMARKS))
+    const selectors = isTablet.value ? LANDMARKS + ',' + CONTROL : LANDMARKS
+    const relevant = (node) =>
+      node.nodeType === 1 &&
+      !node.matches('[data-desk-layer]') &&
+      (nodes.tracked.has(node) || node.matches(selectors) || node.querySelector(selectors))
     for (const mutation of records) {
       if (mutation.target.closest?.('[data-desk-layer],.sun-light-layer')) continue
       if ([...mutation.addedNodes, ...mutation.removedNodes].some(relevant)) {
@@ -152,7 +197,7 @@ export function useDeskSpace(items, enabled = true, arrangement) {
     // 首轮也先留出安静时间。后台回到前台从新的一轮等待开始。
     const wait = Math.max(0, lastPawAt + cooldown - Date.now()) + (2 + 3 * Math.random()) * 60_000
     catTimer = setTimeout(() => {
-      if (!document.hidden && !reduced.matches && scene && Math.random() < 0.6) {
+      if (!document.hidden && !modalOpen.value && !reduced.matches && scene && Math.random() < 0.6) {
         const trail = placePawTrail(placements.value, scene.lanes, scene.obstacles)
         if (trail.length) {
           pawTrail.value = trail
@@ -178,6 +223,15 @@ export function useDeskSpace(items, enabled = true, arrangement) {
     running = true
     refresh = true
     resize = new ResizeObserver(schedule)
+    if (isTablet.value) {
+      controlObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && controls.has(entry.target)) visibleControls.add(entry.target)
+          else visibleControls.delete(entry.target)
+        }
+        schedule()
+      })
+    }
     attributes = new MutationObserver(schedule)
     tree = new MutationObserver(onTreeChange)
     tree.observe(document.body, { childList: true, subtree: true })
@@ -197,6 +251,9 @@ export function useDeskSpace(items, enabled = true, arrangement) {
     if (!running) return
     running = false
     resize.disconnect()
+    controlObserver?.disconnect()
+    controls.clear()
+    visibleControls.clear()
     attributes.disconnect()
     tree.disconnect()
     reduced.removeEventListener('change', onConditions)
@@ -227,15 +284,8 @@ export function useDeskSpace(items, enabled = true, arrangement) {
     } catch {
       /* 会话内仍有冷却 */
     }
-    stopActive = watch(
-      () => !isMobile.value && toValue(enabled),
-      (active) => (active ? start() : stop()),
-      { immediate: true },
-    )
+    start()
   })
-  onBeforeUnmount(() => {
-    stopActive?.()
-    stop()
-  })
-  return { placements, pawTrail }
+  onBeforeUnmount(stop)
+  return { placements, pawTrail, modalOpen }
 }

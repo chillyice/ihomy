@@ -11,7 +11,7 @@ export default {
   windowDesk: {
     title: 'The desk by the window',
     enabled: 'Place objects at the edges of the desk',
-    hint: 'When there is room, a few objects or a trail of paw prints may appear. These preferences stay on this device.',
+    hint: 'Objects sometimes rest in the margins or peek in from the edges on tablets. An occasional trail of paw prints passes by. These preferences stay on this device.',
     bind: 'Open when an object is selected',
     chooseObject: 'Choose a desk object',
     chooseDestination: 'Choose a destination',

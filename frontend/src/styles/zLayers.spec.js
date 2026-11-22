@@ -91,6 +91,7 @@ describe('全局层级标尺守门', () => {
     const chain = [
       '--z-content',
       '--z-sticky',
+      '--z-desk',
       '--z-nav',
       '--z-float',
       '--z-footer',

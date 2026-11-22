@@ -30,7 +30,14 @@
       <ScreensaverOverlay v-if="userStore.isLoggedIn && (isMobile || windowShell)" />
     </template>
     <WindowDesk
-      v-if="routeReady && isWide && !isMobile && desk.enabled && !immersive && !appStore.homeEditMode && !userStore.mustChangePassword"
+      v-if="
+        routeReady &&
+        (isTablet || (isWide && !isMobile)) &&
+        desk.enabled &&
+        !immersive &&
+        !appStore.homeEditMode &&
+        !userStore.mustChangePassword
+      "
       :tracks-only="standalone || userStore.isPureOps"
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
@@ -105,7 +112,7 @@ const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdat
 // 壳内判定(静态读一次,不随运行期变化)
 const isNative = isNativeApp()
 
-const { isMobile, isWide } = useDevice()
+const { isMobile, isWide, isTablet } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()

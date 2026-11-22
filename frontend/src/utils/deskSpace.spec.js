@@ -41,4 +41,36 @@ describe('window desk margins', () => {
     expect(pawTrailFits(trail, placed, large, [blocker])).toBe(false)
     expect(pawTrailFits(trail, placed, [], [])).toBe(false)
   })
+
+  it.each([
+    [768, 1024],
+    [1024, 768],
+    [820, 1180],
+  ])('peeks out of tablet edges with a visible touch target at %i × %i', (width, height) => {
+    const viewport = { width, height }
+    const placed = placeDeskItems(photos, plan, [], [], viewport)
+    expect(placed).toHaveLength(3)
+    expect(new Set(placed.map((p) => p.edge))).toEqual(new Set(['left', 'right']))
+    for (const { x, y, size } of placed) {
+      const onScreen = Math.min(x + size / 2, width) - Math.max(x - size / 2, 0)
+      expect(onScreen).toBeGreaterThanOrEqual(44)
+      expect(onScreen).toBeLessThan(size)
+      expect(y - size / 2).toBeGreaterThan(0)
+      expect(y + size / 2).toBeLessThan(height)
+    }
+    expect(placeDeskItems(photos, [], [], [], viewport)).toEqual([])
+  })
+
+  it('uses only one edge object in tablet split view and moves aside for controls and navigation', () => {
+    const viewport = { width: 540, height: 768 }
+    const rightRail = { left: 480, right: 540, top: 0, bottom: 768 }
+    const [left] = placeDeskItems(photos, plan, [], [rightRail], viewport)
+    expect(left.edge).toBe('left')
+    const button = { left: 0, right: 52, top: left.y - 20, bottom: left.y + 20 }
+    const moved = placeDeskItems(photos, plan, [], [rightRail, button], viewport)
+    expect(moved).toHaveLength(1)
+    expect(moved[0].edge).toBe('left')
+    expect(Math.abs(moved[0].y - left.y)).toBeGreaterThan(moved[0].size / 2 + 20)
+    expect(placeDeskItems(photos, plan, [], [rightRail, { ...rightRail, left: 0, right: 60 }], viewport)).toEqual([])
+  })
 })

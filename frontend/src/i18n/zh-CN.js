@@ -14,7 +14,7 @@ export default {
   windowDesk: {
     title: '窗下桌面',
     enabled: '在桌边摆放小物件',
-    hint: '桌边有空时，偶尔会出现一两件小物或一串猫爪印。摆放偏好保存在这台设备上。',
+    hint: '桌边有空时，偶尔会出现小物或一串猫爪印。在平板上，小物会从页面边缘探出。摆放偏好保存在这台设备上。',
     bind: '点击物品时打开',
     chooseObject: '选择桌面物品',
     chooseDestination: '选择打开的页面',
