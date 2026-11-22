@@ -56,6 +56,7 @@
      太阳光斑/窗影/体积光/雾/浮尘/雨雪/台灯照旧落在弹窗纸面上。 */
   --z-content: 10;
   --z-sticky: 30;
+  --z-desk: 40; /* 桌沿物件在正文上方，导航、模态与光影各用原有层级 */
   --z-nav: 60; /* 侧栏 / 移动端页头 / 移动端底栏 */
   --z-float: 62; /* 音乐播放器等常驻功能层(压在侧栏之上) */
   --z-float-top: 63; /* 浮窗拖动时的底部删除条:压在浮窗之上,低于页脚 */
@@ -323,16 +324,96 @@ html.theme-warm .card:hover {
   transform: translateY(-2px);
 }
 
-/* 顶部色带画在卡面内，编辑虚线、拖动占位和原卡片尺寸独立保留。 */
+/* 旧画册的纸板和卡纸共用同一张透明纤维。图层只画在实际首页的表面，
+ * 图片、天气与文字仍由原组件绘制；设备宽度只改变露出的面积。 */
+:root {
+  --home-grain: url('@/assets/materials/paper-grain.webp?no-inline');
+  --home-grain-size: 128px 128px;
+  --home-grain-veil: 82%;
+  --home-card-veil: 85%;
+  --desk-paper-wash: rgba(var(--color-card-rgb), var(--home-grain-veil));
+  --home-paper-ground: linear-gradient(var(--desk-paper-wash), var(--desk-paper-wash)), var(--home-grain);
+}
+html.theme-warm {
+  --home-grain-veil: 76%;
+}
+html.theme-window {
+  --home-grain-veil: 85%;
+}
+html.dark {
+  --home-card-veil: 88%;
+}
+
+/* 页面大底。窗边有自己的不透明壳；暖居的天气照片位于根底纸之上。 */
+@supports (color: color-mix(in srgb, black, transparent)) {
+  :root {
+    --desk-paper-wash: color-mix(in srgb, var(--color-bg) var(--home-grain-veil), transparent);
+  }
+}
+html:has(.gc-home, .home-page, .mobile-home, .elder-home),
+html .window-shell:has(.wh, .elder-home) {
+  background-image: var(--home-paper-ground);
+  background-size: auto, var(--home-grain-size);
+}
+/* 老 iPad 在实际首页容器上铺纸，离开页面时跟随 Vue 组件收起。 */
+@supports not selector(:has(*)) {
+  .gc-home,
+  .home-page,
+  .mobile-home,
+  .wh,
+  .elder-home {
+    background-image: var(--home-paper-ground);
+    background-size: auto, var(--home-grain-size);
+  }
+}
+
+/* 暖居卡面以色带、薄纸色、纤维三层分别绘制，卡片自身保留实色底和边框。 */
 html.theme-warm .gc-home .gc-card:not(.gc-card-preview),
 html.theme-warm .mobile-home .feed-list .feed-card {
-  background-image: linear-gradient(var(--leaf-accent), var(--leaf-accent));
-  background-position: top;
-  background-repeat: no-repeat;
-  background-size: 100% 5px;
+  --home-strip-height: 5px;
+  --card-paper-wash: rgba(var(--color-card-rgb), var(--home-card-veil));
+  background-image:
+    linear-gradient(var(--leaf-accent), var(--leaf-accent)), linear-gradient(var(--card-paper-wash), var(--card-paper-wash)),
+    var(--home-grain);
+  background-position:
+    top,
+    center,
+    top left;
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-size:
+    100% var(--home-strip-height),
+    auto,
+    var(--home-grain-size);
 }
 html.theme-warm .mobile-home .feed-list .feed-card {
-  background-size: 100% 3px;
+  --home-strip-height: 3px;
+}
+
+/* 光尘的透明卡、手机筛选条和窗边头图各有自己的底色，颗粒只落于卡头/题签。
+ * 伪元素在局部负层绘制，照片原色、文字和触摸热区都留在上方。 */
+.home-page .dash-card:not(.weather) .card-head,
+.mobile-home .filter-scroll,
+html.theme-guangchen .mobile-home .feed-card-head,
+.wh .wh-head,
+.wh .wh-feature-copy,
+.elder-home .elder-head {
+  position: relative;
+  isolation: isolate;
+}
+.home-page .dash-card:not(.weather) .card-head::before,
+.mobile-home .filter-scroll::before,
+html.theme-guangchen .mobile-home .feed-card-head::before,
+.wh .wh-head::before,
+.wh .wh-feature-copy::before,
+.elder-home .elder-head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--home-grain) top left / var(--home-grain-size) repeat;
+  opacity: 0.16;
 }
 
 /* 次级按钮:光尘硬编码 #f3eee6/#5c4c3d → 暖居 --line 底/--text-2 字,hover --card-2(视觉解析 §6.2) */

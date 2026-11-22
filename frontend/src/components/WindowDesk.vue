@@ -1,13 +1,21 @@
 <template>
   <Teleport to="body">
-    <div v-if="placements.length || pawTrail.length" class="window-desk" data-desk-layer>
+    <div
+      v-if="placements.length || pawTrail.length"
+      class="window-desk"
+      data-desk-layer
+      :inert="modalOpen"
+      :aria-hidden="modalOpen || undefined"
+    >
       <router-link
-        v-for="{ item, x, y, size, angle } in placements"
+        v-for="{ item, x, y, size, angle, edge } in placements"
         :key="item.key"
         :to="item.to"
         :aria-label="t(item.labelKey, item.labelParams || {})"
+        :tabindex="modalOpen ? -1 : undefined"
         class="desk-object"
         :class="{ 'round-object': item.kind === 'cup' }"
+        :data-edge="edge"
         :style="{ left: x + 'px', top: y + 'px', width: size + 'px', '--desk-angle': angle + 'deg' }"
       >
         <span class="desk-illustration" aria-hidden="true">
@@ -65,7 +73,7 @@ const { candidates } = useDeskObjects(
 const drawable = computed(() =>
   props.tracksOnly ? [] : candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))),
 )
-const { placements, pawTrail } = useDeskSpace(drawable, true, arrangement)
+const { placements, pawTrail, modalOpen } = useDeskSpace(drawable, arrangement)
 
 function paperStyle(item) {
   const wear = Math.min(1, (item.ageDays || 0) / 10)
@@ -81,7 +89,7 @@ function paperStyle(item) {
 .window-desk {
   position: fixed;
   inset: 0;
-  z-index: var(--z-content);
+  z-index: var(--z-desk);
   overflow: clip;
   pointer-events: none;
   contain: layout style;
@@ -105,6 +113,9 @@ html.dark .window-desk {
 }
 .desk-object.round-object {
   border-radius: 50%;
+}
+.window-desk[aria-hidden='true'] .desk-object {
+  pointer-events: none;
 }
 .desk-object:focus-visible {
   outline: 2px solid var(--leaf-accent);
@@ -187,6 +198,19 @@ html.dark .desk-illustration {
 }
 .desk-object:is(:hover, :focus-visible) .desk-hint {
   opacity: 1;
+}
+.desk-object[data-edge] .desk-hint {
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 10em;
+}
+.desk-object[data-edge='left'] .desk-hint {
+  left: 100%;
+}
+.desk-object[data-edge='right'] .desk-hint {
+  right: 100%;
 }
 .desk-steam {
   position: absolute;

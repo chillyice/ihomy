@@ -47,16 +47,36 @@ function findSpace(slot, lanes, obstacles, preferred, minimum) {
   return null
 }
 
-export function placeDeskItems(items, plan, lanes, obstacles) {
+// 平板在视口外藏起半张图，只让约一指宽的部分探入正文。触控区也由视口裁切。
+function findEdgeSpace(slot, width, height, occupied, size) {
+  const radius = Math.ceil(size * 0.58) + 4
+  const inset = Math.round(6 + slot.u * 6)
+  const end = radius + 24
+  if (height < end * 2) return null
+  for (const side of [slot.side, 1 - slot.side]) {
+    const x = side === 0 ? inset : width - inset
+    for (const v of [slot.v, 0.18, 0.32, 0.48, 0.64, 0.82, 0.94, 0.07]) {
+      const y = Math.round(end + (height - end * 2) * v)
+      const box = bounds(x, y, radius)
+      if (!occupied.some((obstacle) => overlaps(box, obstacle))) return { x, y, size, box, edge: side === 0 ? 'left' : 'right' }
+    }
+  }
+  return null
+}
+
+export function placeDeskItems(items, plan, lanes, obstacles, tabletViewport) {
   const result = []
   const occupied = obstacles.slice()
   for (const item of items) {
     const slot = plan[result.length]
     if (!slot) break
-    const seat = findSpace(slot, lanes, occupied, item.kind === 'leaf' ? 84 : 134, item.kind === 'cup' ? 64 : 48)
+    if (tabletViewport && tabletViewport.width < 600 && result.length) break
+    const seat = tabletViewport
+      ? findEdgeSpace(slot, tabletViewport.width, tabletViewport.height, occupied, item.kind === 'leaf' ? 74 : 84)
+      : findSpace(slot, lanes, occupied, item.kind === 'leaf' ? 84 : 134, item.kind === 'cup' ? 64 : 48)
     if (!seat) continue
     const { x, y, size, box } = seat
-    result.push({ item, x, y, size, angle: slot.angle })
+    result.push({ item, x, y, size, angle: slot.angle, edge: seat.edge })
     occupied.push(box)
   }
   return result
