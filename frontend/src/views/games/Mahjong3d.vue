@@ -523,7 +523,8 @@ function applyMingGang(seat, fromSeat, kind) {
   lastDiscard.value = null
   drawRinshan(seat)
 }
-function applySeatGang(seat, { kind, type }) {
+/** 自己回合内的杠(暗杠:四张全亮;补杠:碰出后再摸到一张),摸岭上牌补位;杠意图里类型在 gangType(type 固定为 'gang') */
+function applySeatGang(seat, { kind, gangType: type }) {
   if (type === 'bugang') {
     const ids = hands.value[seat].filter((id) => mahjongKind(id) === kind).slice(0, 1)
     if (!ids.length) return
