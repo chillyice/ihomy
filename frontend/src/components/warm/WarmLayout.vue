@@ -17,7 +17,7 @@
       <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
       <div class="gc-topbar">
         <div v-a11y-click class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
-          <img class="gc-logo" :src="familyCover || windowMark" alt="" />
+          <img class="gc-logo" :src="familyCover || themeStore.windowMark" alt="" />
           <div>
             <h1 class="gc-title">{{ familyName || 'ihomy' }}</h1>
             <p class="gc-sub">{{ familyDescription || $t('warm.tagline') }}</p>
@@ -157,7 +157,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { useAppStore } from '@/stores/app'
-import windowMark from '@/assets/brand/ihomy-window-96.png'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'

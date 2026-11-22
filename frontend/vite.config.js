@@ -71,8 +71,8 @@ export default defineConfig(({ mode }) => {
                 name: 'ihomy',
                 short_name: '家庭',
                 description: '家庭成员共用内容平台',
-                theme_color: '#045246',
-                background_color: '#ffffff',
+                theme_color: '#F1E7D6',
+                background_color: '#F1E7D6',
                 display: 'standalone',
                 start_url: '/',
                 icons: [

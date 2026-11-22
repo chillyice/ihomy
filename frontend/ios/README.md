@@ -93,11 +93,10 @@ App Group 统一 `group.top.ihomy.app`,三 target 共用同一份 `App/App.entit
 
 ## 图标与启动图
 
-`AppIcon.appiconset/AppIcon-512@2x.png`(1024×1024)与 `Splash.imageset/splash-2732x2732*.png`(2732×2732 ×3 档)
-均取自 `frontend/src/assets/brand/ihomy-window.png`（深青底、暖白窗框和杏黄色窗扇）。
-AppIcon 将深青底铺满方形画布并导出为 RGB，由 iOS 裁切圆角。
-启动图在白底中央使用圆角图标。换品牌时按同样约束重出即可，
-三档 splash 用同一张图(contentMode 是 scaleAspectFill,居中元素不会被裁)。
+`AppIcon.appiconset` 与 `Splash.imageset` 使用 `frontend/src/assets/brand/` 下的 `ihomy-window.png` 和 `ihomy-window-dark.png`。
+左扇叶始终为牛油果绿。浅色图标为棕底、米白右扇，深色图标为米白底、棕色右扇。
+桌面图标以 1024×1024 RGB 格式铺满画布，由 iOS 裁切圆角。iOS 18 起可选用深色桌面图标。
+启动图按系统外观选图，在 2732×2732 画布中央显示圆角图标，浅色画布为米白，深色画布为棕色。
 
 ## 尚未验证(需真机 / macOS)
 

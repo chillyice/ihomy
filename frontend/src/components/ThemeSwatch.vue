@@ -21,7 +21,7 @@
             <span v-for="n in 5" :key="n" class="ts-dust" :class="`d${n}`"></span>
           </template>
           <!-- 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒 -->
-          <img v-else-if="s.id === 'window'" class="ts-window-mark" :src="windowMark" alt="" />
+          <img v-else-if="s.id === 'window'" class="ts-window-mark" :src="themeStore.windowMark" alt="" />
           <template v-else>
             <span class="ts-glow"></span>
             <span class="ts-window"></span>
@@ -39,7 +39,6 @@
 import { computed } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useI18n } from 'vue-i18n'
-import windowMark from '@/assets/brand/ihomy-window-96.png'
 
 const themeStore = useThemeStore()
 const { t } = useI18n()

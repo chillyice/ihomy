@@ -1,9 +1,11 @@
 <template>
-  <span class="ihomy-wordmark"><img :src="windowMark" alt="" />ihomy</span>
+  <span class="ihomy-wordmark"><img :src="themeStore.windowMark" alt="" />ihomy</span>
 </template>
 
 <script setup>
-import windowMark from '@/assets/brand/ihomy-window-96.png'
+import { useThemeStore } from '@/stores/theme'
+
+const themeStore = useThemeStore()
 </script>
 
 <style scoped>

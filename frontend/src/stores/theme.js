@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { loadTheme, applyTheme, THEMES, THEME_IDS } from '@/theme'
+import { loadTheme, applyTheme, windowMarkForMode, THEMES, THEME_IDS } from '@/theme'
 
 // 主题系统唯一数据源:theme(暖居/光尘)× mode(晨/暮)+ autoMode(日出日落自动切晨暮)
 export const useThemeStore = defineStore('theme', {
@@ -7,6 +7,7 @@ export const useThemeStore = defineStore('theme', {
   getters: {
     themes: () => THEME_IDS.map((id) => ({ id, ...THEMES[id] })),
     isDusk: (s) => s.mode === 'dusk',
+    windowMark: (s) => windowMarkForMode(s.mode),
   },
   actions: {
     _apply() {
