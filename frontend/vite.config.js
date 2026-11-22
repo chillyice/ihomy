@@ -87,7 +87,6 @@ export default defineConfig(({ mode }) => {
                   'registerSW.js',
                   'pwa-*.png',
                   'assets/*.{js,css}',
-                  'assets/{sitting-room,walnut}-*.webp',
                   'assets/qweather-icons-*.woff2',
                   'demo/*.svg',
                 ],
@@ -95,10 +94,7 @@ export default defineConfig(({ mode }) => {
                   (entries) => ({
                     manifest: entries.filter(
                       ({ url }) =>
-                        !url.startsWith('assets/') ||
-                        shellFiles.has(url) ||
-                        /^assets\/qweather-icons-.*\.(css|woff2)$/.test(url) ||
-                        /^assets\/(?:sitting-room|walnut)-.*\.webp$/.test(url),
+                        !url.startsWith('assets/') || shellFiles.has(url) || /^assets\/qweather-icons-.*\.(css|woff2)$/.test(url),
                     ),
                     warnings: [],
                   }),

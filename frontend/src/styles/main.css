@@ -15,6 +15,8 @@
   --color-text-tertiary: #8a7a64;
   /* 成功/连接状态(与收支绿区分:那是金额语义色,亮度更低) */
   --color-green: #6f8060;
+  /* 牛油果叶绿：仅用于首页组件顶边、分区标题细线和页签指示线。 */
+  --leaf-accent: #6d7f40;
   /* 主文字色语义别名:与 --color-text 同值,组件按语义引用(深色由 html.dark 覆写) */
   --color-text-primary: var(--color-text);
   /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码。
@@ -178,6 +180,7 @@ html.dark {
   --color-text-secondary: #b0a898;
   --color-text-tertiary: #9a8767;
   --color-green: #8fa080;
+  --leaf-accent: #a6b784;
   /* 深色底上提亮一档,保证收支数字的对比度 */
   --color-income: #86d162;
   --color-expense: #f78989;
@@ -312,6 +315,18 @@ html.theme-warm .card {
 html.theme-warm .card:hover {
   box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
+}
+
+/* 顶部色带画在卡面内，编辑虚线、拖动占位和原卡片尺寸独立保留。 */
+html.theme-warm .gc-home .gc-card:not(.gc-card-preview),
+html.theme-warm .mobile-home .feed-list .feed-card {
+  background-image: linear-gradient(var(--leaf-accent), var(--leaf-accent));
+  background-position: top;
+  background-repeat: no-repeat;
+  background-size: 100% 5px;
+}
+html.theme-warm .mobile-home .feed-list .feed-card {
+  background-size: 100% 3px;
 }
 
 /* 次级按钮:光尘硬编码 #f3eee6/#5c4c3d → 暖居 --line 底/--text-2 字,hover --card-2(视觉解析 §6.2) */
@@ -1802,6 +1817,9 @@ html.dark .page h2 {
   padding-left: 10px;
   border-left: 3px solid var(--color-accent);
 }
+:where(.app-main, .gc-root, .window-shell, .mobile-layout) .section-label {
+  border-left-color: var(--leaf-accent);
+}
 html.dark .section-label {
   color: #e8dcc8;
 }
@@ -2803,6 +2821,10 @@ html.dark .el-tabs__active-bar {
 html.dark .el-dialog .el-tabs__active-bar {
   background: var(--color-brand) !important;
   opacity: 0.5 !important;
+}
+:is(.app-main, .gc-root, .window-shell, .mobile-layout) .el-tabs__active-bar:not(.el-dialog *) {
+  background-color: var(--leaf-accent) !important;
+  opacity: 1 !important;
 }
 .el-dialog .el-tabs__nav-wrap::after {
   display: none !important;

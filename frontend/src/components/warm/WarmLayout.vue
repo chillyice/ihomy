@@ -1,7 +1,7 @@
 <!-- 暖居(Warm Dwelling)主题桌面外壳:顶栏 + studio 外框 + 230px 侧栏 + 主区 -->
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
-  <div class="gc-root" :class="{ scrolled, 'gc-room-shell': route.path === '/home' && !isElder }">
+  <div class="gc-root" :class="{ scrolled: scrolled }">
     <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下);指针静止 1 分钟浮到最前,轻点/滑动即收起 -->
     <div
       v-if="weatherBg"
@@ -1023,112 +1023,4 @@ html.theme-warm .gc-main .fp-page {
    `useDevice` 的 768px(平板短边够宽就走桌面外壳)。这里原先在 ≤880px 把侧栏 display:none,
    769–880 这段就没有任何导航——iPad 竖屏(810/820/834)正好整段落在这里,只剩内容栏。
    真窄到需要收起时,外壳本身已经换成 MobileLayout(底部 TabBar),所以这里不再做窄屏隐藏。 */
-
-/* 首页左侧的内嵌木柜：上层是门牌，中间是导航，柜底用细藤编面收口。 */
-.gc-room-shell .gc-wrap {
-  max-width: 1320px;
-  padding-block: 18px 22px;
-}
-.gc-room-shell .gc-topbar {
-  margin-bottom: 14px;
-}
-.gc-room-shell .gc-studio {
-  background: var(--room-wall);
-  border: 1px solid var(--room-rule);
-  border-radius: 11px;
-}
-.gc-room-shell .gc-app {
-  grid-template-columns: clamp(154px, 16vw, 208px) minmax(0, 1fr);
-}
-.gc-room-shell .gc-main {
-  padding: clamp(14px, 1.65vw, 24px);
-}
-.gc-room-shell .gc-side {
-  border-right: 4px solid var(--room-wood-dark);
-  background: var(--room-walnut) var(--room-veneer) center / 370px auto;
-  color: var(--room-cream);
-  --color-text: var(--room-cream);
-  --color-text-secondary: #f3e5c7;
-  --color-text-tertiary: #e9d4ae;
-  --color-line: rgba(253, 232, 187, 0.13);
-  --color-border: rgba(253, 232, 187, 0.44);
-  --color-card: var(--room-wood-dark);
-  --color-brand: var(--room-ochre);
-  --color-brand-rgb: 211, 166, 87;
-  --color-green: var(--room-cream);
-}
-.gc-room-shell .gc-user {
-  padding: 17px 14px;
-  gap: 8px;
-  background: rgba(39, 20, 12, 0.46);
-  border-bottom: 2px solid rgba(37, 22, 14, 0.52);
-}
-.gc-room-shell .gc-nav {
-  margin: 0 6px;
-  padding: 12px 8px;
-  background: var(--room-moss);
-  box-shadow: inset 0 2px 6px rgba(27, 24, 13, 0.28);
-}
-.gc-room-shell .gc-nav-group {
-  border-bottom: 1px solid var(--color-line);
-  padding-bottom: 3px;
-}
-.gc-room-shell .gc-nav-group-head {
-  font-size: 12px;
-  color: var(--room-cream);
-}
-.gc-room-shell .gc-nav-item {
-  padding-block: 9px;
-  border-radius: 4px;
-}
-.gc-room-shell .gc-dot {
-  width: 4px;
-  height: 4px;
-  background: var(--room-ochre);
-  opacity: 1;
-}
-.gc-room-shell .gc-nav-item.act .gc-dot {
-  background: currentColor;
-}
-.gc-room-shell .gc-side::after {
-  content: '';
-  flex: 0 0 clamp(22px, 5vh, 48px);
-  margin: 9px 12px;
-  border: 2px solid var(--room-wood-dark);
-  border-radius: 3px;
-  background:
-    repeating-linear-gradient(45deg, transparent 0 3px, #b99765 3px 4px, transparent 4px 6px),
-    repeating-linear-gradient(-45deg, #392d21 0 2px, #846746 2px 4px);
-}
-/* 房间照片自带窗影，仅在这面客厅墙上收淡实时时刻的第二层投影。 */
-html:has(.gc-room-shell) .window-shadow {
-  opacity: calc(var(--shadow-alpha, 0.7) * 0.24);
-}
-html:has(.gc-room-shell) :is(.light-bloom, .light-source) {
-  opacity: 0.35;
-}
-html.theme-warm:has(.gc-room-shell) .site-footer {
-  right: calc(max(0px, (100vw - 1320px) / 2) + 28px);
-}
-@media (max-width: 1000px) {
-  .gc-room-shell .gc-wrap {
-    padding: 14px 10px 20px;
-  }
-  .gc-room-shell .gc-user {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    padding-inline: 8px;
-    row-gap: 4px;
-  }
-  .gc-room-shell .gc-mini-weather {
-    grid-column: 2;
-    justify-self: start;
-    padding: 0;
-  }
-}
-@media (max-height: 680px) {
-  .gc-room-shell .gc-side::after {
-    content: none;
-  }
-}
 </style>

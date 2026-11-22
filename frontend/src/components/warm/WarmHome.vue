@@ -3,9 +3,8 @@
   <div class="gc-home" :class="{ 'gc-editing': editMode }">
     <!-- 分享落地:被分享家庭的封面门脸(自己家不挂) -->
     <FamilyCoverBanner v-if="showDoorSign" :family="appStore.family" class="gc-door-sign" />
-    <WarmRoomScene class="gc-main-head">
-      <div class="gc-greeting">
-        <p class="gc-room-date">{{ roomDate }}</p>
+    <div class="gc-main-head">
+      <div>
         <h2 class="gc-h2">{{ greeting }}</h2>
         <div class="gc-subline">
           {{ familyName }} · {{ $t('warm.members', { n: memberCount }) }}
@@ -14,7 +13,7 @@
           </router-link>
         </div>
       </div>
-      <template #actions>
+      <div class="gc-head-btns">
         <template v-if="!editMode">
           <button v-if="canEdit" class="gc-btn ghost sm" @click="startEdit">{{ $t('warm.editHome') }}</button>
           <button class="gc-btn primary sm" @click="$router.push('/blog')">{{ $t('warm.postSomething') }}</button>
@@ -24,8 +23,8 @@
           <button class="gc-btn ghost sm" @click="resetLayout">{{ $t('warm.resetLayout') }}</button>
           <button class="gc-btn primary sm" @click="finishEdit">{{ $t('warm.done') }}</button>
         </template>
-      </template>
-    </WarmRoomScene>
+      </div>
+    </div>
 
     <!-- 编辑提示条 -->
     <Transition name="gc-fade">
@@ -132,8 +131,7 @@
               v-a11y-click
               @click="!editMode && goFeed(f)"
             >
-              <span v-if="w.featured" class="gc-letter-stamp">{{ feedTypeLabel(t, f.type) }}</span>
-              <span v-else class="gc-ic" :style="feedChipStyle(f.type)">{{ feedIcon(f.type) }}</span>
+              <span class="gc-ic" :style="feedChipStyle(f.type)">{{ feedIcon(f.type) }}</span>
               <template v-if="w.featured">
                 <span class="gc-feed-entry">
                   <span class="gc-feed-title">{{ feedSummary(f) }}</span>
@@ -177,7 +175,7 @@
                 <img :src="p.url" :alt="p.description || ''" loading="lazy" />
               </div>
             </template>
-            <div v-if="!w.featured" class="gc-photo-meta">
+            <div class="gc-photo-meta">
               <span class="gc-photo-cap">{{ photoCaption }}</span>
               <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
             </div>
@@ -201,27 +199,17 @@
           <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="!editMode && $router.push('/album')">
             {{ $t('warm.addPhoto') }}
           </div>
-          <div v-if="w.featured && photos.length" class="gc-picture-legend">
-            <span :title="photoCaption">{{ photoCaption }}</span>
-            <small>{{ photoIndex + 1 }} / {{ photos.length }}</small>
-          </div>
         </template>
 
         <!-- 纪念日 -->
         <template v-else-if="w.id === 'anni'">
           <h3 class="gc-card-h3">{{ $t('warm.widget.anni') }}</h3>
           <template v-if="anniversaries.length">
-            <div class="gc-calendar-face">
-              <time v-if="anniversaryDate && w.row >= 2" class="gc-calendar-date" :datetime="anniversaries[0].date">
-                <span>{{ anniversaryDate.y }}.{{ String(anniversaryDate.m).padStart(2, '0') }}</span>
-                <b>{{ anniversaryDate.d }}</b>
-              </time>
-              <div class="gc-calendar-event">
-                <div class="gc-val-lg">{{ anniversaries[0].label }}</div>
-                <span v-if="!anniversaryDate || w.row < 2" class="gc-muted">{{ anniversaries[0].date }} · </span>
-                <span class="gc-days">{{ $t('warm.daysLeft', { n: anniversaries[0].days }) }}</span>
-              </div>
+            <div class="gc-val-lg">{{ anniversaries[0].label }}</div>
+            <div class="gc-muted">
+              {{ anniversaries[0].date }} · <span class="gc-days">{{ $t('warm.daysLeft', { n: anniversaries[0].days }) }}</span>
             </div>
+            <div class="gc-meter"><i :style="{ width: Math.min(100, anniversaries[0].days) + '%' }"></i></div>
             <div v-if="nAnni(w) > 1" class="gc-list gc-anni-more">
               <div v-for="(a, i) in anniversaries.slice(1, nAnni(w))" :key="i" class="gc-row">
                 <span class="gc-ic">🎂</span><span class="gc-val">{{ a.label }}</span
@@ -443,7 +431,6 @@
       </div>
     </div>
 
-    <div v-if="displayWidgets.length" class="gc-ledge" aria-hidden="true"></div>
     <!-- 添加组件托盘(编辑态) -->
     <Transition name="gc-fade">
       <div v-if="editMode && availableWidgets.length" class="gc-add-tray">
@@ -465,7 +452,6 @@ import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
-import WarmRoomScene from '@/components/warm/WarmRoomScene.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { pickInsertIndex } from '@/utils/dragInsert'
@@ -474,9 +460,8 @@ import { bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
 import { buildAgenda } from '@/utils/agenda'
-import { feedPath, feedTypeLabel, feedSummary as feedSummaryOf } from '@/utils/feed'
-import { formatDate, formatDateTime } from '@/utils/datetime'
-import { parseDate } from '@/utils/date'
+import { feedPath, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { formatDate } from '@/utils/datetime'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { useHomeCardData } from '@/composables/useHomeCardData'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
@@ -511,7 +496,6 @@ const familyName = computed(() => appStore.familyName)
 const showDoorSign = computed(() => showCoverBanner(appStore.family, userStore.userInfo?.familyId))
 const memberCount = computed(() => appStore.stats.memberCount || 0)
 const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
-const anniversaryDate = computed(() => parseDate(anniversaries.value[0]?.date))
 
 // ========== 组件注册表 + 布局(localStorage 持久化) ==========
 // 9 个富组件(有专属内容模板);span=8/4 对应 12 列栅格分栏
@@ -605,13 +589,13 @@ const resolveWidget = (entry) => {
   return { ...base, label: widgetLabel(base), span: entry.span || base.span, row, featured: entry.featured === true }
 }
 
-// 相框和信件架、台历并排落在同一柜面。自定义布局继续按保存的顺序和跨度摆放。
+// 新布局首屏：左侧家庭照片，右侧两张短列表。旧排版继续使用原有卡片样式。
 const DEFAULT_LAYOUT = [
-  { id: 'photos', span: 6, row: 4, featured: true },
-  { id: 'feed', span: 6, row: 2, featured: true },
-  { id: 'anni', span: 6, row: 2 },
-  { id: 'reminder', span: 6, row: 2, featured: true },
-  { id: 'finance', span: 6, row: 2 },
+  { id: 'photos', span: 8, row: 6, featured: true },
+  { id: 'reminder', span: 4, row: 3, featured: true },
+  { id: 'feed', span: 4, row: 3, featured: true },
+  { id: 'anni', span: 4, row: 3 },
+  { id: 'finance', span: 8, row: 3 },
 ]
 const STORAGE_KEY = 'ihomy:guangchen:home:v3'
 const LEGACY_KEY = 'ihomy:guangchen:home:v1'
@@ -1531,7 +1515,6 @@ const taskIcon = (type) => TASK_REWARD_ICON[type] || '⭕'
 
 // 问候语:走 now ref + interval,跨小时/切语言都能刷新(computed 内禁 new Date())
 const now = ref(new Date())
-const roomDate = computed(() => formatDateTime(now.value, { month: 'long', day: 'numeric', weekday: 'long' }))
 let clockTimer = null
 const greeting = computed(() => {
   const h = now.value.getHours()
@@ -1561,56 +1544,41 @@ html.theme-warm.dark .gc-home {
 }
 
 .gc-main-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
   margin-bottom: 20px;
-}
-.gc-room-date {
-  margin: 0 0 9px;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
 }
 /* 分享门脸:与下方问候标题同宽 16:9 横幅 */
 .gc-door-sign {
   margin-bottom: 20px;
 }
 .gc-h2 {
-  font-size: clamp(24px, 2.7vw, 42px);
-  line-height: 1.12;
+  font-size: 20px;
   margin: 0;
-  font-weight: 700;
-  text-wrap: balance;
+  font-weight: 650;
+  color: var(--color-text);
 }
 .gc-subline {
   font-size: 12.5px;
-  margin-top: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 3px;
 }
 .gc-weather-link {
   margin-inline-start: 10px;
   padding-inline-start: 10px;
   border-inline-start: 1px solid var(--color-line);
-  color: inherit;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
-.gc-main-head .gc-btn.primary {
-  color: var(--room-wood-dark);
-  background: var(--room-ochre);
-  border-color: var(--room-ochre);
-}
-.gc-main-head .gc-btn.ghost {
-  color: var(--room-cream);
-  background: color-mix(in srgb, var(--room-wood-dark) 84%, transparent);
-  border-color: color-mix(in srgb, var(--room-cream) 65%, transparent);
-}
-.gc-main-head .gc-btn:hover,
-.gc-main-head .gc-btn:focus-visible {
-  color: var(--room-wood-dark);
-  background: var(--room-cream);
-  border-color: var(--room-cream);
+.gc-head-btns {
+  display: flex;
+  gap: 8px;
 }
 
 .gc-grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(12, 1fr);
   grid-auto-rows: 80px;
   gap: 16px;
 }
@@ -1677,11 +1645,10 @@ html.theme-warm.dark .gc-home {
 
 /* 卡片 = 家具块 */
 .gc-card {
-  min-width: 0;
-  background: var(--room-paper);
-  border: 1px solid var(--room-rule);
-  border-radius: 5px;
-  box-shadow: 0 4px 9px rgba(48, 30, 16, 0.12);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
   padding: 18px;
   position: relative;
   overflow: hidden;
@@ -1693,10 +1660,10 @@ html.theme-warm.dark .gc-home {
   box-shadow: var(--shadow-hover);
 }
 .gc-card-h3 {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
   margin: 0 0 12px;
-  color: var(--room-ink);
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1705,39 +1672,11 @@ html.theme-warm.dark .gc-home {
  * 让 6 张卡不再共用同一个「米色面 + 棕字」 */
 .gc-card-h3::before {
   content: '';
-  width: 14px;
-  height: 3px;
+  width: 3px;
+  height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
   background: rgba(var(--chip, var(--color-brand-rgb)), var(--bar-a));
-}
-/* 矮柜的胡桃木前沿与下方两只锥脚，独立于参与拖拽的网格。 */
-.gc-ledge {
-  position: relative;
-  height: 9px;
-  margin: 3px 0 22px;
-  background: var(--room-walnut) var(--room-veneer) center / 320px 160px;
-  border-bottom: 3px solid var(--room-wood-dark);
-  border-radius: 1px 1px 3px 3px;
-  box-shadow: 0 5px 8px rgba(45, 28, 16, 0.18);
-}
-.gc-ledge::before,
-.gc-ledge::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  width: 8px;
-  height: 12px;
-  background: var(--room-walnut);
-  border-radius: 0 0 2px 2px;
-}
-.gc-ledge::before {
-  left: 3%;
-  transform: skewX(-12deg);
-}
-.gc-ledge::after {
-  right: 3%;
-  transform: skewX(12deg);
 }
 /* 右侧附属文字(收支月份/寻物户型名)推到行尾;末位是「更多」按钮时由 .gc-more 自己的 margin-left:auto 接管 */
 .gc-card-h3 > .gc-muted:last-child {
@@ -1920,35 +1859,6 @@ html.theme-warm.dark .gc-home {
   display: flex;
   flex-direction: column;
 }
-.gc-photos:not(.gc-card-tile) {
-  padding: clamp(10px, 1.4vw, 20px);
-  border: 8px solid transparent;
-  border-radius: 2px;
-  background:
-    linear-gradient(var(--room-paper), var(--room-paper)) padding-box,
-    var(--room-veneer) center / 320px 160px border-box,
-    var(--room-walnut);
-  box-shadow:
-    inset 0 1px 3px rgba(59, 38, 21, 0.25),
-    0 5px 10px rgba(42, 27, 16, 0.22);
-}
-.gc-photos.gc-card-edit {
-  outline: 2px dashed var(--color-accent);
-  outline-offset: -5px;
-}
-.gc-photos .gc-card-h3 {
-  margin-bottom: 10px;
-}
-.gc-photos .gc-card-h3::before {
-  display: none;
-}
-.gc-photos .gc-empty-link {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--room-rule);
-  color: var(--room-muted);
-}
 .gc-photo-stack {
   position: relative;
   flex: 1;
@@ -2006,8 +1916,8 @@ html.theme-warm.dark .gc-home {
   transform: translateY(0);
 }
 .gc-featured .gc-photo-stack {
-  border: 1px solid var(--room-rule);
-  border-radius: 1px;
+  border-radius: 10px;
+  min-height: 180px;
 }
 .gc-photo-lead {
   position: absolute;
@@ -2016,29 +1926,24 @@ html.theme-warm.dark .gc-home {
   height: 100%;
   object-fit: cover;
 }
-.gc-picture-legend {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 10px;
-  color: var(--room-ink);
-  font-size: 13px;
-  font-weight: 600;
+.gc-featured .gc-photo-meta {
+  inset: auto 0 0;
+  opacity: 1;
+  transform: none;
+  padding: 48px 16px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
 }
-.gc-picture-legend span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.gc-featured .gc-photo-cap,
+.gc-featured .gc-photo-count {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
-.gc-picture-legend small {
-  flex: none;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--room-muted);
-}
-.gc-photos.gc-r1 .gc-picture-legend {
-  display: none;
+.gc-featured .gc-photo-cap {
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .gc-photo-cap {
   font-size: 12px;
@@ -2110,7 +2015,7 @@ html.theme-warm.dark .gc-home {
   cursor: pointer;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--room-muted);
+  color: var(--color-text-tertiary);
   transition: color 0.2s;
 }
 .gc-more:hover {
@@ -2614,79 +2519,24 @@ html.dark .gc-glass::after {
   color: var(--color-card);
 }
 
-/* 绿色台历：大号日期翻页，旁边留给事件名和倒数。 */
-.gc-card[data-wid='anni']:not(.gc-card-tile) {
-  background: var(--room-moss);
-  color: var(--room-cream);
-  border-bottom: 5px solid var(--room-wood-dark);
+/* 进度条 */
+/* 进度条:填充改纯陶土实色 —— 原先 brand→accent 渐变在窄幅里大半还是棕色,是页面唯一能读出陶土粉的地方却读不出来 */
+.gc-meter {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--color-line);
+  overflow: hidden;
+  margin-top: 8px;
 }
-.gc-card[data-wid='anni'] :is(.gc-card-h3, .gc-val-lg, .gc-val, .gc-muted, .gc-empty) {
-  color: inherit;
-}
-.gc-card[data-wid='anni'] .gc-card-h3::before {
-  background: var(--room-ochre);
-}
-.gc-calendar-face {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.gc-calendar-date {
-  display: grid;
-  align-content: start;
-  flex: none;
-  min-width: 65px;
-  text-align: center;
-  background: var(--room-cream);
-  color: var(--room-wood-dark);
-  border-radius: 3px;
-  box-shadow:
-    0 2px 0 var(--room-ochre),
-    0 5px 5px rgba(35, 29, 19, 0.17);
-  font-variant-numeric: tabular-nums;
-}
-.gc-calendar-date span {
-  padding: 4px 8px;
-  font-size: 10px;
-  letter-spacing: 0.09em;
-  border-bottom: 1px solid var(--room-ochre);
-}
-.gc-calendar-date b {
-  padding: 2px 8px 4px;
-  line-height: 1;
-  font-size: 32px;
-  font-weight: 600;
-}
-.gc-calendar-event {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.gc-r2[data-wid='anni']:has(.gc-calendar-date) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(72px, 24%, 104px);
-  grid-template-rows: auto 1fr;
-  column-gap: 14px;
-}
-.gc-r2 .gc-calendar-face:has(.gc-calendar-date) {
-  display: contents;
-}
-.gc-r2 .gc-calendar-date {
-  grid-area: 1 / 2 / span 2;
-  align-self: center;
-}
-.gc-r2 .gc-calendar-date b {
-  padding-block: 4px 8px;
-  font-size: 46px;
-}
-.gc-r2 .gc-calendar-event {
-  align-self: center;
-  grid-column: 1;
-}
-.gc-r2 .gc-calendar-event .gc-val-lg {
-  font-size: 22px;
+.gc-meter > i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 6px;
 }
 .gc-days {
-  font-size: 12px;
+  color: var(--color-accent);
+  font-weight: 650;
 }
 .gc-anni-more {
   margin-top: 8px;
@@ -2767,28 +2617,6 @@ html.dark .gc-glass::after {
   display: flex;
   flex-direction: column;
 }
-.gc-featured[data-wid='feed']:not(.gc-card-tile) {
-  background: var(--room-paper);
-  border-top: 5px solid var(--room-rust);
-  border-bottom: 4px solid var(--room-walnut);
-  border-radius: 3px 3px 5px 5px;
-  padding: 12px 16px;
-}
-.gc-featured[data-wid='feed'] .gc-card-h3 {
-  margin-bottom: 4px;
-}
-.gc-featured[data-wid='feed'] .gc-card-h3::before {
-  display: none;
-}
-.gc-letter-stamp {
-  flex: none;
-  border: 1px solid var(--room-rule);
-  border-radius: 2px;
-  color: var(--room-muted);
-  padding: 2px 5px;
-  font-size: 10px;
-  font-weight: 650;
-}
 .gc-featured .gc-list {
   min-height: 0;
   overflow-y: auto;
@@ -2797,29 +2625,19 @@ html.dark .gc-glass::after {
   padding-block: 7px;
 }
 .gc-feed-entry {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex: 1;
+  display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 2px;
   line-height: 1.4;
 }
 .gc-feed-title {
-  color: var(--room-ink);
+  color: var(--color-text);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .gc-feed-entry small {
-  flex: none;
-  max-width: 32%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 11px;
-  color: var(--room-muted);
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .gc-ic {
   width: 26px;
@@ -2876,9 +2694,6 @@ html.dark .gc-glass::after {
   }
   .gc-card-tile {
     min-height: 72px;
-  }
-  .gc-photos:not(.gc-card-tile) .gc-photo-stack {
-    min-height: 180px;
   }
 }
 </style>

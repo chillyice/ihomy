@@ -196,24 +196,6 @@ html.dark .tab-item.active {
 html.dark .capture-btn {
   border-color: rgba(var(--color-card-rgb), 0.92);
 }
-/* 客厅的底边收在同一张纸面上，黄铜色拍摄键呼应柜门拉手。 */
-html.theme-warm .mobile-layout:has(.mobile-home) .mobile-tabbar {
-  --color-brand: var(--room-ink);
-  --color-primary: var(--room-ink);
-  --color-text-secondary: var(--room-muted);
-  background: var(--room-paper);
-  border-color: var(--room-rule);
-}
-html.theme-warm .mobile-layout:has(.mobile-home) .capture-btn {
-  background: var(--room-ochre);
-  color: var(--room-wood-dark);
-  border-color: var(--room-paper);
-  box-shadow: 0 2px 6px rgba(48, 34, 20, 0.22);
-}
-html.theme-warm .mobile-layout:has(.mobile-home) .capture-spinner {
-  border-color: color-mix(in srgb, currentColor 32%, transparent);
-  border-top-color: currentColor;
-}
 .tab-item.is-capture:active .capture-btn {
   transform: scale(0.92);
   box-shadow: 0 3px 10px rgba(var(--color-brand-rgb, 184, 140, 110), 0.34);
