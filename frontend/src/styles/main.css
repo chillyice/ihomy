@@ -3066,6 +3066,23 @@ html.dark .el-badge__content {
   border-color: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.65) !important;
 }
+/* 麻将操作条(.my-actions)也是落在毡面浮层上的一排键(对局中整块游戏区都是深色毡):
+ * 暖居浅色给次级键的「近透明暖灰底 + 深褐字」压在深底浮层上读不出来(托管键常驻,最先被看到),
+ * 与上面 .ft-actions 同一套白玻璃口径;主按钮(吃/碰/胡)保持品牌色,禁用档退回低透明度白。 */
+.page.game-shell .my-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text) {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+.page.game-shell .my-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+.page.game-shell .my-actions .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text).is-disabled {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
 /* ===== 对抗牌局·手机横屏:整页铺成一块桌毡 =====
  * 与麻将单机局同一套口径(见 Mahjong.vue 的横屏档):左栏取消,整页就是牌桌,
  * 头部压成浮在左上角的一行,游戏区占满 1×1 网格。桌毡底色上到页面级(--gs-bg),
