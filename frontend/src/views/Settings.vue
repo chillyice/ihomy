@@ -58,6 +58,7 @@
         <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
         <div v-show="activeId === 'appearance'">
           <div id="settings-light"><LightSettings /></div>
+          <WindowDeskSettings v-if="!isMobile && activeId === 'appearance'" />
           <div id="settings-display"><ModeSettings /></div>
           <div id="settings-morning"><MorningSettings /></div>
           <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
@@ -87,6 +88,7 @@ import DailySettings from './settings/DailySettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
+import WindowDeskSettings from './settings/WindowDeskSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
 import MorningSettings from './settings/MorningSettings.vue'
 import ScreensaverSettings from './settings/ScreensaverSettings.vue'

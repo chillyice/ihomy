@@ -29,6 +29,12 @@
       <SiteFooter v-if="!isMobile && !immersive" />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && (isMobile || windowShell)" />
     </template>
+    <WindowDesk
+      v-if="routeReady && isWide && !isMobile && desk.enabled && !immersive && !appStore.homeEditMode && !userStore.mustChangePassword"
+      :tracks-only="standalone || userStore.isPureOps"
+      :destinations="desk.destinations"
+      :arrangement="desk.arrangement"
+    />
     <div v-if="route.name === 'Home' && appStore.loadFailed && !userStore.mustChangePassword" class="home-load-error" role="status">
       <span>{{ $t('home.familyLoadFailed') }}</span>
       <el-button text :loading="appStore.loading" @click="appStore.init()">{{ $t('common.retry') }}</el-button>
@@ -63,6 +69,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useFloatsStore } from '@/stores/floats'
+import { useWindowDeskStore } from '@/stores/windowDesk'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
 import { initPrefSync } from '@/utils/userPref'
@@ -73,6 +80,7 @@ const SunLightLayer = defineAsyncComponent(() => import('@/components/SunLightLa
 const AppSidebar = defineAsyncComponent(() => import('@/components/AppSidebar.vue'))
 const WarmLayout = defineAsyncComponent(() => import('@/components/warm/WarmLayout.vue'))
 const WindowShell = defineAsyncComponent(() => import('@/components/window/WindowShell.vue'))
+const WindowDesk = defineAsyncComponent(() => import('@/components/WindowDesk.vue'))
 const WindowMusicPlayer = defineAsyncComponent(() => import('@/components/WindowMusicPlayer.vue'))
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
@@ -97,12 +105,13 @@ const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdat
 // 壳内判定(静态读一次,不随运行期变化)
 const isNative = isNativeApp()
 
-const { isMobile } = useDevice()
+const { isMobile, isWide } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 // 浮窗开关(音乐页/聊天室可关,拖到底部删除条关的也是这个键)
 const floatsStore = useFloatsStore()
+const desk = useWindowDeskStore()
 const route = useRoute()
 const router = useRouter()
 // 显示模式(老人/儿童):启动即把本机保存的模式贴回 html 根类

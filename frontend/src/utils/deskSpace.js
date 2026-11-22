@@ -1,0 +1,90 @@
+// 页面之间共用一次抽样。几何计算只读这些比例，重新测量不会重新掷骰。
+export function sampleDeskPlan(random = Math.random, minimumCount = 0) {
+  const roll = random()
+  const count = roll < 0.15 ? 0 : roll < 0.5 ? 1 : roll < 0.87 ? 2 : 3
+  const firstSide = Math.floor(random() * 2)
+  return Array.from({ length: Math.max(minimumCount, count) }, (_, i) => ({
+    side: (firstSide + i) % 2,
+    u: 0.22 + random() * 0.56,
+    v: 0.12 + random() * 0.76,
+    angle: Math.round(random() * 14 - 7),
+  }))
+}
+
+// 常规内容页按正文边缘分区；自由布局的首页只在两条窄边内找位置，卡片另外参与碰撞。
+export function deskLanes(width, height, navRight, center) {
+  const leftEnd = center ? Math.min(width, center.left) : Math.min(width / 2, navRight + 180)
+  const rightStart = center ? Math.max(navRight, center.right) : Math.max(width / 2, width - 180)
+  return [
+    { left: Math.max(0, navRight), right: leftEnd, top: 0, bottom: height },
+    { left: rightStart, right: width, top: 0, bottom: height },
+  ]
+}
+
+function bounds(x, y, radius) {
+  return { left: x - radius, right: x + radius, top: y - radius, bottom: y + radius }
+}
+
+function overlaps(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+}
+
+// 预留旋转、悬停和投影所需的边界。窄桌沿只摆仍能拥有完整点击面的物品。
+function findSpace(slot, lanes, obstacles, preferred, minimum) {
+  for (const lane of [lanes[slot.side], lanes[1 - slot.side]]) {
+    const width = lane.right - lane.left
+    const height = lane.bottom - lane.top
+    const size = Math.floor(Math.min(preferred, (Math.min(width, height) - 12) / 1.16))
+    if (size < minimum) continue
+    const radius = Math.ceil(size * 0.58) + 5
+    const x = Math.round(lane.left + radius + (width - 2 * radius) * slot.u)
+    for (const v of [slot.v, 0.22, 0.76, 0.48, 0.94, 0.05]) {
+      const y = Math.round(lane.top + radius + (height - 2 * radius) * v)
+      const box = bounds(x, y, radius)
+      if (!obstacles.some((other) => overlaps(box, other))) return { x, y, size, box }
+    }
+  }
+  return null
+}
+
+export function placeDeskItems(items, plan, lanes, obstacles) {
+  const result = []
+  const occupied = obstacles.slice()
+  for (const item of items) {
+    const slot = plan[result.length]
+    if (!slot) break
+    const seat = findSpace(slot, lanes, occupied, item.kind === 'leaf' ? 84 : 134, item.kind === 'cup' ? 64 : 48)
+    if (!seat) continue
+    const { x, y, size, box } = seat
+    result.push({ item, x, y, size, angle: slot.angle })
+    occupied.push(box)
+  }
+  return result
+}
+
+export function placePawTrail(placements, lanes, obstacles, random = Math.random) {
+  if (placements.length >= 3) return []
+  const occupied = obstacles.concat(placements.map(({ x, y, size }) => bounds(x, y, Math.ceil(size * 0.58) + 5)))
+  const slot = { side: Math.floor(random() * 2), u: random(), v: random() }
+  const seat = findSpace(slot, lanes, occupied, 86, 54)
+  if (!seat) return []
+  const direction = random() < 0.5 ? 1 : -1
+  return Array.from({ length: 4 }, (_, i) => ({
+    x: Math.round(seat.x + (i - 1.5) * seat.size * 0.1 * direction + (i % 2 ? 3 : -3)),
+    y: Math.round(seat.y + (1.5 - i) * seat.size * 0.22),
+    angle: direction * 19,
+    delay: i * 0.28,
+  }))
+}
+
+export function pawTrailFits(trail, placements, lanes, obstacles) {
+  if (!trail.length || placements.length >= 3) return false
+  const occupied = obstacles.concat(placements.map(({ x, y, size }) => bounds(x, y, Math.ceil(size * 0.58) + 5)))
+  return trail.every(({ x, y }) => {
+    const box = bounds(x, y, 13)
+    return (
+      lanes.some((l) => box.left >= l.left && box.right <= l.right && box.top >= l.top && box.bottom <= l.bottom) &&
+      !occupied.some((other) => overlaps(box, other))
+    )
+  })
+}

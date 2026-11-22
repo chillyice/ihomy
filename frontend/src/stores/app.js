@@ -3,12 +3,15 @@ import { defineStore } from 'pinia'
 import { publicApi, homeApi } from '@/api'
 import { parseShareQuery } from '@/utils/shareLanding'
 import { useUserStore } from './user'
+import { activityRevision } from '@/api/activity'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
     family: null,
     modules: [],
     photos: [],
+    photosRevision: 0,
+    photosUpdated: 0,
     stats: { memberCount: 0, upcomingEvents: [] },
     familyLoaded: false,
     dashboardLoaded: false,
@@ -36,6 +39,7 @@ export const useAppStore = defineStore('app', {
       this.loading = true
       const loadFamily = async () => {
         if (!fetchFamily) return
+        const photosRevision = activityRevision.photos
         const pub = await publicApi.getHome(homeId ?? undefined, hid || undefined).catch(() => null)
         if (generation !== this.generation) return
         this.familyLoaded = !!pub
@@ -43,6 +47,8 @@ export const useAppStore = defineStore('app', {
         this.family = pub.family || null
         if (!this.dashboardLoaded) this.modules = pub.modules || []
         this.photos = pub.photos || []
+        this.photosRevision = photosRevision
+        this.photosUpdated = Date.now()
         this.stats = pub.stats || { memberCount: 0, upcomingEvents: [] }
       }
       const loadDashboard = async () => {
@@ -60,12 +66,30 @@ export const useAppStore = defineStore('app', {
         if (generation === this.generation) this.loading = false
       }
     },
+    async refreshPhotos() {
+      const { hid, homeId } = parseShareQuery(window.location.search)
+      const generation = this.generation
+      const revision = activityRevision.photos
+      const pub = await publicApi.getHome(homeId ?? undefined, hid || undefined, { isBackgroundRead: () => true })
+      if (
+        generation !== this.generation ||
+        revision !== activityRevision.photos ||
+        !this.familyLoaded ||
+        !this.family?.id ||
+        this.family.id !== pub?.family?.id
+      )
+        return
+      this.photos = pub.photos || []
+      this.photosRevision = revision
+      this.photosUpdated = Date.now()
+    },
     // 登出/切换家庭时清空缓存,下次 init 强制重新拉取
     reset() {
       this.generation++
       this.family = null
       this.modules = []
       this.photos = []
+      this.photosUpdated = 0
       this.stats = { memberCount: 0, upcomingEvents: [] }
       this.familyLoaded = false
       this.dashboardLoaded = false

@@ -348,6 +348,7 @@
       :share-base="shareBase"
       :can-delete-of="canManagePhoto"
       @delete="onViewerDelete"
+      @close="clearPhotoQuery"
     />
   </div>
 </template>
@@ -436,6 +437,28 @@ const canManagePhoto = (p) =>
 // 相册分享链接基准(公开相册才有):游客凭链接查看,家庭需已公开
 const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''))
 
+function openPhotoQuery() {
+  const token = route.query.p
+  if (props.inline || !token) return
+  const index = photos.value.findIndex((photo) => shareId(photo.id) === String(token))
+  if (index >= 0) {
+    viewer.index = index
+    viewer.visible = true
+  }
+}
+function clearPhotoQuery() {
+  if (props.inline || !route.query.p) return
+  const query = { ...route.query }
+  delete query.p
+  router.replace({ path: route.path, query, hash: route.hash })
+}
+watch(
+  () => route.query.p,
+  () => {
+    if (!loading.value) openPhotoQuery()
+  },
+)
+
 // 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {
   const sequence = ++loadSequence
@@ -452,14 +475,7 @@ const load = async () => {
     readOnly.value = !!data.readOnly
     if (album.value.id && !currentShareToken.value) localStorage.setItem(albumMemoryKey(userStore.userInfo), String(album.value.id))
     // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页(仅整页分享模式;右栏嵌入不受 URL 旧参数影响)
-    const p = props.inline ? null : route.query.p
-    if (p) {
-      const idx = photos.value.findIndex((x) => shareId(x.id) === String(p))
-      if (idx >= 0) {
-        viewer.index = idx
-        viewer.visible = true
-      }
-    }
+    openPhotoQuery()
   } catch {
     if (sequence === loadSequence) loadError.value = true
   } finally {

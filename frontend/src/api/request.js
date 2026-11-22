@@ -7,6 +7,7 @@ import router from '@/router'
 import i18n from '@/i18n'
 import { rewriteAssetUrls } from '@/utils/assetUrl'
 import { createNetFailGate } from '@/utils/netFailGate'
+import { recordActivityWrite } from './activity'
 
 // 基址:Web/开发走同源相对路径;Capacitor 壳内由 .env.app 注入服务端绝对地址
 // (壳内页面 origin 是 https://localhost,相对路径会打到壳自己)
@@ -97,7 +98,9 @@ request.interceptors.response.use(
     if (res.code !== undefined && res.code !== 0) {
       // 5xx 级系统异常附上 tid,用户报障时可直接拿它到运维"详细日志"页检索
       const tid = response.headers?.['x-trace-id']
-      ElMessage.error((res.code >= 500 && tid ? `[tid:${tid}] ` : '') + (res.message || i18n.global.t('common.requestFailed')))
+      if (!response.config?.isBackgroundRead?.()) {
+        ElMessage.error((res.code >= 500 && tid ? `[tid:${tid}] ` : '') + (res.message || i18n.global.t('common.requestFailed')))
+      }
       // 业务层 401(如 refresh token 失效):登出但仅写操作跳登录页
       if (res.code === 401) {
         const userStore = useUserStore()
@@ -106,6 +109,7 @@ request.interceptors.response.use(
       }
       return Promise.reject(res)
     }
+    recordActivityWrite(response.config)
     // 成功时直接返回 data 字段,调用方无需再取 res.data
     // 壳内把 /files/... 补成服务端绝对地址(Web 端此行是恒等返回)
     if (res.data !== undefined) return rewriteAssetUrls(res.data)
@@ -137,6 +141,7 @@ request.interceptors.response.use(
         return Promise.reject(e)
       }
     }
+    if (error.config?.isBackgroundRead?.()) return Promise.reject(error)
     // 连不上网:不立刻弹窗(一次抖动/首屏一批请求同时失败都静默),
     // 连续多次连不上才提示一次,提示后这一轮不再重复打扰
     if (isConnectFailure(error)) {

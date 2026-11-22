@@ -1,10 +1,18 @@
 // 各业务模块 API 汇总:统一走 request 实例,按模块导出供页面使用
 import request from '@/api/request'
 import { serverUrl } from '@/utils/assetUrl'
+import { useUserStore } from '@/stores/user'
+import { activityRevision, sharedActivityRead } from './activity'
+
+function activityScope(domain) {
+  const user = useUserStore()
+  return [user.isLoggedIn, user.userInfo?.id, user.userInfo?.familyId, activityRevision[domain]].join('/')
+}
 
 // 公开接口:无需登录,支持 hid(混淆 token)优先、home_id 兜底指定家庭
 export const publicApi = {
-  getHome: (homeId, hid) => request.get('/public/home', { params: { ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
+  getHome: (homeId, hid, config) =>
+    request.get('/public/home', { ...config, params: { ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
   getFeed: (limit = 10, homeId, hid) =>
     request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
   // 天气/太阳:虽为公开接口,但需携带 JWT 才能让后端按「家庭天气地域偏好」定位,
@@ -191,7 +199,10 @@ export const commentApi = {
 // 站内通知
 export const notificationApi = {
   list: () => request.get('/notification/list'),
-  unreadCount: () => request.get('/notification/unread-count'),
+  unreadCount: sharedActivityRead(
+    (config) => request.get('/notification/unread-count', config),
+    () => activityScope('notifications'),
+  ),
   markRead: (id) => request.put(`/notification/${id}/read`),
   markAllRead: () => request.put('/notification/read-all'),
 }
@@ -342,7 +353,10 @@ export const reminderApi = {
 // 家庭计划(计划+子任务,进度自动联动;today=今日计划+今日提醒)
 export const planApi = {
   list: () => request.get('/plan/list'),
-  today: () => request.get('/plan/today'),
+  today: sharedActivityRead(
+    (config) => request.get('/plan/today', config),
+    () => activityScope('agenda'),
+  ),
   create: (data) => request.post('/plan', data),
   update: (id, data) => request.put(`/plan/${id}`, data),
   remove: (id) => request.delete(`/plan/${id}`),

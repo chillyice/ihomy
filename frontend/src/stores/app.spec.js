@@ -64,4 +64,30 @@ describe('family home initialization', () => {
     expect(homeApi.getDashboard).not.toHaveBeenCalled()
     expect(app.modules).toEqual(['album'])
   })
+
+  it('refreshes only the current photo strip, with share context, and drops late photos after switching homes', async () => {
+    const app = useAppStore()
+    user.isLoggedIn = true
+    window.location.search = '?hid=shared-home'
+    publicApi.getHome.mockResolvedValueOnce({ family: { id: 8 }, photos: [{ id: 1 }] })
+    await app.init()
+    const late = Promise.withResolvers()
+    publicApi.getHome.mockReturnValueOnce(late.promise)
+    const pending = app.refreshPhotos()
+    const [homeId, hid, config] = publicApi.getHome.mock.lastCall
+    expect([homeId, hid, config.isBackgroundRead()]).toEqual([undefined, 'shared-home', true])
+    app.reset()
+    window.location.search = ''
+    publicApi.getHome.mockResolvedValueOnce({ family: { id: 9 }, photos: [{ id: 7 }] })
+    homeApi.getDashboard.mockResolvedValueOnce({ modules: [] })
+    await app.init()
+    late.resolve({ family: { id: 8 }, photos: [{ id: 3 }] })
+    await pending
+    expect(app.photos).toEqual([{ id: 7 }])
+    publicApi.getHome.mockRejectedValueOnce(new Error('offline'))
+    await expect(app.refreshPhotos()).rejects.toThrow('offline')
+    expect(app.familyLoaded).toBe(true)
+    expect(app.family.id).toBe(9)
+    expect(homeApi.getDashboard).toHaveBeenCalledTimes(1)
+  })
 })
