@@ -415,6 +415,10 @@ html.dark .blob-5 {
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
 }
+/* 暖居模拟光穿过纱帘，时刻、天气和用户的阴影深度仍决定投影强弱。 */
+html.theme-warm .window-shadow {
+  opacity: calc(var(--shadow-alpha, 0.7) * 0.34);
+}
 .shadow-bar {
   position: absolute;
   filter: blur(16px);

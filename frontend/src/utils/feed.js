@@ -2,6 +2,10 @@
 // t 为 vue-i18n 的 t 函数;sliceLen 为日记摘要截断长度(历史口径不同,默认 40)。
 export const FEED_TYPES = ['blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
 
+// 暖居桌面动态与手机标签共用色相，色值随晨暮变化。
+const FEED_CHIP = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
+export const feedChipStyle = (type) => ({ '--chip': `var(--blob-${FEED_CHIP[type] || 1})` })
+
 const feedRoutes = {
   diary: '/diary',
   photo: '/album',

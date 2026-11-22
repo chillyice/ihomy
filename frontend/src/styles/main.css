@@ -223,85 +223,82 @@ html.dark {
   color-scheme: dark;
 }
 
-/* ========== 暖居(Light & Dust)主题:暖木 + 陶土 + 鼠尾草绿 + 奶油 ========== */
-/* 晨 dawn:暖木米背景 + 羊皮卡片 + 深木主色 */
+/* 暖居:亚麻墙、纸面与胡桃木构成底色,陶土用于主操作,瓶绿用于导航与绿植。 */
 html.theme-warm {
-  --color-primary: #8a6a4e;
-  /* 强调色要当链接/选中文字用,晨色羊皮底上必须压到 ≥3:1(原 #c9807a 只有 2.1~2.8) */
-  --color-accent: #a3564e;
-  --color-danger: #b4544c;
-  --color-danger-rgb: 180, 84, 76;
-  --color-warning: #96681a;
-  --color-bg: #f1e7d6;
-  --color-bg-2: #e4d5bf;
-  --color-card: #fbf3e4;
-  --color-card-2: #ebdcc6;
-  --color-card-rgb: 251, 243, 228;
-  --color-green: #7c8b6c;
-  --color-line: rgba(138, 106, 78, 0.1);
-  --color-text-tertiary: #8a7a64;
-  --glow-warm: rgba(201, 128, 122, 0.55);
-  --color-text: #4a3a2b;
-  --color-text-secondary: #867660;
-  --color-border: rgba(138, 106, 78, 0.14);
-  --shadow: 0 10px 28px rgba(122, 90, 60, 0.14), 0 2px 6px rgba(122, 90, 60, 0.08);
-  --shadow-hover: 0 16px 44px rgba(122, 90, 60, 0.22), 0 3px 8px rgba(122, 90, 60, 0.1);
+  --color-primary: #604d40;
+  --color-accent: #934746;
+  --color-danger: #913c40;
+  --color-danger-rgb: 145, 60, 64;
+  --color-warning: #785719;
+  --color-bg: #f1eee4;
+  --color-bg-2: #e5e3d7;
+  --color-card: #fffbf2;
+  --color-card-2: #ece9dd;
+  --color-card-rgb: 255, 251, 242;
+  --color-surface: var(--color-card);
+  --color-green: #43685b;
+  --color-line: rgba(94, 85, 66, 0.09);
+  --color-text-tertiary: #665f53;
+  --glow-warm: rgba(214, 159, 87, 0.45);
+  --color-text: #332f29;
+  --color-text-secondary: #5c5b50;
+  --color-border: rgba(94, 85, 66, 0.18);
+  --shadow: 0 8px 26px rgba(81, 64, 46, 0.09), 0 2px 5px rgba(81, 64, 46, 0.06);
+  --shadow-hover: 0 14px 36px rgba(81, 64, 46, 0.15), 0 3px 8px rgba(81, 64, 46, 0.08);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(122, 90, 60, 0.05);
   --overlay-scrim: rgba(58, 46, 34, 0.34);
   --dialog-shadow: 0 20px 50px -18px rgba(58, 46, 34, 0.3), 0 3px 10px rgba(58, 46, 34, 0.08);
-  --color-brand: #866448;
-  --color-brand-hover: #7a5b40;
-  --color-brand-text: #fbf3e4;
-  --color-brand-rgb: 134, 100, 72;
-  /* 光影层 token(暖居晨):羊皮覆盖 + 暖白浮尘 */
-  --light-glass-bg: rgba(251, 243, 228, 0.25);
+  --color-brand: #934e38;
+  --color-brand-hover: #78402f;
+  --color-brand-text: var(--color-card);
+  --color-brand-rgb: 147, 78, 56;
+  --light-glass-bg: rgba(var(--color-card-rgb), 0.25);
   --light-dust: rgba(255, 239, 207, 0.85);
   --light-dust-glow: rgba(255, 236, 196, 0.8);
-  /* 背景色块(暖居晨):陶土/琥珀/鼠尾草绿/暖米,去蓝绿 */
-  --blob-1: 201, 128, 122;
-  --blob-2: 201, 161, 110;
-  --blob-3: 124, 139, 108;
-  --blob-4: 228, 213, 191;
-  --blob-5: 176, 140, 110;
+  /* 装饰色:陶土、蜜金、草绿、灰蓝釉、胡桃木。供卡片浅底和边饰取用。 */
+  --blob-1: 188, 108, 79;
+  --blob-2: 201, 156, 77;
+  --blob-3: 104, 145, 122;
+  --blob-4: 110, 142, 153;
+  --blob-5: 159, 125, 102;
 }
-/* 暮 dusk:深咖背景 + 暖褐卡片 + 琥珀主色(近烛光) */
+/* 暮:炭木墙与胡桃木面,灯下的陶色和叶色各提亮一档。 */
 html.theme-warm.dark {
-  --color-primary: #efe0c8;
-  --color-accent: #e19a8c;
-  --color-danger: #e8908a;
-  --color-danger-rgb: 232, 144, 138;
-  --color-warning: #e0b476;
-  --color-bg: #241a12;
-  --color-bg-2: #2e2217;
-  --color-card: #33241a;
-  --color-card-2: #3d2c20;
-  --color-card-rgb: 51, 36, 26;
-  --color-green: #8fa080;
-  --color-line: rgba(201, 161, 110, 0.12);
-  --color-text-tertiary: #9a8767;
-  --glow-warm: rgba(225, 154, 140, 0.42);
-  --color-text: #efe0c8;
-  --color-text-secondary: #c0a98c;
-  --color-border: rgba(201, 161, 110, 0.16);
+  --color-primary: #eddbc6;
+  --color-accent: #dda6a2;
+  --color-danger: #f49dac;
+  --color-danger-rgb: 244, 157, 172;
+  --color-warning: #e1b76e;
+  --color-bg: #252420;
+  --color-bg-2: #292a24;
+  --color-card: #302e28;
+  --color-card-2: #3a3932;
+  --color-card-rgb: 48, 46, 40;
+  --color-green: #abc4a4;
+  --color-line: rgba(218, 196, 159, 0.1);
+  --color-text-tertiary: #b2a995;
+  --glow-warm: rgba(217, 160, 88, 0.28);
+  --color-text: #f6edde;
+  --color-text-secondary: #d0c6b3;
+  --color-border: rgba(218, 196, 159, 0.19);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 18px 48px rgba(0, 0, 0, 0.55), 0 3px 10px rgba(0, 0, 0, 0.4);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
   --overlay-scrim: rgba(12, 8, 5, 0.62);
   --overlay-scrim-strong: rgba(6, 4, 2, 0.9);
   --dialog-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.7), 0 4px 14px rgba(0, 0, 0, 0.4);
-  --color-brand: #c9a16e;
-  --color-brand-hover: #d8b47e;
-  --color-brand-text: #33241a;
-  --color-brand-rgb: 201, 161, 110;
-  /* 光影层 token(暖居暮):深咖覆盖 + 琥珀浮尘(视觉解析 §6.1 #F3C983) */
-  --light-glass-bg: rgba(36, 26, 18, 0.3);
+  --color-brand: #e5ad91;
+  --color-brand-hover: #f3c1a8;
+  --color-brand-text: var(--color-card);
+  --color-brand-rgb: 229, 173, 145;
+  --light-glass-bg: rgba(var(--color-card-rgb), 0.3);
   --light-dust: rgba(243, 201, 131, 0.85);
   --light-dust-glow: rgba(243, 201, 131, 0.7);
-  --blob-1: 225, 154, 140;
-  --blob-2: 201, 161, 110;
-  --blob-3: 143, 160, 128;
-  --blob-4: 154, 122, 92;
-  --blob-5: 176, 140, 110;
+  --blob-1: 221, 151, 123;
+  --blob-2: 217, 176, 105;
+  --blob-3: 145, 176, 149;
+  --blob-4: 139, 173, 184;
+  --blob-5: 188, 155, 125;
 }
 
 /* ========== 暖居主题:页面 chrome 覆写(家具块 16px 圆角 / 会呼吸的卡片 / 暖木按钮) ========== */
@@ -1431,16 +1428,11 @@ html.theme-warm {
  * Element Plus 给固定列(sticky)用 background:inherit 上底,而斑马纹与悬停行的底色取自
  * --el-fill-color-lighter / --el-fill-color-light;暖居把这两档映射成半透明的 --color-line,
  * 于是偶数行横向滚动时,下层单元格的文字会从固定列(操作列)透上来。
- * 表格范围内改用「半透明线色叠加在卡片色上」算出的等效实色(晨暮各一套)。 */
+ * 表格改用纸面与次级面的不透明混色,晨暮皆随主题换色。 */
 html.theme-warm .el-table {
-  --el-fill-color-lighter: #f0e5d5; /* 斑马纹:rgba(138,106,78,.1) over #fbf3e4 */
-  --el-fill-color-light: #ebe0cf; /* 行悬停:rgba(138,106,78,.14) over #fbf3e4 */
-  --el-table-row-hover-bg-color: #ebe0cf;
-}
-html.theme-warm.dark .el-table {
-  --el-fill-color-lighter: #453324; /* 斑马纹:rgba(201,161,110,.12) over #33241a */
-  --el-fill-color-light: #4b3827; /* 行悬停:rgba(201,161,110,.16) over #33241a */
-  --el-table-row-hover-bg-color: #4b3827;
+  --el-fill-color-lighter: color-mix(in srgb, var(--color-card-2) 60%, var(--color-card));
+  --el-fill-color-light: var(--color-card-2);
+  --el-table-row-hover-bg-color: var(--el-fill-color-light);
 }
 
 /* 深色模式:硬编码深色字体覆写为浅色 */

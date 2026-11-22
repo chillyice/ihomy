@@ -98,4 +98,19 @@ html.dark .header-title {
   align-items: center;
   gap: 8px;
 }
+html.theme-warm .mobile-header {
+  background: rgba(var(--color-card-rgb), 0.96);
+  border-color: var(--color-border);
+}
+html.theme-warm .header-title {
+  color: var(--color-text);
+}
+html.theme-warm .back-btn,
+html.theme-warm .home-btn {
+  color: var(--color-green);
+}
+html.theme-warm .back-btn:active,
+html.theme-warm .home-btn:active {
+  background: var(--color-line);
+}
 </style>

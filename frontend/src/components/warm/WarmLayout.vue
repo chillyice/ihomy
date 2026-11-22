@@ -655,7 +655,7 @@ watch(
 .gc-seg-thumb {
   position: absolute;
   border-radius: 11px;
-  background: var(--color-brand);
+  background: var(--color-green);
   box-shadow: var(--shadow);
   transition:
     left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
@@ -680,7 +680,7 @@ watch(
   color: var(--color-card);
 }
 .gc-seg:has(button.on:hover) .gc-seg-thumb {
-  background: var(--color-brand-hover);
+  background: color-mix(in srgb, var(--color-green) 88%, var(--color-text));
 }
 
 /* ===== studio 外框(钉在浏览器视口内,内容内部滚动) ===== */
@@ -690,10 +690,8 @@ watch(
   display: flex;
   border-radius: 22px;
   overflow: hidden;
-  /* 极淡双色底衬:右上陶土粉(--blob-1)+ 左下鼠尾草绿(--blob-3),压在最底不抢暖木米主调 */
-  background:
-    radial-gradient(560px 320px at 82% 4%, rgba(var(--blob-1), 0.12), transparent 64%),
-    radial-gradient(520px 340px at 6% 96%, rgba(var(--blob-3), 0.12), transparent 62%), var(--color-bg);
+  /* 桌面留出素色阅读区，暖光只照在靠窗的一角。 */
+  background: radial-gradient(ellipse at 100% 0, rgba(var(--blob-2), 0.12), transparent 48%), var(--color-bg);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-hover);
 }
@@ -710,8 +708,8 @@ watch(
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--color-card), var(--color-card-2));
-  border-right: 1px solid var(--color-line);
+  background: color-mix(in srgb, rgb(var(--blob-3)) 16%, var(--color-card));
+  border-right: 1px solid var(--color-border);
 }
 .gc-nav {
   flex: 1;
@@ -736,9 +734,14 @@ watch(
   color: var(--color-text);
 }
 .gc-nav-item.act {
-  background: var(--color-brand);
+  background: var(--color-green);
   color: var(--color-card);
   box-shadow: var(--shadow);
+}
+.gc-nav-item.act .gc-dot {
+  background: rgb(var(--blob-2));
+  box-shadow: 0 0 0 1px var(--color-card);
+  opacity: 1;
 }
 /* 编辑模式三态:待拖入(可拖入且未添加)/ 已拖入冲突(已添加)/ 不可拖入(settings·ops) */
 .gc-nav-item.widget-src {
@@ -836,6 +839,10 @@ watch(
 
 /* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭;固定在侧栏顶部不随导航滚动 */
 .gc-user {
+  --door-fill: var(--color-green);
+  --door-ink: var(--color-card);
+  background: var(--door-fill);
+  color: var(--door-ink);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -844,10 +851,14 @@ watch(
   border-bottom: 1px solid var(--color-line);
   cursor: pointer;
 }
+html.theme-warm.dark .gc-user {
+  --door-fill: color-mix(in srgb, var(--color-green) 19%, var(--color-card));
+  --door-ink: var(--color-text);
+}
 .gc-user .el-avatar {
   flex-shrink: 0;
-  background: var(--color-green);
-  color: var(--color-card);
+  background: var(--door-ink);
+  color: var(--door-fill);
   font-weight: 700;
 }
 .gc-user-meta {
@@ -857,14 +868,13 @@ watch(
 .gc-user-name {
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .gc-user-fam {
   font-size: 11.5px;
-  color: var(--color-text-tertiary);
+  color: color-mix(in srgb, var(--door-ink) 90%, var(--door-fill));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -881,20 +891,20 @@ watch(
   transition: background 0.2s;
 }
 .gc-mini-weather:hover {
-  background: var(--color-line);
+  background: color-mix(in srgb, var(--door-ink) 9%, transparent);
 }
 .gc-mw-icon {
   font-size: 16px;
   line-height: 1;
-  color: var(--color-text);
 }
 .gc-mw-temp {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 .gc-mw-warn {
+  background: var(--color-card);
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   font-size: 14px;
@@ -932,7 +942,7 @@ watch(
   font-size: 11.5px;
   font-weight: 650;
   letter-spacing: 0.5px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: color 0.2s;
 }

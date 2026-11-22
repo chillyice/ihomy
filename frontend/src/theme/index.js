@@ -9,7 +9,7 @@ export const THEMES = {
   warm: {
     id: 'warm',
     label: { zh: '暖居', en: 'Warm Dwelling' },
-    meta: { dawn: '#F1E7D6', dusk: '#241A12' },
+    meta: { dawn: '#F1EEE4', dusk: '#252420' },
   },
   guangchen: {
     id: 'guangchen',
@@ -96,7 +96,7 @@ function cloneOldTheme(root) {
     if (name.startsWith('--')) overlay.style.setProperty(name, cs.getPropertyValue(name))
   }
   // 幕布底色:旧主题背景色(克隆 #app 本身透明,需自铺底色遮住 html 背景)
-  const oldBg = cs.getPropertyValue('--color-bg').trim() || '#F1E7D6'
+  const oldBg = cs.getPropertyValue('--color-bg').trim() || THEMES.warm.meta.dawn
   overlay.style.background = oldBg
 
   document.body.appendChild(overlay)
