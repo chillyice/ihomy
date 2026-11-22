@@ -1,0 +1,22 @@
+/* 同一间客厅：木作、软包与黄铜保留材质色，墙纸和纸张随光线明暗。 */
+html.theme-warm {
+  --room-veneer: url('../../assets/warm-room/walnut.webp');
+  --room-walnut: #74503b;
+  --room-wood-dark: #3e291e;
+  --room-cream: #fff3d9;
+  --room-moss: #454d32;
+  --room-ochre: #d3a657;
+  --room-rust: #995139;
+  --room-wall: #e9e1d2;
+  --room-paper: #faf4e5;
+  --room-ink: #32271f;
+  --room-muted: #64584a;
+  --room-rule: #c9bba3;
+}
+html.theme-warm.dark {
+  --room-wall: #29251e;
+  --room-paper: #373127;
+  --room-ink: #f8ebcd;
+  --room-muted: #d7c6a9;
+  --room-rule: #665643;
+}

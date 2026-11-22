@@ -4,14 +4,20 @@
     <div v-if="showDoorSign" class="m-door-sign">
       <FamilyCoverBanner :family="appStore.family" />
     </div>
+    <WarmRoomScene v-else-if="isWarm">
+      <h2 class="room-family-name">{{ appStore.family?.name || 'ihomy' }}</h2>
+      <p v-if="appStore.stats.memberCount" class="room-family-members">{{ $t('warm.members', { n: appStore.stats.memberCount }) }}</p>
+    </WarmRoomScene>
+    <h3 v-if="isWarm" class="room-post-heading">{{ $t('warm.widget.feed') }}</h3>
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
-      <div class="filter-scroll">
+      <div ref="filterScroll" class="filter-scroll">
         <span
           v-for="f in filters"
           :key="f.key"
           class="filter-chip"
           :class="{ active: activeFilter === f.key }"
+          :aria-pressed="activeFilter === f.key"
           v-a11y-click
           @click="activeFilter = f.key"
           >{{ f.label }}</span
@@ -31,6 +37,7 @@
             v-for="(f, i) in filteredFeeds"
             :key="f.type + '-' + (f.id ?? i)"
             class="feed-card anim-rise"
+            :data-kind="isWarm ? f.type : undefined"
             :style="{ '--i': Math.min(i, 12) }"
             v-a11y-click
             @click="goFeed(f)"
@@ -61,23 +68,33 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'
 import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
+import { bindHorizontalWheel } from '@/utils/horizontalWheel'
+import './warm/room.css'
 
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const themeStore = useThemeStore()
+const isWarm = computed(() => themeStore.theme === 'warm')
+const WarmRoomScene = defineAsyncComponent(() => import('@/components/warm/WarmRoomScene.vue'))
 const { t } = useI18n()
 const root = ref(null)
+const filterScroll = ref(null)
+watch([filterScroll, isWarm], ([el, warm], _, onCleanup) => {
+  if (el && warm) onCleanup(bindHorizontalWheel(el))
+})
 const feeds = ref([])
 const loading = ref(true)
 const loadError = ref(false)
@@ -358,5 +375,149 @@ html.dark .feed-summary {
   padding: 60px 0;
   color: var(--color-text-secondary, #999);
   font-size: 14px;
+}
+
+/* 客厅的薄木分档，下方按原时间顺序收好家人的信件、照片与书目。 */
+html.theme-warm .mobile-home {
+  background: color-mix(in srgb, var(--room-paper) 86%, var(--room-moss));
+  color: var(--room-ink);
+}
+.room-family-name {
+  margin: 0;
+  font-size: clamp(22px, 6vw, 36px);
+  font-weight: 650;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.room-family-members {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.room-post-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 18px 18px 12px;
+  color: var(--room-ink);
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+.room-post-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--room-rule);
+}
+html.theme-warm .filter-bar {
+  background-color: var(--room-walnut);
+  background-image: linear-gradient(color-mix(in srgb, var(--room-wood-dark) 62%, transparent) 0 0), var(--room-veneer);
+  background-size:
+    auto,
+    240px auto;
+  border: 0;
+  border-bottom: 3px solid var(--room-wood-dark);
+  box-shadow: inset 0 1px color-mix(in srgb, var(--room-ochre) 48%, transparent);
+}
+html.theme-warm .filter-scroll {
+  gap: 2px;
+  padding: 5px 16px;
+  mask-image: linear-gradient(90deg, transparent, black 8px, black calc(100% - 8px), transparent);
+}
+html.theme-warm .filter-chip {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  min-height: 34px;
+  padding: 2px 10px;
+  color: var(--room-cream);
+  border-radius: 2px;
+  font-size: 13px;
+}
+html.theme-warm .filter-chip.active {
+  background: var(--room-cream);
+  color: var(--room-wood-dark);
+}
+html.theme-warm .filter-chip::after {
+  content: none;
+}
+html.theme-warm .feed-list {
+  padding: 16px 14px 80px;
+}
+html.theme-warm .feed-card {
+  border: 1px solid var(--room-rule);
+  border-radius: 3px;
+  background: var(--room-paper);
+  color: var(--room-ink);
+  padding: 13px 15px 15px;
+  box-shadow: 0 2px 3px rgba(48, 34, 20, 0.09);
+}
+html.theme-warm .feed-card-head {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--room-rule);
+}
+html.theme-warm .feed-card-head .el-avatar {
+  --el-avatar-bg-color: var(--room-moss);
+  --el-avatar-text-color: var(--room-cream);
+  flex-shrink: 0;
+}
+html.theme-warm .feed-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--room-ink);
+}
+html.theme-warm .feed-type-tag {
+  flex-shrink: 0;
+  border: 1px solid var(--room-rule);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--room-muted);
+  padding: 1px 5px;
+}
+html.theme-warm .feed-time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--room-muted);
+}
+html.theme-warm .feed-title,
+html.theme-warm .feed-summary {
+  color: var(--room-ink);
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+html.theme-warm .feed-title + .feed-summary {
+  color: var(--room-muted);
+}
+html.theme-warm .feed-cover {
+  border-radius: 2px;
+}
+html.theme-warm [data-kind='photo'] .feed-cover {
+  border: 5px solid var(--room-cream);
+  box-shadow: 0 1px 4px rgba(48, 34, 20, 0.24);
+}
+html.theme-warm [data-kind='book'] .feed-card-body {
+  align-items: center;
+}
+html.theme-warm [data-kind='book'] .feed-cover {
+  width: 62px;
+  height: 80px;
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: 2px 2px 2px rgba(48, 34, 20, 0.21);
+}
+html.theme-warm .feed-empty,
+html.theme-warm .feed-retry {
+  color: var(--room-muted);
+}
+@media (min-width: 600px) {
+  html.theme-warm .feed-list-inner {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+  html.theme-warm .feed-card {
+    margin-bottom: 0;
+  }
 }
 </style>
