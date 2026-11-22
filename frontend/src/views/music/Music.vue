@@ -1,7 +1,22 @@
 <!-- 音乐页:曲库(搜索/来源筛选/多选/设备映射)+按专辑+歌单管理(设为BGM),工具栏对齐相册/放映厅规范 -->
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('music.pageTitle') }]" />
+  <div class="page" :class="{ 'listening-room': isWindow }">
+    <section v-if="isWindow" class="record-shelf">
+      <div>
+        <h2>{{ $t('music.pageTitle') }}</h2>
+        <p>{{ $t('music.tracksCount', { n: tracks.length }) }}</p>
+      </div>
+      <div v-if="!selectMode && tab === 'all'" class="record-picks">
+        <button v-for="song in filteredTracks.slice(0, 3)" :key="song.id" @click="play(song)">
+          <img v-if="song.coverUrl" :src="song.coverUrl" alt="" /><span v-else class="record-disc" aria-hidden="true">♫</span>
+          <span
+            ><strong>{{ song.title || $t('music.unknownTrack') }}</strong
+            ><small>{{ song.artist }}</small></span
+          ><span aria-hidden="true">▶</span>
+        </button>
+      </div>
+    </section>
+    <Breadcrumb v-else :items="[{ label: $t('music.pageTitle') }]" />
 
     <PageToolbar>
       <template v-if="!selectMode">
@@ -28,7 +43,16 @@
             <el-option v-for="s in sourceOptions" :key="s.value" :value="s.value" :label="s.label" />
           </el-select>
         </div>
-        <div class="tb-right">
+        <button
+          v-if="isWindow"
+          type="button"
+          class="music-library-options"
+          :aria-expanded="optionsOpen"
+          @click="optionsOpen = !optionsOpen"
+        >
+          {{ $t('windowTools.libraryOptions') }}
+        </button>
+        <div v-show="!isWindow || optionsOpen" class="tb-right">
           <!-- 悬浮播放器开关:关掉后右下角悬浮播放器不再显示;拖到底部删除条关的也是它 -->
           <label v-if="userStore.isLoggedIn" class="float-toggle">
             <span class="float-toggle-label">{{ $t('music.floatToggle') }}</span>
@@ -575,6 +599,7 @@ const tracks = ref([])
 const playlists = ref([])
 const player = reactive({ visible: false, track: null, url: '' })
 const theme = useThemeStore()
+const optionsOpen = ref(false)
 const isWindow = computed(() => theme.theme === 'window')
 const music = useWindowMusicStore()
 const isCurrent = (track) => isWindow.value && music.current?.id === track.id

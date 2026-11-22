@@ -1,4 +1,13 @@
 <template>
+  <header v-if="theme.theme === 'window' && mode !== 'edit'" class="finder-heading">
+    <h2>{{ $t(focusedSearch && !mapOpen ? 'windowTools.find' : 'windowTools.houseMap') }}</h2>
+    <div v-if="focusedSearch && !mapOpen && houses.length" class="finder-houses">
+      <button v-for="house in houses" :key="house.id" @click="browseHouse(house.id)">
+        {{ house.name }} <span aria-hidden="true">↗</span>
+      </button>
+    </div>
+    <router-link v-else-if="!focusedSearch" to="/item?focus=search">{{ $t('windowTools.find') }}</router-link>
+  </header>
   <!-- 顶栏 -->
   <PageToolbar root-class="fp-topbar" :holder-margin="0" always>
     <el-select
@@ -526,6 +535,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemSearchStore } from '@/stores/itemSearch'
+import { useThemeStore } from '@/stores/theme'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, CopyDocument, Delete, Edit, Microphone } from '@element-plus/icons-vue'
 import { itemApi, fileApi, aiApi } from '@/api'
@@ -582,6 +592,12 @@ const floorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, sc
 const route = useRoute()
 const router = useRouter()
 const searchMemory = useItemSearchStore()
+const theme = useThemeStore()
+async function browseHouse(id) {
+  currentHouseId.value = id
+  await onHouseChange()
+  await showMap()
+}
 const focusedSearch = computed(() => route.query.focus === 'search')
 const mapOpen = computed(() => focusedSearch.value && route.query.view === 'map')
 const searchInput = ref(null)

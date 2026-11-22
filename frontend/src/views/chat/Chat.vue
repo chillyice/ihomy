@@ -2,9 +2,16 @@
      消息区/输入区组装在 ChatPanel(与全局浮窗共用) -->
 <template>
   <div class="page chat-page">
-    <Breadcrumb :items="[{ label: $t('chat.title') }]" />
+    <Breadcrumb v-if="theme.theme !== 'window'" :items="[{ label: $t('chat.title') }]" />
     <div ref="chatBox" class="chat-box card" :class="{ 'keyboard-open': !!keyboardFrame }" :style="keyboardFrame">
-      <div class="chat-title">
+      <header v-if="theme.theme === 'window'" class="room-heading">
+        <div>
+          <small>{{ user.userInfo?.nickname }}</small>
+          <h2>{{ $t(route.query.target === 'assistant' ? 'chat.assistant.title' : 'chat.title') }}</h2>
+        </div>
+        <label class="float-toggle">{{ $t('chat.floatToggle') }} <el-switch v-model="chatFloatOn" /></label>
+      </header>
+      <div v-else class="chat-title">
         <span class="chat-title-text"
           >{{ $t('chat.title') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span></span
         >
@@ -15,7 +22,22 @@
         </label>
       </div>
 
-      <ChatContactRail v-if="showContacts" :key="familyScope" class="window-contacts" @select="selected" />
+      <div v-if="theme.theme === 'window' && route.query.target === 'assistant' && chatStore.activeKey === 'ai'" class="assistant-desk">
+        <aside>
+          <router-link to="/chat">{{ $t('windowTools.contacts') }}</router-link
+          ><strong>{{ $t('windowTools.privateChat') }}</strong> <router-link to="/plan">{{ $t('windowTools.scheduleLink') }}</router-link
+          ><router-link to="/item?focus=search">{{ $t('windowTools.find') }}</router-link>
+        </aside>
+        <section><AssistantConversation /></section>
+      </div>
+      <ChatContactRail v-else-if="showContacts" :key="familyScope" class="window-contacts" @select="selected" />
+      <div v-else-if="theme.theme === 'window' && !singlePane" class="family-inbox">
+        <aside>
+          <h3>{{ $t('windowTools.contacts') }}</h3>
+          <ChatContactRail :key="familyScope" @select="selected" />
+        </aside>
+        <ChatPanel single-pane @contacts="focusContacts" @select="selected" />
+      </div>
       <ChatPanel v-else :single-pane="singlePane" @contacts="contacts" @select="selected" />
     </div>
   </div>
@@ -32,6 +54,7 @@ import { useDevice } from '@/composables/useDevice'
 import { useFloatsStore } from '@/stores/floats'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import AssistantConversation from '@/components/chat/AssistantConversation.vue'
 import ChatContactRail from '@/components/chat/ChatContactRail.vue'
 
 const chatStore = useChatStore()
@@ -75,6 +98,9 @@ function selected() {
 function contacts() {
   if (window.history.state?.back === '/chat') router.back()
   else router.replace({ path: '/chat' })
+}
+function focusContacts() {
+  chatBox.value?.querySelector('.family-inbox aside button')?.focus()
 }
 watch(
   () => [route.query.target, familyScope.value],

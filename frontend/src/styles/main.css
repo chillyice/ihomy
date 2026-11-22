@@ -3522,6 +3522,211 @@ html.theme-window .mobile-tabbar .tab-item.active,
 html.theme-window .mobile-header :is(.back-btn, .home-btn) {
   color: var(--color-brand);
 }
+.record-shelf,
+.finder-heading,
+.room-heading {
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  padding: clamp(14px, 2.5vw, 32px) 0;
+  margin-bottom: 16px;
+}
+.record-shelf h2,
+.finder-heading h2,
+.room-heading h2 {
+  font-size: clamp(24px, 3vw, 38px);
+  margin: 0;
+  line-height: 1.15;
+}
+.record-shelf p,
+.room-heading small,
+.record-picks small {
+  color: var(--color-text-secondary);
+}
+.record-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+}
+.record-picks button,
+.finder-houses button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text);
+  border-radius: 12px;
+  padding: 12px;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.record-picks button:hover,
+.finder-houses button:hover {
+  border-color: var(--color-brand);
+}
+.record-picks img,
+.record-disc {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.record-disc {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+}
+.record-picks button span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.record-picks strong,
+.record-picks small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.finder-heading {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 16px;
+}
+.music-library-options {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-brand);
+  font: inherit;
+  cursor: pointer;
+}
+@media (min-width: 900px) {
+  html.theme-window .fp-page.fp-search-layout:has(.finder-heading) {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+}
+.finder-houses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.finder-heading a,
+.assistant-desk a {
+  color: var(--color-brand);
+}
+.room-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+.family-inbox,
+.assistant-desk {
+  display: grid;
+  grid-template-columns: minmax(160px, 26%) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+}
+.family-inbox > aside,
+.assistant-desk > aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-card-2);
+  border-radius: 12px;
+  padding: 14px;
+  gap: 12px;
+  overflow: auto;
+}
+.family-inbox h3 {
+  margin: 0;
+}
+.family-inbox .chat-rail {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.family-inbox .rail-item {
+  min-height: 44px;
+}
+.assistant-desk > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.assistant-desk .suggestions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-self: stretch;
+  gap: 10px;
+}
+.assistant-desk .suggestions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--color-card-2);
+  color: var(--color-text);
+  text-align: start;
+}
+.assistant-desk .suggestions button::after {
+  content: '↗';
+  color: var(--color-brand);
+}
+.assistant-desk .assistant-bubble:not(.mine) {
+  border: 0;
+  border-left: 3px solid var(--color-brand);
+  border-radius: 0;
+  padding: 12px 18px;
+}
+html.window-chat-keyboard .room-heading,
+html.window-chat-keyboard .assistant-desk > aside {
+  display: none;
+}
+@media (max-width: 899px) {
+  .assistant-desk {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .assistant-desk > section {
+    flex: 1;
+  }
+  .assistant-desk > aside {
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+  }
+  .room-heading {
+    padding: 8px 0;
+    margin-bottom: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .record-picks {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .record-picks button {
+    flex: 0 0 min(78%, 270px);
+    scroll-snap-align: start;
+  }
+}
 html.theme-window .mobile-tabbar .capture-btn {
   background: var(--color-brand);
   color: var(--color-brand-text);

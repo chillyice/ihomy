@@ -1,4 +1,7 @@
 export default {
+  libraryOptions: '曲库管理与显示',
+  houseMap: '家里的户型图',
+  scheduleLink: '查看日程',
   privateChat: '个人会话',
   direct: '私聊',
   contacts: '会话列表',

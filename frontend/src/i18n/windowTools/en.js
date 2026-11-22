@@ -1,4 +1,7 @@
 export default {
+  libraryOptions: 'Library options',
+  houseMap: 'Home floor plan',
+  scheduleLink: 'View schedule',
   privateChat: 'Personal conversation',
   direct: 'Direct message',
   contacts: 'Conversations',
