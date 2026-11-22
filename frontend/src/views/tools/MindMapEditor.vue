@@ -333,7 +333,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { THEMES } from '@/theme'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
@@ -437,7 +436,7 @@ const DARK_KEY = 'ihomy:mindmap:dark'
 const darkOverlayConfig = () => {
   const warm = document.documentElement.classList.contains('theme-warm')
   return {
-    backgroundColor: (warm ? THEMES.warm : THEMES.guangchen).meta.dusk,
+    backgroundColor: warm ? '#241a12' : '#0f1a2e',
     lineColor: 'rgba(255, 255, 255, 0.3)',
     root: { fillColor: '#4a5568', color: '#f2f5f9', startColor: '#4a5568' },
     second: { fillColor: '#2a303c', color: '#e2e8f0', borderColor: '#4a5364' },

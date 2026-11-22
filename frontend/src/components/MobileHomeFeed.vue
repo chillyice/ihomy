@@ -38,7 +38,7 @@
             <div class="feed-card-head">
               <el-avatar :size="32" :src="f.authorAvatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
               <span class="feed-author">{{ f.authorName || $t('feed.authorFallback') }}</span>
-              <span class="feed-type-tag" :style="feedChipStyle(f.type)">{{ feedTypeLabel(f.type) }}</span>
+              <span class="feed-type-tag">{{ feedTypeLabel(f.type) }}</span>
               <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
             </div>
             <div class="feed-card-body" :class="{ 'photo-story': f.type === 'photo' }">
@@ -68,7 +68,7 @@ import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { useHomeFeed } from '@/composables/useHomeFeed'
-import { feedChipStyle, feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'
 import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
@@ -358,39 +358,5 @@ html.dark .feed-summary {
   padding: 60px 0;
   color: var(--color-text-secondary, #999);
   font-size: 14px;
-}
-
-html.theme-warm .filter-bar {
-  background: rgba(var(--color-card-rgb), 0.96);
-  border-color: var(--color-border);
-}
-html.theme-warm .filter-chip,
-html.theme-warm .feed-summary {
-  color: var(--color-text-secondary);
-}
-html.theme-warm .filter-chip.active {
-  color: var(--color-green);
-}
-html.theme-warm .filter-chip::after {
-  background: var(--color-green);
-}
-html.theme-warm .feed-card {
-  background: var(--color-card);
-  border-color: var(--color-border);
-}
-html.theme-warm .feed-card-head .el-avatar {
-  background: color-mix(in srgb, var(--color-green) 12%, var(--color-card));
-  color: var(--color-green);
-}
-html.theme-warm .feed-author,
-html.theme-warm .feed-title {
-  color: var(--color-text);
-}
-html.theme-warm .feed-type-tag {
-  background: color-mix(in srgb, rgb(var(--chip)) 16%, var(--color-card));
-  color: color-mix(in srgb, rgb(var(--chip)) 32%, var(--color-text));
-}
-html.theme-warm .feed-cover {
-  background: var(--color-card-2);
 }
 </style>

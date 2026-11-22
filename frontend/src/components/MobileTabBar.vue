@@ -211,26 +211,6 @@ html.dark .capture-btn {
   border-top-color: #fff;
   animation: capture-spin 0.8s linear infinite;
 }
-html.theme-warm .mobile-tabbar {
-  background: rgba(var(--color-card-rgb), 0.96);
-  border-color: var(--color-border);
-}
-html.theme-warm .tab-item.active {
-  color: var(--color-green);
-}
-html.theme-warm .tab-indicator::after {
-  background: var(--color-green);
-}
-html.theme-warm .capture-btn {
-  background: var(--color-brand);
-  color: var(--color-brand-text);
-  border-color: var(--color-card);
-  box-shadow: var(--shadow);
-}
-html.theme-warm .capture-spinner {
-  border-color: color-mix(in srgb, currentColor 35%, transparent);
-  border-top-color: currentColor;
-}
 @keyframes capture-spin {
   to {
     transform: rotate(360deg);

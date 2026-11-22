@@ -460,7 +460,7 @@ import { bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
 import { buildAgenda } from '@/utils/agenda'
-import { feedChipStyle, feedPath, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { feedPath, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatDate } from '@/utils/datetime'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { useHomeCardData } from '@/composables/useHomeCardData'
@@ -499,9 +499,9 @@ const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 
 // ========== 组件注册表 + 布局(localStorage 持久化) ==========
 // 9 个富组件(有专属内容模板);span=8/4 对应 12 列栅格分栏
-// 卡面、标题和图标共用一组色相：陶土、蜜金、草绿、雾蓝、胡桃木。
+// chip = 该卡的色相锚点(--blob-N:1 陶土 / 2 暖沙 / 3 鼠尾草 / 4 暖米 / 5 暖木),标题竖条与列表图标芯片都取此色
 const WIDGETS = [
-  { id: 'weather', labelKey: 'warm.widget.weather', icon: '🌤', span: 8, chip: 4 },
+  { id: 'weather', labelKey: 'warm.widget.weather', icon: '🌤', span: 8, chip: 1 },
   { id: 'feed', labelKey: 'warm.widget.feed', icon: '👥', span: 4, chip: 3 },
   { id: 'photos', labelKey: 'warm.widget.photos', icon: '📷', span: 4, chip: 2 },
   { id: 'anni', labelKey: 'warm.widget.anni', icon: '🎂', span: 4, chip: 1 },
@@ -509,7 +509,7 @@ const WIDGETS = [
   { id: 'item', labelKey: 'warm.widget.item', icon: '📦', span: 4, chip: 5 },
   { id: 'task', labelKey: 'warm.widget.task', icon: '🎯', span: 4, chip: 5 },
   { id: 'wish', labelKey: 'warm.widget.wish', icon: '⭐', span: 4, chip: 3 },
-  { id: 'reminder', labelKey: 'warm.widget.reminder', icon: '🔔', span: 4, chip: 2 },
+  { id: 'reminder', labelKey: 'warm.widget.reminder', icon: '🔔', span: 4, chip: 1 },
   { id: 'daily', labelKey: 'warm.widget.daily', icon: '🌅', span: 4, chip: 2 },
 ]
 const WIDGET_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]))
@@ -1496,6 +1496,9 @@ const pm25Text = computed(() => {
 
 const FEED_ICON = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
 const feedIcon = (type) => FEED_ICON[type] || '✨'
+// 动态类型 → 图标芯片色相(博客陶土 / 影像暖沙 / 愿望鼠尾草 / 日记·任务暖木)
+const FEED_CHIP = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
+const feedChipStyle = (type) => ({ '--chip': `var(--blob-${FEED_CHIP[type] || 1})` })
 const feedSummary = (f) => feedSummaryOf(t, f)
 const goFeed = (f) => {
   const path = feedPath(f)
@@ -1523,7 +1526,8 @@ const greeting = computed(() => {
 </script>
 
 <style>
-/* 大面积卡面少量染色，小面积的标题与图标保留更浓的同色。 */
+/* 补色强度档:陶土粉(--blob-1)与鼠尾草绿(--blob-3)原先只以 .12~.14 的雾状渐变存在,
+ * 叠在米色卡面上与卡面只差个位数 RGB,读不出色相 —— 统一提到可读区间,并且立一条「标题色相锚点」 */
 .gc-home {
   color: var(--color-text);
   --chip-a: 0.2;
@@ -1531,7 +1535,7 @@ const greeting = computed(() => {
   --sill-a: 0.5;
   --sage-a: 0.3;
 }
-/* 深色卡面上的图标需要更清晰的轮廓。 */
+/* 暮色是 #33241A 深咖底,同一 alpha 在暗底上更向灰收敛,补色统一再提一档 */
 html.theme-warm.dark .gc-home {
   --chip-a: 0.26;
   --bar-a: 1;
@@ -1641,7 +1645,7 @@ html.theme-warm.dark .gc-home {
 
 /* 卡片 = 家具块 */
 .gc-card {
-  background: color-mix(in srgb, rgb(var(--chip)) 8%, var(--color-card));
+  background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 16px;
   box-shadow: var(--shadow);
@@ -1651,12 +1655,6 @@ html.theme-warm.dark .gc-home {
   transition:
     box-shadow 0.35s ease,
     transform 0.35s ease;
-}
-.gc-featured {
-  background: color-mix(in srgb, rgb(var(--chip)) 17%, var(--color-card));
-}
-.gc-photos {
-  background: var(--color-card);
 }
 .gc-card:hover {
   box-shadow: var(--shadow-hover);
@@ -2081,7 +2079,7 @@ html.theme-warm.dark .gc-home {
 }
 .gc-item-voice.recording {
   background: var(--color-accent);
-  color: var(--color-card);
+  color: #fff7f0;
   border-color: var(--color-accent);
   animation: gcVoicePulse 1.2s ease-in-out infinite;
 }
@@ -2484,7 +2482,7 @@ html.dark .gc-glass::after {
 .gc-btn.primary {
   background: var(--color-brand);
   border-color: var(--color-brand);
-  color: var(--color-brand-text);
+  color: var(--color-card);
   box-shadow: var(--shadow);
 }
 .gc-btn.primary:hover {
@@ -2493,7 +2491,7 @@ html.dark .gc-glass::after {
 .gc-btn.accent {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: var(--color-card);
+  color: #fff7f0;
   box-shadow: var(--shadow);
 }
 
@@ -2510,7 +2508,7 @@ html.dark .gc-glass::after {
 }
 .gc-tag.acc {
   background: var(--color-accent);
-  color: var(--color-card);
+  color: #fff7f0;
 }
 .gc-tag.grn {
   background: var(--color-green);
@@ -2571,7 +2569,7 @@ html.dark .gc-glass::after {
   padding: 5px 10px;
   border: 0;
   border-radius: 8px;
-  background: rgba(var(--chip), 0.1);
+  background: rgba(160, 140, 110, 0.1);
   color: inherit;
   font: inherit;
   font-size: 12px;
@@ -2581,13 +2579,13 @@ html.dark .gc-glass::after {
   transition: background 0.2s;
 }
 .gc-fin-holding:hover {
-  background: rgba(var(--chip), 0.18);
+  background: rgba(160, 140, 110, 0.18);
 }
 .gc-fin-holding b {
   font-variant-numeric: tabular-nums;
 }
 .gc-fin-holding-label {
-  color: var(--color-text-secondary);
+  opacity: 0.55;
 }
 
 /* 列表 */
