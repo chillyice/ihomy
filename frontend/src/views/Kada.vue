@@ -223,7 +223,7 @@
         <span class="ksep" aria-hidden="true">/</span>
         <a :href="repoUrl" target="_blank" rel="noopener noreferrer">{{ $t('kada.sourceCode') }}</a>
         <span class="ksep" aria-hidden="true">/</span>
-        <span>{{ $t('kada.hostedBy') }}</span>
+        <span class="ihomy-host-credit">{{ $t('kada.hostedBy') }}</span>
       </footer>
     </div>
   </div>

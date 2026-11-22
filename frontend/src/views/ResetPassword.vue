@@ -227,7 +227,7 @@ html.dark .login-card {
 .toggle {
   text-align: center;
   margin-top: 18px;
-  color: var(--color-accent);
+  color: var(--leaf-ink);
   font-size: 13px;
   cursor: pointer;
 }

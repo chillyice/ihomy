@@ -200,7 +200,14 @@
       </div>
       <div v-if="panelOpen" class="wp-widgets">
         <div class="wp-widgets-cap">{{ $t('wallpaper.widgetsTitle') }}</div>
-        <button v-for="w in WIDGET_DEFS" :key="w.id" class="wp-widgets-row" :class="{ on: isOn(w.id) }" @click="toggleWidget(w.id)">
+        <button
+          v-for="w in WIDGET_DEFS"
+          :key="w.id"
+          class="wp-widgets-row"
+          :class="{ on: isOn(w.id) }"
+          :aria-pressed="isOn(w.id)"
+          @click="toggleWidget(w.id)"
+        >
           <span class="wp-widgets-mark">{{ isOn(w.id) ? '✓' : '＋' }}</span>
           <span>{{ $t(w.label) }}</span>
         </button>
@@ -1139,7 +1146,9 @@ onBeforeUnmount(() => {
   width: 14px;
   text-align: center;
   font-weight: 700;
-  color: var(--color-brand);
+}
+.wp-widgets-row.on .wp-widgets-mark {
+  color: var(--leaf-ink);
 }
 /* 窄屏控件挂右上角,面板改排到控件行下方(往上排会顶出屏幕) */
 @media (max-width: 768px) {
@@ -1197,7 +1206,7 @@ onBeforeUnmount(() => {
   outline: none;
 }
 .wp-input:focus {
-  border-color: var(--color-brand);
+  border-color: var(--leaf-accent);
 }
 .wp-captcha {
   display: flex;

@@ -87,7 +87,12 @@
             </div>
             <nav class="gc-nav">
               <div v-for="g in navGroups" :key="g.category" class="gc-nav-group">
-                <button class="gc-nav-group-head" @click="toggleGroup(g.category)">
+                <button
+                  class="gc-nav-group-head"
+                  :aria-expanded="!!expanded[g.category]"
+                  :aria-current="!expanded[g.category] && g.items.some((m) => isActive(m.path, route)) ? 'location' : undefined"
+                  @click="toggleGroup(g.category)"
+                >
                   <svg
                     class="gc-chev"
                     :class="{ open: expanded[g.category] }"
@@ -110,6 +115,7 @@
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"
+                    :aria-current="isActive(m.path, route) ? 'location' : undefined"
                     :class="{
                       act: isActive(m.path, route),
                       'widget-src': canDragNav && m.draggable && !m.added,

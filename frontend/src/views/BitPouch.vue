@@ -203,7 +203,7 @@
         <span class="bpfoot-links">
           <a :href="repoUrl" target="_blank" rel="noopener noreferrer">{{ $t('bitPouch.sourceCode') }}</a>
           <span class="bpfoot-sep" aria-hidden="true">/</span>
-          <span>{{ $t('bitPouch.hostedBy') }}</span>
+          <span class="ihomy-host-credit">{{ $t('bitPouch.hostedBy') }}</span>
         </span>
       </footer>
     </div>

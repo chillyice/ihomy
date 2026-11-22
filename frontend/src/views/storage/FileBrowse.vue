@@ -603,20 +603,11 @@ onBeforeUnmount(() => {
 }
 /* 多选对勾圆标(统一交互,与相册多选一致;禁左上 checkbox 角标) */
 .pick-badge {
+  position: static;
   flex: none;
   width: 20px;
   height: 20px;
   margin-right: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--el-border-color);
-  background: var(--el-fill-color-light);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.pick-badge.on {
-  background: var(--color-primary, var(--color-brand));
-  border-color: var(--color-primary, var(--color-brand));
 }
 .select-count {
   font-size: 13px;

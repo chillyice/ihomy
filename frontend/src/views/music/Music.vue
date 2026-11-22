@@ -1706,7 +1706,7 @@ html.dark .add-album-cover.placeholder {
 /* ========== 多选模式(相册同款:右上对勾角标,卡片描边) ========== */
 .music-card.selected,
 .album-card.selected {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--leaf-accent);
   outline-offset: -2px;
 }
 .select-count {

@@ -96,6 +96,7 @@
               :key="a.id"
               class="album-pane-row"
               :class="{ active: a.id === activeAlbumId }"
+              :aria-current="a.id === activeAlbumId ? 'true' : undefined"
               @click="selectAlbum(a.id)"
             >
               <div class="pane-cover">
@@ -550,26 +551,14 @@ onBeforeUnmount(() => {
   margin-right: 8px;
 }
 .album-card.selected {
-  outline: 3px solid var(--color-primary, var(--color-brand));
-  outline-offset: -3px;
+  outline: 2px solid var(--leaf-accent);
+  outline-offset: -2px;
 }
 .pick-badge {
-  position: absolute;
   top: 10px;
   left: 10px;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(184, 140, 110, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-.pick-badge.on {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
 }
 .album-grid {
   display: grid;
@@ -603,8 +592,8 @@ onBeforeUnmount(() => {
   }
 }
 .album-pane-row.active {
-  background: rgba(var(--color-brand-rgb), 0.12);
-  border-color: rgba(var(--color-brand-rgb), 0.25);
+  background: var(--leaf-wash);
+  border-color: var(--leaf-accent);
 }
 .pane-cover {
   width: 48px;

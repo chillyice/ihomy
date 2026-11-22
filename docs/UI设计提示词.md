@@ -450,6 +450,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 18. 主题切换
 
+- **全站牛油果绿点缀**。把 ihomy 看作一间屋子，暖木、奶油色与各主题原有底色承托内容，叶绿像房间角落的一盆植物。暖居、光尘和窗边的首页与功能内页都沿用这套搭配。细线用晨色 `#6D7F40`、暮色 `#A6B784`（`--leaf-accent`），用于指出当前栏目、页签和键盘焦点。小字和图标用 `--leaf-ink`，选中项可配一层透底的 `--leaf-wash`。桌面侧栏与手机导航表达同一个当前位置。页面底色、主要操作、金额和告警各自承担原有的视觉含义。
 - **双层伪元素背景 1s 过渡**:`linear-gradient` 背景不支持 CSS transition 插值,改为双层伪元素 `::before`(浅色渐变)/`::after`(深色渐变),`html.dark` 时 opacity 交叉淡入淡出 1s。
 - 面板/色块/文字颜色同步 1s 过渡。
 - **手动切主题取消自动**:`onTheme` 设 `autoMode=false` + ElMessage.info 提示"已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)"。`applyAutoTheme` 检测 `autoMode=false` 自动跳过。

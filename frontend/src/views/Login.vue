@@ -290,13 +290,13 @@ html.dark .login-card {
   font-size: 12.5px;
   text-decoration: none;
 }
-.app-download:hover {
-  color: var(--color-accent);
+.app-download:is(:hover, :focus-visible) {
+  color: var(--leaf-ink);
 }
 .toggle {
   text-align: center;
   margin-top: 18px;
-  color: var(--color-accent);
+  color: var(--leaf-ink);
   font-size: 13px;
   cursor: pointer;
 }

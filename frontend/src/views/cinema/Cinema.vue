@@ -1105,8 +1105,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 .video-card.selected {
-  outline: 3px solid var(--color-primary, var(--color-brand));
-  outline-offset: -3px;
+  outline: 2px solid var(--leaf-accent);
+  outline-offset: -2px;
 }
 .video-poster {
   position: relative;

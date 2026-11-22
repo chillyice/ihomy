@@ -15,8 +15,12 @@
   --color-text-tertiary: #8a7a64;
   /* 成功/连接状态(与收支绿区分:那是金额语义色,亮度更低) */
   --color-green: #6f8060;
-  /* 牛油果叶绿：仅用于首页组件顶边、分区标题细线和页签指示线。 */
-  --leaf-accent: #6d7f40;
+  /* 全站叶绿：细线标位置，小字与透底薄色标选中项。 */
+  --leaf-day: #6d7f40;
+  --leaf-night: #a6b784;
+  --leaf-accent: var(--leaf-day);
+  --leaf-ink: #50622f;
+  --leaf-wash: color-mix(in srgb, var(--leaf-accent) 12%, transparent);
   /* 主文字色语义别名:与 --color-text 同值,组件按语义引用(深色由 html.dark 覆写) */
   --color-text-primary: var(--color-text);
   /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码。
@@ -180,7 +184,9 @@ html.dark {
   --color-text-secondary: #b0a898;
   --color-text-tertiary: #9a8767;
   --color-green: #8fa080;
-  --leaf-accent: #a6b784;
+  --leaf-accent: var(--leaf-night);
+  --leaf-ink: #c1d19e;
+  --leaf-wash: color-mix(in srgb, var(--leaf-accent) 15%, transparent);
   /* 深色底上提亮一档,保证收支数字的对比度 */
   --color-income: #86d162;
   --color-expense: #f78989;
@@ -516,10 +522,6 @@ html.theme-warm .gc-pin .fp-topbar {
 }
 .gh-chip.is-shareable:active {
   transform: scale(0.97);
-}
-.gh-chip.is-shareable:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
 }
 /* 窄屏(手机竖屏):读数动辄四五个挤一行,字号与间距收一档,标签才不至于被压成「目…」;
    手机横屏档在后面另外降到 10.5px,档位不冲突 */
@@ -1630,6 +1632,41 @@ html.theme-warm .gc-main:has(.mj-shell) {
 }
 
 /* ========== 页面通用:标题栏 + 面包屑 ========== */
+/* 桌面导航只给当前位置留一处叶绿标记。编辑首页时仍使用组件库自己的拖放样式。 */
+.app-sidebar .sidebar-nav .nav-item.active:not(.widget-src),
+.gc-nav .gc-nav-item.act:not(.widget-src, .widget-added, .widget-none),
+.window-shell .window-rail .rail-link.router-link-exact-active {
+  color: var(--leaf-ink);
+  background-color: var(--leaf-wash);
+}
+.app-sidebar .nav-item.active:not(.widget-src),
+.window-rail .rail-link.router-link-exact-active {
+  box-shadow: inset 3px 0 var(--leaf-accent);
+  opacity: 1;
+}
+.gc-nav .gc-nav-item.act:not(.widget-src, .widget-added, .widget-none) {
+  box-shadow: none;
+}
+.gc-nav .gc-nav-item.act:not(.widget-src, .widget-added, .widget-none) .gc-dot {
+  border-radius: 2px 6px;
+  background-color: var(--leaf-accent);
+  opacity: 1;
+}
+.gc-nav .gc-nav-group-head[aria-current='location'] {
+  color: var(--leaf-ink);
+  box-shadow: inset 3px 0 var(--leaf-accent);
+}
+/* 当前模块未固定到底栏时，页头标题承担位置提示。 */
+.mobile-layout.has-tabbar:not(:has(> .mobile-tabbar .tab-item.active)) > .mobile-header > .header-title:not(:empty)::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 7px;
+  vertical-align: 0.1em;
+  border-radius: 2px 6px;
+  background-color: var(--leaf-accent);
+}
 .page-header {
   display: flex;
   justify-content: flex-start;
@@ -1793,12 +1830,8 @@ html.dark .view-toggle {
     color 0.2s;
 }
 .vt-btn.active {
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--color-accent);
-}
-html.dark .vt-btn.active {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--color-brand);
+  background: var(--leaf-wash);
+  color: var(--leaf-ink);
 }
 .page h2 {
   font-size: 22px;
@@ -1817,7 +1850,7 @@ html.dark .page h2 {
   padding-left: 10px;
   border-left: 3px solid var(--color-accent);
 }
-:where(.app-main, .gc-root, .window-shell, .mobile-layout) .section-label {
+:where(.app-main, .gc-root, .window-shell, .mobile-layout, .kiosk) .section-label {
   border-left-color: var(--leaf-accent);
 }
 html.dark .section-label {
@@ -2035,6 +2068,13 @@ html.dark .el-button--danger.is-link:hover {
 .el-checkbox-button__original:checked + .el-checkbox-button__inner,
 .el-checkbox-button.is-checked .el-checkbox-button__inner {
   color: var(--color-brand-text) !important;
+}
+.page-toolbar .el-radio-button {
+  --el-radio-button-checked-bg-color: var(--leaf-wash);
+  --el-radio-button-checked-border-color: var(--leaf-accent);
+}
+.page-toolbar .el-radio-button.is-active:not(.is-disabled) .el-radio-button__inner {
+  color: var(--leaf-ink) !important;
 }
 
 /* 表格操作列:全站放图标按钮(配 el-tooltip 出文字),这里统一紧凑内边距与间距 */
@@ -2346,11 +2386,6 @@ html.dark .el-dialog__footer .el-button:not(.el-button--primary):not(.el-button-
   background: #fffdf8 !important;
   min-height: 38px !important;
 }
-.el-dialog .el-input__wrapper.is-focus {
-  box-shadow:
-    0 0 0 1px #c4a87e inset,
-    0 0 0 3px rgba(var(--color-brand-rgb), 0.12) !important;
-}
 .el-dialog .el-input__inner::placeholder {
   color: #c4b8a8 !important;
   opacity: 0.7 !important;
@@ -2367,10 +2402,6 @@ html.dark .el-dialog .el-input__inner::placeholder {
   border-radius: 10px !important;
   border-color: #e4ddd0 !important;
   background: #fffdf8 !important;
-}
-.el-dialog .el-textarea__inner:focus {
-  border-color: #c4a87e !important;
-  box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), 0.12) !important;
 }
 .el-dialog .el-textarea__inner::placeholder {
   color: #c4b8a8 !important;
@@ -2510,11 +2541,6 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
   box-shadow: 0 0 0 1px #e4ddd0 inset !important;
   background: #fffdf8 !important;
   min-height: 38px !important;
-}
-.el-message-box__input .el-input__wrapper.is-focus {
-  box-shadow:
-    0 0 0 1px #c4a87e inset,
-    0 0 0 3px rgba(var(--color-brand-rgb), 0.12) !important;
 }
 .el-message-box__input .el-input__inner::placeholder {
   color: #c4b8a8 !important;
@@ -3304,8 +3330,7 @@ html.dark .el-badge__content {
   border-radius: 14px !important;
 }
 
-/* ===== 多选圆标(封面单选/多选):相册详情 / 影院 / 物品 / 音乐四处共用 =====
-   底随卡片色、描边走品牌色、选中态品牌底,深色下不会再是一颗白点;勾选图标只在选中时显示 */
+/* ===== 资源多选圆标：选中后用叶绿底和反差色勾号标识，覆盖深浅封面 ===== */
 .pick-badge {
   position: absolute;
   top: 8px;
@@ -3318,19 +3343,19 @@ html.dark .el-badge__content {
   align-items: center;
   justify-content: center;
   background: rgba(var(--color-card-rgb), 0.85);
-  border: 2px solid rgba(var(--color-brand-rgb), 0.6);
+  border: 2px solid color-mix(in srgb, var(--color-text-secondary) 66%, transparent);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   transition:
     background 0.15s,
     border-color 0.15s;
 }
 .pick-badge.on {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
+  background: var(--leaf-accent);
+  border-color: var(--leaf-accent);
 }
 .pick-badge svg {
   opacity: 0;
-  color: var(--color-brand-text);
+  color: var(--color-card);
   transition: opacity 0.15s;
 }
 .pick-badge.on svg {
@@ -3361,8 +3386,8 @@ html.dark .el-badge__content {
   background: rgba(var(--color-brand-rgb), 0.06);
 }
 .rl-row.selected {
-  background: rgba(var(--color-brand-rgb), 0.1);
-  box-shadow: 0 0 0 1.5px var(--color-brand);
+  background: var(--leaf-wash);
+  box-shadow: 0 0 0 1.5px var(--leaf-accent);
 }
 .rl-thumb {
   position: relative;
@@ -3557,7 +3582,6 @@ html.theme-window
   background: var(--color-card) !important;
   border-color: var(--color-border);
 }
-html.theme-window .mobile-tabbar .tab-item.active,
 html.theme-window .mobile-header :is(.back-btn, .home-btn) {
   color: var(--color-brand);
 }
@@ -3796,9 +3820,6 @@ html.theme-window :is(.el-dialog, .el-message-box) :is(.el-textarea__inner, .el-
   background: var(--color-bg) !important;
   box-shadow: inset 0 0 0 1px var(--color-border) !important;
 }
-html.theme-window :is(.el-dialog, .el-message-box) :is(.el-textarea__inner:focus, .el-input__wrapper.is-focus) {
-  box-shadow: inset 0 0 0 2px var(--color-brand) !important;
-}
 html.theme-window .site-footer {
   position: static;
   justify-content: center;
@@ -3808,9 +3829,34 @@ html.theme-window .site-footer {
   font-family: inherit;
   text-shadow: none;
 }
-html.theme-window :focus-visible {
-  outline: 2px solid var(--color-brand);
+/* 产品页保有自己的明暗模式，署名旁的叶子随所在表面取色。 */
+.ihomy-host-credit::before {
+  content: '';
+  display: inline-block;
+  width: 0.64em;
+  height: 0.44em;
+  margin-inline-end: 0.4em;
+  vertical-align: 0.1em;
+  border-radius: 85% 4%;
+  background-color: var(--leaf-accent);
+  background-color: light-dark(var(--leaf-day), var(--leaf-night));
+}
+/* 键盘可沿细线寻找当前位置，表单的输入框只画一圈。 */
+.window-shell :focus-visible:not(:where(.el-input__inner, .el-textarea__inner, .el-select__input)),
+:is(.app-main, .app-sidebar, .gc-root, .window-shell, .mobile-layout, .kiosk, .site-footer, .el-dialog, .el-message-box)
+  :where(a[href], button, summary, [role='button'], [role='link'], [role='tab'], [role='switch']):focus-visible {
+  outline: 2px solid var(--leaf-accent);
   outline-offset: 2px;
+}
+:is(.app-main, .gc-root, .window-shell, .mobile-layout) :is(.el-input, .el-textarea) {
+  --el-input-focus-border-color: var(--leaf-accent);
+}
+html :is(.el-dialog, .el-message-box) :is(.el-textarea__inner:focus, .el-input__wrapper.is-focus),
+html :is(.app-main, .gc-root, .window-shell, .mobile-layout, .el-dialog) .el-select__wrapper.is-focused {
+  box-shadow: inset 0 0 0 2px var(--leaf-accent) !important;
+}
+html .el-form-item.is-error :is(.el-textarea__inner:focus, .el-input__wrapper.is-focus, .el-select__wrapper.is-focused) {
+  box-shadow: inset 0 0 0 2px var(--el-color-danger) !important;
 }
 @media (prefers-reduced-motion: reduce) {
   html.theme-window,

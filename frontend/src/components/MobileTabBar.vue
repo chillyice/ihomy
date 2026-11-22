@@ -14,6 +14,7 @@
       class="tab-item"
       :class="{ active: item.code === activeCode, 'is-capture': item.capture }"
       :aria-label="labelOf(item)"
+      :aria-current="item.code === activeCode ? 'location' : undefined"
       @pointerdown="startHold"
       @pointerup="endHold"
       @pointercancel="endHold"
@@ -119,7 +120,7 @@ const onPick = (code) => {
   width: 28px;
   height: 3px;
   border-radius: 0 0 3px 3px;
-  background: var(--color-brand);
+  background: var(--leaf-accent);
 }
 html.dark .mobile-tabbar {
   background: rgba(var(--color-card-rgb), 0.92);
@@ -154,10 +155,7 @@ html.dark .mobile-tabbar {
   transform: scale(0.9);
 }
 .tab-item.active {
-  color: var(--color-primary, var(--color-brand));
-}
-html.dark .tab-item.active {
-  color: var(--color-brand);
+  color: var(--leaf-ink);
 }
 .tab-label {
   max-width: 100%;

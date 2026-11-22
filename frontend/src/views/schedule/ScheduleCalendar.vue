@@ -26,6 +26,8 @@
         type="button"
         class="cal-cell"
         :class="{ 'out-month': !cell.inMonth, selected: cell.selected, 'is-today': cell.isToday }"
+        :aria-current="cell.isToday ? 'date' : undefined"
+        :aria-pressed="cell.selected"
         @click="$emit('update:selected', cell.date)"
       >
         <span class="cell-day">{{ cell.day }}</span>
@@ -166,12 +168,14 @@ const pickToday = () => emit('update:selected', todayString())
 .cal-cell.out-month {
   opacity: 0.4;
 }
-.cal-cell.is-today {
-  border-color: var(--color-brand);
+.cal-cell.is-today .cell-day {
+  color: var(--leaf-ink);
+  text-decoration: underline 2px var(--leaf-accent);
+  text-underline-offset: 2px;
 }
 .cal-cell.selected {
-  background: rgba(var(--color-brand-rgb), 0.2);
-  border-color: var(--color-brand-hover);
+  background: var(--leaf-wash);
+  border-color: var(--leaf-accent);
 }
 .cell-day {
   font-size: 15px;

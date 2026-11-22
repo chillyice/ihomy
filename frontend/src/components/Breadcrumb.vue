@@ -10,7 +10,7 @@
       <template v-for="(it, i) in items" :key="i">
         <span class="sep">/</span>
         <router-link v-if="it.to || it.path" :to="it.to || it.path" class="crumb-link">{{ it.label }}</router-link>
-        <span v-else class="crumb-current">{{ it.label }}</span>
+        <span v-else class="crumb-current" :aria-current="i === items.length - 1 ? 'page' : undefined">{{ it.label }}</span>
       </template>
     </div>
     <div v-if="$slots.right" class="crumb-right">
@@ -86,5 +86,8 @@ const isWarm = computed(() => themeStore.theme === 'warm')
 .crumb-current {
   color: var(--color-text);
   font-weight: 500;
+}
+.crumb-current[aria-current='page'] {
+  color: var(--leaf-ink);
 }
 </style>

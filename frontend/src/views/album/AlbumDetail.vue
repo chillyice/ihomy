@@ -950,8 +950,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 24px rgba(31, 58, 95, 0.15);
 }
 .child-tile.selected {
-  outline: 3px solid var(--color-primary, var(--color-brand));
-  outline-offset: -3px;
+  outline: 2px solid var(--leaf-accent);
+  outline-offset: -2px;
 }
 .child-tile-cover {
   position: relative;
@@ -1006,8 +1006,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 6px 18px rgba(31, 58, 95, 0.12);
 }
 .child-card.selected {
-  outline: 3px solid var(--color-primary, var(--color-brand));
-  outline-offset: -3px;
+  outline: 2px solid var(--leaf-accent);
+  outline-offset: -2px;
 }
 .child-cover {
   position: relative;
@@ -1052,8 +1052,8 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
 }
 .photo-card.selected .photo-wrap {
-  outline: 3px solid var(--color-primary, var(--color-brand));
-  outline-offset: -3px;
+  outline: 2px solid var(--leaf-accent);
+  outline-offset: -2px;
 }
 .live-badge {
   position: absolute;

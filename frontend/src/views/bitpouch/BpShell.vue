@@ -11,7 +11,7 @@
         <span class="bptools-spacer"></span>
         <router-link class="bpc-link" to="/bit-pouch">{{ $t('bitPouch.tools.backToHome') }}</router-link>
         <span aria-hidden="true">·</span>
-        <span>{{ $t('bitPouch.hostedBy') }}</span>
+        <span class="ihomy-host-credit">{{ $t('bitPouch.hostedBy') }}</span>
       </footer>
     </div>
   </div>

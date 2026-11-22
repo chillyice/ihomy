@@ -114,7 +114,7 @@
         </button>
       </div>
       <nav class="cy-links" :aria-label="$t('chillyice.linksAria')">
-        <router-link class="cy-link cy-link--primary" to="/home">{{ $t('chillyice.backHome') }}</router-link>
+        <router-link class="cy-link cy-link--primary ihomy-host-credit" to="/home">{{ $t('chillyice.backHome') }}</router-link>
         <a class="cy-link" :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ $t('chillyice.github') }}</a>
       </nav>
     </section>
@@ -818,6 +818,9 @@ onBeforeUnmount(() => {
   background: var(--cy-ink);
   border-color: var(--cy-ink);
   color: var(--cy-bg);
+}
+.cy-link--primary::before {
+  background-color: light-dark(var(--leaf-night), var(--leaf-day));
 }
 .cy-link--primary:hover {
   background: var(--cy-accent);

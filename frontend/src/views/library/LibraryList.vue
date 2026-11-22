@@ -684,10 +684,13 @@ onMounted(async () => {
   color: var(--color-text-secondary);
   cursor: pointer;
 }
-.library-view-toggle button:hover,
-.library-view-toggle button[aria-pressed='true'] {
+.library-view-toggle button:hover {
   background: var(--shelf-hover);
   color: var(--color-text-primary);
+}
+.library-view-toggle button[aria-pressed='true'] {
+  background: var(--leaf-wash);
+  color: var(--leaf-ink);
 }
 .library-view-toggle .el-icon {
   font-size: 16px;
@@ -746,8 +749,8 @@ onMounted(async () => {
   background: var(--shelf-hover);
 }
 .shelf-book.selected {
-  background: var(--shelf-hover);
-  border-color: var(--color-brand);
+  background: var(--leaf-wash);
+  border-color: var(--leaf-accent);
 }
 .book-entry {
   position: relative;
@@ -884,7 +887,7 @@ onMounted(async () => {
   border-bottom-color: var(--color-border);
 }
 .view-list .shelf-book.selected {
-  border-bottom-color: var(--color-brand);
+  border-bottom-color: var(--leaf-accent);
 }
 .view-list .book-entry {
   grid-template-columns: 42px minmax(0, 1fr);
