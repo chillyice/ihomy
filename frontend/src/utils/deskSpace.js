@@ -1,3 +1,6 @@
+// 贴图随机歪放的最大角度（±）。超过 45° 就成了「斜着挂」，观感不对，所以封顶在这里。
+const MAX_TILT = 30
+
 // 页面之间共用一次抽样。几何计算只读这些比例，重新测量不会重新掷骰。
 export function sampleDeskPlan(random = Math.random, minimumCount = 0) {
   const roll = random()
@@ -7,7 +10,7 @@ export function sampleDeskPlan(random = Math.random, minimumCount = 0) {
     side: (firstSide + i) % 2,
     u: 0.22 + random() * 0.56,
     v: 0.12 + random() * 0.76,
-    angle: Math.round(random() * 14 - 7),
+    angle: Math.round(random() * MAX_TILT * 2 - MAX_TILT),
   }))
 }
 
@@ -29,6 +32,17 @@ function overlaps(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }
 
+// 歪放的方图沿 x 轴的实际半宽是 (size/2)·(|cosθ|+|sinθ|)：不按角度补偿,
+// 30° 的大角会捅出贴边预留的范围,在视口边缘被裁掉。
+function tiltSpread(angle = 0) {
+  const rad = (Math.abs(angle) * Math.PI) / 180
+  return Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad))
+}
+
+function turnedRadius(size, angle = 0) {
+  return Math.ceil((size / 2) * tiltSpread(angle)) + 5
+}
+
 // 桌面物件边长 = 平板底数 ×3。桌沿装不下这么大的物品,允许跨到正文边缘;
 // 只保证不压导航、整件留在视口内,并避开浮窗等障碍。
 const DESK_SCALE = 3
@@ -40,7 +54,7 @@ function findWideSpace(slot, lanes, obstacles, preferred, minimum) {
   const viewHeight = lanes[1].bottom
   const size = Math.floor(Math.min(preferred, viewWidth * 0.3, (viewHeight - 12) / 1.16))
   if (size < minimum) return null
-  const radius = Math.ceil(size * 0.58) + 5
+  const radius = turnedRadius(size, slot.angle)
   if (radius * 2 + 16 > viewHeight) return null
   for (const side of [slot.side, 1 - slot.side]) {
     const lane = lanes[side]
@@ -76,7 +90,7 @@ function findSpace(slot, lanes, obstacles, preferred, minimum) {
 
 // 平板在视口外藏起半张图，只让约一指宽的部分探入正文。触控区也由视口裁切。
 function findEdgeSpace(slot, width, height, occupied, size) {
-  const radius = Math.ceil(size * 0.58) + 4
+  const radius = Math.max(Math.ceil(size * 0.58) + 4, turnedRadius(size, slot.angle))
   const inset = Math.round(6 + slot.u * 6)
   const end = radius + 24
   if (height < end * 2) return null

@@ -14,8 +14,9 @@ describe('window desk margins', () => {
   it('scales desktop objects three times the tablet size and keeps them clear of navigation', () => {
     const placed = placeDeskItems(photos, plan, large, [])
     expect(placed.length).toBeGreaterThanOrEqual(2)
-    for (const { x, y, size } of placed) {
-      const r = Math.ceil(size * 0.58) + 5
+    for (const { x, y, size, angle } of placed) {
+      const rad = (Math.abs(angle) * Math.PI) / 180
+      const r = Math.ceil((size / 2) * (Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad)))) + 5
       expect(size).toBe(402)
       expect(x - r).toBeGreaterThanOrEqual(220)
       expect(x + r).toBeLessThanOrEqual(1920)
@@ -23,6 +24,13 @@ describe('window desk margins', () => {
       expect(y + r).toBeLessThanOrEqual(900)
     }
     expect(placeDeskItems(photos, plan, large, [])).toEqual(placed)
+  })
+
+  it('tilts objects at a wider random angle capped at 30 degrees', () => {
+    const angles = [0, 0.25, 0.5, 0.75, 1].map((roll) => sampleDeskPlan(() => roll, 1)[0].angle)
+    expect(Math.max(...angles)).toBeLessThanOrEqual(30)
+    expect(Math.min(...angles)).toBeGreaterThanOrEqual(-30)
+    expect(Math.max(...angles.map(Math.abs))).toBeGreaterThan(20)
   })
 
   it('shrinks objects on narrow windows and skips them when the viewport is too short', () => {
