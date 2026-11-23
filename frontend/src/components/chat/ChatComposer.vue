@@ -126,11 +126,11 @@
       </template>
     </el-dialog>
 
-    <!-- 游戏邀请:八个 H5 小游戏选一个 -->
+    <!-- 游戏邀请 -->
     <el-dialog v-model="gameVisible" :title="$t('chat.composer.gameTitle')" width="dialog-md" append-to-body>
       <div class="game-grid">
         <button v-for="g in H5_GAMES" :key="g.code" type="button" class="game-pick" @click="pickGame(g)">
-          <el-icon :size="20"><Trophy /></el-icon>
+          <GameIcon :code="g.code" :size="32" />
           <span>{{ $t(g.nameKey) }}</span>
         </button>
       </div>
@@ -183,6 +183,7 @@ import { CHAT_EMOJI } from '@/utils/chatEmoji'
 import { CHAT_FONT_MAX, CHAT_FONT_MIN, CHAT_TEXT_COLORS } from '@/utils/chatStyle'
 import { MAX_PARTICIPANTS } from '@/utils/callMesh'
 import ChatObjectPicker from '@/components/chat/ChatObjectPicker.vue'
+import GameIcon from '@/components/games/GameIcon.vue'
 
 const IMAGE_MAX_BYTES = 20 * 1024 * 1024
 const DRAFT_MAX = 2000

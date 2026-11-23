@@ -79,9 +79,10 @@
     <div v-if="activeCategory" v-loading="loading" class="tool-grid">
       <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
       <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card paper-surface" @click="$router.push(b.path)">
-        <div class="tool-icon">
+        <div v-if="b.icon" class="tool-icon">
           <el-icon :size="30"><component :is="b.icon" /></el-icon>
         </div>
+        <GameIcon v-else :code="b.key" class="builtin-icon" />
         <div class="tool-name">{{ $t(b.titleKey) }}</div>
         <div class="tool-desc">{{ $t(b.descKey) }}</div>
         <div class="tool-meta">
@@ -244,37 +245,24 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
-  Sunny,
   VideoPlay,
   ArrowRight,
   ArrowLeft,
   MoreFilled,
-  Grid,
-  Cpu,
-  Histogram,
   Link,
   Monitor,
   MagicStick,
   Collection,
-  Aim,
-  Tickets,
-  Box,
-  Cherry,
-  Medal,
   Promotion,
   Flag,
   GoldMedal,
   Star,
   Grape,
   Compass,
-  Postcard,
-  Trophy,
-  Coin,
-  Connection,
-  Wallet,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameIcon from '@/components/games/GameIcon.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
@@ -346,13 +334,12 @@ const embeddedEntries = EMBEDDED_GAMES.map((g) => ({
   category: g.category,
 }))
 
-/** 站内固定入口也按同一套分类参与筛选;图标直接引用组件 */
+/** 自研游戏的 key 同时对应暖居图标文件名。 */
 const builtinGames = [
   {
     key: 'garden',
     titleKey: 'games.garden.title',
     descKey: 'games.garden.desc',
-    icon: Sunny,
     path: '/tools/plant',
     category: 'SIMULATION',
   },
@@ -360,7 +347,6 @@ const builtinGames = [
     key: 'petlink',
     titleKey: 'games.petlink.title',
     descKey: 'games.petlink.desc',
-    icon: Grid,
     path: '/games/petlink',
     category: 'PUZZLE',
   },
@@ -368,15 +354,13 @@ const builtinGames = [
     key: 'sudoku',
     titleKey: 'games.sudoku.title',
     descKey: 'games.sudoku.desc',
-    icon: Cpu,
     path: '/games/sudoku',
     category: 'PUZZLE',
   },
   {
-    key: 'g2048',
+    key: '2048',
     titleKey: 'games.g2048.title',
     descKey: 'games.g2048.desc',
-    icon: Histogram,
     path: '/games/2048',
     category: 'PUZZLE',
   },
@@ -384,15 +368,13 @@ const builtinGames = [
     key: 'minesweeper',
     titleKey: 'games.minesweeper.title',
     descKey: 'games.minesweeper.desc',
-    icon: Aim,
     path: '/games/minesweeper',
     category: 'PUZZLE',
   },
   {
-    key: 'klondike',
+    key: 'solitaire',
     titleKey: 'games.solitaire.title',
     descKey: 'games.solitaire.desc',
-    icon: Tickets,
     path: '/games/cards/klondike',
     category: 'CARD',
   },
@@ -400,7 +382,6 @@ const builtinGames = [
     key: 'spider',
     titleKey: 'games.spider.title',
     descKey: 'games.spider.desc',
-    icon: Connection,
     path: '/games/cards/spider',
     category: 'CARD',
   },
@@ -408,7 +389,6 @@ const builtinGames = [
     key: 'freecell',
     titleKey: 'games.freecell.title',
     descKey: 'games.freecell.desc',
-    icon: Wallet,
     path: '/games/cards/freecell',
     category: 'CARD',
   },
@@ -416,7 +396,6 @@ const builtinGames = [
     key: 'tetris',
     titleKey: 'games.tetris.title',
     descKey: 'games.tetris.desc',
-    icon: Box,
     path: '/games/tetris',
     category: 'ARCADE',
   },
@@ -424,7 +403,6 @@ const builtinGames = [
     key: 'snake',
     titleKey: 'games.snake.title',
     descKey: 'games.snake.desc',
-    icon: Cherry,
     path: '/games/snake',
     category: 'ARCADE',
   },
@@ -432,7 +410,6 @@ const builtinGames = [
     key: 'mahjong',
     titleKey: 'games.mahjong.title',
     descKey: 'games.mahjong.desc',
-    icon: Medal,
     path: '/games/mahjong',
     category: 'CASUAL',
   },
@@ -440,7 +417,6 @@ const builtinGames = [
     key: 'ludo',
     titleKey: 'games.ludo.title',
     descKey: 'games.ludo.desc',
-    icon: Promotion,
     path: '/games/ludo',
     category: 'CASUAL',
   },
@@ -448,7 +424,6 @@ const builtinGames = [
     key: 'doudizhu',
     titleKey: 'games.doudizhu.title',
     descKey: 'games.doudizhu.desc',
-    icon: Postcard,
     path: '/games/doudizhu',
     category: 'CARD',
   },
@@ -456,7 +431,6 @@ const builtinGames = [
     key: 'mahjong3d',
     titleKey: 'games.mahjong3d.title',
     descKey: 'games.mahjong3d.desc',
-    icon: Coin,
     path: '/games/mahjong3d',
     category: 'CASUAL',
   },
@@ -464,7 +438,6 @@ const builtinGames = [
     key: 'guandan',
     titleKey: 'games.guandan.title',
     descKey: 'games.guandan.desc',
-    icon: Trophy,
     path: '/games/guandan',
     category: 'CARD',
   },
@@ -472,7 +445,6 @@ const builtinGames = [
     key: 'baohuang',
     titleKey: 'games.baohuang.title',
     descKey: 'games.baohuang.desc',
-    icon: Medal,
     path: '/games/baohuang',
     category: 'CARD',
   },
@@ -480,7 +452,6 @@ const builtinGames = [
     key: 'gouji',
     titleKey: 'games.gouji.title',
     descKey: 'games.gouji.desc',
-    icon: Coin,
     path: '/games/gouji',
     category: 'CARD',
   },
@@ -889,6 +860,10 @@ onMounted(() => {
 }
 .tool-card:hover {
   transform: translateY(-3px);
+}
+.builtin-icon {
+  display: grid;
+  margin-bottom: 14px;
 }
 .tool-icon {
   width: 56px;

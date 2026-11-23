@@ -1,9 +1,7 @@
 <!-- 游戏邀请卡:房间邀请直达房间大厅,旧 1v1 邀请直达对战详情,普通邀请直达游戏页 -->
 <template>
   <div class="invite-card">
-    <el-icon class="invite-icon" :size="22">
-      <component :is="gameIcon" />
-    </el-icon>
+    <GameIcon :code="payload.gameCode" :size="40" />
     <div class="invite-main">
       <div class="invite-title">{{ gameName }}</div>
       <div class="invite-hint">
@@ -24,26 +22,11 @@
 
 <script setup>
 // 游戏邀请(GAME_INVITE):payload {gameCode, roomId?, mode?, matchId?};content=游戏名快照。
-// 图标按 gameCode 映射(与 Games.vue 固定入口同款),未知游戏回落奖杯
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Aim, Box, Cherry, Cpu, Grid, Histogram, Medal, Promotion, Tickets, Trophy } from '@element-plus/icons-vue'
+import GameIcon from '@/components/games/GameIcon.vue'
 import { gameByCode, parsePayload } from '@/utils/chatMsg'
 import { useI18n } from 'vue-i18n'
-
-const GAME_ICONS = {
-  game_petlink: Grid,
-  game_sudoku: Cpu,
-  game_2048: Histogram,
-  game_minesweeper: Aim,
-  game_mahjong: Medal,
-  game_ludo: Promotion,
-  game_tetris: Box,
-  game_snake: Cherry,
-  game_solitaire: Tickets,
-  game_spider: Tickets,
-  game_freecell: Tickets,
-}
 
 const props = defineProps({
   msg: { type: Object, required: true },
@@ -53,7 +36,6 @@ const router = useRouter()
 const { t } = useI18n()
 const payload = computed(() => parsePayload(props.msg.payload) || {})
 const game = computed(() => gameByCode(payload.value.gameCode))
-const gameIcon = computed(() => GAME_ICONS[payload.value.gameCode] || Trophy)
 const roomId = computed(() => {
   const n = Number(payload.value.roomId)
   return Number.isFinite(n) && n > 0 ? n : 0
@@ -78,17 +60,6 @@ const gameName = computed(() => {
   border-radius: 10px;
   background: rgba(var(--color-brand-rgb), 0.08);
   border: 1px solid rgba(var(--color-brand-rgb), 0.22);
-}
-.invite-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--color-brand-rgb), 0.14);
-  color: var(--color-brand-text);
 }
 .invite-main {
   min-width: 0;
