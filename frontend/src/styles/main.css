@@ -367,69 +367,28 @@ html .window-shell:has(.wh, .elder-home) {
   }
 }
 
-/* 暖居首页的纸色、纤维和绿条共用一套绘制参数，编辑态也能沿用。 */
-html.theme-warm .gc-home .gc-card:not(.gc-card-preview),
-html.theme-warm .mobile-home .feed-list .feed-card {
-  --home-strip-height: 5px;
-  --card-paper-wash: rgba(var(--color-card-rgb), var(--home-card-veil));
-  --card-paper-layers:
-    linear-gradient(var(--leaf-accent), var(--leaf-accent)), linear-gradient(var(--card-paper-wash), var(--card-paper-wash)),
-    var(--home-grain);
-  --card-paper-sizes: 100% var(--home-strip-height), auto, var(--home-grain-size);
-  background-image: var(--card-paper-layers);
-  background-position:
-    top,
-    center,
-    top left;
-  background-repeat: no-repeat, no-repeat, repeat;
-  background-size: var(--card-paper-sizes);
+/* 卡纸整张铺在内容下面。分片固定纸角与厚度，中部保留原画的水粉笔触。 */
+html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview), .mobile-home .feed-list .feed-card) {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 5px;
 }
-html.theme-warm .mobile-home .feed-list .feed-card {
-  --home-strip-height: 3px;
+html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview, .gc-card-edit), .mobile-home .feed-list .feed-card) {
+  border-color: transparent;
 }
-
-/* 取桌沿水粉便签的纸质做九宫格。透明通道裁纸，颜色层留下干笔；
- * 四角定宽，长边按原笔触密度重复，仅装饰层参与裁切。 */
-@supports (-webkit-mask-box-image: none) or (mask-border-source: none) {
-  html.theme-warm .gc-home .gc-card:not(.gc-card-preview, .gc-card-edit),
-  html.theme-warm .mobile-home .feed-list .feed-card {
-    --card-edge: url('@/assets/materials/gouache-paper-edge.webp?no-inline');
-    position: relative;
-    isolation: isolate;
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview, .gc-card-edit), .mobile-home .feed-list .feed-card)::before,
-  html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview, .gc-card-edit), .mobile-home .feed-list .feed-card)::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    pointer-events: none;
-  }
-
-  html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview, .gc-card-edit), .mobile-home .feed-list .feed-card)::before {
-    background-color: var(--color-card);
-    background-image: var(--card-paper-layers);
-    background-size:
-      100% calc(var(--home-strip-height) + 3px),
-      auto,
-      var(--home-grain-size);
-    background-position:
-      top,
-      center,
-      top left;
-    background-repeat: no-repeat, no-repeat, repeat;
-    -webkit-mask-box-image: var(--card-edge) 32 fill / 16px / 0 round;
-    mask-border: var(--card-edge) 32 fill / 16px / 0 round;
-  }
-
-  html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview, .gc-card-edit), .mobile-home .feed-list .feed-card)::after {
-    border-image: var(--card-edge) 32 / 16px / 0 round;
-    mix-blend-mode: soft-light;
-  }
+html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview), .mobile-home .feed-list .feed-card)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-image: url('@/assets/materials/painted-card.webp?no-inline') 48 124 72 48 fill / 12px 30px 18px 12px stretch;
+  filter: var(--painted-card-tone, saturate(0.78));
+}
+html.theme-warm.dark {
+  --painted-card-tone: brightness(0.6) contrast(2.4) brightness(0.44) saturate(0.72);
 }
 
 /* 光尘的透明卡、手机筛选条和窗边头图各有自己的底色，颗粒只落于卡头/题签。

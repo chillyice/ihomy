@@ -23,11 +23,11 @@
             <img :src="item.src" alt="" draggable="false" decoding="async" @error="hideMissingImage(item)" />
           </span>
           <span v-else-if="item.kind === 'note'" class="memo-paper" :style="paperStyle(item)">
-            <img :src="imageOf(item)" alt="" draggable="false" @error="hideMissingImage(item)" />
-            <img v-if="item.ageDays > 0" class="memo-fold" :src="imageOf(item)" alt="" draggable="false" />
+            <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
+            <img v-if="item.ageDays > 0" class="memo-fold" v-bind="illustrationSource(item, size)" alt="" draggable="false" />
           </span>
           <template v-else>
-            <img :src="imageOf(item)" alt="" draggable="false" @error="hideMissingImage(item)" />
+            <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
             <span v-if="item.kind === 'cup'" class="desk-steam"><i></i><i></i></span>
           </template>
         </span>
@@ -60,6 +60,13 @@ const props = defineProps({
 const { t } = useI18n()
 const artFiles = import.meta.glob('../assets/windowdesk/*.webp', { eager: true, import: 'default', query: '?url&no-inline' })
 const imageOf = (item) => (item.kind === 'photo' ? item.src : artFiles[`../assets/windowdesk/${item.art}.webp`])
+const hdArtFiles = import.meta.glob('../assets/windowdesk/hd/*.webp', { eager: true, import: 'default', query: '?url&no-inline' })
+function illustrationSource(item, size) {
+  const src = imageOf(item)
+  const hd = hdArtFiles[`../assets/windowdesk/hd/${item.art}.webp`]
+  const width = item.kind === 'leaf' ? 168 : 268
+  return { src, srcset: `${src} ${width}w, ${hd} ${width * 3}w`, sizes: `${size}px` }
+}
 const missingImages = shallowRef(new Set())
 const hideMissingImage = (item) => {
   missingImages.value = new Set(missingImages.value).add(imageOf(item))
