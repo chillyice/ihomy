@@ -11,6 +11,55 @@ describe('window desk margins', () => {
     expect(sampleDeskPlan(() => 0, 1)).toHaveLength(1)
   })
 
+  describe('two visible objects', () => {
+    const height = 914
+    const lanes = deskLanes(2560, height, 0, { left: 600, right: 1960 })
+    const slots = [1, 0, 1].map((side) => ({ side, u: 0.5, v: 0.8, angle: 0 }))
+    const pair = [{ kind: 'journal' }, { kind: 'leaf' }]
+    const rightStrip = { left: 2250, right: 2260, top: 0, bottom: height }
+    const lowerLeft = { left: 0, right: 600, top: 510, bottom: height }
+
+    it('uses opposite edges and opposite halves even when both slots prefer the same height', () => {
+      const placed = placeDeskItems(pair, slots.slice(0, 2), lanes, [])
+      expect(placed).toHaveLength(2)
+      expect(placed[0].edge).not.toBe(placed[1].edge)
+      expect(placed[0].y < height / 2).not.toBe(placed[1].y < height / 2)
+    })
+
+    it('uses the first object’s actual corner after the obstacles force it across and up', () => {
+      // The right strip blocks the journal, but leaves enough room beside it for the leaf.
+      const placed = placeDeskItems(pair, slots.slice(0, 2), lanes, [rightStrip, lowerLeft])
+      expect(placed.map((p) => p.edge)).toEqual(['left', 'right'])
+      expect(placed[0].y).toBeLessThan(height / 2)
+      expect(placed[1].y).toBeGreaterThan(height / 2)
+    })
+
+    it('can move the first item when the second only fits in one corner', () => {
+      const leftStrip = { ...rightStrip, left: 300, right: 310 }
+      const upperRight = { left: 1960, right: 2560, top: 0, bottom: 400 }
+      const placed = placeDeskItems([pair[1], pair[0]], slots.slice(1), lanes, [leftStrip, upperRight])
+      expect(placed.map((p) => p.edge)).toEqual(['left', 'right'])
+      expect(placed[0].y).toBeLessThan(height / 2)
+      expect(placed[1].y).toBeGreaterThan(height / 2)
+    })
+
+    it('separates the two that fit when a three-object plan cannot fit the last one', () => {
+      const leftStrip = { ...rightStrip, left: 300, right: 310 }
+      const items = [{ kind: 'leaf' }, { kind: 'note' }, { kind: 'journal' }]
+      const placed = placeDeskItems(items, slots, lanes, [leftStrip, rightStrip])
+      expect(placed.map((p) => p.item)).toEqual(items.slice(0, 2))
+      expect(placed[0].edge).not.toBe(placed[1].edge)
+      expect(placed[0].y < height / 2).not.toBe(placed[1].y < height / 2)
+    })
+
+    it('uses the upper and lower ends of one edge when the other edge is blocked', () => {
+      const rail = { ...rightStrip, right: 2560 }
+      const placed = placeDeskItems(pair, slots.slice(0, 2), lanes, [rail])
+      expect(placed.map((p) => p.edge)).toEqual(['left', 'left'])
+      expect(placed[0].y < height / 2).not.toBe(placed[1].y < height / 2)
+    })
+  })
+
   it('uses the 381 / 914 reference for large pieces and preserves relative sizes and a ceiling', () => {
     function sizeAt(kind, height) {
       const lanes = deskLanes(2560, height, 220, { left: 900, right: 1660 })

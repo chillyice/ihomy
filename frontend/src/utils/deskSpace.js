@@ -59,7 +59,7 @@ const ITEM_SCALE = {
   leaf: 0.58,
 }
 
-function findDeskSpace(item, slot, lanes, obstacles, cards) {
+function* deskSeats(item, slot, lanes, obstacles, cards) {
   const { right: width, bottom: height } = lanes[1]
   const scale = ITEM_SCALE[item.kind] ?? 0.85
   const preferred = Math.round(Math.min(480, Math.max(180, height * (381 / 914))) * scale)
@@ -92,11 +92,36 @@ function findDeskSpace(item, slot, lanes, obstacles, cards) {
         box.right = x + inset
       }
       if (!obstacles.some((other) => overlaps(box, other))) {
-        return { x, y, size, cropWidth: cropped ? room : 0, box, edge: side === 0 ? 'left' : 'right' }
+        yield { box, layout: { item, angle: slot.angle, x, y, size, cropWidth: cropped ? room : 0, edge: side === 0 ? 'left' : 'right' } }
       }
     }
   }
-  return null
+}
+
+// 只在实际出现两件时比较位置。优先对角，其次分居两侧；被迫共边时尽量拉开高度。
+function pairSeparation(a, b, height) {
+  const firstIsUpper = a.y < height / 2
+  const secondIsUpper = b.y < height / 2
+  return (a.edge !== b.edge ? 2 : 0) + (firstIsUpper !== secondIsUpper ? 1 : 0) + Math.abs(a.y - b.y) / height
+}
+
+function spreadDeskPair(pair, plan, lanes, obstacles, cards) {
+  const height = lanes[1].bottom
+  let best = pair
+  let score = pairSeparation(pair[0], pair[1], height)
+  if (score >= 3) return best
+  const secondSeats = [...deskSeats(pair[1].item, plan[1], lanes, obstacles, cards)]
+  for (const first of deskSeats(pair[0].item, plan[0], lanes, obstacles, cards)) {
+    for (const second of secondSeats) {
+      if (overlaps(first.box, second.box)) continue
+      const next = pairSeparation(first.layout, second.layout, height)
+      if (next <= score) continue
+      best = [first.layout, second.layout]
+      if (next >= 3) return best
+      score = next
+    }
+  }
+  return best
 }
 
 // 预留旋转、悬停和投影所需的边界。窄桌沿只摆仍能拥有完整点击面的物品。
@@ -124,13 +149,12 @@ export function placeDeskItems(items, plan, lanes, obstacles, cards = []) {
     const slot = plan[result.length]
     if (!slot) break
     if (lanes[1].right < 600 && result.length) break
-    const seat = findDeskSpace(item, slot, lanes, occupied, cards)
+    const seat = deskSeats(item, slot, lanes, occupied, cards).next().value
     if (!seat) continue
-    const { box, ...layout } = seat
-    result.push({ item, angle: slot.angle, ...layout })
-    occupied.push(box)
+    result.push(seat.layout)
+    occupied.push(seat.box)
   }
-  return result
+  return result.length === 2 ? spreadDeskPair(result, plan, lanes, obstacles, cards) : result
 }
 
 export function placePawTrail(placements, lanes, obstacles, random = Math.random) {
