@@ -4,66 +4,49 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('settings.title') }]" />
 
-    <div class="settings-layout">
+    <div class="settings-layout" :class="{ 'settings-mobile': isMobile }">
       <!-- 桌面端:分组侧栏 -->
       <aside v-if="!isMobile" class="settings-side paper-surface">
         <el-menu :default-active="activeId" class="settings-menu" @select="openPanel">
           <el-menu-item-group v-for="g in groups" :key="g.key" :title="$t(g.labelKey)">
             <el-menu-item v-for="p in g.items" :key="p.id" :index="p.id">
-              <span class="menu-icon">{{ p.icon }}</span
-              >{{ $t(p.labelKey) }}
+              <SettingsIcon :name="p.id" class="menu-icon" />{{ $t(p.labelKey) }}
             </el-menu-item>
           </el-menu-item-group>
         </el-menu>
       </aside>
 
       <!-- 移动端:分组列表 -->
-      <div v-if="isMobile && !activeId" class="settings-index">
-        <div v-for="g in groups" :key="g.key" class="settings-group">
-          <div class="group-label">{{ $t(g.labelKey) }}</div>
-          <div class="group-card paper-surface">
-            <div v-for="p in g.items" :key="p.id" v-a11y-click class="group-row" @click="openPanel(p.id)">
-              <span class="row-icon">{{ p.icon }}</span>
-              <span class="row-text">{{ $t(p.labelKey) }}</span>
-              <el-icon class="row-arrow"><ArrowRight /></el-icon>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SettingsDirectory v-if="isMobile && !activeId" :groups="groups" @open="openPanel" />
 
       <!-- 配置区:移动端单大类带返回条;桌面端全部 v-show 保留状态。
            无权限的大类(pointsRule/ai/backup)连挂载都跳过,组件不发请求也就不弹 403 -->
       <div v-else class="settings-body">
-        <div v-if="isMobile" class="panel-bar paper-heading">
-          <div v-a11y-click class="panel-back" @click="closePanel">
+        <div v-if="isMobile && currentPanel" class="panel-bar paper-heading">
+          <SettingsIcon :name="currentPanel.id" class="panel-icon" />
+          <span class="panel-title">{{ $t(currentPanel.labelKey) }}</span>
+          <button type="button" class="panel-back" @click="closePanel">
             <el-icon><ArrowLeft /></el-icon>
             <span>{{ $t('settings.allSettings') }}</span>
-          </div>
-          <span class="panel-title">{{ currentPanel ? $t(currentPanel.labelKey) : '' }}</span>
+          </button>
         </div>
 
-        <div v-show="activeId === 'profile'"><ProfileSettings /></div>
-        <div v-show="activeId === 'health'"><HealthSettings /></div>
-        <div v-show="activeId === 'family'"><FamilySettings /></div>
-        <div v-if="panelVisible('pointsRule')" v-show="activeId === 'pointsRule'"><PointsRuleSettings /></div>
-        <div v-if="panelVisible('ai')" v-show="activeId === 'ai'"><AiSettings /></div>
-        <div v-if="panelVisible('backup')" v-show="activeId === 'backup'"><BackupSettings /></div>
-        <!-- 首页内容:每日内容 + 天气(天气仅家长可配) -->
-        <div v-show="activeId === 'content'">
-          <div id="settings-daily"><DailySettings /></div>
-          <div v-if="userStore.hasPerm('family:manage')" id="settings-weather"><WeatherSettings /></div>
+        <div v-for="panel in mountedPanels" :key="panel.id" v-show="activeId === panel.id">
+          <component :is="panel.component" v-if="panel.component" />
+          <!-- 首页内容:每日内容 + 天气(天气仅家长可配) -->
+          <template v-else-if="panel.id === 'content'">
+            <div id="settings-daily"><DailySettings /></div>
+            <div v-if="userStore.hasPerm('family:manage')" id="settings-weather"><WeatherSettings /></div>
+          </template>
+          <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
+          <template v-else-if="panel.id === 'appearance'">
+            <div id="settings-light"><LightSettings /></div>
+            <WindowDeskSettings v-if="(!isMobile || isTablet) && activeId === 'appearance'" />
+            <div id="settings-display"><ModeSettings /></div>
+            <div id="settings-morning"><MorningSettings /></div>
+            <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
+          </template>
         </div>
-        <div v-show="activeId === 'media'"><MediaSettings /></div>
-        <template v-if="activeId === 'storage'"><StorageView /></template>
-        <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
-        <div v-show="activeId === 'appearance'">
-          <div id="settings-light"><LightSettings /></div>
-          <WindowDeskSettings v-if="(!isMobile || isTablet) && activeId === 'appearance'" />
-          <div id="settings-display"><ModeSettings /></div>
-          <div id="settings-morning"><MorningSettings /></div>
-          <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
-        </div>
-        <div v-show="activeId === 'client'"><AppSettings /></div>
       </div>
     </div>
   </div>
@@ -72,7 +55,7 @@
 <script setup>
 import { computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useDevice } from '@/composables/useDevice'
@@ -93,6 +76,8 @@ import ModeSettings from './settings/ModeSettings.vue'
 import MorningSettings from './settings/MorningSettings.vue'
 import ScreensaverSettings from './settings/ScreensaverSettings.vue'
 import AppSettings from './settings/AppSettings.vue'
+import SettingsDirectory from './settings/SettingsDirectory.vue'
+import SettingsIcon from './settings/SettingsIcon.vue'
 import { isNativeApp } from '@/utils/platform'
 
 const userStore = useUserStore()
@@ -105,17 +90,17 @@ const { isMobile, isTablet } = useDevice()
 // perm 与后端 @RequirePermission 同码:面板对无权角色隐藏,挂载也一并跳过(防隐形面板发请求吃 403)
 // 健康面板不加 perm:令牌/同意/审计全是本人自助端点,孩子与访客也能配自己的
 const PANELS = [
-  { id: 'profile', icon: '👤', labelKey: 'settings.cat.profile' },
-  { id: 'health', icon: '❤️', labelKey: 'settings.cat.health' },
-  { id: 'family', icon: '🏠', labelKey: 'settings.cat.family' },
-  { id: 'pointsRule', icon: '🏅', labelKey: 'settings.cat.pointsRule', perm: 'points:manage' },
-  { id: 'ai', icon: '🤖', labelKey: 'settings.cat.ai', perm: 'family:manage' },
-  { id: 'backup', icon: '💾', labelKey: 'settings.cat.backup', perm: 'family:manage' },
-  { id: 'content', icon: '📅', labelKey: 'settings.cat.content' },
-  { id: 'media', icon: '🎬', labelKey: 'settings.cat.media' },
-  { id: 'storage', icon: '🗄️', labelKey: 'settings.cat.storage' },
-  { id: 'appearance', icon: '🎨', labelKey: 'settings.cat.appearance' },
-  { id: 'client', icon: '📱', labelKey: 'settings.cat.client', nativeOnly: true },
+  { id: 'profile', labelKey: 'settings.cat.profile', component: ProfileSettings },
+  { id: 'health', labelKey: 'settings.cat.health', component: HealthSettings },
+  { id: 'family', labelKey: 'settings.cat.family', component: FamilySettings },
+  { id: 'pointsRule', labelKey: 'settings.cat.pointsRule', perm: 'points:manage', component: PointsRuleSettings },
+  { id: 'ai', labelKey: 'settings.cat.ai', perm: 'family:manage', component: AiSettings },
+  { id: 'backup', labelKey: 'settings.cat.backup', perm: 'family:manage', component: BackupSettings },
+  { id: 'content', labelKey: 'settings.cat.content' },
+  { id: 'media', labelKey: 'settings.cat.media', component: MediaSettings },
+  { id: 'storage', labelKey: 'settings.cat.storage', component: StorageView },
+  { id: 'appearance', labelKey: 'settings.cat.appearance' },
+  { id: 'client', labelKey: 'settings.cat.client', nativeOnly: true, component: AppSettings },
 ]
 
 // 分组顺序:账号 → 家庭 → 内容与媒体 → 外观与设备
@@ -130,8 +115,6 @@ const GROUPS = [
 const TAB_ALIAS = { daily: 'content', weather: 'content', light: 'appearance', display: 'appearance' }
 
 const visiblePanels = computed(() => PANELS.filter((p) => (!p.perm || userStore.hasPerm(p.perm)) && (!p.nativeOnly || isNativeApp())))
-
-const panelVisible = (id) => visiblePanels.value.some((p) => p.id === id)
 
 const groups = computed(() =>
   GROUPS.map((g) => ({ ...g, items: g.ids.map((id) => visiblePanels.value.find((p) => p.id === id)).filter(Boolean) })).filter(
@@ -149,6 +132,8 @@ const activeId = computed(() => {
 })
 
 const currentPanel = computed(() => visiblePanels.value.find((p) => p.id === activeId.value))
+// 手机只挂载打开的分类，避免无关配置发请求；桌面切换时保留表单草稿。
+const mountedPanels = computed(() => visiblePanels.value.filter((p) => p.id === activeId.value || (!isMobile.value && p.id !== 'storage')))
 
 // 合并后旧链接仍指向某一小块:进页直接滚到那张卡(如老人模式的「设置」→ ?tab=display)
 const TAB_ANCHOR = { daily: '#settings-daily', weather: '#settings-weather', light: '#settings-light', display: '#settings-display' }
@@ -180,6 +165,9 @@ const closePanel = () => router.push({ path: '/settings' })
   gap: 16px;
   align-items: flex-start;
 }
+.settings-mobile {
+  padding: 14px clamp(12px, 3.6vw, 18px) 20px;
+}
 .settings-side {
   width: 190px;
   flex-shrink: 0;
@@ -206,6 +194,8 @@ const closePanel = () => router.push({ path: '/settings' })
   line-height: 40px;
 }
 .menu-icon {
+  width: 26px;
+  height: 26px;
   margin-right: 8px;
 }
 .settings-body {
@@ -213,67 +203,36 @@ const closePanel = () => router.push({ path: '/settings' })
   min-width: 0;
 }
 
-/* 移动端分组列表:与「我的」页的行式入口同款 */
-.settings-group + .settings-group {
-  margin-top: 16px;
-}
-.group-label {
-  font-size: 12.5px;
-  color: var(--color-text-secondary);
-  padding: 0 4px 6px;
-}
-.group-card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow), var(--shadow-inset);
-  overflow: hidden;
-}
-.group-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--color-text);
-}
-.group-row + .group-row {
-  border-top: 1px solid var(--color-border);
-}
-.group-row:active {
-  background: var(--color-card-2);
-}
-.row-icon {
-  width: 20px;
-  text-align: center;
-}
-.row-text {
-  flex: 1;
-  min-width: 0;
-}
-.row-arrow {
-  color: var(--color-text-secondary);
-}
-
 /* 移动端大类页顶部的返回条:一级列表 ↔ 单个大类 */
 .panel-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  padding: 4px 8px 4px 12px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
   margin-bottom: 12px;
 }
 .panel-back {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 14px;
-  color: var(--color-accent);
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 6px;
+  margin-inline-start: auto;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
   cursor: pointer;
   flex-shrink: 0;
 }
 .panel-title {
-  font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
