@@ -170,6 +170,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { ArrowLeft, FullScreen, Monitor, Reading } from '@element-plus/icons-vue'
 import { useGameView } from '@/composables/useGameView'
+import { useGameExit } from '@/composables/useGameExit'
 import { gameMuted, toggleGameMuted } from '@/utils/games/gameSound'
 
 const props = defineProps({
@@ -202,6 +203,7 @@ const props = defineProps({
   sound: { type: Boolean, default: false },
 })
 const emit = defineEmits(['back', 'newGame'])
+useGameExit(() => emit('back'))
 
 const { t } = useI18n()
 // 静音状态是全局单例,页面自己也可以 import 同一份(如引擎侧需要读当前值)

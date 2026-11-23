@@ -380,7 +380,7 @@ watch([wideList, topAlbums], ([wide, roots]) => {
 })
 
 // 返回键先回「全部相册」:第一次选中压一层同 URL 历史,popstate 只清选中、不离开页面
-//(Android 壳的返回键在 canGoBack 时走 router.back(),弹出这一层同样只触发 popstate)
+// Android 返回键识别 album-panel 标记，也会先弹出这个同 URL 的历史项。
 let panelLayerPushed = false
 const selectAlbum = (id) => {
   panelClosed = false

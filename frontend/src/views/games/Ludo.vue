@@ -275,7 +275,6 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import GameShell from '@/components/games/GameShell.vue'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
-import { useGameExit } from '@/composables/useGameExit'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
@@ -940,9 +939,6 @@ watch(
 
 /** 返回:房间局回房间页(房主先确认结束本局,其他人先托管把席位交 AI),单机回游戏列表 */
 const goBack = () => play.exitToLobby({ aiGame: true })
-
-// 手机沉浸态:左上角浮动返回键优先走本页退出逻辑,房间局才会先退房/结束房间
-useGameExit(goBack)
 
 onBeforeUnmount(() => {
   animToken += 1

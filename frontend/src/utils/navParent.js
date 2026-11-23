@@ -4,12 +4,9 @@
 // history 里压着的是「来路」而不是「上级」——从博客详情返回可能落到相册,从相册详情
 // 返回可能落到首页。按路由表向上退一级,不管从哪儿进来,落点都一致。
 //
-// 解析规则(纯函数,便于单测):
-//   1. 当前页在路由表里带 meta.parent(字符串)= 显式指定上级;meta.parent === false = 不给返回;
-//   2. 否则逐段剥掉路径末尾,取第一个能在路由表里命中、且不是当前这条路由本身的路径;
-//   3. 一路剥到根都没有 → 回首页(与旧「无历史就回首页」的兜底一致)。
-// 说明:跳过「命中同一条路由」是为了 /blog/edit/:id? 这类可选参数——'/blog/edit/5' 剥一段
-// 会命中 '/blog/edit'(还是编辑页自己),必须继续剥到 '/blog' 列表。
+// 路由显式声明的上级优先。独立子屏和房间对局按实际入口返回，
+// 其他页面从路由模式中找最近的父级，最终到达当前账号的首页。
+import { ROOM_GAMES } from './gameRoom'
 
 export const HOME_PATH = '/home'
 
@@ -61,6 +58,24 @@ function entryByPattern(pattern, entries = []) {
   return entries.find((entry) => entry && entry.path && normalizePath(entry.path) === pattern) || null
 }
 
+const roomGamePaths = new Set(Object.values(ROOM_GAMES).map((game) => game.path))
+
+/** 只还原表示独立子屏的查询参数，列表筛选与锚点不算一级。 */
+function queryParent(path, fullPath) {
+  const beforeHash = fullPath.split('#', 1)[0]
+  const queryStart = beforeHash.indexOf('?')
+  if (queryStart < 0) return null
+  const query = new URLSearchParams(beforeHash.slice(queryStart + 1))
+  if (path === '/settings' && query.get('tab')) return '/settings'
+  if (path === '/chat' && ['assistant', 'conversation'].includes(query.get('target'))) return '/chat'
+  if (path === '/item' && query.get('focus') === 'search') {
+    return query.get('view') === 'map' ? '/item?focus=search' : '/item'
+  }
+  const room = query.get('room')
+  if (roomGamePaths.has(path) && /^[1-9]\d*$/.test(room)) return `/games/room/${room}`
+  return null
+}
+
 /**
  * 解析某条路由的「上一级」路径。
  * @param {string} fullPath 当前完整路径(可带 query/hash)
@@ -70,12 +85,22 @@ function entryByPattern(pattern, entries = []) {
  */
 export function parentPathOf(fullPath, entries = [], fallback = HOME_PATH) {
   const path = normalizePath(fullPath)
-  if (!path || path === '/' || path === HOME_PATH) return null
+  if (!path || path === '/' || path === HOME_PATH || path === fallback) return null
 
   const current = findRoute(path, entries)
   const override = current?.meta?.parent
   if (override === false || override === null) return null
   if (typeof override === 'string' && override) return override
+
+  const parentScreen = queryParent(path, fullPath)
+  if (parentScreen) return parentScreen
+
+  // 这两个详情入口和当前页的路径不构成前缀，例如 /blog/edit/12 的上级是 /blog/12。
+  const id = path.split('/').at(-1)
+  if (/^[1-9]\d*$/.test(id)) {
+    if (current?.name === 'BlogEdit') return `/blog/${id}`
+    if (current?.name === 'SnakeMatch') return `/games/match/${id}`
+  }
 
   // 只在当前路由自己的模式串上做「整段前缀」比较:用真实路径去试会撞上兄弟分支
   // (如 '/album/shared/token' 的两段前缀 '/album/shared' 会被 '/album/:id' 误判为相册详情)

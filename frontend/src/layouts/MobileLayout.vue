@@ -63,6 +63,8 @@ import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import { isMobileGamePath, isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
 import { isNativeApp } from '@/utils/platform'
+import { useAppBack } from '@/composables/useAppBack'
+import { parentPathOf } from '@/utils/navParent'
 import { useDevice } from '@/composables/useDevice'
 import { GAME_EXIT_KEY, createGameExitRegistry } from '@/composables/useGameExit'
 import { isMobileTabActive } from '@/utils/mobileTabs'
@@ -125,7 +127,7 @@ const SWIPE_IGNORE_SELECTOR = [
 ].join(', ')
 
 const startTabSwitch = (next, transition = 'mobile-tab') => {
-  if (!tabOrder.value.includes(next) || next === activeTab.value) return
+  if ((next !== 'home' && !tabOrder.value.includes(next)) || next === activeTab.value) return
   tabScroll[activeTab.value] = window.scrollY
   tabTransition.value = transition
   activeTab.value = next
@@ -260,12 +262,23 @@ async function exitGame() {
     }
   }
   if (gameExit.hasHandler()) {
-    gameExit.run()
-    return
+    return gameExit.run()
   }
   // 上一级而不是上一页:从首页卡片 / 分享链接直达时也回所属列表,不按浏览历史倒回去
-  router.push(route.path.startsWith('/tools/') ? '/tools' : '/games')
+  return router.replace(parentPathOf(route.fullPath, router.getRoutes()))
 }
+
+useAppBack(() => {
+  if (isGameRoute.value) {
+    exitGame()
+    return true
+  }
+  if (isHomeRoute.value && displayedTab.value !== 'home') {
+    startTabSwitch('home', 'mobile-tab-prev')
+    return true
+  }
+  return false
+})
 
 watch(isGameRoute, applyGameMode, { immediate: true })
 
@@ -330,7 +343,8 @@ const pageTitle = computed(() => {
 
 watch(
   () => route.path,
-  () => {
+  (next, previous) => {
+    if (isMobileHomePath(previous) && !isMobileHomePath(next)) activeTab.value = 'home'
     window.scrollTo(0, 0)
   },
 )

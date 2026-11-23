@@ -218,6 +218,7 @@
 
 <script setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
+import { useAppBack } from '@/composables/useAppBack'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
@@ -360,15 +361,18 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeyDown)
 })
 
+const backFromReader = () => {
+  if (isFullscreen.value) {
+    isFullscreen.value = false
+    applyFullscreen()
+  } else close()
+  return true
+}
+useAppBack(backFromReader)
 const onKeyDown = (e) => {
   if (e.key === 'ArrowLeft') prevPage()
   else if (e.key === 'ArrowRight') nextPage()
-  else if (e.key === 'Escape') {
-    if (isFullscreen.value) {
-      isFullscreen.value = false
-      applyFullscreen()
-    } else close()
-  }
+  else if (e.key === 'Escape') backFromReader()
 }
 
 // === EPUB ===

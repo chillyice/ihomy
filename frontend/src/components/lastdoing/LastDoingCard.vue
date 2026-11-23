@@ -1,10 +1,10 @@
 <!--
-  「上次在做」卡片:手机首页顶部(mobile)/ 侧栏停靠(dock)/ 平板浮卡(float)。
-  数据来自 utils/lastDoing(跟账号走);暖居手机首页保留空态提示。
+  「上次在做」:暖居手机全部动态首条(warm-mobile)/ 手机首页顶部(mobile)/ 侧栏停靠(dock)/ 平板浮卡(float)。
+  数据来自 utils/lastDoing(跟账号走)，没有可续做记录时隐藏。
   相对时间每分钟刷新一次(模板里不读 Date.now 做 computed)。
 -->
 <template>
-  <section v-if="hasItems || warmMobile" class="last-doing" :class="`is-${variant}`" :aria-label="t('lastDoing.title')">
+  <section v-if="rows.length" class="last-doing" :class="`is-${variant}`" :aria-label="t('lastDoing.title')">
     <template v-if="compact">
       <el-tooltip :content="rows[0]?.title" placement="right">
         <button type="button" class="ld-compact" :aria-label="t('lastDoing.title')" @click="go(rows[0])">
@@ -13,18 +13,8 @@
       </el-tooltip>
     </template>
     <template v-else>
-      <div class="ld-head" :class="{ 'paper-heading': !warmMobile }">
+      <div v-if="!warmMobile" class="ld-head paper-heading">
         <span class="ld-head-title">{{ $t('lastDoing.title') }}</span>
-        <button
-          v-if="warmMobile && recent.length > 1"
-          type="button"
-          class="ld-toggle"
-          :aria-expanded="expanded"
-          @click="expanded = !expanded"
-        >
-          {{ $t(expanded ? 'lastDoing.collapse' : 'lastDoing.expand') }}
-          <el-icon><ArrowDown /></el-icon>
-        </button>
         <button
           v-if="variant === 'float'"
           type="button"
@@ -37,7 +27,8 @@
         </button>
       </div>
       <button v-for="it in rows" :key="it.kind + ':' + it.id" type="button" class="ld-row" @click="go(it)">
-        <el-icon class="ld-icon"><component :is="kindIcon(it.kind)" /></el-icon>
+        <span v-if="warmMobile" class="ld-label">{{ $t('lastDoing.title') }}</span>
+        <el-icon v-else class="ld-icon"><component :is="kindIcon(it.kind)" /></el-icon>
         <span class="ld-body">
           <strong class="ld-title">{{ it.title }}</strong>
           <small class="ld-meta">{{ metaOf(it) }}</small>
@@ -45,7 +36,6 @@
         <el-icon v-if="warmMobile || variant === 'mobile'" class="ld-arrow"><ArrowRight /></el-icon>
       </button>
       <p v-if="variant === 'dock'" class="ld-hint">{{ $t('lastDoing.hint') }}</p>
-      <p v-if="warmMobile && !hasItems" class="ld-empty">{{ $t('lastDoing.empty') }}</p>
     </template>
   </section>
 </template>
@@ -54,7 +44,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowDown, ArrowRight, CaretRight, EditPen, Notebook, Reading, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowRight, CaretRight, EditPen, Notebook, Reading, VideoPlay } from '@element-plus/icons-vue'
 import { buildDoingPath, useLastDoing, visibleDoing } from '@/utils/lastDoing'
 import { formatRelativeTime } from '@/utils/datetime'
 
@@ -81,13 +71,10 @@ onMounted(() => {
 onBeforeUnmount(() => clearInterval(timer))
 
 const ICONS = { BOOK: Reading, CINEMA: VideoPlay, BLOG: EditPen, DIARY: Notebook }
-const MAX_ROWS = { mobile: 1, dock: 3, float: 2 }
+const MAX_ROWS = { 'warm-mobile': 1, mobile: 1, dock: 3, float: 2 }
 
 const warmMobile = computed(() => props.variant === 'warm-mobile')
-const expanded = ref(false)
-const recent = computed(() => visibleDoing(items.value, now.value))
-const rows = computed(() => (warmMobile.value && expanded.value ? recent.value : recent.value.slice(0, MAX_ROWS[props.variant] ?? 1)))
-const hasItems = computed(() => rows.value.length > 0)
+const rows = computed(() => visibleDoing(items.value, now.value).slice(0, MAX_ROWS[props.variant] ?? 1))
 
 const kindIcon = (kind) => ICONS[kind] || Reading
 
@@ -127,9 +114,7 @@ const go = (it) => {
 
 /* 暖居手机把续做位置装进一张带书签的纸卡，晨暮随主题用色。 */
 .is-warm-mobile {
-  position: relative;
-  margin: 14px 16px 0;
-  padding: 0 14px 6px;
+  margin: 0 0 12px;
   border: 1px solid var(--color-border);
   border-radius: 6px 14px 14px 6px;
   background-color: var(--color-card);
@@ -137,62 +122,25 @@ const go = (it) => {
   background-size: auto, var(--home-grain-size);
   box-shadow: 0 2px var(--album-fold);
 }
-.is-warm-mobile::before {
-  content: '';
-  position: absolute;
-  top: -1px;
-  left: 16px;
-  width: 10px;
-  height: 23px;
-  background: var(--color-brand);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
-}
-.is-warm-mobile .ld-head {
-  min-height: 44px;
-  padding: 0 0 0 22px;
-}
-.is-warm-mobile .ld-head-title {
+.ld-label {
+  flex: none;
+  padding: 3px 6px;
+  border-inline-start: 2px solid var(--color-brand);
+  border-radius: 2px;
+  background: rgba(var(--color-brand-rgb), 0.1);
   color: var(--color-text);
-  font-size: 16px;
-}
-.ld-toggle {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.ld-toggle[aria-expanded='true'] .el-icon {
-  transform: rotate(180deg);
+  font-size: 12px;
 }
 .is-warm-mobile .ld-row {
   min-height: 52px;
-  padding: 6px 0;
+  padding: 6px 12px;
   gap: 10px;
-  border-top: 1px solid var(--color-border);
-}
-.is-warm-mobile .ld-icon {
-  width: 32px;
-  height: 36px;
-  border-radius: 5px;
-  background: rgba(var(--color-brand-rgb), 0.1);
 }
 .is-warm-mobile .ld-title {
   font-size: 15px;
 }
 .is-warm-mobile .ld-meta {
   font-size: 12px;
-}
-.ld-empty {
-  margin: 0 0 6px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 1.55;
 }
 .is-warm-mobile button:focus-visible {
   outline: 2px solid var(--color-brand);

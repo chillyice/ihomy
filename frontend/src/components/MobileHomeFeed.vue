@@ -4,7 +4,7 @@
     <div v-if="showDoorSign" class="m-door-sign">
       <FamilyCoverBanner :family="appStore.family" />
     </div>
-    <LastDoingCard v-if="userStore.isLoggedIn && !isChild" :key="userStore.userInfo?.id" :variant="isWarm ? 'warm-mobile' : 'mobile'" />
+    <LastDoingCard v-if="canResume && !isWarm" :key="userStore.userInfo?.id" variant="mobile" />
     <h2 v-if="isWarm" class="feed-heading">{{ $t('home.familyFeed') }}</h2>
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
@@ -24,7 +24,9 @@
     </div>
 
     <!-- 动态流:切换筛选项时整组淡出再淡入,避免列表内容硬切 -->
-    <div class="feed-list" v-loading="loading && !feeds.length">
+    <div class="feed-list">
+      <LastDoingCard v-if="canResume && isWarm && activeFilter === 'all'" :key="userStore.userInfo?.id" variant="warm-mobile" />
+      <div v-if="loading && !feeds.length" v-loading="true" class="feed-loading" />
       <div v-if="loadError" role="status" class="feed-retry">
         {{ $t('common.loadFailed') }}
         <el-button text :disabled="loading" @click="load().catch(() => {})">{{ $t('common.retry') }}</el-button>
@@ -100,6 +102,7 @@ const appStore = useAppStore()
 const themeStore = useThemeStore()
 const isWarm = computed(() => themeStore.theme === 'warm')
 const { isChild } = useDisplayMode()
+const canResume = computed(() => userStore.isLoggedIn && !isChild.value)
 const vHorizontalWheel = {
   mounted(el) {
     el.unbindWheel = bindHorizontalWheel(el)
@@ -295,6 +298,9 @@ html.dark .filter-chip::after {
   align-items: center;
   gap: 12px;
   color: var(--color-text-secondary);
+}
+.feed-loading {
+  min-height: 56px;
 }
 .photo-story {
   flex-direction: column;

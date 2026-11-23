@@ -18,6 +18,7 @@ const ROUTES = [
   { path: '/kitchen/recipe/:id/edit', name: 'RecipeEdit' },
   { path: '/games', name: 'Games' },
   { path: '/games/snake', name: 'Snake' },
+  { path: '/games/mahjong', name: 'Mahjong' },
   { path: '/games/snake/match/:id', name: 'SnakeMatch' },
   { path: '/games/cards/:game?', name: 'Cards' },
   { path: '/games/room/:id', name: 'GameRoom' },
@@ -32,6 +33,8 @@ const ROUTES = [
   { path: '/health', name: 'Health' },
   { path: '/health/shared/:token', name: 'HealthShared', meta: { parent: '/home' } },
   { path: '/chat', name: 'Chat' },
+  { path: '/item', name: 'Item' },
+  { path: '/bit_pouch', name: 'BitPouch' },
   { path: '/no-back', name: 'NoBack', meta: { parent: false } },
   { path: '/:pathMatch(.*)*', name: 'NotFound' },
 ]
@@ -72,7 +75,7 @@ describe('parentPathOf', () => {
   })
 
   it('可选参数段剥出来还是当前页时继续往上剥', () => {
-    expect(parentPathOf('/blog/edit/12', ROUTES)).toBe('/blog')
+    expect(parentPathOf('/blog/edit/12', ROUTES)).toBe('/blog/12')
     expect(parentPathOf('/blog/edit', ROUTES)).toBe('/blog')
     expect(parentPathOf('/games/cards/klondike', ROUTES)).toBe('/games')
   })
@@ -80,7 +83,7 @@ describe('parentPathOf', () => {
   it('多级路径回到最近一层兄弟页', () => {
     expect(parentPathOf('/kitchen/recipe/9/edit', ROUTES)).toBe('/kitchen/recipe/9')
     expect(parentPathOf('/kitchen/recipe/9', ROUTES)).toBe('/kitchen')
-    expect(parentPathOf('/games/snake/match/3', ROUTES)).toBe('/games/snake')
+    expect(parentPathOf('/games/snake/match/3', ROUTES)).toBe('/games/match/3')
     expect(parentPathOf('/tools/mindmap/4', ROUTES)).toBe('/tools/mindmap')
     expect(parentPathOf('/bit-pouch/tools/json', ROUTES)).toBe('/bit-pouch/tools')
   })
@@ -106,9 +109,34 @@ describe('parentPathOf', () => {
     expect(parentPathOf('/settings', ROUTES)).toBe('/home')
   })
 
-  it('query 不参与解析:带着页签的同一页与纯路径同落点', () => {
+  it('普通筛选和分享参数不增加返回层级', () => {
     expect(parentPathOf('/plan?tab=today', ROUTES)).toBe('/home')
     expect(parentPathOf('/chat?peer=3', ROUTES)).toBe('/home')
+  })
+
+  it.each([
+    ['/settings?tab=client', '/settings', '/home'],
+    ['/chat?target=conversation', '/chat', '/home'],
+    ['/chat?target=assistant#last', '/chat', '/home'],
+    ['/item?view=map&focus=search', '/item?focus=search', '/item', '/home'],
+    ['/blog/edit/31?from=feed', '/blog/31', '/blog', '/home'],
+    ['/games/mahjong?room=18', '/games/room/18', '/games', '/home'],
+    ['/games/cards/klondike?room=18', '/games/room/18', '/games', '/home'],
+    ['/games/room/18?room=18', '/games', '/home'],
+    ['/games/mahjong?room=0', '/games', '/home'],
+    ['/games/snake/match/6', '/games/match/6', '/games', '/home'],
+    ['/bit_pouch', '/home'],
+  ])('从 %s 逐级回到首页后终止', (...steps) => {
+    let path = steps[0]
+    for (const expected of steps.slice(1)) {
+      path = parentPathOf(path, ROUTES)
+      expect(path).toBe(expected)
+    }
+    expect(parentPathOf(path, ROUTES)).toBe(null)
+  })
+
+  it('纯运维账号在自己的根页结束返回', () => {
+    expect(parentPathOf('/ops?tab=trace', ROUTES, '/ops')).toBe(null)
   })
 
   it('路由表里查不到的深链回首页,而不是按历史倒回去', () => {

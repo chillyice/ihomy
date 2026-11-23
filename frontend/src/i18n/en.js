@@ -69,7 +69,6 @@ export default {
     requestFailed: 'Request failed',
     networkError: 'Network error',
     networkUnstable: 'Cannot reach the network, please check your connection',
-    pressAgainToExit: 'Press back again to exit',
     networkOffline: 'Network disconnected, some content is unavailable',
     networkBack: 'Network restored',
     preparingFile: 'Preparing file…',
@@ -6601,7 +6600,6 @@ export default {
   },
   lastDoing: {
     title: 'Last activity',
-    empty: 'Find books you’ve read, films you’ve watched, and blog posts or diary entries you’ve saved here.',
     book: 'Book',
     cinema: 'Cinema',
     blog: 'Blog',

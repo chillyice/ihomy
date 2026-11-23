@@ -24,9 +24,9 @@ const router = useRouter()
 const goBack = () => {
   // 上一级而不是上一页:从首页卡片/聊天分享/通知深链直达详情时,浏览历史里的来路不是上级;
   // 按路由表退一级,落点与从列表点进来的路径一致(见 utils/navParent.js)
-  router.push(parentPathOf(route.path, router.getRoutes()) || '/home')
+  router.replace(parentPathOf(route.fullPath, router.getRoutes()) || '/home')
 }
-const goHome = () => router.push('/')
+const goHome = () => router.replace('/home')
 </script>
 
 <style scoped>
