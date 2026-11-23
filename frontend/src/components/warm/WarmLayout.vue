@@ -498,14 +498,16 @@ watch(
   color: var(--color-text);
 }
 
-/* 全屏氛围底图(最底层,压在 SunLightLayer 之下):基础浓度由用户设置(天气图固定 30%) */
+/* 全屏氛围底图(最底层,压在 SunLightLayer 之下):基础浓度由用户设置(默认=天气图的 30%);
+   浓度走自定义属性,内联只覆写变量,浮现态的 opacity:1 仍能压过基础值 */
 .gc-weatherbg {
   position: fixed;
   inset: 0;
   z-index: 0;
+  --bg-base-opacity: 0.3;
   background-size: cover;
   background-position: center;
-  opacity: var(--bg-base-opacity, 0.3);
+  opacity: var(--bg-base-opacity);
   pointer-events: none;
   transition: opacity 1.2s ease;
 }
