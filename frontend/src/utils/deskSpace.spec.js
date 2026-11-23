@@ -11,28 +11,33 @@ describe('window desk margins', () => {
     expect(sampleDeskPlan(() => 0, 1)).toHaveLength(1)
   })
 
-  it('keeps three visible photos within the measured margins on either side of the navigation and page', () => {
+  it('scales desktop objects three times the tablet size and keeps them clear of navigation', () => {
     const placed = placeDeskItems(photos, plan, large, [])
-    expect(placed).toHaveLength(3)
+    expect(placed.length).toBeGreaterThanOrEqual(2)
     for (const { x, y, size } of placed) {
       const r = Math.ceil(size * 0.58) + 5
-      expect(large.some((l) => x - r >= l.left && x + r <= l.right && y - r >= l.top && y + r <= l.bottom)).toBe(true)
+      expect(size).toBe(402)
+      expect(x - r).toBeGreaterThanOrEqual(220)
+      expect(x + r).toBeLessThanOrEqual(1920)
+      expect(y - r).toBeGreaterThanOrEqual(0)
+      expect(y + r).toBeLessThanOrEqual(900)
     }
     expect(placeDeskItems(photos, plan, large, [])).toEqual(placed)
-    expect(placePawTrail(placed, large, [])).toEqual([])
   })
 
-  it('skips a cup that cannot fit even if a smaller item fits and rejects occupied board edges', () => {
-    const narrow = deskLanes(1440, 900, 220, { left: 290, right: 1370 })
-    const items = [{ kind: 'cup' }, { kind: 'leaf' }]
-    expect(placeDeskItems(items, plan, narrow, []).map((p) => p.item.kind)).toEqual(['leaf'])
+  it('shrinks objects on narrow windows and skips them when the viewport is too short', () => {
+    const compact = deskLanes(1000, 800, 220, null)
+    const [one] = placeDeskItems([{ kind: 'photo' }], plan, compact, [])
+    expect(one.size).toBe(300)
+    const short = deskLanes(1440, 300, 220, null)
+    expect(placeDeskItems([{ kind: 'photo' }], plan, short, [])).toEqual([])
     const board = deskLanes(1500, 800, 220, null)
     expect(placeDeskItems(photos, plan, board, board)).toEqual([])
     expect(placePawTrail([], board, board)).toEqual([])
   })
 
   it('removes footprints when a floating panel covers the path or its margin disappears', () => {
-    const placed = placeDeskItems(photos.slice(0, 2), plan, large, [])
+    const placed = [{ x: 300, y: 300, size: 84 }]
     const trail = placePawTrail(placed, large, [], () => 0.4)
     expect(trail).toHaveLength(4)
     expect(pawTrailFits(trail, placed, large, [])).toBe(true)

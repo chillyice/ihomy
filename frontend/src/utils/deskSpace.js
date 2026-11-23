@@ -29,6 +29,33 @@ function overlaps(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }
 
+// 桌面物件边长 = 平板底数 ×3。桌沿装不下这么大的物品,允许跨到正文边缘;
+// 只保证不压导航、整件留在视口内,并避开浮窗等障碍。
+const DESK_SCALE = 3
+const DESK_PREFERRED = { leaf: 84, other: 134 }
+const DESK_MINIMUM = { cup: 64, other: 48 }
+
+function findWideSpace(slot, lanes, obstacles, preferred, minimum) {
+  const viewWidth = lanes[1].right
+  const viewHeight = lanes[1].bottom
+  const size = Math.floor(Math.min(preferred, viewWidth * 0.3, (viewHeight - 12) / 1.16))
+  if (size < minimum) return null
+  const radius = Math.ceil(size * 0.58) + 5
+  if (radius * 2 + 16 > viewHeight) return null
+  for (const side of [slot.side, 1 - slot.side]) {
+    const lane = lanes[side]
+    // 外侧贴住桌沿边界:左件紧接导航右缘,右件贴视口右缘
+    const x = side === 0 ? Math.round(lane.left + radius) : Math.round(lane.right - radius)
+    if (x - radius < 0 || x + radius > viewWidth) continue
+    for (const v of [slot.v, 0.22, 0.76, 0.48, 0.94, 0.05]) {
+      const y = Math.round(radius + 8 + (viewHeight - radius * 2 - 16) * v)
+      const box = bounds(x, y, radius)
+      if (!obstacles.some((other) => overlaps(box, other))) return { x, y, size, box, edge: side === 0 ? 'left' : 'right' }
+    }
+  }
+  return null
+}
+
 // 预留旋转、悬停和投影所需的边界。窄桌沿只摆仍能拥有完整点击面的物品。
 function findSpace(slot, lanes, obstacles, preferred, minimum) {
   for (const lane of [lanes[slot.side], lanes[1 - slot.side]]) {
@@ -73,7 +100,13 @@ export function placeDeskItems(items, plan, lanes, obstacles, tabletViewport) {
     if (tabletViewport && tabletViewport.width < 600 && result.length) break
     const seat = tabletViewport
       ? findEdgeSpace(slot, tabletViewport.width, tabletViewport.height, occupied, item.kind === 'leaf' ? 74 : 84)
-      : findSpace(slot, lanes, occupied, item.kind === 'leaf' ? 84 : 134, item.kind === 'cup' ? 64 : 48)
+      : findWideSpace(
+          slot,
+          lanes,
+          occupied,
+          (item.kind === 'leaf' ? DESK_PREFERRED.leaf : DESK_PREFERRED.other) * DESK_SCALE,
+          item.kind === 'cup' ? DESK_MINIMUM.cup : DESK_MINIMUM.other,
+        )
     if (!seat) continue
     const { x, y, size, box } = seat
     result.push({ item, x, y, size, angle: slot.angle, edge: seat.edge })
