@@ -43,7 +43,6 @@
           `gc-r${w.row}`,
           {
             'gc-weather': baseOf(w) === 'weather',
-            'gc-overflow': baseOf(w) === 'weather',
             'gc-card-tile': compact(w),
             'gc-card-styled': Boolean(w.component),
             'gc-item-card': baseOf(w) === 'item',
@@ -109,39 +108,15 @@
         <!-- 统一渲染出口:注册表里带 component 的样式(新样式只加注册表,这里不用加分支) -->
         <component :is="w.component" v-else-if="w.component" v-bind="w.props(widgetCtx())" />
 
-        <!-- 天气活窗(暖居签名) -->
-        <template v-else-if="w.id === 'weather'">
-          <h3 class="gc-card-h3">
-            <span>{{ $t('warm.weatherWindow', { city: weatherCity }) }}</span>
-          </h3>
-          <div class="gc-glass" v-a11y-click @click="!editMode && $router.push('/weather')">
-            <div v-if="weatherBg" class="gc-win-bg" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
-            <div class="gc-win-glow"></div>
-            <span class="gc-win-dust" style="animation-delay: -1s"></span>
-            <span class="gc-win-dust" style="animation-delay: -4s; left: 30%; top: 12%"></span>
-            <span class="gc-win-dust" style="animation-delay: -7s; left: 12%; top: 50%"></span>
-            <span class="gc-win-dust" style="animation-delay: -10s; left: 44%; top: 30%"></span>
-            <div :key="weatherTemp + '|' + weatherText" class="gc-win-info">
-              <div class="gc-temp">
-                {{ weatherTemp }}°<span class="gc-c">C</span>
-                <span v-if="todayHigh != null" class="gc-hilo">↑{{ todayHigh }}° ↓{{ todayLow ?? '—' }}°</span>
-              </div>
-              <div class="gc-we">{{ weatherText }}</div>
-              <div class="gc-st">{{ weatherSub }}</div>
-            </div>
-            <div v-if="showWeatherMetrics(w)" class="gc-win-metrics">
-              <span class="gc-wm">💧 {{ humidityText }}</span>
-              <span class="gc-wm">🌬 {{ windText }}</span>
-              <span class="gc-wm">🌫 {{ pm25Text }}</span>
-            </div>
-            <div v-if="showWeatherForecast(w)" class="gc-forecast">
-              <div v-for="d in forecast" :key="d.fxDate" class="gc-fc-item">
-                <span class="gc-fc-date">{{ fcDate(d.fxDate) }}</span>
-                <span class="gc-fc-range">{{ d.tempMin }}~{{ d.tempMax }}°</span>
-              </div>
-            </div>
-          </div>
-        </template>
+        <WeatherWindow
+          v-else-if="w.id === 'weather'"
+          :weather="sunLight?.weather?.value"
+          :detail="sunLight?.weatherDetail?.value"
+          :night="sunLight?.sunScene?.value?.isNight"
+          :background="weatherBg"
+          :span="w.span"
+          :row="w.row"
+        />
 
         <!-- 家人动态 -->
         <template v-else-if="w.id === 'feed'">
@@ -444,6 +419,7 @@ import { showCoverBanner } from '@/utils/shareLanding'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
 import { recentMonthRows } from '@/utils/bookTrend'
 import { MODULE_DEFAULT_WIDGET, WIDGETS as WIDGET_DEFS, WIDGET_MODULE, siblingsOf, widgetById } from './widgets/registry'
+import WeatherWindow from './widgets/WeatherWindow.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -1075,7 +1051,6 @@ onBeforeUnmount(() => {
 // 横向丰富度看「列宽 span」:越宽横向信息越丰富(宽而矮 → 宽幅数据)
 // 两维同时放大 → 横纵都丰富;同时缩小 → 横纵都缩紧
 const vTier = (w) => ({ 2: 'S', 3: 'M', 4: 'L', 6: 'XL' })[w.row] || 'M'
-const hTier = (w) => ({ 4: 'S', 6: 'M', 8: 'L', 12: 'XL' })[w.span] || 'M'
 
 const nFeed = (w) => ({ S: 2, M: 4, L: 6, XL: 9 })[vTier(w)] ?? 3
 const nTask = (w) => ({ S: 2, M: 3, L: 5, XL: 8 })[vTier(w)] ?? 3
@@ -1083,10 +1058,6 @@ const nWish = (w) => ({ S: 2, M: 4, L: 6, XL: 10 })[vTier(w)] ?? 3
 const nReminder = (w) => ({ S: 2, M: 4, L: 6, XL: 10 })[vTier(w)] ?? 3
 const nItem = (w) => ({ S: 1, M: 2, L: 3, XL: 5 })[vTier(w)] ?? 2
 const nAnni = (w) => ({ S: 1, M: 3, L: 4, XL: 6 })[vTier(w)] ?? 1
-
-// 横向丰富度:天气预报/指标、收支明细看 span
-const showWeatherForecast = (w) => hTier(w) !== 'S' && forecast.value.length > 0
-const showWeatherMetrics = (w) => hTier(w) === 'XL'
 
 // ========== 数据 ==========
 const feeds = ref([])
@@ -1419,39 +1390,8 @@ onBeforeUnmount(() => {
   if (itemVoiceRecording.value) itemVoiceStop()
 })
 
-const weatherCity = computed(() => sunLight?.weather?.value?.city || appStore.familyName || '')
 const weatherTemp = computed(() => sunLight?.weather?.value?.temp ?? '—')
 const weatherText = computed(() => sunLight?.weather?.value?.text || '')
-const weatherSub = computed(() => {
-  const temp = sunLight?.weather?.value?.temp
-  if (temp != null) return temp >= 28 ? t('warm.weatherHot') : temp >= 15 ? t('warm.weatherMild') : t('warm.weatherCold')
-  return ''
-})
-const weatherDetail = computed(() => sunLight?.weatherDetail?.value)
-const todayHigh = computed(() => weatherDetail.value?.daily?.[0]?.tempMax ?? null)
-const todayLow = computed(() => weatherDetail.value?.daily?.[0]?.tempMin ?? null)
-const forecast = computed(() => (weatherDetail.value?.daily || []).slice(1, 4))
-const fcDate = (d) => {
-  const dt = new Date(d)
-  return `${dt.getMonth() + 1}/${dt.getDate()}`
-}
-// 巨大档关键指标(湿度/风力/PM2.5;缺数据显示 —)
-const humidityText = computed(() => {
-  const h = weatherDetail.value?.nowFull?.humidity
-  return h != null ? `${h}%` : '—'
-})
-const windText = computed(() => {
-  const f = weatherDetail.value?.nowFull
-  if (!f) return '—'
-  const dir = f.windDir || ''
-  const scale = f.windScale != null ? t('home.dashboard.windScale', { n: f.windScale }) : ''
-  return dir || scale ? `${dir} ${scale}`.trim() : '—'
-})
-const pm25Text = computed(() => {
-  const p = weatherDetail.value?.air?.pm2p5
-  return p != null ? `${p}` : '—'
-})
-
 const FEED_ICON = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
 const feedIcon = (type) => FEED_ICON[type] || '✨'
 // 动态类型 → 图标芯片色相(博客陶土 / 影像暖沙 / 愿望鼠尾草 / 日记·任务暖木)
@@ -1602,13 +1542,13 @@ html.theme-warm.dark .gc-home {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .gc-home:not(.gc-editing) :is(.gc-row, .gc-daily-know, .gc-daily-pic, .gc-win-info, .gc-fc-item) {
+  .gc-home:not(.gc-editing) :is(.gc-row, .gc-daily-know, .gc-daily-pic) {
     animation: gc-content-arrive 280ms ease-out backwards;
   }
-  .gc-home:not(.gc-editing) :is(.gc-row, .gc-fc-item):nth-child(2) {
+  .gc-home:not(.gc-editing) .gc-row:nth-child(2) {
     animation-delay: 35ms;
   }
-  .gc-home:not(.gc-editing) :is(.gc-row, .gc-fc-item):nth-child(n + 3) {
+  .gc-home:not(.gc-editing) .gc-row:nth-child(n + 3) {
     animation-delay: 70ms;
   }
   .gc-home:not(.gc-editing) :is(.gc-meter > i, .gc-fin-bar) {
@@ -1730,9 +1670,6 @@ html.theme-warm.dark .gc-home {
 }
 .gc-card-link {
   cursor: pointer;
-}
-.gc-overflow {
-  overflow: hidden;
 }
 /* 卡片重排中「被拿起」的源卡片:实时移动到落点并降透明度,作为唯一占位(不再另插幽灵卡) */
 .gc-card-dragging {
@@ -2258,171 +2195,13 @@ html.theme-warm.dark .gc-home {
   overflow: hidden;
 }
 
-/* 天气活窗 */
-/* 底部 3px 陶土「窗台线」:暖居的隐喻是屋里的窗,一条实色窗台比一层模糊光晕更能说明这是陶土粉 */
-.gc-glass {
-  position: relative;
-  height: 230px;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  background: linear-gradient(160deg, var(--color-bg-2), var(--color-card-2));
-  box-shadow:
-    inset 0 0 0 1px var(--color-line),
-    inset 0 14px 40px rgba(122, 90, 60, 0.08),
-    inset 0 -3px 0 rgba(var(--blob-1), var(--sill-a));
-}
-/* 天气卡在固定行高网格内占满剩余高度(8 列 × 4 行基准) */
 .gc-weather {
-  display: flex;
-  flex-direction: column;
+  container-type: inline-size;
+  min-width: 0;
 }
-.gc-weather .gc-glass {
-  flex: 1;
-  height: auto;
-  min-height: 120px;
-}
-/* 右上陶土暖光 + 左下鼠尾草绿光斑:半径收小(原 360/280px 铺太开被拉平成「泛黄」)并把绿的 alpha 提到可读 */
-.gc-glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(240px 150px at 76% 16%, var(--glow-warm), transparent 60%),
-    radial-gradient(200px 140px at 8% 92%, rgba(var(--blob-3), var(--sage-a)), transparent 56%);
-}
-.gc-glass::after {
-  content: '';
-  position: absolute;
-  left: 14%;
-  top: -4%;
-  width: 46%;
-  height: 110%;
-  background: url("data:image/svg+xml,%3Csvg width='340' height='760' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFE9C4' stop-opacity='.38'/%3E%3Cstop offset='.55' stop-color='%23FFDDA6' stop-opacity='.13'/%3E%3Cstop offset='1' stop-color='%23FFDDA6' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='340' height='760' fill='url(%23b)' transform='rotate(14 170 380)'/%3E%3C/svg%3E");
-  background-size: 100% 100%;
-  mix-blend-mode: screen;
-  opacity: 0.8;
-  transform: rotate(10deg);
-}
-/* 暮色:screen 混合叠在深咖窗面上会把 SVG 矩形的直边暴露成一块「硬边米色板」,降透明 + 模糊化回光 */
-html.dark .gc-glass::after {
-  opacity: 0.3;
-  filter: blur(7px);
-}
-.gc-win-glow {
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  width: 130px;
-  height: 130px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--glow-warm), transparent 66%);
-  filter: blur(20px);
-}
-.gc-win-dust {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #fff0d0;
-  position: absolute;
-  left: 6%;
-  top: 6%;
-  filter: blur(0.3px);
-  opacity: 0;
-  animation: gcWd 13s ease-in-out infinite;
-  box-shadow: 0 0 6px 1px rgba(255, 236, 196, 0.8);
-}
-@keyframes gcWd {
-  0% {
-    transform: translate(0, 0) rotate(0);
-    opacity: 0;
-  }
-  14% {
-    opacity: 0.9;
-  }
-  36% {
-    transform: translate(120px, 70px) rotate(160deg);
-    opacity: 1;
-  }
-  58% {
-    transform: translate(40px, 150px) rotate(280deg);
-    opacity: 0.7;
-  }
-  80% {
-    transform: translate(150px, 210px) rotate(420deg);
-    opacity: 0.3;
-  }
-  100% {
-    transform: translate(90px, 250px);
-    opacity: 0;
-  }
-}
-.gc-win-info {
-  position: absolute;
-  left: 22px;
-  bottom: 22px;
-  color: var(--color-text);
-}
-.gc-temp {
-  font-size: 40px;
-  font-weight: 650;
-  line-height: 1;
-  letter-spacing: -1px;
-}
-.gc-c {
-  font-size: 18px;
-  vertical-align: top;
-}
-.gc-we {
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 6px;
-}
-.gc-st {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  margin-top: 3px;
-}
-.gc-win-bg {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.5;
-}
-.gc-hilo {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin-left: 12px;
-}
-.gc-forecast {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: flex;
-  gap: 14px;
-}
-.gc-fc-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-size: 11.5px;
-  color: var(--color-text-secondary);
-}
-.gc-fc-range {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-.gc-win-metrics {
-  position: absolute;
-  top: 14px;
-  left: 18px;
-  display: flex;
-  gap: 12px;
-  font-size: 11.5px;
-  color: var(--color-text-secondary);
+.gc-weather:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
 /* 按钮(扩展 primary/accent) */
