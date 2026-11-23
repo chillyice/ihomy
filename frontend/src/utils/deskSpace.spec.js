@@ -11,15 +11,26 @@ describe('window desk margins', () => {
     expect(sampleDeskPlan(() => 0, 1)).toHaveLength(1)
   })
 
-  it('scales desktop objects three times the tablet size and keeps them clear of navigation', () => {
+  it('uses the 381 / 914 reference for large pieces and preserves relative sizes and a ceiling', () => {
+    function sizeAt(kind, height) {
+      const lanes = deskLanes(2560, height, 220, { left: 900, right: 1660 })
+      return placeDeskItems([{ kind }], plan, lanes, [])[0].size
+    }
+    expect(sizeAt('journal', 914)).toBe(381)
+    expect(sizeAt('journal', 720)).toBe(300)
+    expect(sizeAt('journal', 2160)).toBe(480)
+    expect(sizeAt('leaf', 914)).toBeLessThan(sizeAt('cup', 914))
+    expect(sizeAt('cup', 914)).toBeLessThan(sizeAt('journal', 914))
+  })
+
+  it('preserves the layout between measurements and keeps navigation and the middle clear', () => {
     const placed = placeDeskItems(photos, plan, large, [])
     expect(placed.length).toBeGreaterThanOrEqual(2)
-    for (const { x, y, size, angle } of placed) {
+    for (const { x, y, size, angle, cropWidth } of placed) {
       const rad = (Math.abs(angle) * Math.PI) / 180
       const r = Math.ceil((size / 2) * (Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad)))) + 5
-      expect(size).toBe(402)
-      expect(x - r).toBeGreaterThanOrEqual(220)
-      expect(x + r).toBeLessThanOrEqual(1920)
+      expect(x - (cropWidth ? cropWidth / 2 : r)).toBeGreaterThanOrEqual(220)
+      expect(y / 900 <= 0.33 || y / 900 >= 0.67).toBe(true)
       expect(y - r).toBeGreaterThanOrEqual(0)
       expect(y + r).toBeLessThanOrEqual(900)
     }
@@ -33,15 +44,15 @@ describe('window desk margins', () => {
     expect(Math.max(...angles.map(Math.abs))).toBeGreaterThan(20)
   })
 
-  it('shrinks objects on narrow windows and skips them when the viewport is too short', () => {
-    const compact = deskLanes(1000, 800, 220, null)
-    const [one] = placeDeskItems([{ kind: 'photo' }], plan, compact, [])
-    expect(one.size).toBe(300)
-    const short = deskLanes(1440, 300, 220, null)
-    expect(placeDeskItems([{ kind: 'photo' }], plan, short, [])).toEqual([])
-    const board = deskLanes(1500, 800, 220, null)
-    expect(placeDeskItems(photos, plan, board, board)).toEqual([])
-    expect(placePawTrail([], board, board)).toEqual([])
+  it('lets a full-width board card reduce the exposed strip even on a wide monitor', () => {
+    const board = deskLanes(1800, 914, 220, null, 1800)
+    const card = { left: 220, right: 1800, top: 0, bottom: 914 }
+    const [open] = placeDeskItems(photos, plan, board, [])
+    const [crowded] = placeDeskItems(photos, plan, board, [], [card])
+    expect(crowded.size).toBeLessThan(open.size)
+    expect(crowded.edge).toBe('right')
+    expect(card.right - (crowded.x - crowded.cropWidth / 2)).toBeLessThanOrEqual(44)
+    expect(placeDeskItems(photos, plan, board, [card])).toEqual([])
   })
 
   it('removes footprints when a floating panel covers the path or its margin disappears', () => {
@@ -59,31 +70,34 @@ describe('window desk margins', () => {
     [768, 1024],
     [1024, 768],
     [820, 1180],
-  ])('peeks out of tablet edges with a visible touch target at %i × %i', (width, height) => {
-    const viewport = { width, height }
-    const placed = placeDeskItems(photos, plan, [], [], viewport)
+    [1000, 914],
+  ])('bounds the rotated artwork at crowded edges at %i × %i', (width, height) => {
+    const lanes = deskLanes(width, height, 0, { left: 0, right: width })
+    const placed = placeDeskItems(photos, plan, lanes, [])
     expect(placed).toHaveLength(3)
     expect(new Set(placed.map((p) => p.edge))).toEqual(new Set(['left', 'right']))
-    for (const { x, y, size } of placed) {
-      const onScreen = Math.min(x + size / 2, width) - Math.max(x - size / 2, 0)
-      expect(onScreen).toBeGreaterThanOrEqual(44)
-      expect(onScreen).toBeLessThan(size)
+    for (const { x, y, size, cropWidth } of placed) {
+      expect(cropWidth).toBeGreaterThan(12)
+      expect(cropWidth).toBeLessThanOrEqual(44)
+      expect(size).toBeGreaterThan(cropWidth * 3)
+      expect(Math.min(x, width - x)).toBe(cropWidth / 2)
+      expect(y / height <= 0.33 || y / height >= 0.67).toBe(true)
       expect(y - size / 2).toBeGreaterThan(0)
       expect(y + size / 2).toBeLessThan(height)
     }
-    expect(placeDeskItems(photos, [], [], [], viewport)).toEqual([])
+    expect(placeDeskItems(photos, [], lanes, [])).toEqual([])
   })
 
   it('uses only one edge object in tablet split view and moves aside for controls and navigation', () => {
-    const viewport = { width: 540, height: 768 }
+    const lanes = deskLanes(540, 768, 0, { left: 0, right: 540 })
     const rightRail = { left: 480, right: 540, top: 0, bottom: 768 }
-    const [left] = placeDeskItems(photos, plan, [], [rightRail], viewport)
+    const [left] = placeDeskItems(photos, plan, lanes, [rightRail])
     expect(left.edge).toBe('left')
     const button = { left: 0, right: 52, top: left.y - 20, bottom: left.y + 20 }
-    const moved = placeDeskItems(photos, plan, [], [rightRail, button], viewport)
+    const moved = placeDeskItems(photos, plan, lanes, [rightRail, button])
     expect(moved).toHaveLength(1)
     expect(moved[0].edge).toBe('left')
     expect(Math.abs(moved[0].y - left.y)).toBeGreaterThan(moved[0].size / 2 + 20)
-    expect(placeDeskItems(photos, plan, [], [rightRail, { ...rightRail, left: 0, right: 60 }], viewport)).toEqual([])
+    expect(placeDeskItems(photos, plan, lanes, [rightRail, { ...rightRail, left: 0, right: 60 }])).toEqual([])
   })
 })

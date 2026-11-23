@@ -8,28 +8,38 @@
       :aria-hidden="modalOpen || undefined"
     >
       <router-link
-        v-for="{ item, x, y, size, angle, edge } in placements"
+        v-for="{ item, x, y, size, cropWidth, angle, edge } in placements"
         :key="item.key"
         :to="item.to"
         :aria-label="t(item.labelKey, item.labelParams || {})"
         :tabindex="modalOpen ? -1 : undefined"
         class="desk-object"
-        :class="{ 'round-object': item.kind === 'cup' }"
+        :class="{ 'round-object': item.kind === 'cup' && !cropWidth, 'edge-crop': cropWidth }"
         :data-edge="edge"
-        :style="{ left: x + 'px', top: y + 'px', width: size + 'px', '--desk-angle': angle + 'deg' }"
+        :style="{
+          left: x + 'px',
+          top: y + 'px',
+          width: (cropWidth || size) + 'px',
+          height: size + 'px',
+          '--desk-size': size + 'px',
+          '--desk-angle': angle + 'deg',
+          '--desk-ink': cropWidth ? paintInset(item, angle) : undefined,
+        }"
       >
-        <span class="desk-illustration" aria-hidden="true">
-          <span v-if="item.kind === 'photo'" class="instant-print">
-            <img :src="item.src" alt="" draggable="false" decoding="async" @error="hideMissingImage(item)" />
+        <span class="desk-crop" aria-hidden="true">
+          <span class="desk-illustration">
+            <span v-if="item.kind === 'photo'" class="instant-print">
+              <img :src="item.src" alt="" draggable="false" decoding="async" @error="hideMissingImage(item)" />
+            </span>
+            <span v-else-if="item.kind === 'note'" class="memo-paper" :style="paperStyle(item)">
+              <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
+              <img v-if="item.ageDays > 0" class="memo-fold" v-bind="illustrationSource(item, size)" alt="" draggable="false" />
+            </span>
+            <template v-else>
+              <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
+              <span v-if="item.kind === 'cup'" class="desk-steam"><i></i><i></i></span>
+            </template>
           </span>
-          <span v-else-if="item.kind === 'note'" class="memo-paper" :style="paperStyle(item)">
-            <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
-            <img v-if="item.ageDays > 0" class="memo-fold" v-bind="illustrationSource(item, size)" alt="" draggable="false" />
-          </span>
-          <template v-else>
-            <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
-            <span v-if="item.kind === 'cup'" class="desk-steam"><i></i><i></i></span>
-          </template>
         </span>
         <span class="desk-hint" aria-hidden="true">{{ t(item.labelKey, item.labelParams || {}) }}</span>
       </router-link>
@@ -82,6 +92,32 @@ const drawable = computed(() =>
 )
 const { placements, pawTrail, modalOpen } = useDeskSpace(drawable, arrangement)
 
+// 原画有透明留白。按正放和倾斜 30° 时颜料的水平半宽（画布百分比）取景，
+// 让朝向正文的一边保留物件本身的轮廓。叶片和杯子按实际选中的插画区分。
+const paintHalfWidths = {
+  bookmark: [12, 30],
+  coffee: [41, 41],
+  tea: [37, 37],
+  envelope: [40, 46],
+  fruit: [34, 36],
+  'fruit-peach': [36, 41],
+  'fruit-pear': [32, 33],
+  journal: [27, 43],
+  'leaf-autumn': [42, 44],
+  'leaf-spring': [23, 31],
+  'leaf-summer': [37, 39],
+  'leaf-winter': [28, 35],
+  note: [37, 51],
+  phone: [21, 35],
+  photo: [42, 61],
+  recipe: [38, 46],
+  record: [36, 51],
+}
+function paintInset(item, angle) {
+  const [upright, tilted] = paintHalfWidths[item.art ?? item.kind] ?? [40, 50]
+  return upright + (tilted - upright) * Math.min(1, Math.abs(angle) / 30) + '%'
+}
+
 function paperStyle(item) {
   const wear = Math.min(1, (item.ageDays || 0) / 10)
   const hue = [0, 27, -24][item.paperTone] || 0
@@ -107,6 +143,8 @@ html.dark .window-desk {
 }
 .desk-object {
   --desk-angle: 0deg;
+  --desk-size: 100%;
+  --desk-ink: 30%;
   position: absolute;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
@@ -121,6 +159,25 @@ html.dark .window-desk {
 .desk-object.round-object {
   border-radius: 50%;
 }
+.desk-crop {
+  position: absolute;
+  inset: -25% 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  pointer-events: none;
+}
+.edge-crop .desk-crop {
+  overflow: clip;
+}
+.edge-crop[data-edge='left'] .desk-illustration {
+  justify-self: end;
+  translate: calc(50% - var(--desk-ink)) 0;
+}
+.edge-crop[data-edge='right'] .desk-illustration {
+  justify-self: start;
+  translate: calc(var(--desk-ink) - 50%) 0;
+}
 .window-desk[aria-hidden='true'] .desk-object {
   pointer-events: none;
 }
@@ -132,7 +189,7 @@ html.dark .window-desk {
   position: relative;
   display: grid;
   place-items: center;
-  width: 100%;
+  width: var(--desk-size);
   aspect-ratio: 1;
   transform: rotate(var(--desk-angle));
   filter: drop-shadow(1px 2px 2px var(--desk-shadow));

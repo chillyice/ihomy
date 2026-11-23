@@ -6,6 +6,7 @@ const CENTER =
   '.gc-studio,.app-main > .page,.window-content :is(.mobile-tab-content,.mobile-sub-content) > .page,.elder-home,.login-card,.kada > .kwrap,.bp > .bpwrap'
 const NAV = '.app-sidebar,.window-rail'
 const BOARD = '.app-main > .home-page'
+const CARD = '.home-page .dash-card'
 const TABLET_PAGE = '.mobile-layout,.app-main'
 const MODAL = '[aria-modal="true"],dialog[open],.el-overlay'
 const CONTROL =
@@ -43,11 +44,10 @@ const FLOATS = [
   '.call-mini',
   '.light-test-console',
   '.daily-add-fab',
-  '.home-page .dash-card',
   '.home-page .door-sign',
   '.el-popper',
 ].join(',')
-const LANDMARKS = [CENTER, NAV, BOARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, FLOATS, '.gc-side'].join(',')
+const LANDMARKS = [CENTER, NAV, BOARD, CARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, FLOATS, '.gc-side'].join(',')
 const cooldown = 10 * 60_000
 let visitPlan,
   lastPawAt = 0
@@ -62,7 +62,15 @@ function samePlacements(left, right) {
     left.length === right.length &&
     left.every((p, i) => {
       const q = right[i]
-      return p.item === q.item && p.x === q.x && p.y === q.y && p.size === q.size && p.angle === q.angle && p.edge === q.edge
+      return (
+        p.item === q.item &&
+        p.x === q.x &&
+        p.y === q.y &&
+        p.size === q.size &&
+        p.cropWidth === q.cropWidth &&
+        p.angle === q.angle &&
+        p.edge === q.edge
+      )
     })
   )
 }
@@ -100,8 +108,9 @@ export function useDeskSpace(items, arrangement) {
       centers: matching(CENTER),
       nav: matching(NAV),
       board: matching(BOARD),
+      cards: matching(CARD),
       tabletPages: matching(TABLET_PAGE),
-      tabletNav: matching(NAV + ',.gc-side'),
+      rails: matching(NAV + ',.gc-side'),
       modals: matching(MODAL),
       busy: matching(BUSY),
       editHosts: matching(EDITHOST),
@@ -141,8 +150,10 @@ export function useDeskSpace(items, arrangement) {
       clearScene()
       return
     }
-    const center = nodes.centers.map(visibleRect).find(Boolean)
-    if (!center && !nodes.board.some(visibleRect) && !(isTablet.value && nodes.tabletPages.some(visibleRect))) {
+    const board = nodes.board.some(visibleRect)
+    const center =
+      nodes.centers.map(visibleRect).find(Boolean) || (!board && isTablet.value && nodes.tabletPages.map(visibleRect).find(Boolean))
+    if (!center && !board) {
       clearScene()
       return
     }
@@ -150,26 +161,20 @@ export function useDeskSpace(items, arrangement) {
     const width = document.documentElement.clientWidth
     const height = window.innerHeight
     const lanes = deskLanes(width, height, navRight, center)
-    const obstacles = nodes.floats.map(visibleRect).filter(Boolean)
+    const cards = nodes.cards.map(visibleRect).filter(Boolean)
+    const objectObstacles = nodes.floats.concat(nodes.rails).map(visibleRect).filter(Boolean)
+    const obstacles = objectObstacles.concat(cards)
     scene = { lanes, obstacles }
-    let objectObstacles = obstacles
-    if (isTablet.value) {
-      // 平板物件压在普通卡面上。桌边浮窗、导航和独立操作控件始终留给原页面。
-      objectObstacles = nodes.floats
-        .filter((node) => !node.matches('.home-page .dash-card'))
-        .concat(nodes.tabletNav)
-        .map(visibleRect)
-        .filter(Boolean)
-      for (const node of visibleControls) {
-        const rect = node.getBoundingClientRect()
-        if (rect.left > 68 && rect.right < width - 68) continue
-        // 大张可点击的卡片可从中部打开；角落的独立图标和输入区需要完整的点击范围。
-        const largeCard = rect.width > width / 2 || (rect.width >= 160 && rect.height >= 96)
-        if (largeCard && !node.matches('input,textarea,select,[contenteditable="true"]')) continue
-        if (rect.width && rect.height) objectObstacles.push(rect)
-      }
+    for (const node of visibleControls) {
+      const rect = node.getBoundingClientRect()
+      // 大卡片由正文边界限制露出量，独立按钮和输入区保留完整点击面。
+      const largeCard = rect.width > width / 2 || (rect.width >= 160 && rect.height >= 96)
+      if (largeCard && !node.matches('input,textarea,select,[contenteditable="true"]')) continue
+      if (rect.width && rect.height) objectObstacles.push(rect)
     }
-    const next = placeDeskItems(toValue(items), visitPlan, lanes, objectObstacles, isTablet.value ? { width, height } : null)
+    // 自由画板没有固定正文列，按候选高度附近的卡片实测剩余空间。
+    const objectLanes = board && !center ? deskLanes(width, height, navRight, null, width) : lanes
+    const next = placeDeskItems(toValue(items), visitPlan, objectLanes, objectObstacles, cards)
     if (!samePlacements(placements.value, next)) placements.value = next
     if (pawTrail.value.length && !pawTrailFits(pawTrail.value, next, lanes, obstacles)) clearTrail()
   }
@@ -178,7 +183,7 @@ export function useDeskSpace(items, arrangement) {
   }
   function onTreeChange(records) {
     if (refresh) return schedule()
-    const selectors = isTablet.value ? LANDMARKS + ',' + CONTROL : LANDMARKS
+    const selectors = LANDMARKS + ',' + CONTROL
     const relevant = (node) =>
       node.nodeType === 1 &&
       !node.matches('[data-desk-layer]') &&
@@ -224,15 +229,13 @@ export function useDeskSpace(items, arrangement) {
     running = true
     refresh = true
     resize = new ResizeObserver(schedule)
-    if (isTablet.value) {
-      controlObserver = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && controls.has(entry.target)) visibleControls.add(entry.target)
-          else visibleControls.delete(entry.target)
-        }
-        schedule()
-      })
-    }
+    controlObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && controls.has(entry.target)) visibleControls.add(entry.target)
+        else visibleControls.delete(entry.target)
+      }
+      schedule()
+    })
     attributes = new MutationObserver(schedule)
     tree = new MutationObserver(onTreeChange)
     tree.observe(document.body, { childList: true, subtree: true })
