@@ -501,7 +501,12 @@
     <el-dialog v-model="player.visible" append-to-body :title="player.video?.title" width="800px" top="5vh" destroy-on-close>
       <video v-if="player.video?.videoUrl" :src="player.video.videoUrl" controls autoplay class="player-video" />
     </el-dialog>
-    <MediaPlayer v-model="mediaPlayer.visible" :item="mediaPlayer.item" @played="loadMedia" />
+    <MediaPlayer
+      v-model="mediaPlayer.visible"
+      :item="mediaPlayer.item"
+      :work-id="mediaPlayer.item?.seriesId || mediaPlayer.item?.id"
+      @played="loadMedia"
+    />
     <SyncDialog v-model="syncVisible" target="video" @synced="load" />
 
     <!-- 分享范围:不选圈 = 只给自家人 -->

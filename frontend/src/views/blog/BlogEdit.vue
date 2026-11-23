@@ -91,6 +91,7 @@ import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 import { addBlogCategory, blogCategoryChoices } from '@/utils/blogCategories'
+import { recordDoing } from '@/utils/lastDoing'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -179,6 +180,7 @@ const onSave = async () => {
       }
     }
     ElMessage.success(t('common.saveSuccess'))
+    if (blogId) recordDoing({ kind: 'BLOG', id: blogId, title: form.title })
     router.push('/blog')
   } finally {
     loading.value = false

@@ -99,6 +99,16 @@ async function push(localKey, serverKey, value, storage) {
 }
 
 /**
+ * 读服务端全量偏好的只读副本(同一会话只拉一次)。
+ * 给「按记录时间合并」的偏好用(如上次在做):这种语义不能用整份远端覆盖本机。
+ * 拉取失败返回 null,调用方应保留本机现状。
+ */
+export async function readRemotePrefMap() {
+  if (!isLoggedIn()) return null
+  return loadRemote()
+}
+
+/**
  * 进页面时调一次:与服务端对齐。
  * 返回「需要页面应用的值」(只有 use-remote 才有),其余情况返回 null 表示页面上的布局不用动。
  */

@@ -111,7 +111,7 @@
       </template>
     </div>
 
-    <MediaPlayer v-model="player.visible" :item="player.item" @played="reload" />
+    <MediaPlayer v-model="player.visible" :item="player.item" :work-id="itemId" @played="reload" />
 
     <!-- 加入愿望单:来源带媒体引擎条目ID(字符串)与片名快照 -->
     <AddToWishDialog

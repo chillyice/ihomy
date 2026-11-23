@@ -39,6 +39,7 @@ const FLOATS = [
   '.chat-float-ball',
   '.chat-float-panel',
   '.chat-float-bubble',
+  '.last-doing-float',
   '.call-mini',
   '.light-test-console',
   '.daily-add-fab',

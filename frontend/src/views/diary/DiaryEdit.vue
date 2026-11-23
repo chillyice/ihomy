@@ -154,6 +154,7 @@ import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/ut
 import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
+import { recordDoing } from '@/utils/lastDoing'
 import { useDevice } from '@/composables/useDevice'
 import { useUserStore } from '@/stores/user'
 
@@ -549,6 +550,11 @@ const onSave = async () => {
     }
     clearDraft() // 保存成功,草稿使命完成
     ElMessage.success(t('common.saveSuccess'))
+    // 「上次在做」:日记没有标题,用正文首行/前 24 字做卡片标题
+    if (diaryId) {
+      const title = content.value.trim().split('\n')[0].slice(0, 24)
+      recordDoing({ kind: 'DIARY', id: diaryId, title, authorId: authorId.value ?? userStore.userInfo?.id })
+    }
     // 编辑完成回到该作者的日记本翻书视图;新建回到书架
     router.push(isEdit.value && authorId.value != null ? `/diary/book/${authorId.value}` : '/diary')
   } finally {

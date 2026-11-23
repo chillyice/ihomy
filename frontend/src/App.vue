@@ -55,6 +55,8 @@
     <WebUpdateBanner v-if="!isNative && routeReady" />
     <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页);儿童模式不显示 -->
     <ChatFloat v-if="userStore.isLoggedIn && !isChild" />
+    <!-- 上次在做:平板/窄屏电脑的贴边浮卡(宽屏电脑改为侧栏停靠,手机改为首页顶部) -->
+    <LastDoingFloat v-if="showDoingFloat" />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
     <CallOverlay v-if="userStore.isLoggedIn" />
     <!-- 应用内更新弹窗(仅原生壳):懒加载,Web 端永不加载 Capacitor 运行时 -->
@@ -81,6 +83,7 @@ import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
 import { initPrefSync } from '@/utils/userPref'
 import { useDevice } from '@/composables/useDevice'
+import { initLastDoing, lastDoingMode, resetLastDoing } from '@/utils/lastDoing'
 import { useHotkeys } from '@/composables/useHotkeys'
 import { usePenTap } from '@/composables/usePenTap'
 const SunLightLayer = defineAsyncComponent(() => import('@/components/SunLightLayer.vue'))
@@ -99,6 +102,7 @@ import ChildLock from '@/components/ChildLock.vue'
 import WebUpdateBanner from '@/components/WebUpdateBanner.vue'
 import { initDisplayMode, useDisplayMode } from '@/composables/useDisplayMode'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
+const LastDoingFloat = defineAsyncComponent(() => import('@/components/lastdoing/LastDoingFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
 // 命令面板(Ctrl/⌘+K):懒加载,内部只对精细指针显示,独立页/沉浸页不挂载
 const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette.vue'))
@@ -122,7 +126,7 @@ const desk = useWindowDeskStore()
 const route = useRoute()
 const router = useRouter()
 // 显示模式(老人/儿童):启动即把本机保存的模式贴回 html 根类
-const { isChild } = useDisplayMode()
+const { isChild, isElder } = useDisplayMode()
 initDisplayMode()
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
@@ -147,6 +151,21 @@ const { locale } = useI18n()
 const isWarm = computed(() => themeStore.theme === 'warm' && !isMobile.value && !userStore.isPureOps)
 const isWindow = computed(() => themeStore.theme === 'window')
 const windowShell = computed(() => isWindow.value && !immersive.value && !userStore.isPureOps)
+
+// 上次在做浮卡:平板/窄窗口电脑用贴边浮卡;宽屏电脑停靠侧栏、手机走首页顶部
+const showDoingFloat = computed(
+  () =>
+    routeReady.value &&
+    !standalone.value &&
+    !immersive.value &&
+    !userStore.isPureOps &&
+    !userStore.mustChangePassword &&
+    !appStore.homeEditMode &&
+    !isChild.value &&
+    !isElder.value &&
+    userStore.isLoggedIn &&
+    lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }) === 'float',
+)
 
 // 站内窗边页面允许低视力成员双指放大，独立产品及旧主题沿用原来的视口约定。
 const viewport = document.querySelector('meta[name="viewport"]')
@@ -217,6 +236,16 @@ watch(
     appStore.reset()
     loadFamily()
   },
+)
+
+// 上次在做:登录后与账号偏好按记录时间合并;退出/切号清空内存态(游客不展示)
+watch(
+  [() => userStore.isLoggedIn, () => userStore.userInfo?.id],
+  ([logged, uid]) => {
+    if (logged && uid) initLastDoing()
+    else if (!logged) resetLastDoing()
+  },
+  { immediate: true },
 )
 
 // 首次进站、从独立页返回、完成强制改密共用同一个入口。

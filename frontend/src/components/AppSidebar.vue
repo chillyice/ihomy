@@ -18,6 +18,9 @@
       </span>
     </div>
 
+    <!-- 上次在做:宽屏电脑停靠在侧栏;平板/窄窗口改由 App.vue 的浮卡展示 -->
+    <LastDoingCard v-if="showDockCard" variant="dock" :compact="collapsed" />
+
     <!-- 导航列表 -->
     <nav class="sidebar-nav">
       <!-- 编辑态:没有对应导航项的组件(资产卡)从这里拖入首页 -->
@@ -228,6 +231,9 @@ import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
 import { notificationTypeKey } from '@/utils/notificationType'
 import { useDisplayMode } from '@/composables/useDisplayMode'
+import { useDevice } from '@/composables/useDevice'
+import { lastDoingMode } from '@/utils/lastDoing'
+import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
@@ -242,6 +248,11 @@ const userStore = useUserStore()
 const { isChild } = useDisplayMode()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
+const { isTablet, isWide } = useDevice()
+// 宽屏电脑才停靠;平板/窄窗口由全局浮卡接管,避免同一份内容出现两次
+const showDockCard = computed(
+  () => userStore.isLoggedIn && lastDoingMode({ isMobile: false, isTablet: isTablet.value, isWide: isWide.value }) === 'dock',
+)
 
 const WIDGET_MAP = {
   blog: 'feed',

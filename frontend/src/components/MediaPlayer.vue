@@ -75,11 +75,14 @@ import { useI18n } from 'vue-i18n'
 import { mediaApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { recordDoing } from '@/utils/lastDoing'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   // { id, name, seriesName, seasonNumber, episodeNumber, positionTicks }
   item: { type: Object, default: null },
+  // 作品级 id(剧集取 seriesId):「上次在做」按作品去重,不按单集
+  workId: { type: [String, Number], default: null },
 })
 const emit = defineEmits(['update:modelValue', 'played'])
 
@@ -402,13 +405,29 @@ const onEnded = async () => {
   }
 }
 
+// 「上次在做」:按作品记一条(剧集带当前集,便于详情页定位);关闭与卸载各记一次,
+// lastDoing 内部 1 秒去重,不会重复写。
+const recordResume = () => {
+  const it = props.item
+  if (!it) return
+  recordDoing({
+    kind: 'CINEMA',
+    id: props.workId || it.seriesId || it.id,
+    title: it.seriesName || it.name,
+    episodeId: it.seriesName ? it.id : undefined,
+    episodeCode: it.seriesName ? code.value : undefined,
+  })
+}
+
 const onClosed = () => {
+  recordResume()
   reset()
   syncPip(false)
   sunLight?.restoreEffects()
 }
 
 onBeforeUnmount(() => {
+  recordResume()
   reportProgress()
   destroyHls()
   syncPip(false)

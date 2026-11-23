@@ -6509,6 +6509,17 @@ export default {
       invalidFormat: '无法识别的文件格式，请选择 .md、.markdown 或 .txt 文件',
     },
   },
+  lastDoing: {
+    title: '上次在做',
+    book: '电子书',
+    cinema: '放映厅',
+    blog: '博客',
+    diary: '日记',
+    progress: '读到 {p}%',
+    hint: '打开电子书、放映厅、博客或日记后,这里会自动记下续做位置。',
+    collapse: '收起',
+    expand: '展开',
+  },
   library: {
     filters: '筛选',
     bookCount: '{n} 本书',

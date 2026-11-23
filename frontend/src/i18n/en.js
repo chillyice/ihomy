@@ -6573,6 +6573,17 @@ export default {
       invalidFormat: 'Unrecognized file format, please select .md, .markdown, or .txt',
     },
   },
+  lastDoing: {
+    title: 'Last activity',
+    book: 'Book',
+    cinema: 'Cinema',
+    blog: 'Blog',
+    diary: 'Diary',
+    progress: '{p}% read',
+    hint: 'Open a book, cinema title, blog post or diary and your place is saved here.',
+    collapse: 'Collapse',
+    expand: 'Expand',
+  },
   library: {
     filters: 'Filters',
     bookCount: '{n} books',

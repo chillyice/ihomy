@@ -4,6 +4,8 @@
     <div v-if="showDoorSign" class="m-door-sign">
       <FamilyCoverBanner :family="appStore.family" />
     </div>
+    <!-- 上次在做:最近续读/续看/续写的内容(没有记录时整块不渲染) -->
+    <LastDoingCard variant="mobile" />
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
       <div class="filter-scroll">
@@ -67,6 +69,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
+import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'

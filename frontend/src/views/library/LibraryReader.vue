@@ -223,6 +223,7 @@ import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { recordDoing } from '@/utils/lastDoing'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 const props = defineProps({ book: Object })
@@ -772,6 +773,13 @@ const saveProgress = async () => {
       await libraryApi.updateBorrow(props.book.id, { cfi, progress })
     } catch (e) {}
   }
+  // 「上次在做」:关闭/卸载都走这里,记下这本书与读到哪
+  recordDoing({
+    kind: 'BOOK',
+    id: props.book.id,
+    title: props.book.title,
+    progress: progress ?? undefined,
+  })
 }
 
 const setBorrowStatus = async (status) => {

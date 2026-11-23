@@ -134,7 +134,9 @@ const enterLightTest = () => {
 // ihomy:chat:rail:v1(聊天对象列收起)、ihomy:chat:rail:w:v1(聊天对象列宽度)、ihomy:chat:text:v1(聊天字号/自己气泡颜色)、
 // ihomy:games:lastRoomGame(一起玩默认游戏)、ihomy:room:autoReady(自动准备)、
 // ihomy:mahjong3d:view(立体麻将视角偏好)、
-// ihomy:call:mini:v1(通话小窗位置)、ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
+// ihomy:call:mini:v1(通话小窗位置)、ihomy:last-doing:float:v1(上次在做浮卡位置)、
+// ihomy:last-doing:float:collapsed(上次在做浮卡收起态)、
+// ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
 // 是功能偏好不是布局,这里不清,要重新打开去聊天室 / 音乐页。
 // ihomy:panel:*、ihomy:vinyl:pos 与 ihomy:room:chat:v1(房间聊天已并入全局浮窗)是历史键(现已无写入方),
 // 保留清理是为了清掉老浏览器里的残留。
@@ -163,6 +165,8 @@ const resetPanelLayout = () => {
       localStorage.removeItem('ihomy:room:chat:v1')
       localStorage.removeItem('ihomy:mahjong3d:view')
       localStorage.removeItem('ihomy:call:mini:v1')
+      localStorage.removeItem('ihomy:last-doing:float:v1')
+      localStorage.removeItem('ihomy:last-doing:float:collapsed')
       ElMessage.success(t('settings.resetPanelDone'))
       setTimeout(() => location.reload(), 800)
     })

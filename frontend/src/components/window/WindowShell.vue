@@ -4,6 +4,7 @@
       <router-link class="window-brand" to="/home" :aria-label="app.familyName || 'ihomy'">
         <img :src="app.family?.coverImage || brand" alt="" /><span>{{ app.familyName || 'ihomy' }}</span>
       </router-link>
+      <LastDoingCard v-if="showDockCard" variant="dock" :compact="collapsed" />
       <nav :aria-label="$t('windowHome.directory')">
         <router-link class="rail-link" to="/home" :title="$t('nav.home')"
           ><el-icon><House /></el-icon><span>{{ $t('nav.home') }}</span></router-link
@@ -69,6 +70,8 @@ import { iconComp } from '@/utils/navModules'
 import { isMobileGamePath, isMobileHomePath } from '@/utils/mobileNav'
 import { useWindowPanel } from '@/utils/windowPanel'
 import brand from '@/assets/brand/ihomy-window-96.png'
+import { lastDoingMode } from '@/utils/lastDoing'
+import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 const WindowDirectory = defineAsyncComponent(() => import('./WindowDirectory.vue'))
 const route = useRoute()
 const router = useRouter()
@@ -76,8 +79,11 @@ const app = useAppStore()
 const user = useUserStore()
 const nav = useWindowDirectory()
 const { isChild: child } = useDisplayMode()
-const { isMobile, isWide } = useDevice()
+const { isMobile, isTablet, isWide } = useDevice()
 const compact = computed(() => isMobile.value || !isWide.value)
+const showDockCard = computed(
+  () => user.isLoggedIn && lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }) === 'dock',
+)
 const isHome = computed(() => isMobileHomePath(route.path))
 const game = computed(() => isMobile.value && isMobileGamePath(route.path))
 const collapsed = ref(false)
