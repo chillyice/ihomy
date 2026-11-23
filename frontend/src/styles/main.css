@@ -367,6 +367,75 @@ html .window-shell:has(.wh, .elder-home) {
   }
 }
 
+/* 暖居首页的装帧：导航用亚麻书布，卡片承托在低对比的麦色衬纸上。 */
+html.theme-warm {
+  --album-paper: var(--color-bg);
+  --album-page-wash: rgba(var(--color-card-rgb), 0.78);
+  --album-fold: color-mix(in srgb, var(--color-text) 16%, transparent);
+}
+html.theme-warm.dark {
+  --album-page-wash: rgba(var(--color-card-rgb), 0.91);
+  --album-fold: color-mix(in srgb, var(--color-bg) 82%, transparent);
+}
+html.theme-warm:has(.gc-home, .mobile-home, .elder-home) {
+  background-color: var(--color-bg);
+  --home-grain-veil: 88%;
+}
+html.theme-warm :is(.gc-studio, .mobile-tab-content):has(.gc-home, .mobile-home, .elder-home) {
+  background-color: var(--album-paper);
+  background-image:
+    radial-gradient(ellipse at 68% 12%, var(--album-page-wash), transparent 80%),
+    linear-gradient(var(--album-page-wash), var(--album-page-wash)), var(--home-grain);
+  background-size: auto, auto, var(--home-grain-size);
+}
+html.theme-warm .gc-studio:has(.gc-home, .elder-home) {
+  border-radius: 12px 19px 16px 10px;
+  box-shadow:
+    0 2px var(--album-paper),
+    0 3px var(--album-fold),
+    var(--shadow-hover);
+}
+html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-main {
+  background-image: linear-gradient(90deg, var(--album-fold), transparent 17px);
+}
+
+html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-side,
+html.theme-warm .gc-wrap:has(.gc-home, .elder-home) .gc-seg,
+html.theme-warm .mobile-layout:has(.mobile-home, .elder-home) .mobile-tabbar,
+html.theme-warm .mobile-home .filter-bar {
+  background-color: var(--color-card-2);
+  background-image: url('@/assets/materials/album-bookcloth.webp?no-inline');
+  background-blend-mode: soft-light;
+  background-size: 128px 128px;
+}
+html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-side {
+  border-right-color: var(--album-fold);
+  box-shadow: inset -7px 0 9px -8px var(--album-fold);
+}
+html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-nav-group-head {
+  color: var(--color-text-secondary);
+}
+html.theme-warm .mobile-layout:has(.mobile-home, .elder-home) .mobile-tabbar,
+html.theme-warm .mobile-home .filter-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.theme-warm .mobile-home .filter-scroll::before {
+  content: none;
+}
+
+/* 桌面按组件分纸，拖动后仍是同一张；动态流按阅读顺序交替。 */
+html.theme-warm .gc-home :is([data-wid='feed'], [data-wid='finance'], [data-wid='wish']),
+html.theme-warm .mobile-home .feed-card:nth-child(3n + 2) {
+  --card-art: url('@/assets/materials/painted-card-pressed.webp?no-inline');
+  --card-cut: 106 54 46 132 fill / 24px 12px 12px 31px;
+}
+html.theme-warm .gc-home :is([data-wid='anni'], [data-wid='reminder'], [data-wid='task']),
+html.theme-warm .mobile-home .feed-card:nth-child(3n) {
+  --card-art: url('@/assets/materials/painted-card-laid.webp?no-inline');
+  --card-cut: 38 38 60 59 fill / 10px 10px 15px 15px;
+}
+
 /* 卡纸整张铺在内容下面。分片固定纸角与厚度，中部保留原画的水粉笔触。 */
 html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview), .mobile-home .feed-list .feed-card) {
   position: relative;
@@ -384,7 +453,8 @@ html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview), .mobile-home .feed-
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  border-image: url('@/assets/materials/painted-card.webp?no-inline') 48 124 72 48 fill / 12px 30px 18px 12px stretch;
+  border-image: var(--card-art, url('@/assets/materials/painted-card.webp?no-inline'))
+    var(--card-cut, 48 124 72 48 fill / 12px 30px 18px 12px) stretch;
   filter: var(--painted-card-tone, saturate(0.78));
 }
 html.theme-warm.dark {
