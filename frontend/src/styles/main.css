@@ -324,7 +324,7 @@ html.theme-warm .card:hover {
   transform: translateY(-2px);
 }
 
-/* 旧画册的纸板和卡纸共用同一张透明纤维。图层只画在实际首页的表面，
+/* 旧画册的纸板和卡纸共用同一张透明纤维。图层只画在页面的承托面，
  * 图片、天气与文字仍由原组件绘制；设备宽度只改变露出的面积。 */
 :root {
   --home-grain: url('@/assets/materials/paper-grain.webp?no-inline');
@@ -367,7 +367,7 @@ html .window-shell:has(.wh, .elder-home) {
   }
 }
 
-/* 暖居首页的装帧：导航用亚麻书布，卡片承托在低对比的麦色衬纸上。 */
+/* 暖居标准站内页面的装帧：导航用亚麻书布，卡片承托在低对比的麦色衬纸上。 */
 html.theme-warm {
   --album-paper: var(--color-bg);
   --album-page-wash: rgba(var(--color-card-rgb), 0.78);
@@ -377,44 +377,46 @@ html.theme-warm.dark {
   --album-page-wash: rgba(var(--color-card-rgb), 0.91);
   --album-fold: color-mix(in srgb, var(--color-bg) 82%, transparent);
 }
-html.theme-warm:has(.gc-home, .mobile-home, .elder-home) {
+html.warm-paper-page:not(.fp-edit-focus) {
   background-color: var(--color-bg);
+  background-image: var(--home-paper-ground);
+  background-size: auto, var(--home-grain-size);
   --home-grain-veil: 88%;
 }
-html.theme-warm :is(.gc-studio, .mobile-tab-content):has(.gc-home, .mobile-home, .elder-home) {
+html.warm-paper-page:not(.fp-edit-focus) :is(.gc-studio, .mobile-tab-content, .mobile-sub-content) {
   background-color: var(--album-paper);
   background-image:
     radial-gradient(ellipse at 68% 12%, var(--album-page-wash), transparent 80%),
     linear-gradient(var(--album-page-wash), var(--album-page-wash)), var(--home-grain);
   background-size: auto, auto, var(--home-grain-size);
 }
-html.theme-warm .gc-studio:has(.gc-home, .elder-home) {
+html.warm-paper-page:not(.fp-edit-focus) .gc-studio {
   border-radius: 12px 19px 16px 10px;
   box-shadow:
     0 2px var(--album-paper),
     0 3px var(--album-fold),
     var(--shadow-hover);
 }
-html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-main {
+html.warm-paper-page:not(.fp-edit-focus) .gc-studio .gc-main {
   background-image: linear-gradient(90deg, var(--album-fold), transparent 17px);
 }
 
-html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-side,
-html.theme-warm .mobile-layout:has(.mobile-home, .elder-home) .mobile-tabbar,
+html.warm-paper-page:not(.fp-edit-focus) .gc-studio .gc-side,
+html.theme-warm.warm-paper-page .mobile-layout :is(.mobile-header, .mobile-tabbar),
 html.theme-warm .mobile-home .filter-bar {
   background-color: var(--color-card-2);
   background-image: url('@/assets/materials/album-bookcloth.webp?no-inline');
   background-blend-mode: soft-light;
   background-size: 128px 128px;
 }
-html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-side {
+html.warm-paper-page:not(.fp-edit-focus) .gc-studio .gc-side {
   border-right-color: var(--album-fold);
   box-shadow: inset -7px 0 9px -8px var(--album-fold);
 }
-html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-nav-group-head {
+html.warm-paper-page:not(.fp-edit-focus) .gc-studio .gc-nav-group-head {
   color: var(--color-text-secondary);
 }
-html.theme-warm .mobile-layout:has(.mobile-home, .elder-home) .mobile-tabbar,
+html.theme-warm.warm-paper-page .mobile-layout :is(.mobile-header, .mobile-tabbar),
 html.theme-warm .mobile-home .filter-bar {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -458,6 +460,60 @@ html.theme-warm :is(.gc-home .gc-card:not(.gc-card-preview), .mobile-home .feed-
 }
 html.theme-warm.dark {
   --painted-card-tone: brightness(0.6) contrast(2.4) brightness(0.44) saturate(0.72);
+}
+
+/* 暖居业务页：纸签承托操作，压纹留在标题和图注，正文与金额使用原有卡底。 */
+html.warm-paper-page {
+  --caption-wash: rgba(var(--color-card-rgb), 0.86);
+  --caption-paper: linear-gradient(var(--caption-wash), var(--caption-wash)), var(--home-grain);
+  --mat-edge: color-mix(in srgb, var(--color-text-secondary) 28%, var(--color-card-2));
+}
+
+/* 工具栏滚进顶栏后要能融入导航；原位的纸签只装饰底层，浮层及焦点环可溢出。 */
+html.warm-paper-page .page-toolbar.card:not(.fused) {
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+html.warm-paper-page .page-toolbar.card:not(.fused)::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  pointer-events: none;
+  border-image: url('@/assets/materials/painted-card-pressed.webp?no-inline') 106 54 46 132 fill / 12px 9px 9px 20px stretch;
+  filter: var(--painted-card-tone, saturate(0.78));
+}
+
+/* 只在分组页眉压一层向下消隐的纸纹。背景层没有命中区，也不改变表头或列表的尺寸。 */
+html.warm-paper-page .page .card:has(> .section-label, > .records-head) {
+  background-image: linear-gradient(to bottom, var(--caption-wash), var(--color-card)), var(--home-grain);
+  background-repeat: no-repeat, repeat-x;
+  background-size:
+    100% 48px,
+    128px 48px;
+}
+
+/* 资源清单与图注用薄卡纸；选中、悬停仍由各页面的状态底色表达。 */
+html.warm-paper-page .page :is(.rl-row.card, .blog-item.card, .album-card.card):not(.selected, :hover),
+html.warm-paper-page .page .album-header.card,
+html.warm-paper-page .el-dialog:not(.is-fullscreen) > .el-dialog__header:has(.el-dialog__title:not(:empty)),
+html.warm-paper-page .el-drawer > .el-drawer__header:has(.el-drawer__title:not(:empty)) {
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  background-size: auto, var(--home-grain-size);
+}
+html.warm-paper-page .page :is(.rl-thumb, .album-pane-row .pane-cover) {
+  box-shadow:
+    0 0 0 2px var(--color-card),
+    0 0 0 3px var(--mat-edge);
+}
+html.warm-paper-page .el-dialog:not(.is-fullscreen) > .el-dialog__header:has(.el-dialog__title:not(:empty)),
+html.warm-paper-page .el-drawer > .el-drawer__header:has(.el-drawer__title:not(:empty)) {
+  border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 -1px var(--color-border);
 }
 
 /* 光尘的透明卡、手机筛选条和窗边头图各有自己的底色，颗粒只落于卡头/题签。

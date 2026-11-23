@@ -83,6 +83,7 @@ import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
 import { initPrefSync } from '@/utils/userPref'
 import { useDevice } from '@/composables/useDevice'
+import { isMobileGamePath } from '@/utils/mobileNav'
 import { initLastDoing, lastDoingMode, resetLastDoing } from '@/utils/lastDoing'
 import { useHotkeys } from '@/composables/useHotkeys'
 import { usePenTap } from '@/composables/usePenTap'
@@ -151,6 +152,22 @@ const { locale } = useI18n()
 const isWarm = computed(() => themeStore.theme === 'warm' && !isMobile.value && !userStore.isPureOps)
 const isWindow = computed(() => themeStore.theme === 'window')
 const windowShell = computed(() => isWindow.value && !immersive.value && !userStore.isPureOps)
+
+// 标准站内页面共用纸面；根类也覆盖 Teleport 到 body 的弹窗。
+watch(
+  () =>
+    routeReady.value &&
+    themeStore.theme === 'warm' &&
+    !standalone.value &&
+    !immersive.value &&
+    !route.meta.ops &&
+    !userStore.isPureOps &&
+    route.name !== 'MindMapEditor' &&
+    !isMobileGamePath(route.path),
+  (active) => document.documentElement.classList.toggle('warm-paper-page', active),
+  { immediate: true },
+)
+onBeforeUnmount(() => document.documentElement.classList.remove('warm-paper-page'))
 
 // 上次在做浮卡:平板/窄窗口电脑用贴边浮卡;宽屏电脑停靠侧栏、手机走首页顶部
 const showDoingFloat = computed(
