@@ -22,8 +22,9 @@ class AssistantToolsTest {
     private final SysRoleMapper roles = mock(SysRoleMapper.class);
     private final DiaryService diaries = mock(DiaryService.class);
     private final ItemAiService itemAi = mock(ItemAiService.class);
-    private final AssistantWrites writes = new AssistantWrites(diaries, null, null, null, null, null, null, null, null, null, null);
-    private final AssistantTools tools = new AssistantTools(security, roles, null, null, itemAi, writes);
+    private final AssistantWrites writes = new AssistantWrites(diaries, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null);
+    private final AssistantTools tools = new AssistantTools(security, roles, null, null, itemAi, null, writes);
 
     @BeforeEach
     void loggedIn() {

@@ -20,16 +20,24 @@
             {{ $t('chat.assistant.open') }} ·
             {{ $te('nav.' + run.result.page) ? $t('nav.' + run.result.page) : $t('chat.assistant.tools.open_page') }}
           </router-link>
-          <details v-else-if="readTools.includes(run.name)">
-            <summary>{{ $t('chat.assistant.tools.' + run.name) }}</summary>
-            <p v-if="run.result?.reply">{{ run.result.reply }}</p>
-            <ul v-if="(run.result?.items || run.result?.matches)?.length">
-              <li v-for="(item, idx) in (run.result.items || run.result.matches).slice(0, 20)" :key="idx">
-                <router-link v-if="safePath(item.path)" :to="safePath(item.path)">{{ itemLabel(item) }}</router-link>
-                <span v-else>{{ itemLabel(item) }}</span>
-              </li>
+          <details v-else-if="run.result && !run.result.error">
+            <summary>{{ toolLabel(run.name) }}</summary>
+            <p v-if="run.result.reply">{{ run.result.reply }}</p>
+            <p v-else-if="run.result.summary">{{ run.result.summary }}</p>
+            <template v-for="(rows, section) in runLists(run.result)" :key="section">
+              <ul>
+                <li v-for="(item, idx) in rows.slice(0, 20)" :key="idx">
+                  <router-link v-if="item && item.path && safePath(item.path)" :to="safePath(item.path)">{{ itemLabel(item) }}</router-link>
+                  <span v-else>{{ itemLabel(item) }}</span>
+                </li>
+              </ul>
+            </template>
+            <ul v-if="runFields(run.result).length">
+              <li v-for="field in runFields(run.result)" :key="field.key">{{ field.key }}：{{ field.value }}</li>
             </ul>
-            <p v-else-if="!run.result?.reply">{{ run.result?.error || $t('chat.assistant.emptyResult') }}</p>
+            <p v-if="!run.result.reply && !run.result.summary && !runLists(run.result).length && !runFields(run.result).length">
+              {{ $t('chat.assistant.emptyResult') }}
+            </p>
           </details>
         </template>
         <AssistantActionCard v-for="action in message.pendingActions" :key="action.id" :action="action" />
@@ -113,10 +121,54 @@ const stream = ref(null)
 const input = ref(null)
 const micOwner = Symbol()
 const suggestions = computed(() =>
-  user.userInfo?.role === 'GUEST' ? ['schedule', 'item', 'diary'] : ['schedule', 'reminder', 'item', 'diary'],
+  user.userInfo?.role === 'GUEST' ? ['schedule', 'item', 'diary'] : ['schedule', 'plan', 'reminder', 'item', 'diary'],
 )
-const readTools = ['get_schedule', 'find_item', 'search_content', 'list_family_members']
-// Only server tool results get interactive navigation. Model prose may contain formatting.
+const listKeys = [
+  'items',
+  'matches',
+  'plans',
+  'reminders',
+  'undated',
+  'events',
+  'tracks',
+  'playlists',
+  'albums',
+  'products',
+  'accounts',
+  'todayRecommend',
+]
+const safePath = (path) => assistantPath(path, getDisplayMode() === 'child')
+const toolLabel = (name) => {
+  const key = 'chat.assistant.tools.' + name
+  return t(key) === key ? name : t(key)
+}
+const runLists = (result) =>
+  !result || typeof result !== 'object' ? [] : listKeys.map((key) => result[key]).filter((rows) => Array.isArray(rows) && rows.length)
+const hiddenKeys = ['reply', 'summary', 'error', 'path', 'page']
+const runFields = (result) =>
+  !result || typeof result !== 'object'
+    ? []
+    : Object.entries(result)
+        .filter(([key, value]) => !hiddenKeys.includes(key) && value !== null && ['string', 'number', 'boolean'].includes(typeof value))
+        .slice(0, 12)
+        .map(([key, value]) => ({ key, value: String(value) }))
+function itemLabel(item) {
+  if (item === null || item === undefined) return ''
+  if (typeof item !== 'object') return String(item)
+  return [
+    item.date,
+    item.next,
+    item.time,
+    item.remindTime,
+    item.title || item.name,
+    item.author || item.artist,
+    item.room,
+    item.year,
+    item.location,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 const proseOnly = {
   ALLOWED_TAGS: [
     'p',
@@ -141,8 +193,6 @@ const proseOnly = {
   ],
   ALLOWED_ATTR: [],
 }
-const safePath = (path) => assistantPath(path, getDisplayMode() === 'child')
-const itemLabel = (item) => [item.date, item.time, item.title || item.name || item.itemName, item.location].filter(Boolean).join(' · ')
 const voiceHint = computed(() => t('chat.assistant.voice.' + assistant.voice))
 function toggleVoice() {
   if (assistant.voice === 'idle') assistant.startVoice(t, micOwner)
