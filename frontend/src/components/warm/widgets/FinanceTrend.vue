@@ -6,8 +6,8 @@
   <div class="wft">
     <BookTrendChart :rows="rows" compact />
     <div class="wft-sum">
-      <span class="wft-item in">+{{ formatYuan(income) }}</span>
-      <span class="wft-item out">-{{ formatYuan(expense) }}</span>
+      <span :key="`income-${income}`" class="wft-item in">+{{ formatYuan(income) }}</span>
+      <span :key="`expense-${expense}`" class="wft-item out">-{{ formatYuan(expense) }}</span>
     </div>
   </div>
 </template>
@@ -47,5 +47,25 @@ const expense = computed(() => (props.rows || []).reduce((sum, r) => sum + (Numb
 }
 .wft-item.out {
   color: var(--color-expense);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gc-home:not(.gc-editing) .wft :deep(.bt-bars) {
+    transform-origin: center bottom;
+    animation: trend-grow 480ms var(--ease-soft) backwards;
+  }
+  .gc-home:not(.gc-editing) .wft-item {
+    animation: total-appear 300ms ease-out;
+  }
+}
+@keyframes trend-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes total-appear {
+  from {
+    opacity: 0.4;
+    transform: translateY(3px);
+  }
 }
 </style>

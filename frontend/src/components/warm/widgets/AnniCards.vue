@@ -9,14 +9,14 @@
       <div class="wac-unit">{{ $t('warm.daysShort') }}</div>
       <div class="wac-label">{{ a.label }}</div>
       <div class="wac-date">{{ a.date }}</div>
-      <div class="wac-meter"><i :style="{ width: Math.min(100, Number(a.days) || 0) + '%' }"></i></div>
+      <div class="wac-meter"><i :style="{ transform: `scaleX(${Math.min(100, Math.max(0, Number(a.days) || 0)) / 100})` }"></i></div>
     </div>
   </div>
   <div v-else class="gc-empty">{{ $t('warm.noAnni') }}</div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 
@@ -33,11 +33,7 @@ const list = computed(() => (props.list || []).slice(0, MAX_CARDS))
 
 // 横滑容器:隐藏原生滚动条 + 滚轮映射横滑(触屏走浏览器原生滑动)
 const scrollEl = ref(null)
-let unbindWheel = null
-onMounted(() => {
-  unbindWheel = bindHorizontalWheel(scrollEl.value)
-})
-onBeforeUnmount(() => unbindWheel?.())
+watch(scrollEl, (el, _, onCleanup) => onCleanup(bindHorizontalWheel(el)))
 </script>
 
 <style scoped>
@@ -68,19 +64,12 @@ onBeforeUnmount(() => unbindWheel?.())
   border: 1px solid var(--color-border);
   scroll-snap-align: start;
   cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-.wac-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
 }
 .wac-days {
   font-size: 30px;
   line-height: 1;
   font-weight: 700;
-  color: var(--chip, var(--color-primary));
+  color: rgb(var(--chip, var(--color-brand-rgb)));
   font-variant-numeric: tabular-nums;
 }
 .wac-unit {
@@ -112,10 +101,32 @@ onBeforeUnmount(() => unbindWheel?.())
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--chip, var(--color-primary));
-  transition: width 0.4s ease;
+  background: rgb(var(--chip, var(--color-brand-rgb)));
+  transform-origin: left center;
 }
 .is-editing .wac-card {
   cursor: grab;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wac:not(.is-editing) .wac-meter i {
+    animation: meter-fill 480ms var(--ease-soft) backwards;
+    transition: transform 320ms var(--ease-soft);
+  }
+  @media (hover: hover) {
+    .wac:not(.is-editing) .wac-card {
+      transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+    }
+    .wac:not(.is-editing) .wac-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+@keyframes meter-fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 </style>

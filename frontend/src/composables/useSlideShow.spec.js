@@ -79,3 +79,16 @@ it('clears its timer when the scope is disposed', () => {
   vi.advanceTimersByTime(10000)
   expect(show.index.value).toBe(0)
 })
+
+it('keeps the requested direction across wraparound and resumes forward autoplay', () => {
+  const { show, effects } = mountShow({ count: ref(3) })
+  show.prev()
+  expect([show.index.value, show.direction.value]).toEqual([2, -1])
+  vi.advanceTimersByTime(5000)
+  expect([show.index.value, show.direction.value]).toEqual([0, 1])
+  show.go(2)
+  expect(show.direction.value).toBe(1)
+  show.go(1)
+  expect(show.direction.value).toBe(-1)
+  effects.stop()
+})

@@ -121,7 +121,7 @@
             <span class="gc-win-dust" style="animation-delay: -4s; left: 30%; top: 12%"></span>
             <span class="gc-win-dust" style="animation-delay: -7s; left: 12%; top: 50%"></span>
             <span class="gc-win-dust" style="animation-delay: -10s; left: 44%; top: 30%"></span>
-            <div class="gc-win-info">
+            <div :key="weatherTemp + '|' + weatherText" class="gc-win-info">
               <div class="gc-temp">
                 {{ weatherTemp }}°<span class="gc-c">C</span>
                 <span v-if="todayHigh != null" class="gc-hilo">↑{{ todayHigh }}° ↓{{ todayLow ?? '—' }}°</span>
@@ -149,7 +149,7 @@
           <div v-if="feeds.length" class="gc-list">
             <div
               v-for="(f, i) in feeds.slice(0, w.featured ? 3 : nFeed(w))"
-              :key="i"
+              :key="f.type + '-' + (f.id ?? i)"
               class="gc-row"
               v-a11y-click
               @click="!editMode && goFeed(f)"
@@ -170,59 +170,7 @@
           <div v-else class="gc-empty">{{ $t('warm.noFeed') }}</div>
         </template>
 
-        <!-- 照片(暖居卡牌堆轮播) -->
-        <template v-else-if="w.id === 'photos'">
-          <h3 class="gc-card-h3">
-            {{ $t('warm.widget.photos')
-            }}<button class="gc-more" @click.stop="!editMode && $router.push('/album')">{{ $t('warm.albumArrow') }}</button>
-          </h3>
-          <div
-            v-if="photos.length"
-            class="gc-photo-stack"
-            v-a11y-click
-            @mouseenter="photoHover = true"
-            @mouseleave="photoHover = false"
-            @click="!editMode && advancePhotos()"
-          >
-            <img v-if="w.featured && topPhoto" class="gc-photo-lead" :src="topPhoto.url" :alt="photoCaption" />
-            <template v-else>
-              <div
-                v-for="(p, i) in stackCards"
-                :key="p.id"
-                class="gc-photo-pcard"
-                :class="{ 'gc-photo-hovered': hoveredCard === i }"
-                :style="pcardStyle(i)"
-                @mouseenter="onCardEnter(i)"
-                @mouseleave="onCardLeave()"
-              >
-                <img :src="p.url" :alt="p.description || ''" loading="lazy" />
-              </div>
-            </template>
-            <div class="gc-photo-meta">
-              <span class="gc-photo-cap">{{ photoCaption }}</span>
-              <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
-            </div>
-            <button
-              v-if="photos.length > 1 && !editMode"
-              class="gc-photo-nav gc-photo-prev"
-              @click.stop="prevPhotos()"
-              :aria-label="$t('warm.prevPhoto')"
-            >
-              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
-            </button>
-            <button
-              v-if="photos.length > 1 && !editMode"
-              class="gc-photo-nav gc-photo-next"
-              @click.stop="advancePhotos()"
-              :aria-label="$t('warm.nextPhoto')"
-            >
-              <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
-            </button>
-          </div>
-          <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="!editMode && $router.push('/album')">
-            {{ $t('warm.addPhoto') }}
-          </div>
-        </template>
+        <PhotoCarousel v-else-if="w.id === 'photos'" :photos="photos" :edit-mode="editMode" :variant="w.featured ? 'featured' : 'stack'" />
 
         <!-- 纪念日 -->
         <template v-else-if="w.id === 'anni'">
@@ -424,11 +372,11 @@
             }}<button v-if="dailyKnowledgeOn" class="gc-more" :title="$t('daily.next')" @click.stop="!editMode && reloadDaily()">↻</button>
           </h3>
           <div class="gc-daily">
-            <div v-if="dailyImage" class="gc-daily-pic">
+            <div v-if="dailyImage" :key="dailyImage.url" class="gc-daily-pic">
               <img :src="dailyImage.url" :alt="dailyImage.copyright || ''" loading="lazy" />
               <span v-if="dailyImage.copyright" class="gc-daily-cap">{{ dailyImage.copyright }}</span>
             </div>
-            <div v-if="dailyKnowledge" class="gc-daily-know">{{ dailyKnowledge }}</div>
+            <div v-if="dailyKnowledge" :key="dailyKnowledge" class="gc-daily-know">{{ dailyKnowledge }}</div>
             <div v-if="!dailyImage && !dailyKnowledge" class="gc-empty">{{ dailyEmptyHint }}</div>
           </div>
         </template>
@@ -472,6 +420,7 @@ import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick, watch } fr
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { gsap } from 'gsap'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
@@ -484,7 +433,7 @@ import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
 import { buildAgenda } from '@/utils/agenda'
 import { feedPath, feedSummary as feedSummaryOf } from '@/utils/feed'
-import { formatDate } from '@/utils/datetime'
+import PhotoCarousel from './widgets/PhotoCarousel.vue'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { useHomeCardData } from '@/composables/useHomeCardData'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
@@ -669,9 +618,11 @@ watch(
 
 // ========== 布局动画(FLIP:先量后放,统一驱动「变大缩小 / 邻居移动 / 回弹」) ==========
 const gridEl = ref(null)
+let entranceMedia
 const flipAnims = new WeakMap()
 const captureRects = () => {
   const m = new Map()
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return m
   gridEl.value?.querySelectorAll('.gc-card').forEach((c) => {
     if (c.dataset.wid) m.set(c.dataset.wid, c.getBoundingClientRect())
   })
@@ -681,7 +632,7 @@ const captureRects = () => {
 const FLIP_EASE = 'cubic-bezier(.34, 1.56, .64, 1)'
 const flipLayout = (prev) => {
   const grid = gridEl.value
-  if (!grid) return
+  if (!grid || !prev.size) return
   const moves = []
   grid.querySelectorAll('.gc-card').forEach((c) => {
     const id = c.dataset.wid
@@ -755,7 +706,9 @@ const startEdit = () => appStore.toggleHomeEditMode()
 const finishEdit = () => appStore.toggleHomeEditMode()
 // 编辑期间的增删/拖拽/缩放/恢复默认都只改内存,退出编辑(点「完成」或经侧栏再次点编辑)时才落库
 watch(editMode, (on) => {
-  if (!on) {
+  if (on) {
+    entranceMedia?.revert()
+  } else {
     styleMenuId.value = null
     saveLayout()
   }
@@ -1154,59 +1107,6 @@ const financeHolding = computed(() => {
   return { principal: s.holdingPrincipal, count: s.holdingCount }
 })
 
-// ========== 照片卡牌堆(点击翻动 + 5s 自动轮播 + hover 摆正放大/暂停) ==========
-const photoIndex = ref(0)
-const photoHover = ref(false)
-const hoveredCard = ref(-1) // 当前 hover 的照片卡索引(-1 = 无),hover 时该卡摆正放大(JS 追踪,正确处理扇形重叠)
-const PHOTO_STACK_N = 4
-const topPhoto = computed(() => photos.value[photoIndex.value] || photos.value[0] || null)
-const photoCaption = computed(
-  () => topPhoto.value?.description || formatDate(topPhoto.value?.takenAt || topPhoto.value?.createdAt) || t('warm.familyPhoto'),
-)
-const stackCards = computed(() => {
-  const arr = photos.value
-  const n = arr.length
-  if (!n) return []
-  const out = []
-  for (let i = 0; i < Math.min(PHOTO_STACK_N, n); i++) out.push(arr[(photoIndex.value + i) % n])
-  return out
-})
-const pcardStyle = (i) => {
-  const n = Math.min(PHOTO_STACK_N, photos.value.length)
-  const mid = (n - 1) / 2
-  return {
-    '--dx': `${((i - mid) * 12).toFixed(1)}px`,
-    '--dy': `${(Math.abs(i - mid) * 8).toFixed(1)}px`,
-    '--rot': `${((i - mid) * 5).toFixed(1)}deg`,
-    '--z': 10 - i,
-  }
-}
-const onCardEnter = (i) => {
-  hoveredCard.value = i
-}
-const onCardLeave = () => {
-  hoveredCard.value = -1
-}
-const advancePhotos = () => {
-  if (photos.value.length > 1) photoIndex.value = (photoIndex.value + 1) % photos.value.length
-}
-const prevPhotos = () => {
-  if (photos.value.length > 1) photoIndex.value = (photoIndex.value - 1 + photos.value.length) % photos.value.length
-}
-let photoTimer = null
-const startPhotoTimer = () => {
-  if (!photoTimer)
-    photoTimer = setInterval(() => {
-      if (!photoHover.value) advancePhotos()
-    }, 5000)
-}
-const stopPhotoTimer = () => {
-  if (photoTimer) {
-    clearInterval(photoTimer)
-    photoTimer = null
-  }
-}
-
 // ========== 寻物(搜索 + 语音 + 户型图预览) ==========
 const itemHouse = ref(null)
 const itemFloorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
@@ -1474,14 +1374,6 @@ watch(
   },
   { immediate: true },
 )
-watch(
-  () => Boolean(visibleCardById('photos') && photos.value.length > 1),
-  (visible) => {
-    if (visible) startPhotoTimer()
-    else stopPhotoTimer()
-  },
-  { immediate: true },
-)
 // 注册表里带 component 的样式组件要的数据,统一在这里交给 props(ctx)
 const widgetCtx = () => ({
   feeds: feeds.value,
@@ -1496,6 +1388,22 @@ const retryCards = () => {
   }
 }
 onMounted(() => {
+  if (!editMode.value) {
+    entranceMedia = gsap.matchMedia()
+    entranceMedia.add('(prefers-reduced-motion: no-preference)', () => {
+      const cards = gridEl.value.querySelectorAll('.gc-card')
+      if (cards.length) {
+        gsap.from(cards, {
+          y: 10,
+          opacity: 0.4,
+          duration: 0.34,
+          stagger: { amount: 0.18 },
+          ease: 'power2.out',
+          clearProps: 'transform,opacity',
+        })
+      }
+    })
+  }
   window.addEventListener('online', retryCards)
   clockTimer = setInterval(() => {
     now.value = new Date()
@@ -1504,9 +1412,9 @@ onMounted(() => {
   applyRemoteLayout()
 })
 onBeforeUnmount(() => {
+  entranceMedia?.revert()
   window.removeEventListener('online', retryCards)
   clearTimeout(itemVoiceTimer)
-  stopPhotoTimer()
   clearInterval(clockTimer)
   if (itemVoiceRecording.value) itemVoiceStop()
 })
@@ -1693,6 +1601,60 @@ html.theme-warm.dark .gc-home {
   text-overflow: ellipsis;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .gc-home:not(.gc-editing) :is(.gc-row, .gc-daily-know, .gc-daily-pic, .gc-win-info, .gc-fc-item) {
+    animation: gc-content-arrive 280ms ease-out backwards;
+  }
+  .gc-home:not(.gc-editing) :is(.gc-row, .gc-fc-item):nth-child(2) {
+    animation-delay: 35ms;
+  }
+  .gc-home:not(.gc-editing) :is(.gc-row, .gc-fc-item):nth-child(n + 3) {
+    animation-delay: 70ms;
+  }
+  .gc-home:not(.gc-editing) :is(.gc-meter > i, .gc-fin-bar) {
+    transform-origin: left center;
+    animation: gc-balance-reveal 440ms ease-out;
+  }
+  .gc-home:not(.gc-editing) .gc-item-dot.hit {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: gc-locate-item 420ms ease-out;
+  }
+  .gc-home:not(.gc-editing) :is(.gc-tile-icon, .gc-link-icon, .gc-row .gc-ic) {
+    transition: transform 180ms ease-out;
+  }
+  .gc-home:not(.gc-editing) .gc-card:focus-visible :is(.gc-tile-icon, .gc-link-icon) {
+    transform: translateY(-2px);
+  }
+  .gc-home:not(.gc-editing) .gc-row:focus-visible .gc-ic {
+    transform: translateX(2px);
+  }
+  @media (hover: hover) {
+    .gc-home:not(.gc-editing) .gc-card:hover :is(.gc-tile-icon, .gc-link-icon) {
+      transform: translateY(-2px);
+    }
+    .gc-home:not(.gc-editing) .gc-row[role='button']:hover .gc-ic {
+      transform: translateX(2px);
+    }
+  }
+}
+@keyframes gc-content-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes gc-balance-reveal {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes gc-locate-item {
+  50% {
+    transform: scale(1.6);
+  }
+}
+
 /* 卡片 = 家具块 */
 .gc-card {
   background: var(--color-card);
@@ -1702,9 +1664,7 @@ html.theme-warm.dark .gc-home {
   padding: 18px;
   position: relative;
   overflow: hidden;
-  transition:
-    box-shadow 0.35s ease,
-    transform 0.35s ease;
+  transition: box-shadow 0.35s ease;
 }
 .gc-card:hover {
   box-shadow: var(--shadow-hover);
@@ -1990,155 +1950,6 @@ html.theme-warm.dark .gc-home {
   display: flex;
   flex-direction: column;
 }
-.gc-photo-stack {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-.gc-photo-pcard {
-  position: absolute;
-  width: 72%;
-  height: 76%;
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--color-line);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
-  z-index: var(--z, 10);
-  transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--rot, 0deg));
-  transition:
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.3s ease,
-    opacity 0.5s ease;
-}
-.gc-photo-pcard.gc-photo-hovered {
-  z-index: 40;
-  transform: translate(0, 0) rotate(0deg) scale(1.1);
-  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.28);
-}
-.gc-photo-pcard img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.gc-photo-meta {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  z-index: 45;
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
-  pointer-events: none;
-}
-.gc-photo-stack:hover .gc-photo-meta {
-  opacity: 1;
-  transform: translateY(0);
-}
-.gc-featured .gc-photo-stack {
-  border-radius: 10px;
-  min-height: 180px;
-}
-.gc-photo-lead {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.gc-featured .gc-photo-meta {
-  inset: auto 0 0;
-  opacity: 1;
-  transform: none;
-  padding: 48px 16px 14px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
-}
-.gc-featured .gc-photo-cap,
-.gc-featured .gc-photo-count {
-  padding: 0;
-  background: transparent;
-  backdrop-filter: none;
-}
-.gc-featured .gc-photo-cap {
-  font-size: 15px;
-  line-height: 1.4;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.gc-photo-cap {
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
-  max-width: 72%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gc-photo-count {
-  font-size: 11px;
-  color: #fff;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-.gc-photo-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
-  transition:
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-.gc-photo-nav:hover {
-  background: rgba(0, 0, 0, 0.6);
-  transform: translateY(-50%) scale(1.06);
-}
-.gc-photo-nav svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.gc-photo-prev {
-  left: 2px;
-}
-.gc-photo-next {
-  right: 2px;
-}
-
 /* 头部「更多」小链接(照片→相册 / 寻物→管理) */
 .gc-more {
   all: unset;

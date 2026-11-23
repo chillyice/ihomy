@@ -44,7 +44,20 @@
               <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
             </div>
             <div class="feed-card-body" :class="{ 'photo-story': f.type === 'photo' }">
-              <div v-if="feedCover(f)" class="feed-cover">
+              <div
+                v-if="themeStore.theme === 'warm' && f.type === 'photo' && Array.isArray(f.urls) && f.urls.length > 1"
+                v-horizontal-wheel
+                class="feed-cover feed-photo-strip"
+              >
+                <img
+                  v-for="(url, index) in f.urls"
+                  :key="index"
+                  :src="url"
+                  :alt="f.descriptions?.[index] || $t('feed.type.photo')"
+                  loading="lazy"
+                />
+              </div>
+              <div v-else-if="feedCover(f)" class="feed-cover">
                 <img :src="feedCover(f)" :alt="feedSummary(f)" loading="lazy" />
               </div>
               <div class="feed-text">
@@ -68,6 +81,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 import { useHomeFeed } from '@/composables/useHomeFeed'
@@ -75,10 +89,20 @@ import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryO
 import { formatRelativeTime } from '@/utils/datetime'
 import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
+import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const themeStore = useThemeStore()
+const vHorizontalWheel = {
+  mounted(el) {
+    el.unbindWheel = bindHorizontalWheel(el)
+  },
+  unmounted(el) {
+    el.unbindWheel()
+  },
+}
 const { t } = useI18n()
 const root = ref(null)
 const feeds = ref([])
@@ -326,6 +350,24 @@ html.dark .feed-type-tag {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.photo-story .feed-photo-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, transparent, black 4px, black calc(100% - 4px), transparent);
+}
+.feed-photo-strip img {
+  width: 94%;
+  flex: none;
+  scroll-snap-align: start;
+}
+@media (pointer: coarse) {
+  .feed-photo-strip {
+    scroll-snap-type: x mandatory;
+  }
 }
 .feed-text {
   flex: 1;

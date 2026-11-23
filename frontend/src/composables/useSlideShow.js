@@ -5,19 +5,24 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 // count: () => number(条目数);active: () => boolean(卡片在页面上且不在编辑态);interval: 毫秒
 export function useSlideShow({ count, active = () => true, interval = 5000 } = {}) {
   const index = ref(0)
+  const direction = ref(1)
   const hovered = ref(false)
   const total = computed(() => Math.max(0, Number(count?.()) || 0))
   let timer = null
 
-  const next = () => {
-    if (total.value > 1) index.value = (index.value + 1) % total.value
+  const step = (delta) => {
+    if (total.value < 2) return
+    direction.value = delta
+    index.value = (index.value + delta + total.value) % total.value
   }
-  const prev = () => {
-    if (total.value > 1) index.value = (index.value - 1 + total.value) % total.value
-  }
+  const next = () => step(1)
+  const prev = () => step(-1)
   const go = (i) => {
     if (!total.value) return
-    index.value = (((Number(i) || 0) % total.value) + total.value) % total.value
+    const target = (((Number(i) || 0) % total.value) + total.value) % total.value
+    if (target === index.value) return
+    direction.value = target > index.value ? 1 : -1
+    index.value = target
   }
   const start = () => {
     if (timer) return
@@ -50,5 +55,5 @@ export function useSlideShow({ count, active = () => true, interval = 5000 } = {
   )
   onScopeDispose(stop)
 
-  return { index, hovered, total, next, prev, go, start, stop, pause }
+  return { index, direction, hovered, total, next, prev, go, start, stop, pause }
 }

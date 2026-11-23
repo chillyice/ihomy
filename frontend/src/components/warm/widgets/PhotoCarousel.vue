@@ -1,47 +1,87 @@
-<!-- 相册 · 横向自动切换:单张全宽幻灯片,4s 自动横移、hover 暂停、左右箭头/圆点,点卡进相册 -->
+<!-- 暖居相册的三种布局共享切换方向、手势与自动播放。 -->
 <template>
   <h3 class="gc-card-h3">
-    {{ $t('warm.widget.photos') }}<button class="gc-more" @click.stop="!editMode && go('/album')">{{ $t('warm.albumArrow') }}</button>
+    {{ $t('warm.widget.photos') }}<button class="gc-more" @click.stop="openAlbum">{{ $t('warm.albumArrow') }}</button>
   </h3>
-  <div v-if="slides.length" class="pcs" :class="{ 'is-editing': editMode }" @mouseenter="pause(true)" @mouseleave="pause(false)">
-    <div class="pcs-track" :style="{ transform: `translate3d(-${index * 100}%, 0, 0)` }">
-      <div v-for="(p, i) in slides" :key="p.id || i" class="pcs-slide" @click="!editMode && go('/album')">
-        <img :src="p.url" :alt="p.description || ''" loading="lazy" />
-      </div>
-    </div>
-
+  <div
+    v-if="current"
+    class="pcs"
+    :class="[`pcs-${variant}`, { 'is-editing': editMode }]"
+    @pointerenter="hovered = $event.pointerType === 'mouse'"
+    @pointerleave="hovered = false"
+    @focusin="focused = $event.target.matches(':focus-visible')"
+    @focusout="focused = false"
+    @keydown.stop
+  >
+    <button
+      type="button"
+      class="pcs-surface"
+      :aria-label="variant === 'carousel' ? $t('warm.albumArrow') : $t('warm.nextPhoto')"
+      :disabled="editMode || (variant !== 'carousel' && slides.length < 2)"
+      @click.stop="activate"
+      @pointerdown="startSwipe"
+      @pointermove="moveSwipe"
+      @pointerup="endSwipe"
+      @pointercancel="cancelSwipe"
+      @lostpointercapture.self="cancelSwipe"
+      @pointerleave="!$event.currentTarget.hasPointerCapture($event.pointerId) && cancelSwipe($event)"
+      @keydown.left.prevent="prev"
+      @keydown.right.prevent="next"
+    >
+      <Transition
+        :name="direction === 1 ? 'pcs-forward' : 'pcs-back'"
+        :css="!editMode && !reduced"
+        @before-enter="setReleaseOffset"
+        @before-leave="setReleaseOffset"
+      >
+        <span :key="current.id ?? current.url" class="pcs-viewport">
+          <span class="pcs-strip">
+            <span
+              v-for="frame in frames"
+              :key="frame.offset"
+              class="pcs-frame"
+              :style="{ left: `${frame.offset * 100}%` }"
+              :aria-hidden="frame.offset !== 0"
+            >
+              <span v-for="(photo, i) in frame.photos" :key="photo.id ?? photo.url" class="pcs-print" :style="stackStyle(i)">
+                <img :src="photo.url" :alt="photo.description || ''" draggable="false" />
+              </span>
+            </span>
+          </span>
+        </span>
+      </Transition>
+    </button>
     <div class="pcs-meta">
       <span class="pcs-cap">{{ caption }}</span>
       <span class="pcs-count">{{ index + 1 }} / {{ slides.length }}</span>
     </div>
-
     <template v-if="slides.length > 1 && !editMode">
-      <button class="pcs-nav prev" :title="$t('warm.prevPhoto')" @click.stop="prev">
+      <button class="pcs-nav prev" :aria-label="$t('warm.prevPhoto')" @click.stop="prev">
         <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
       </button>
-      <button class="pcs-nav next" :title="$t('warm.nextPhoto')" @click.stop="next">
+      <button class="pcs-nav next" :aria-label="$t('warm.nextPhoto')" @click.stop="next">
         <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
       </button>
+      <div v-if="variant === 'carousel' && slides.length <= 12" class="pcs-dots">
+        <button
+          v-for="(p, i) in slides"
+          :key="p.id ?? p.url"
+          class="pcs-dot"
+          :class="{ on: i === index }"
+          :aria-label="String(i + 1)"
+          :aria-current="i === index"
+          @click.stop="go(i)"
+        ></button>
+      </div>
     </template>
-
-    <div v-if="slides.length > 1 && slides.length <= 12" class="pcs-dots">
-      <button
-        v-for="(p, i) in slides"
-        :key="`dot-${p.id || i}`"
-        class="pcs-dot"
-        :class="{ on: i === index }"
-        :aria-label="String(i + 1)"
-        @click.stop="go2(i)"
-      ></button>
-    </div>
   </div>
-  <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="!editMode && go('/album')">
+  <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="openAlbum">
     {{ $t('warm.addPhoto') }}
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSlideShow } from '@/composables/useSlideShow'
@@ -50,35 +90,135 @@ import { formatDate } from '@/utils/datetime'
 const props = defineProps({
   photos: { type: Array, default: () => [] },
   editMode: { type: Boolean, default: false },
+  variant: { type: String, default: 'carousel' },
 })
 
 const router = useRouter()
 const { t } = useI18n()
-const go = (path) => router.push(path)
+const openAlbum = () => {
+  if (!props.editMode) router.push('/album')
+}
+const slides = computed(() => {
+  const photos = props.photos || []
+  return props.variant === 'carousel' ? photos.slice(0, 30) : photos
+})
+const focused = ref(false)
+const interacting = ref(false)
+const reducedQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+const reduced = ref(Boolean(reducedQuery?.matches))
+const visible = ref(!document.hidden)
+const syncReduced = () => {
+  reduced.value = reducedQuery.matches
+}
+const syncVisible = () => {
+  visible.value = !document.hidden
+}
 
-// 首页只展示最近一批:照片再多也不在首屏铺几百个 img(lazy 也顶不住布局),其余去相册页看
-const MAX_SLIDES = 30
-const slides = computed(() => (props.photos || []).slice(0, MAX_SLIDES))
-const reducedMotion =
-  typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false
-const {
-  index,
-  next,
-  prev,
-  go: go2,
-  pause,
-} = useSlideShow({
-  count: () => slides.value.length,
-  active: () => !props.editMode && !reducedMotion,
-  interval: 4000,
+onMounted(() => {
+  reducedQuery?.addEventListener('change', syncReduced)
+  document.addEventListener('visibilitychange', syncVisible)
+})
+onBeforeUnmount(() => {
+  reducedQuery?.removeEventListener('change', syncReduced)
+  document.removeEventListener('visibilitychange', syncVisible)
 })
 
-const current = computed(() => slides.value[index.value] || null)
+const { index, direction, next, prev, go, hovered } = useSlideShow({
+  count: () => slides.value.length,
+  active: () => !props.editMode && !reduced.value && visible.value && !focused.value && !interacting.value,
+  interval: props.variant === 'carousel' ? 4000 : 5000,
+})
+const current = computed(() => slides.value[index.value])
 const caption = computed(() => {
   const p = current.value
-  if (!p) return ''
-  return p.description || formatDate(p.takenAt || p.createdAt) || t('warm.familyPhoto')
+  return p?.description || formatDate(p?.takenAt || p?.createdAt) || t('warm.familyPhoto')
 })
+const frameSize = computed(() => (props.variant === 'stack' ? Math.min(slides.value.length, 4) : 1))
+const frames = computed(() => {
+  const count = slides.value.length
+  return (count > 1 ? [-1, 0, 1] : [0]).map((offset) => ({
+    offset,
+    photos: Array.from({ length: frameSize.value }, (_, i) => slides.value[(index.value + offset + i + count) % count]),
+  }))
+})
+const stackStyle = (i) => {
+  if (props.variant !== 'stack') return
+  const spread = i - (frameSize.value - 1) / 2
+  return {
+    '--dx': `${spread * 12}px`,
+    '--dy': `${Math.abs(spread) * 8}px`,
+    '--rot': `${spread * 5}deg`,
+    '--z': 10 - i,
+  }
+}
+
+let gesture = null
+let suppressClick = false
+let releasePan = 0
+function resetSwipe(surface, settle) {
+  surface.classList.toggle('is-settling', settle)
+  surface.style.removeProperty('--pan')
+  gesture = null
+  interacting.value = false
+}
+function startSwipe(e) {
+  if (!e.isPrimary) {
+    if (gesture) {
+      suppressClick = true
+      resetSwipe(e.currentTarget, true)
+    }
+    return
+  }
+  suppressClick = false
+  if (e.button !== 0 || props.editMode || slides.value.length < 2) return
+  e.currentTarget.classList.remove('is-settling')
+  gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, horizontal: false }
+  interacting.value = true
+}
+function moveSwipe(e) {
+  if (gesture?.id !== e.pointerId) return
+  const dx = e.clientX - gesture.x
+  const dy = e.clientY - gesture.y
+  if (!gesture.horizontal) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return
+    if (Math.abs(dx) <= Math.abs(dy)) {
+      suppressClick = true
+      cancelSwipe(e)
+      return
+    }
+    gesture.horizontal = true
+    suppressClick = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const width = e.currentTarget.clientWidth
+  gesture.dx = Math.max(-width, Math.min(dx, width))
+  if (!reduced.value) e.currentTarget.style.setProperty('--pan', `${gesture.dx}px`)
+}
+function cancelSwipe(e) {
+  if (gesture?.id !== e.pointerId) return
+  resetSwipe(e.currentTarget, true)
+}
+function endSwipe(e) {
+  if (gesture?.id !== e.pointerId) return
+  const { dx, horizontal } = gesture
+  const advance = !props.editMode && horizontal && Math.abs(dx) >= Math.min(42, e.currentTarget.clientWidth / 4)
+  resetSwipe(e.currentTarget, !advance)
+  if (!advance) return
+  releasePan = reduced.value ? 0 : dx
+  if (dx < 0) next()
+  else prev()
+  nextTick(() => {
+    releasePan = 0
+  })
+}
+function setReleaseOffset(el) {
+  el.style.setProperty('--release-pan', `${releasePan}px`)
+}
+function activate(e) {
+  if (props.editMode || (suppressClick && e.detail !== 0)) return
+  if (props.variant === 'carousel') openAlbum()
+  else next()
+}
 </script>
 
 <style scoped>
@@ -89,19 +229,109 @@ const caption = computed(() => {
   overflow: hidden;
   border-radius: 12px;
   background: var(--color-line);
+}
+.pcs-surface {
+  --pan: 0px;
+  --release-pan: 0px;
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
   cursor: pointer;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
 }
-.pcs-track {
-  display: flex;
-  height: 100%;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+.pcs-surface:disabled {
+  cursor: default;
 }
-.pcs-slide {
-  flex: 0 0 100%;
-  height: 100%;
+.is-editing .pcs-surface {
+  pointer-events: none;
 }
-.pcs-slide img {
+.is-settling .pcs-strip {
+  transition: transform 180ms ease-out;
+}
+.pcs-surface:focus-visible {
+  outline-offset: -3px;
+}
+.pcs-viewport,
+.pcs-strip,
+.pcs-frame,
+.pcs-print {
+  position: absolute;
+  display: block;
+  inset: 0;
+}
+.pcs-viewport {
+  overflow: hidden;
+}
+.pcs-strip {
+  transform: translateX(var(--pan, 0px));
+}
+.pcs-frame {
+  width: 100%;
+}
+.pcs-forward-enter-active,
+.pcs-forward-leave-active,
+.pcs-back-enter-active,
+.pcs-back-leave-active {
+  transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pcs-forward-leave-from,
+.pcs-back-leave-from {
+  transform: translateX(var(--release-pan, 0px));
+}
+.pcs-forward-enter-from {
+  transform: translateX(calc(100% + var(--release-pan, 0px)));
+}
+.pcs-back-enter-from {
+  transform: translateX(calc(-100% + var(--release-pan, 0px)));
+}
+.pcs-forward-leave-to {
+  transform: translateX(-100%);
+}
+.pcs-back-leave-to {
+  transform: translateX(100%);
+}
+.pcs-featured {
+  min-height: 180px;
+  border-radius: 10px;
+}
+.pcs-stack {
+  background: transparent;
+}
+.pcs-stack .pcs-frame {
+  display: grid;
+  place-items: center;
+}
+.pcs-stack .pcs-print {
+  --dx: 0px;
+  --dy: 0px;
+  --rot: 0deg;
+  --z: 10;
+  position: absolute;
+  inset: auto;
+  width: 72%;
+  height: 76%;
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: var(--z);
+  transform: translate(var(--dx), var(--dy)) rotate(var(--rot));
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+  background: var(--color-line);
+  transition: transform 0.3s ease;
+}
+@media (hover: hover) {
+  .pcs-stack .pcs-print:hover {
+    z-index: 15;
+    transform: scale(1.1);
+  }
+}
+.pcs-print img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -199,9 +429,36 @@ const caption = computed(() => {
   background: #fff;
   transform: scale(1.25);
 }
-/* 编辑态不响应自动切换,也不显示导航,拖拽/缩放优先 */
-.is-editing .pcs-dots,
-.is-editing .pcs-nav {
-  display: none;
+.pcs-featured .pcs-meta {
+  padding: 48px 16px 14px;
+}
+.pcs-featured .pcs-cap {
+  font-size: 15px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.pcs-stack .pcs-meta {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.pcs-stack:hover .pcs-meta,
+.pcs-stack:focus-within .pcs-meta {
+  opacity: 1;
+}
+@media (hover: none) {
+  .pcs-stack .pcs-meta {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pcs *,
+  .is-settling .pcs-strip,
+  .pcs-stack .pcs-meta,
+  .pcs-stack .pcs-print {
+    transition: none;
+  }
+  .pcs-stack .pcs-print:hover {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot));
+  }
 }
 </style>

@@ -6,7 +6,7 @@
       v-for="(f, i) in list"
       :key="f.type + '-' + (f.id ?? i)"
       class="wfc-card"
-      :style="{ '--chip': `var(--blob-${feedChip(f.type)})` }"
+      :style="{ '--chip': `var(--blob-${feedChip(f.type)})`, '--i': i }"
       v-a11y-click
       @click="!editMode && open(f)"
     >
@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { feedCover, feedChip, feedIcon, feedPath, feedSummary, feedTypeLabel } from '@/utils/feed'
@@ -50,11 +50,7 @@ const open = (f) => {
 
 // 隐藏原生滚动条 + 滚轮映射横滑(见 utils/horizontalWheel,与记账本/麻将牌桌同款)
 const scrollEl = ref(null)
-let unbindWheel = null
-onMounted(() => {
-  unbindWheel = bindHorizontalWheel(scrollEl.value)
-})
-onBeforeUnmount(() => unbindWheel?.())
+watch(scrollEl, (el, _, onCleanup) => onCleanup(bindHorizontalWheel(el)))
 </script>
 
 <style scoped>
@@ -86,13 +82,6 @@ onBeforeUnmount(() => unbindWheel?.())
   border: 1px solid var(--color-border);
   scroll-snap-align: start;
   cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-.wfc-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
 }
 .wfc-cover {
   position: relative;
@@ -101,7 +90,7 @@ onBeforeUnmount(() => unbindWheel?.())
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: color-mix(in srgb, var(--chip) 22%, var(--color-card-2));
+  background: color-mix(in srgb, rgb(var(--chip)) 22%, var(--color-card-2));
 }
 .wfc-cover img {
   width: 100%;
@@ -130,7 +119,7 @@ onBeforeUnmount(() => unbindWheel?.())
   color: #fff;
   padding: 2px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--chip) 78%, #000);
+  background: color-mix(in srgb, rgb(var(--chip)) 78%, #000);
 }
 .wfc-body {
   display: flex;
@@ -158,5 +147,29 @@ onBeforeUnmount(() => unbindWheel?.())
 }
 .is-editing .wfc-card {
   cursor: grab;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wfc:not(.is-editing) .wfc-card {
+    animation: feed-arrive 330ms var(--ease-soft) backwards;
+    animation-delay: calc(min(var(--i, 0), 4) * 35ms);
+  }
+  .wfc-cover img,
+  .wfc-ic {
+    transition: transform 230ms var(--ease-soft);
+  }
+  @media (hover: hover) {
+    .wfc:not(.is-editing) .wfc-card:hover :is(img, .wfc-ic) {
+      transform: scale(1.05);
+    }
+  }
+  .wfc:not(.is-editing) .wfc-card:focus-visible :is(img, .wfc-ic) {
+    transform: scale(1.05);
+  }
+}
+@keyframes feed-arrive {
+  from {
+    opacity: 0.4;
+    transform: translateX(12px);
+  }
 }
 </style>
