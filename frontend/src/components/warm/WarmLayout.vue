@@ -2,12 +2,13 @@
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
   <div class="gc-root" :class="{ scrolled: scrolled }">
-    <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下);指针静止 1 分钟浮到最前,轻点/滑动即收起 -->
+    <!-- 全屏氛围底图层(最底,压在 SunLightLayer 之下):默认每日天气 AI 生图,也可换成用户自己的背景;
+         指针静止 1 分钟浮到最前,轻点/滑动即收起 -->
     <div
-      v-if="weatherBg"
+      v-if="bgLayer"
       class="gc-weatherbg"
       :class="{ revealed: bgRevealed }"
-      :style="{ backgroundImage: `url(${weatherBg})` }"
+      :style="{ backgroundImage: bgLayer.image, backgroundSize: bgLayer.size, '--bg-base-opacity': bgLayer.opacity }"
       @pointerdown="onRevealPointerDown"
       @pointermove="onRevealPointerMove"
       @click.stop.prevent="dismissBgReveal"
@@ -163,6 +164,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'
+import { initWarmBg, warmBgLayer, warmBgState } from '@/utils/warmBackground'
 import WarmHome from '@/components/warm/WarmHome.vue'
 import WarmModeToggle from '@/components/warm/WarmModeToggle.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
@@ -217,6 +219,11 @@ watch(
   { immediate: true },
 )
 
+// 背景来源:默认天气图,用户也可在「设置 → 外观与显示 → 暖居背景」换成内置氛围或自己的照片。
+// 本机偏好模块加载即生效;账号同步(换设备恢复)在 initWarmBg 里做一次。
+initWarmBg()
+const bgLayer = computed(() => warmBgLayer(warmBgState, { weatherUrl: weatherBg.value, isLoggedIn: userStore.isLoggedIn }))
+
 // 背景照片待机浮现:只有指针停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
 // 静止超过 1 分钟 → 背景浮到最前;移动/触摸 → 恢复原始状态。
 // 浮现中的图片自己接管点击(见模板 @click):这一下只用于把图片收回去,
@@ -246,7 +253,7 @@ const bgActivity = (x, y) => {
     bgIdleTimer = null
   }
   if (bgRevealed.value) bgRevealed.value = false
-  if (!weatherBg.value) return // 无背景图片时不触发
+  if (!bgLayer.value) return // 无背景图片时不触发
   if (!isBackgroundArea(x, y)) return // 不是背景板不触发
   bgIdleTimer = setTimeout(() => {
     bgIdleTimer = null
@@ -491,14 +498,14 @@ watch(
   color: var(--color-text);
 }
 
-/* 天气 AI 生图全屏底图(最底层,压在 SunLightLayer 之下) */
+/* 全屏氛围底图(最底层,压在 SunLightLayer 之下):基础浓度由用户设置(天气图固定 30%) */
 .gc-weatherbg {
   position: fixed;
   inset: 0;
   z-index: 0;
   background-size: cover;
   background-position: center;
-  opacity: 0.3;
+  opacity: var(--bg-base-opacity, 0.3);
   pointer-events: none;
   transition: opacity 1.2s ease;
 }

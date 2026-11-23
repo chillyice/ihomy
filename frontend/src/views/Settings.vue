@@ -38,9 +38,11 @@
             <div id="settings-daily"><DailySettings /></div>
             <div v-if="userStore.hasPerm('family:manage')" id="settings-weather"><WeatherSettings /></div>
           </template>
-          <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
+          <!-- 外观与显示:光照/主题 + 暖居背景(仅暖居桌面外壳)+ 显示模式 + 每日早安 + 屏保(仅手机端) -->
           <template v-else-if="panel.id === 'appearance'">
             <div id="settings-light"><LightSettings /></div>
+            <!-- 背景作用于桌面暖居外壳(WarmLayout),手机端走 MobileLayout 看不到效果,故不在手机设置里露出 -->
+            <div v-if="themeStore.theme === 'warm' && !isMobile" id="settings-warmbg"><WarmBackgroundSettings /></div>
             <WindowDeskSettings v-if="activeId === 'appearance'" :show-objects="isTablet || (isWide && !isMobile)" />
             <div id="settings-display"><ModeSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
@@ -71,6 +73,7 @@ import DailySettings from './settings/DailySettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
+import WarmBackgroundSettings from './settings/WarmBackgroundSettings.vue'
 import WindowDeskSettings from './settings/WindowDeskSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
 import MorningSettings from './settings/MorningSettings.vue'

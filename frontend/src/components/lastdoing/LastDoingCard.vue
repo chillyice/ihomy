@@ -4,7 +4,7 @@
   相对时间每分钟刷新一次(模板里不读 Date.now 做 computed)。
 -->
 <template>
-  <section v-if="rows.length" class="last-doing" :class="`is-${variant}`" :aria-label="t('lastDoing.title')">
+  <section v-if="rows.length" class="last-doing" :class="[`is-${variant}`, { 'is-compact': compact }]" :aria-label="t('lastDoing.title')">
     <template v-if="compact">
       <el-tooltip :content="rows[0]?.title" placement="right">
         <button type="button" class="ld-compact" :aria-label="t('lastDoing.title')" @click="go(rows[0])">
@@ -14,7 +14,7 @@
     </template>
     <template v-else>
       <div v-if="!warmMobile" class="ld-head paper-heading">
-        <span class="ld-head-title">{{ $t('lastDoing.title') }}</span>
+        <span class="ld-head-title" :title="variant === 'dock' ? $t('lastDoing.hint') : undefined">{{ $t('lastDoing.title') }}</span>
         <button
           v-if="variant === 'float'"
           type="button"
@@ -35,7 +35,6 @@
         </span>
         <el-icon v-if="warmMobile || variant === 'mobile'" class="ld-arrow"><ArrowRight /></el-icon>
       </button>
-      <p v-if="variant === 'dock'" class="ld-hint">{{ $t('lastDoing.hint') }}</p>
     </template>
   </section>
 </template>
@@ -71,7 +70,7 @@ onMounted(() => {
 onBeforeUnmount(() => clearInterval(timer))
 
 const ICONS = { BOOK: Reading, CINEMA: VideoPlay, BLOG: EditPen, DIARY: Notebook }
-const MAX_ROWS = { 'warm-mobile': 1, mobile: 1, dock: 3, float: 2 }
+const MAX_ROWS = { 'warm-mobile': 1, mobile: 1, dock: 2, float: 1 }
 
 const warmMobile = computed(() => props.variant === 'warm-mobile')
 const rows = computed(() => visibleDoing(items.value, now.value).slice(0, MAX_ROWS[props.variant] ?? 1))
@@ -147,48 +146,49 @@ const go = (it) => {
   outline-offset: 1px;
 }
 
-/* ===== 桌面侧栏:停靠卡片(面积约为浮卡的三倍) ===== */
+/* ===== 桌面侧栏：高度随记录条数变化 ===== */
 .is-dock {
   display: flex;
   flex-direction: column;
-  min-height: 300px;
-  margin: 10px 10px 6px;
-  padding: 12px 12px 10px;
+  flex: none;
+  margin: 6px 10px;
+  padding: 5px 8px;
   border-radius: 14px;
   border: 1px solid var(--color-line);
   background: rgba(var(--color-brand-rgb), 0.06);
 }
+.is-dock .ld-head {
+  padding-bottom: 2px;
+}
 .is-dock .ld-row {
-  padding: 10px 8px;
+  padding: 3px 4px;
   border-radius: 10px;
+  line-height: 1.25;
 }
 .is-dock .ld-row:hover {
   background: var(--color-line);
 }
 .is-dock .ld-title {
-  font-size: 14px;
+  font-size: 13px;
 }
 .is-dock .ld-meta {
-  font-size: 12px;
-}
-.ld-hint {
-  margin: auto 2px 2px;
-  padding-top: 10px;
   font-size: 11.5px;
-  line-height: 1.65;
-  color: var(--color-text-secondary);
+}
+.is-dock.is-compact {
+  margin: 4px auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 /* ===== 平板/窄屏:贴边浮卡 ===== */
 .is-float {
   width: 100%;
-  height: 100%;
-  padding: 8px 8px 6px;
+  padding: 3px 8px;
   border-radius: 14px;
   border: 1px solid var(--color-border);
   background: var(--color-card);
   box-shadow: var(--shadow-hover);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -196,8 +196,9 @@ const go = (it) => {
   padding: 0 2px 2px;
 }
 .is-float .ld-row {
-  padding: 4px 2px;
-  min-height: 0;
+  min-height: 32px;
+  padding: 2px;
+  line-height: 1.2;
 }
 
 .ld-head {
@@ -282,7 +283,7 @@ const go = (it) => {
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin: 8px auto 4px;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--color-line);
   border-radius: 12px;

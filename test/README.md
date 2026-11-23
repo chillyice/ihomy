@@ -37,6 +37,17 @@ test/
 
 ## 快速导航
 
+- **日常调试**：每改完一个功能点，运行下表中覆盖该行为的用例。跨前后端的改动分别选取两端用例。下一处改动重新选取，避免把工作区其他人的改动也算进来。
+
+| 改动范围 | 执行方式 |
+|---|---|
+| 前端单一功能 | 在 `frontend` 运行 `npm test -- src/utils/scheduleType.spec.js`。同一功能涉及多个 spec 时，把所需路径列在同一条命令中。 |
+| 前端共享逻辑 | 在 `frontend` 运行 `npx vitest related --run src/utils/scheduleType.js`，由静态导入关系选取测试。涉及 Vue 模板、动态加载或扫描文件的守门检查时，按改动显式指定对应 spec。 |
+| 后端 | 在 `backend` 运行 `.\mvnw.cmd -B "-Dtest=RepeatScheduleTest" test`。逗号分隔多个相关类，`类名#方法名` 可限定单个方法。 |
+| 接口或页面交互 | 从 `automation/README.md` 选对应的接口脚本，或在 [功能测试用例](cases/功能测试用例.md) 中选对应场景编号。 |
+
+零匹配时，按被改函数或行为查找调用方测试。仍无自动化覆盖就执行对应手工场景，记录实际执行的用例和结果。
+
 - **要跑全站用例**:看 `cases/功能测试用例.md`——§0.1 测试环境与账号矩阵 → §1~33 各域用例 → §34 风险点与易漏点 → 附录 A 统计。
 - **要跑登录冒烟**:`automation/smoke_login.py`(用法见 `automation/README.md`)。
 - **要执行脑图 GUI 回归**:对照 `cases/功能测试用例.md` §32 的 MM-101~133,证据截图规范见 `ui-automation/README.md`。

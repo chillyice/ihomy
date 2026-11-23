@@ -4,7 +4,14 @@
   LightSettings 的「恢复面板布局」会一并清掉。
 -->
 <template>
-  <div v-if="hasItems" class="last-doing-float" :class="{ 'is-collapsed': collapsed }" :style="boxStyle" @pointerdown="onWrapperDown">
+  <div
+    v-if="hasItems"
+    ref="box"
+    class="last-doing-float"
+    :class="{ 'is-collapsed': collapsed }"
+    :style="boxStyle"
+    @pointerdown="onWrapperDown"
+  >
     <button
       v-if="collapsed"
       type="button"
@@ -22,15 +29,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Reading } from '@element-plus/icons-vue'
 import LastDoingCard from './LastDoingCard.vue'
 import { useDragResize } from '@/utils/useDragResize'
 import { useLastDoing, visibleDoing } from '@/utils/lastDoing'
 
 const COLLAPSE_KEY = 'ihomy:last-doing:float:collapsed'
-const FLOAT_W = 168
-const FLOAT_H = 118
+const TAB_SIZE = 40
 
 const readCollapsed = () => {
   try {
@@ -43,11 +49,12 @@ const readCollapsed = () => {
 const collapsed = ref(readCollapsed())
 const viewportHeight = typeof window === 'undefined' ? 800 : window.innerHeight || 800
 
-const { pos, size, zIndex, dragging, onDragStart } = useDragResize({
+const box = ref(null)
+const { pos, size, zIndex, dragging, onDragStart, clampToViewport } = useDragResize({
   x: 10,
   y: Math.max(12, Math.round(viewportHeight * 0.3)),
-  w: FLOAT_W,
-  h: FLOAT_H,
+  w: TAB_SIZE,
+  h: TAB_SIZE,
   storageKey: 'ihomy:last-doing:float:v1',
   anchorRight: true,
   minY: 8,
@@ -56,8 +63,6 @@ const { pos, size, zIndex, dragging, onDragStart } = useDragResize({
 const boxStyle = computed(() => ({
   right: `${pos.value.x}px`,
   top: `${pos.value.y}px`,
-  width: `${collapsed.value ? 40 : size.value.w}px`,
-  height: `${collapsed.value ? 40 : size.value.h}px`,
   zIndex: zIndex.value,
 }))
 
@@ -77,6 +82,27 @@ onMounted(() => {
 })
 onBeforeUnmount(() => clearInterval(timer))
 const hasItems = computed(() => visibleDoing(items.value, now.value).length > 0)
+
+// 卡片按内容排版，拖动边界跟随实际外框，覆盖旧版本缓存的固定高度。
+watch(
+  box,
+  (el, _, onCleanup) => {
+    if (!el) return
+    const measure = () => {
+      size.value = { w: el.offsetWidth, h: el.offsetHeight }
+      clampToViewport()
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      onCleanup(watch([collapsed, items, now], measure, { flush: 'post' }))
+      return
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    onCleanup(() => observer.disconnect())
+  },
+  { flush: 'post' },
+)
 
 const persistCollapsed = (on) => {
   collapsed.value = on
@@ -104,10 +130,12 @@ const onTabClick = (e) => {
 .last-doing-float {
   position: fixed;
   box-sizing: border-box;
+  width: 168px;
+  max-width: 100vw;
   touch-action: none;
 }
 .last-doing-float.is-collapsed {
-  touch-action: none;
+  width: 40px;
 }
 .ld-tab {
   display: flex;

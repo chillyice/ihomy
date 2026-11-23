@@ -2,6 +2,8 @@ package com.ihomy.common;
 
 import cn.hutool.core.date.ChineseDate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.LocalDate;
 
@@ -18,24 +20,14 @@ class AnniversaryDateTest {
         return LocalDate.of(cd.getGregorianYear(), cd.getGregorianMonth() + 1, cd.getGregorianDay());
     }
 
-    @Test
-    void solarKeepsThisYearWhenNotYetPassed() {
-        LocalDate today = LocalDate.of(2026, 5, 19);
-        assertThat(AnniversaryDate.nextOccurrence("solar", 5, 20, 0, today))
-                .isEqualTo(LocalDate.of(2026, 5, 20));
-    }
-
-    @Test
-    void solarRollsToNextYearOncePassed() {
-        LocalDate today = LocalDate.of(2026, 5, 21);
-        assertThat(AnniversaryDate.nextOccurrence("solar", 5, 20, 0, today))
-                .isEqualTo(LocalDate.of(2027, 5, 20));
-    }
-
-    @Test
-    void solarTodayCountsAsToday() {
-        LocalDate today = LocalDate.of(2026, 10, 30);
-        assertThat(AnniversaryDate.nextOccurrence("solar", 10, 30, 0, today)).isEqualTo(today);
+    @ParameterizedTest
+    @CsvSource({
+            "5, 20, 2026-05-19, 2026-05-20",
+            "10, 30, 2026-10-30, 2026-10-30",
+            "5, 20, 2026-05-21, 2027-05-20"
+    })
+    void solarPicksFirstOccurrenceOnOrAfterToday(int month, int day, LocalDate today, LocalDate expected) {
+        assertThat(AnniversaryDate.nextOccurrence("solar", month, day, 0, today)).isEqualTo(expected);
     }
 
     @Test
@@ -52,18 +44,11 @@ class AnniversaryDateTest {
         assertThat(AnniversaryDate.nextOccurrence("lunar", 8, null, 0, today)).isNull();
     }
 
-    @Test
-    void lunarPicksThisLunarYearWhenNotYetPassed() {
-        LocalDate expected = solarOfLunar(2026, 8, 15, false);
-        assertThat(AnniversaryDate.nextOccurrence("lunar", 8, 15, 0, LocalDate.of(2026, 1, 1)))
-                .isEqualTo(expected);
-    }
-
-    @Test
-    void lunarRollsToNextLunarYearWhenPassed() {
-        LocalDate expected = solarOfLunar(2027, 8, 15, false);
-        assertThat(AnniversaryDate.nextOccurrence("lunar", 8, 15, 0, LocalDate.of(2027, 1, 1)))
-                .isEqualTo(expected);
+    @ParameterizedTest
+    @CsvSource({"2026-01-01, 2026", "2027-01-01, 2027"})
+    void lunarPicksUpcomingMidAutumnFestival(LocalDate today, int expectedLunarYear) {
+        assertThat(AnniversaryDate.nextOccurrence("lunar", 8, 15, 0, today))
+                .isEqualTo(solarOfLunar(expectedLunarYear, 8, 15, false));
     }
 
     @Test

@@ -94,6 +94,8 @@ wallpaper-engine/           Wallpaper Engine 网页壁纸壳页(机制见该目�
 
 ## 构建与验证
 
+**日常调试**：每改完一部分，只运行本次功能及受影响调用方的用例。前端指定 spec，后端指定测试类或方法，手工按用例号选取；未命中时补查覆盖并说明验证范围。命令见 `test/README.md`。全量回归用于 CI 或明确要求跑全量时。
+
 ```powershell
 cd backend;  .\mvnw.cmd -B clean package      # 编译+测试+打 jar → target/ihomy-backend.jar
 cd backend;  .\mvnw.cmd -B clean package -DskipTests   # 只求编译

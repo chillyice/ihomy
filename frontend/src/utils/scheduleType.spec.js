@@ -3,32 +3,16 @@ import { classify, matchFilter, typeOfKind, TYPE_FILTERS, REPEAT, REMIND } from 
 
 // 计划 §3 的七行判定表,逐行锁定
 describe('classify 七行判定', () => {
-  it('无日期 → 计划(PLAN)', () => {
-    expect(classify({ hasDate: false, repeat: 'NONE', remind: 'NONE' })).toBe('PLAN')
-  })
-
-  it('有日期 + 不循环 + 无提醒 → 事项(ITEM)', () => {
-    expect(classify({ hasDate: true, repeat: 'NONE', remind: 'NONE' })).toBe('ITEM')
-  })
-
-  it('有日期 + 不循环 + 当天提醒 → 提醒(REMINDER)', () => {
-    expect(classify({ hasDate: true, repeat: 'NONE', remind: 'ON_TIME' })).toBe('REMINDER')
-  })
-
-  it('有日期 + 每年循环 + 无提醒 → 纪念日(ANNIVERSARY)', () => {
-    expect(classify({ hasDate: true, repeat: REPEAT.YEARLY, remind: REMIND.NONE })).toBe('ANNIVERSARY')
-  })
-
-  it('有日期 + 每年循环 + 提前提醒 → 纪念日(ANNIVERSARY)', () => {
-    expect(classify({ hasDate: true, repeat: REPEAT.YEARLY, remind: REMIND.ADVANCE })).toBe('ANNIVERSARY')
-  })
-
-  it('有日期 + 每年循环 + 当天提醒 → 每日任务(TASK)', () => {
-    expect(classify({ hasDate: true, repeat: REPEAT.YEARLY, remind: REMIND.ON_TIME })).toBe('TASK')
-  })
-
-  it('有日期 + 每天循环 + 当天提醒 → 每日任务(TASK)', () => {
-    expect(classify({ hasDate: true, repeat: REPEAT.DAILY, remind: REMIND.ON_TIME })).toBe('TASK')
+  it.each([
+    [false, 'NONE', 'NONE', 'PLAN'],
+    [true, 'NONE', 'NONE', 'ITEM'],
+    [true, 'NONE', 'ON_TIME', 'REMINDER'],
+    [true, REPEAT.YEARLY, REMIND.NONE, 'ANNIVERSARY'],
+    [true, REPEAT.YEARLY, REMIND.ADVANCE, 'ANNIVERSARY'],
+    [true, REPEAT.YEARLY, REMIND.ON_TIME, 'TASK'],
+    [true, REPEAT.DAILY, REMIND.ON_TIME, 'TASK'],
+  ])('有日期=%s，循环=%s，提醒=%s → %s', (hasDate, repeat, remind, expected) => {
+    expect(classify({ hasDate, repeat, remind })).toBe(expected)
   })
 })
 

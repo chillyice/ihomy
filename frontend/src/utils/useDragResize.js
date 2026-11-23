@@ -248,5 +248,5 @@ export function useDragResize(initial) {
   const cancelPendingDrag = () => {
     if (!dragging.value && !resizing.value) stopListening()
   }
-  return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, cancelPendingDrag, reset }
+  return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, cancelPendingDrag, clampToViewport, reset }
 }
