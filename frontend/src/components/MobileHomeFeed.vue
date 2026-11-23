@@ -1,23 +1,25 @@
 <template>
-  <div ref="root" class="mobile-home">
+  <div ref="root" class="mobile-home" :class="{ 'warm-feed': isWarm }">
     <!-- 分享落地:被分享家庭的封面门脸(自己家不挂) -->
     <div v-if="showDoorSign" class="m-door-sign">
       <FamilyCoverBanner :family="appStore.family" />
     </div>
-    <!-- 上次在做:最近续读/续看/续写的内容(没有记录时整块不渲染) -->
-    <LastDoingCard variant="mobile" />
+    <LastDoingCard v-if="userStore.isLoggedIn && !isChild" :key="userStore.userInfo?.id" :variant="isWarm ? 'warm-mobile' : 'mobile'" />
+    <h2 v-if="isWarm" class="feed-heading">{{ $t('home.familyFeed') }}</h2>
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
-      <div class="filter-scroll">
-        <span
+      <div v-horizontal-wheel class="filter-scroll">
+        <button
           v-for="f in filters"
           :key="f.key"
           class="filter-chip"
           :class="{ active: activeFilter === f.key }"
-          v-a11y-click
+          type="button"
+          :aria-pressed="activeFilter === f.key"
           @click="activeFilter = f.key"
-          >{{ f.label }}</span
         >
+          {{ f.label }}
+        </button>
       </div>
     </div>
 
@@ -89,12 +91,15 @@ import { feedPath, feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryO
 import { formatRelativeTime } from '@/utils/datetime'
 import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
 const themeStore = useThemeStore()
+const isWarm = computed(() => themeStore.theme === 'warm')
+const { isChild } = useDisplayMode()
 const vHorizontalWheel = {
   mounted(el) {
     el.unbindWheel = bindHorizontalWheel(el)
@@ -200,6 +205,8 @@ html.dark .filter-bar {
 }
 
 .filter-chip {
+  border: 0;
+  font: inherit;
   flex-shrink: 0;
   position: relative;
   padding: 4px 0;
@@ -249,6 +256,38 @@ html.dark .filter-chip::after {
 
 .feed-list {
   padding: 12px 16px 80px;
+}
+.warm-feed {
+  display: flow-root;
+  padding-top: var(--safe-area-inset-top);
+}
+.feed-heading {
+  margin: 18px 16px 8px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+.warm-feed .filter-bar {
+  top: var(--safe-area-inset-top);
+}
+.warm-feed .filter-scroll {
+  gap: 8px;
+  padding: 0 16px;
+  mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+}
+.warm-feed .filter-chip {
+  min-width: 44px;
+  min-height: 44px;
+}
+.warm-feed .filter-chip::after {
+  bottom: 4px;
+}
+.warm-feed .filter-chip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -3px;
+}
+.warm-feed .feed-list {
+  padding-bottom: 12px;
 }
 .feed-retry {
   display: flex;

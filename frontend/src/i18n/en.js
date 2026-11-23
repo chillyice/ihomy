@@ -6599,6 +6599,7 @@ export default {
   },
   lastDoing: {
     title: 'Last activity',
+    empty: 'Find books you’ve read, films you’ve watched, and blog posts or diary entries you’ve saved here.',
     book: 'Book',
     cinema: 'Cinema',
     blog: 'Blog',

@@ -20,7 +20,7 @@ const REPEAT_GUARD_MS = 1000
 export const DOING_KINDS = ['BOOK', 'CINEMA', 'BLOG', 'DIARY']
 
 const doingItems = ref([])
-let loadedUid = null
+let activeSession = null
 const lastRecordAt = new Map()
 
 function currentUid() {
@@ -165,6 +165,7 @@ function persist() {
 export function recordDoing(entry) {
   const uid = currentUid()
   if (!uid) return
+  if (activeSession?.uid !== uid) initLastDoing()
   const now = Date.now()
   const normalized = normalizeDoingEntry({ ...entry, at: entry?.at ?? now })
   if (!normalized) return
@@ -182,17 +183,19 @@ export function recordDoing(entry) {
 export async function initLastDoing() {
   const uid = currentUid()
   if (!uid) {
-    doingItems.value = []
-    loadedUid = null
+    resetLastDoing()
     return
   }
-  if (loadedUid === uid) return
-  loadedUid = uid
-  const local = parseDoingStore(readPref(LAST_DOING_LOCAL_KEY), uid)
-  doingItems.value = local
+  if (activeSession?.uid === uid) return
+  const session = { uid }
+  activeSession = session
+  lastRecordAt.clear()
+  doingItems.value = parseDoingStore(readPref(LAST_DOING_LOCAL_KEY), uid)
   const map = await readRemotePrefMap()
-  if (!map) return
+  // 同一账号退出再登录也是新会话，旧响应不能回填或触发上传。
+  if (!map || activeSession !== session || currentUid() !== uid) return
   const remote = parseDoingStore(map[LAST_DOING_PREF_KEY], uid)
+  const local = doingItems.value
   if (!remote.length) {
     if (local.length) persist()
     return
@@ -208,7 +211,7 @@ export async function initLastDoing() {
 /** 退出登录 / 切换账号:清内存态(本机缓存按 uid 校验,不主动删) */
 export function resetLastDoing() {
   doingItems.value = []
-  loadedUid = null
+  activeSession = null
   lastRecordAt.clear()
 }
 

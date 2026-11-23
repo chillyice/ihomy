@@ -6536,6 +6536,7 @@ export default {
   },
   lastDoing: {
     title: '上次在做',
+    empty: '读过的书、看过的影片，以及保存过的博客和日记，会出现在这里。',
     book: '电子书',
     cinema: '放映厅',
     blog: '博客',

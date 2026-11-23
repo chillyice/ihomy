@@ -1,17 +1,23 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 
-// 这里只验证纯函数;同步层(userPref → api/request → router)在 Node 环境没有 window,打桩掉
-vi.mock('@/api', () => ({ userPrefApi: { all: vi.fn(), save: vi.fn() } }))
-vi.mock('@/stores/user', () => ({ useUserStore: () => ({ isLoggedIn: false, userInfo: null }) }))
+vi.mock('@/utils/userPref', () => ({ readPref: vi.fn(), readRemotePrefMap: vi.fn(), writePref: vi.fn() }))
+let user
+vi.mock('@/stores/user', () => ({ useUserStore: () => user }))
+import { readRemotePrefMap, writePref } from '@/utils/userPref'
 
 import {
   MAX_DOING_ITEMS,
+  LAST_DOING_PREF_KEY,
   buildDoingPath,
+  initLastDoing,
   lastDoingMode,
   mergeDoing,
   normalizeDoingEntry,
   parseDoingStore,
+  recordDoing,
+  resetLastDoing,
   serializeDoingStore,
+  useLastDoing,
   visibleDoing,
 } from './lastDoing'
 
@@ -19,6 +25,55 @@ const NOW = Date.UTC(2026, 10, 23, 8, 0, 0)
 const HOUR = 60 * 60 * 1000
 
 const book = { kind: 'BOOK', id: 12, title: '雪国', at: NOW, progress: 42 }
+
+describe('initLastDoing', () => {
+  const remoteHistory = (uid, entries) => ({ [LAST_DOING_PREF_KEY]: serializeDoingStore(entries, uid) })
+
+  beforeEach(() => {
+    resetLastDoing()
+    vi.resetAllMocks()
+    user = { isLoggedIn: true, userInfo: { id: 7 } }
+  })
+
+  it('退出后忽略未完成的请求', async () => {
+    const request = Promise.withResolvers()
+    readRemotePrefMap.mockReturnValueOnce(request.promise)
+    const loading = initLastDoing()
+    user = { isLoggedIn: false, userInfo: null }
+    resetLastDoing()
+    request.resolve(remoteHistory(7, [book]))
+    await loading
+    expect(useLastDoing().items.value).toEqual([])
+    expect(writePref).not.toHaveBeenCalled()
+  })
+
+  it.each([7, 8])('重新登录账号 %i 后忽略上次登录的响应', async (uid) => {
+    const request = Promise.withResolvers()
+    readRemotePrefMap.mockReturnValueOnce(request.promise)
+    const loading = initLastDoing()
+    resetLastDoing()
+    user.userInfo.id = uid
+    const current = { ...book, id: 24 }
+    readRemotePrefMap.mockResolvedValueOnce(remoteHistory(uid, [current]))
+    await initLastDoing()
+    request.resolve(remoteHistory(7, [book]))
+    await loading
+    expect(useLastDoing().items.value).toEqual([current])
+    expect(writePref).not.toHaveBeenCalled()
+  })
+
+  it('合并等待远端响应期间刚发生的续做', async () => {
+    const request = Promise.withResolvers()
+    readRemotePrefMap.mockReturnValueOnce(request.promise)
+    const loading = initLastDoing()
+    const current = { ...book, id: 24, at: NOW + HOUR }
+    recordDoing(current)
+    request.resolve(remoteHistory(7, [book]))
+    await loading
+    expect(useLastDoing().items.value).toEqual([current, book])
+    expect(parseDoingStore(writePref.mock.lastCall[2], 7)).toEqual([current, book])
+  })
+})
 
 describe('normalizeDoingEntry', () => {
   it('大写 kind 并夹紧进度', () => {
