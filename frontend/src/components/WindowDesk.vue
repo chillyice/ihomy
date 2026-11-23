@@ -1,12 +1,6 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="placements.length || pawTrail.length"
-      class="window-desk"
-      data-desk-layer
-      :inert="modalOpen"
-      :aria-hidden="modalOpen || undefined"
-    >
+    <div v-if="placements.length" class="window-desk" data-desk-layer :inert="modalOpen" :aria-hidden="modalOpen || undefined">
       <router-link
         v-for="{ item, x, y, size, cropWidth, angle, edge } in placements"
         :key="item.key"
@@ -43,15 +37,6 @@
         </span>
         <span class="desk-hint" aria-hidden="true">{{ t(item.labelKey, item.labelParams || {}) }}</span>
       </router-link>
-      <span
-        v-for="(step, index) in pawTrail"
-        :key="index"
-        class="desk-paw"
-        aria-hidden="true"
-        :style="{ left: step.x + 'px', top: step.y + 'px', rotate: step.angle + 'deg', animationDelay: step.delay + 's' }"
-      >
-        <i></i><i></i><i></i><i></i>
-      </span>
     </div>
   </Teleport>
 </template>
@@ -65,7 +50,6 @@ import { useDeskSpace } from '@/composables/useDeskSpace'
 const props = defineProps({
   destinations: { type: Object, default: () => ({}) },
   arrangement: { type: Number, default: 0 },
-  tracksOnly: { type: Boolean, default: false },
 })
 const { t } = useI18n()
 const artFiles = import.meta.glob('../assets/windowdesk/*.webp', { eager: true, import: 'default', query: '?url&no-inline' })
@@ -82,15 +66,9 @@ const hideMissingImage = (item) => {
   missingImages.value = new Set(missingImages.value).add(imageOf(item))
 }
 const arrangement = () => props.arrangement
-const { candidates } = useDeskObjects(
-  () => !props.tracksOnly,
-  () => props.destinations,
-  arrangement,
-)
-const drawable = computed(() =>
-  props.tracksOnly ? [] : candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))),
-)
-const { placements, pawTrail, modalOpen } = useDeskSpace(drawable, arrangement)
+const { candidates } = useDeskObjects(true, () => props.destinations, arrangement)
+const drawable = computed(() => candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))))
+const { placements, modalOpen } = useDeskSpace(drawable, arrangement)
 
 // 原画有透明留白。按正放和倾斜 30° 时颜料的水平半宽（画布百分比）取景，
 // 让朝向正文的一边保留物件本身的轮廓。叶片和杯子按实际选中的插画区分。
@@ -313,69 +291,8 @@ html.dark .desk-illustration {
     transform: translate(22%, -58%) scaleY(1.1);
   }
 }
-.desk-paw {
-  position: absolute;
-  width: 16px;
-  height: 17px;
-  translate: -50% -50%;
-  color: var(--color-text-secondary);
-  opacity: 0;
-  animation: paw-step 3.8s ease-in-out both;
-}
-html:is(.kada-page, .bitpouch-page) .desk-paw {
-  color: light-dark(#6d604d, #c2b9a2);
-}
-.desk-paw::after,
-.desk-paw i {
-  position: absolute;
-  background: currentColor;
-}
-.desk-paw::after {
-  content: '';
-  left: 21%;
-  bottom: 2%;
-  width: 61%;
-  height: 48%;
-  border-radius: 58% 58% 41% 41%;
-}
-.desk-paw i {
-  width: 21%;
-  height: 31%;
-  border-radius: 50%;
-}
-.desk-paw i:nth-child(1) {
-  left: 0;
-  top: 25%;
-  rotate: -26deg;
-}
-.desk-paw i:nth-child(2) {
-  left: 24%;
-  top: 3%;
-  rotate: -10deg;
-}
-.desk-paw i:nth-child(3) {
-  right: 24%;
-  top: 3%;
-  rotate: 10deg;
-}
-.desk-paw i:nth-child(4) {
-  right: 0;
-  top: 25%;
-  rotate: 26deg;
-}
-@keyframes paw-step {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  16%,
-  51% {
-    opacity: 0.48;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .desk-steam,
-  .desk-paw {
+  .desk-steam {
     display: none;
   }
   .desk-illustration,

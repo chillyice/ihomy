@@ -41,7 +41,7 @@
           <!-- 外观与显示:光照/主题 + 显示模式 + 每日早安 + 屏保(仅手机端) -->
           <template v-else-if="panel.id === 'appearance'">
             <div id="settings-light"><LightSettings /></div>
-            <WindowDeskSettings v-if="(!isMobile || isTablet) && activeId === 'appearance'" />
+            <WindowDeskSettings v-if="activeId === 'appearance'" :show-objects="isTablet || (isWide && !isMobile)" />
             <div id="settings-display"><ModeSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
             <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
@@ -84,7 +84,7 @@ const userStore = useUserStore()
 const themeStore = useThemeStore()
 const route = useRoute()
 const router = useRouter()
-const { isMobile, isTablet } = useDevice()
+const { isMobile, isTablet, isWide } = useDevice()
 
 // 大类清单:移动端列表与桌面侧栏共用这一份;perm/nativeOnly 决定可见性
 // perm 与后端 @RequirePermission 同码:面板对无权角色隐藏,挂载也一并跳过(防隐形面板发请求吃 403)

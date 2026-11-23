@@ -1,6 +1,6 @@
 import { onMounted, onBeforeUnmount, shallowRef, toValue, watch } from 'vue'
 import { useDevice } from './useDevice'
-import { deskLanes, pawTrailFits, placeDeskItems, placePawTrail, sampleDeskPlan } from '@/utils/deskSpace'
+import { DESK_FLOATS, deskLanes, placeDeskItems, sampleDeskPlan } from '@/utils/deskSpace'
 
 const CENTER =
   '.gc-studio,.app-main > .page,.window-content :is(.mobile-tab-content,.mobile-sub-content) > .page,.elder-home,.login-card,.kada > .kwrap,.bp > .bpwrap'
@@ -23,34 +23,8 @@ const BUSY = [
   '.gc-drag-ghost',
 ].join(',')
 const EDITHOST = '.gc-home,.home-page,.gc-weatherbg'
-const FLOATS = [
-  '.gc-topbar',
-  '.window-top',
-  '.mobile-header',
-  '.mobile-tabbar',
-  '.site-footer',
-  '.back-to-top',
-  '.install-prompt',
-  '.web-update',
-  '.child-lock',
-  '.music-player',
-  '.music-player .playlist',
-  '.window-player',
-  '.window-queue',
-  '.chat-float-ball',
-  '.chat-float-panel',
-  '.chat-float-bubble',
-  '.last-doing-float',
-  '.call-mini',
-  '.light-test-console',
-  '.daily-add-fab',
-  '.home-page .door-sign',
-  '.el-popper',
-].join(',')
-const LANDMARKS = [CENTER, NAV, BOARD, CARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, FLOATS, '.gc-side'].join(',')
-const cooldown = 10 * 60_000
-let visitPlan,
-  lastPawAt = 0
+const LANDMARKS = [CENTER, NAV, BOARD, CARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, DESK_FLOATS, '.gc-side'].join(',')
+let visitPlan
 
 function visibleRect(node) {
   const rect = node.getBoundingClientRect()
@@ -78,26 +52,18 @@ function samePlacements(left, right) {
 // 只在整页结构发生变化时收集边界元素。滚动、尺寸和浮窗的拖动复用已收集的元素。
 export function useDeskSpace(items, arrangement) {
   const placements = shallowRef([])
-  const pawTrail = shallowRef([])
   const { isTablet } = useDevice()
   const modalOpen = shallowRef(false)
   let running = false,
     refresh = true,
     frame = 0
-  let nodes, scene, resize, attributes, tree, reduced
+  let nodes, resize, attributes, tree
   let controlObserver
   let controls = new Set()
   const visibleControls = new Set()
-  let catTimer, fadeTimer
   visitPlan ??= sampleDeskPlan()
 
-  function clearTrail() {
-    clearTimeout(fadeTimer)
-    if (pawTrail.value.length) pawTrail.value = []
-  }
   function clearScene() {
-    scene = null
-    clearTrail()
     if (placements.value.length) placements.value = []
   }
   function collect() {
@@ -114,7 +80,7 @@ export function useDeskSpace(items, arrangement) {
       modals: matching(MODAL),
       busy: matching(BUSY),
       editHosts: matching(EDITHOST),
-      floats: matching(FLOATS),
+      floats: matching(DESK_FLOATS),
     }
     if (controlObserver) {
       const current = new Set([...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],' + MODAL)))
@@ -163,8 +129,6 @@ export function useDeskSpace(items, arrangement) {
     const lanes = deskLanes(width, height, navRight, center)
     const cards = nodes.cards.map(visibleRect).filter(Boolean)
     const objectObstacles = nodes.floats.concat(nodes.rails).map(visibleRect).filter(Boolean)
-    const obstacles = objectObstacles.concat(cards)
-    scene = { lanes, obstacles }
     for (const node of visibleControls) {
       const rect = node.getBoundingClientRect()
       // 大卡片由正文边界限制露出量，独立按钮和输入区保留完整点击面。
@@ -176,7 +140,6 @@ export function useDeskSpace(items, arrangement) {
     const objectLanes = board && !center ? deskLanes(width, height, navRight, null, width) : lanes
     const next = placeDeskItems(toValue(items), visitPlan, objectLanes, objectObstacles, cards)
     if (!samePlacements(placements.value, next)) placements.value = next
-    if (pawTrail.value.length && !pawTrailFits(pawTrail.value, next, lanes, obstacles)) clearTrail()
   }
   function schedule() {
     if (running && !document.hidden && !frame) frame = requestAnimationFrame(measure)
@@ -197,33 +160,9 @@ export function useDeskSpace(items, arrangement) {
       }
     }
   }
-  function armCats() {
-    clearTimeout(catTimer)
-    if (!running || document.hidden || reduced.matches) return
-    // 首轮也先留出安静时间。后台回到前台从新的一轮等待开始。
-    const wait = Math.max(0, lastPawAt + cooldown - Date.now()) + (2 + 3 * Math.random()) * 60_000
-    catTimer = setTimeout(() => {
-      if (!document.hidden && !modalOpen.value && !reduced.matches && scene && Math.random() < 0.6) {
-        const trail = placePawTrail(placements.value, scene.lanes, scene.obstacles)
-        if (trail.length) {
-          pawTrail.value = trail
-          lastPawAt = Date.now()
-          try {
-            sessionStorage.setItem('ihomy:desk:last-paw', String(lastPawAt))
-          } catch {
-            /* 无存储时仍有内存冷却 */
-          }
-          fadeTimer = setTimeout(clearTrail, 4800)
-        }
-      }
-      armCats()
-    }, wait)
-  }
-  function onConditions() {
-    clearTrail()
+  function onVisibilityChange() {
     if (document.hidden) clearScene()
     else schedule()
-    armCats()
   }
   function start() {
     running = true
@@ -239,14 +178,12 @@ export function useDeskSpace(items, arrangement) {
     attributes = new MutationObserver(schedule)
     tree = new MutationObserver(onTreeChange)
     tree.observe(document.body, { childList: true, subtree: true })
-    reduced.addEventListener('change', onConditions)
     window.addEventListener('resize', schedule)
     document.addEventListener('scroll', schedule, { capture: true, passive: true })
     document.addEventListener('transitionend', onTransition)
     document.addEventListener('fullscreenchange', schedule)
-    document.addEventListener('visibilitychange', onConditions)
+    document.addEventListener('visibilitychange', onVisibilityChange)
     schedule()
-    armCats()
   }
   function onTransition(event) {
     if (event.target.matches?.(LANDMARKS)) schedule()
@@ -260,15 +197,13 @@ export function useDeskSpace(items, arrangement) {
     visibleControls.clear()
     attributes.disconnect()
     tree.disconnect()
-    reduced.removeEventListener('change', onConditions)
     window.removeEventListener('resize', schedule)
     document.removeEventListener('scroll', schedule, true)
     document.removeEventListener('transitionend', onTransition)
     document.removeEventListener('fullscreenchange', schedule)
-    document.removeEventListener('visibilitychange', onConditions)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     cancelAnimationFrame(frame)
     frame = 0
-    clearTimeout(catTimer)
     clearScene()
     nodes = null
   }
@@ -277,19 +212,10 @@ export function useDeskSpace(items, arrangement) {
     () => toValue(arrangement),
     () => {
       visitPlan = sampleDeskPlan(Math.random, 1)
-      clearTrail()
       schedule()
     },
   )
-  onMounted(() => {
-    reduced = matchMedia('(prefers-reduced-motion: reduce)')
-    try {
-      lastPawAt = Math.max(lastPawAt, Math.min(Number(sessionStorage.getItem('ihomy:desk:last-paw')) || 0, Date.now()))
-    } catch {
-      /* 会话内仍有冷却 */
-    }
-    start()
-  })
+  onMounted(start)
   onBeforeUnmount(stop)
-  return { placements, pawTrail, modalOpen }
+  return { placements, modalOpen }
 }

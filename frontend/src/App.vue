@@ -34,14 +34,16 @@
         routeReady &&
         (isTablet || (isWide && !isMobile)) &&
         desk.enabled &&
+        !standalone &&
+        !userStore.isPureOps &&
         !immersive &&
         !appStore.homeEditMode &&
         !userStore.mustChangePassword
       "
-      :tracks-only="standalone || userStore.isPureOps"
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
     />
+    <PawTrail v-if="routeReady && desk.enabled && route.name !== 'Wallpaper' && route.name !== 'Kiosk'" />
     <div v-if="route.name === 'Home' && appStore.loadFailed && !userStore.mustChangePassword" class="home-load-error" role="status">
       <span>{{ $t('home.familyLoadFailed') }}</span>
       <el-button text :loading="appStore.loading" @click="appStore.init()">{{ $t('common.retry') }}</el-button>
@@ -92,6 +94,7 @@ const AppSidebar = defineAsyncComponent(() => import('@/components/AppSidebar.vu
 const WarmLayout = defineAsyncComponent(() => import('@/components/warm/WarmLayout.vue'))
 const WindowShell = defineAsyncComponent(() => import('@/components/window/WindowShell.vue'))
 const WindowDesk = defineAsyncComponent(() => import('@/components/WindowDesk.vue'))
+const PawTrail = defineAsyncComponent(() => import('@/components/PawTrail.vue'))
 const WindowMusicPlayer = defineAsyncComponent(() => import('@/components/WindowMusicPlayer.vue'))
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'

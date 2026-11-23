@@ -1,6 +1,31 @@
 // 贴图随机歪放的最大角度（±）。超过 45° 就成了「斜着挂」，观感不对，所以封顶在这里。
 const MAX_TILT = 30
 
+export const DESK_FLOATS = [
+  '.gc-topbar',
+  '.window-top',
+  '.mobile-header',
+  '.mobile-tabbar',
+  '.site-footer',
+  '.back-to-top',
+  '.install-prompt',
+  '.web-update',
+  '.child-lock',
+  '.music-player',
+  '.music-player .playlist',
+  '.window-player',
+  '.window-queue',
+  '.chat-float-ball',
+  '.chat-float-panel',
+  '.chat-float-bubble',
+  '.last-doing-float',
+  '.call-mini',
+  '.light-test-console',
+  '.daily-add-fab',
+  '.home-page .door-sign',
+  '.el-popper',
+].join(',')
+
 // 页面之间共用一次抽样。几何计算只读这些比例，重新测量不会重新掷骰。
 export function sampleDeskPlan(random = Math.random, minimumCount = 0) {
   const roll = random()
@@ -157,11 +182,9 @@ export function placeDeskItems(items, plan, lanes, obstacles, cards = []) {
   return result.length === 2 ? spreadDeskPair(result, plan, lanes, obstacles, cards) : result
 }
 
-export function placePawTrail(placements, lanes, obstacles, random = Math.random) {
-  if (placements.length >= 3) return []
-  const occupied = obstacles.concat(placements.map(({ x, y, size, angle }) => bounds(x, y, turnedRadius(size, angle))))
+export function placePawTrail(lanes, obstacles, random = Math.random) {
   const slot = { side: Math.floor(random() * 2), u: random(), v: random() }
-  const seat = findSpace(slot, lanes, occupied, 86, 54)
+  const seat = findSpace(slot, lanes, obstacles, 86, 54)
   if (!seat) return []
   const direction = random() < 0.5 ? 1 : -1
   return Array.from({ length: 4 }, (_, i) => ({
@@ -172,14 +195,12 @@ export function placePawTrail(placements, lanes, obstacles, random = Math.random
   }))
 }
 
-export function pawTrailFits(trail, placements, lanes, obstacles) {
-  if (!trail.length || placements.length >= 3) return false
-  const occupied = obstacles.concat(placements.map(({ x, y, size, angle }) => bounds(x, y, turnedRadius(size, angle))))
+export function pawTrailFits(trail, lanes, obstacles) {
   return trail.every(({ x, y }) => {
     const box = bounds(x, y, 13)
     return (
       lanes.some((l) => box.left >= l.left && box.right <= l.right && box.top >= l.top && box.bottom <= l.bottom) &&
-      !occupied.some((other) => overlaps(box, other))
+      !obstacles.some((other) => overlaps(box, other))
     )
   })
 }

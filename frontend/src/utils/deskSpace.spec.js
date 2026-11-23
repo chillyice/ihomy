@@ -105,14 +105,21 @@ describe('window desk margins', () => {
   })
 
   it('removes footprints when a floating panel covers the path or its margin disappears', () => {
-    const placed = [{ x: 300, y: 300, size: 84 }]
-    const trail = placePawTrail(placed, large, [], () => 0.4)
+    const trail = placePawTrail(large, [], () => 0.4)
     expect(trail).toHaveLength(4)
-    expect(pawTrailFits(trail, placed, large, [])).toBe(true)
+    expect(pawTrailFits(trail, large, [])).toBe(true)
     const { x, y } = trail[0]
     const blocker = { left: x - 1, right: x + 1, top: y - 1, bottom: y + 1 }
-    expect(pawTrailFits(trail, placed, large, [blocker])).toBe(false)
-    expect(pawTrailFits(trail, placed, [], [])).toBe(false)
+    expect(pawTrailFits(trail, large, [blocker])).toBe(false)
+    expect(pawTrailFits(trail, [], [])).toBe(false)
+  })
+
+  it('can place a trail at a phone edge even with three desk objects on screen', () => {
+    const lanes = deskLanes(375, 667, 0, null, 84)
+    const objects = [50, 300, 550].map((top) => ({ left: 0, right: 84, top, bottom: top + 110 }))
+    const trail = placePawTrail(lanes, objects, () => 0.4)
+    expect(trail).toHaveLength(4)
+    expect(pawTrailFits(trail, lanes, objects)).toBe(true)
   })
 
   it.each([

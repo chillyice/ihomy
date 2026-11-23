@@ -3,10 +3,11 @@
     <div class="section-label">{{ $t('windowDesk.title') }}</div>
     <el-form label-position="top" class="settings-form">
       <el-form-item>
-        <el-switch v-model="desk.enabled" :aria-label="$t('windowDesk.enabled')" :active-text="$t('windowDesk.enabled')" />
-        <div class="share-tip">{{ $t('windowDesk.hint') }}</div>
+        <el-switch v-model="desk.enabled" :aria-label="$t(switchLabel)" :active-text="$t(switchLabel)" />
+        <div class="share-tip">{{ $t('windowDesk.pawHint') }}</div>
       </el-form-item>
-      <template v-if="desk.enabled">
+      <template v-if="desk.enabled && showObjects">
+        <div class="share-tip">{{ $t('windowDesk.hint') }}</div>
         <el-form-item :label="$t('windowDesk.bind')">
           <div class="desk-bindings">
             <el-select v-model="kind" :aria-label="$t('windowDesk.chooseObject')">
@@ -36,6 +37,8 @@ import { useAppStore } from '@/stores/app'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { DESK_DEFAULT_PATHS, DESK_DESTINATIONS, deskPathAllowed } from '@/utils/deskObjects'
 
+const props = defineProps({ showObjects: Boolean })
+const switchLabel = computed(() => (props.showObjects ? 'windowDesk.enabled' : 'windowDesk.pawsEnabled'))
 const desk = useWindowDeskStore()
 const app = useAppStore()
 const { isChild } = useDisplayMode()
