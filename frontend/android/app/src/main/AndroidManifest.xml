@@ -26,9 +26,9 @@
          usesCleartextTraffic=false:接口与文件全部 https,壳内不需要明文流量。 -->
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/logo_window_dark"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/logo_window_dark"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
@@ -37,20 +37,10 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:theme="@style/IhomyLauncher"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
             android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <!-- 长按图标快捷方式:今日日程 / 记账本 / 家庭聊天 / 相册(静态声明,走 ihomy:// 深链) -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
 
             <!-- 桌面卡片深链:ihomy://plan?date=... / ihomy://anniversary 等,进入壳内由 deeplink.js 统一路由 -->
             <intent-filter>
@@ -112,6 +102,64 @@
             </intent-filter>
 
         </activity>
+
+        <activity
+            android:name=".launcher.LauncherActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="top.ihomy.app.launcher"
+            android:theme="@style/IhomyLauncher" />
+
+        <!-- 桌面入口只负责唤起独立的主任务，切图标不会关闭用户正在操作的页面。 -->
+        <activity-alias
+            android:name=".WindowDarkLauncher"
+            android:targetActivity=".launcher.LauncherActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/logo_window_dark">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".WindowLightLauncher"
+            android:targetActivity=".launcher.LauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/logo_window_light">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".LeafDarkLauncher"
+            android:targetActivity=".launcher.LauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/logo_leaf_dark">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".LeafLightLauncher"
+            android:targetActivity=".launcher.LauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/logo_leaf_light">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
 
         <!-- 健康连接授权弹窗里的「为什么需要」说明页(系统要求:声明 ACTION_SHOW_PERMISSIONS_RATIONALE) -->
         <activity

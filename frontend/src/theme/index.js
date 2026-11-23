@@ -3,7 +3,14 @@
 // 应用方式:html.theme-{id} + html.dark(=dusk,驱动 Element Plus 暗色 css-vars)
 // 持久化 key 沿用 'ihomy-theme',做旧 {dark, autoMode} → {theme, mode, autoMode} 迁移
 
+import dawnWindowMark from '@/assets/brand/ihomy-window-96.png'
+import duskWindowMark from '@/assets/brand/ihomy-window-dark-96.png'
+
 export const THEME_STORAGE_KEY = 'ihomy-theme'
+
+export function windowMarkForMode(mode) {
+  return mode === 'dusk' ? duskWindowMark : dawnWindowMark
+}
 
 export const THEMES = {
   warm: {

@@ -13,6 +13,22 @@
           </el-radio-group>
         </div>
       </el-form-item>
+      <el-form-item :label="$t('settings.appIcon.title')">
+        <div class="icon-options" role="group" :aria-label="$t('settings.appIcon.title')">
+          <button
+            v-for="id in APP_ICON_IDS"
+            :key="id"
+            type="button"
+            class="icon-option"
+            :aria-pressed="appIcon.id === id"
+            :disabled="appIcon.busy"
+            @click="selectIcon(id)"
+          >
+            <img :src="appIconImage(id)" alt="" width="44" height="44" />
+            <span>{{ $t(`settings.appIcon.${id}`) }}</span>
+          </button>
+        </div>
+      </el-form-item>
       <el-divider />
       <el-form-item :label="$t('settings.lampMode')">
         <el-radio-group :model-value="lampMode" @change="(v) => (lampMode = v)">
@@ -98,6 +114,7 @@ import { useRouter } from 'vue-router'
 import { authApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
+import { APP_ICON_IDS, appIconImage, useAppIconStore } from '@/stores/appIcon'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import ThemeSwatch from '@/components/ThemeSwatch.vue'
 
@@ -121,6 +138,16 @@ const {
 
 // 主题:theme(暖居/光尘)× mode(晨/暮)+ 日出日落自动,统一由 Pinia store 管理
 const themeStore = useThemeStore()
+const appIcon = useAppIconStore()
+
+async function selectIcon(id) {
+  try {
+    await appIcon.select(id)
+  } catch (error) {
+    const key = error.code === 'UNIMPLEMENTED' ? 'updateAndroid' : 'changeFailed'
+    ElMessage.error(t(`settings.appIcon.${key}`))
+  }
+}
 
 // 进入光照测试:跳转首页并启动测试模式
 const enterLightTest = () => {
@@ -224,6 +251,34 @@ html.dark .share-tip {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.icon-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.icon-option {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.icon-option img {
+  border-radius: 9px;
+}
+.icon-option[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+.icon-option:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
 /* 个性化设置:控件行 + 标签水平排列,垂直居中 */

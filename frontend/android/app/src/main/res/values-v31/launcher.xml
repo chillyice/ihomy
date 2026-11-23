@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The platform selects the icon from the alias used to launch the app. -->
+    <style name="IhomyLauncher" parent="IhomyLauncherBase">
+        <item name="android:windowSplashScreenAnimatedIcon">@null</item>
+    </style>
+</resources>

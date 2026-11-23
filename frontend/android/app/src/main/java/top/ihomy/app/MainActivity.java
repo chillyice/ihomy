@@ -16,6 +16,7 @@ import top.ihomy.app.health.HealthDataPlugin;
 import top.ihomy.app.health.HealthPrefs;
 import top.ihomy.app.health.HealthSyncWorker;
 import top.ihomy.app.live.AppVisibility;
+import top.ihomy.app.launcher.AppIconPlugin;
 import top.ihomy.app.photo.PhotoBackupPlugin;
 import top.ihomy.app.pip.PipPlugin;
 import top.ihomy.app.screen.ScreenPlugin;
@@ -36,6 +37,7 @@ public class MainActivity extends BridgeActivity {
         // 桌面卡片桥:令牌下发 / 登出清理 / 改动后即时刷新(周期任务在插件 load 时注册)。
         // 必须在 super.onCreate 之前注册——桥在 super 里构建,晚了插件就不存在。
         registerPlugin(WidgetBridgePlugin.class);
+        registerPlugin(AppIconPlugin.class);
         // 系统日历导出:写本机专属日历做提醒兜底(设置页手动触发)
         registerPlugin(CalendarSyncPlugin.class);
         // 系统分享收件:微信/相册/浏览器 → 分享 → ihomy(落点由站内「分享到家庭」页决定)

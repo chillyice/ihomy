@@ -5,7 +5,7 @@
     <!-- 顶部:家庭封面 + 家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
       <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">
-        <img :src="familyCover || windowMark" alt="" class="brand-cover" />
+        <img :src="familyCover || appIcon.image" alt="" class="brand-cover" />
         <span class="brand-text">{{ familyName || 'ihomy' }}</span>
       </span>
       <span
@@ -218,7 +218,6 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import windowMark from '@/assets/brand/ihomy-window-96.png'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
@@ -237,6 +236,7 @@ import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
+import { useAppIconStore } from '@/stores/appIcon'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 
@@ -294,6 +294,7 @@ const toggleLightEffect = () => {
 
 const collapsed = ref(false)
 const themeStore = useThemeStore()
+const appIcon = useAppIconStore()
 
 const familyName = computed(() => appStore.familyName)
 const familyCover = computed(() => appStore.family?.coverImage || '')

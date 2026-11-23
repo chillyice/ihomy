@@ -66,26 +66,12 @@ export default defineConfig(({ mode }) => {
             },
             VitePWA({
               registerType: 'autoUpdate',
-              includeAssets: ['apple-touch-window.png'],
-              manifest: {
-                name: 'ihomy',
-                short_name: '家庭',
-                description: '家庭成员共用内容平台',
-                theme_color: '#045246',
-                background_color: '#ffffff',
-                display: 'standalone',
-                start_url: '/',
-                icons: [
-                  { src: 'pwa-window-192.png', sizes: '192x192', type: 'image/png' },
-                  { src: 'pwa-window-512.png', sizes: '512x512', type: 'image/png' },
-                  { src: 'pwa-window-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-                ],
-              },
+              manifest: JSON.parse(readFileSync(new URL('./public/app-icons/window-dark/manifest.webmanifest', import.meta.url), 'utf8')),
               workbox: {
                 globPatterns: [
                   'index.html',
                   'registerSW.js',
-                  'pwa-*.png',
+                  'app-icons/**/*.{png,webmanifest}',
                   'assets/*.{js,css}',
                   'assets/qweather-icons-*.woff2',
                   'demo/*.svg',

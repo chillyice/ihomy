@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="logo_paper">#F1E7D6</color>
+    <color name="logo_umber">#4A3A2B</color>
+    <color name="logo_splash_canvas">@color/logo_paper</color>
+
+    <style name="IhomyLauncherBase" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/logo_splash_canvas</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+    <style name="IhomyLauncher" parent="IhomyLauncherBase">
+        <!-- Android 10–11 use one starting theme for every alias. -->
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+    </style>
+</resources>

@@ -2,7 +2,7 @@
   <div class="window-shell" :class="{ 'has-rail': !compact, 'rail-collapsed': collapsed && !compact }">
     <aside v-if="!compact" class="window-rail">
       <router-link class="window-brand" to="/home" :aria-label="app.familyName || 'ihomy'">
-        <img :src="app.family?.coverImage || brand" alt="" /><span>{{ app.familyName || 'ihomy' }}</span>
+        <img :src="app.family?.coverImage || appIcon.image" alt="" /><span>{{ app.familyName || 'ihomy' }}</span>
       </router-link>
       <LastDoingCard v-if="showDockCard" variant="dock" :compact="collapsed" />
       <nav :aria-label="$t('windowHome.directory')">
@@ -37,7 +37,7 @@
     </aside>
     <div v-if="compact && (!isMobile || isHome) && !game" class="window-top">
       <router-link class="window-brand" to="/home"
-        ><img :src="app.family?.coverImage || brand" alt="" /><span>{{ app.familyName || 'ihomy' }}</span></router-link
+        ><img :src="app.family?.coverImage || appIcon.image" alt="" /><span>{{ app.familyName || 'ihomy' }}</span></router-link
       >
       <button class="directory-button" @click="directory = true">
         <el-icon><Grid /></el-icon>{{ $t('windowHome.directory') }}
@@ -69,13 +69,14 @@ import { useAppStore } from '@/stores/app'
 import { iconComp } from '@/utils/navModules'
 import { isMobileGamePath, isMobileHomePath } from '@/utils/mobileNav'
 import { useWindowPanel } from '@/utils/windowPanel'
-import brand from '@/assets/brand/ihomy-window-96.png'
+import { useAppIconStore } from '@/stores/appIcon'
 import { lastDoingMode } from '@/utils/lastDoing'
 import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 const WindowDirectory = defineAsyncComponent(() => import('./WindowDirectory.vue'))
 const route = useRoute()
 const router = useRouter()
 const app = useAppStore()
+const appIcon = useAppIconStore()
 const user = useUserStore()
 const nav = useWindowDirectory()
 const { isChild: child } = useDisplayMode()
