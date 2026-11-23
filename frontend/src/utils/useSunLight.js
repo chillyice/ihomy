@@ -5,12 +5,21 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
+import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
 import { setSunContext } from '@/theme'
 import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
+
+// 漫射天光从窗户上方铺开。积雪的反照最亮，雷云下只留少量灰蓝色天光。
+const DIFFUSE_SKY = {
+  rain: { color: 'rgb(169, 197, 217)', opacity: 0.13 },
+  snow: { color: 'rgb(235, 246, 255)', opacity: 0.21 },
+  thunder: { color: 'rgb(136, 155, 181)', opacity: 0.09 },
+  fog: { color: 'rgb(244, 241, 230)', opacity: 0.16 },
+}
 
 export function useSunLight() {
   const themeStore = useThemeStore()
@@ -23,14 +32,10 @@ export function useSunLight() {
     rotation: 0,
     palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' },
     rays: [],
-    shadowVRotation: 0,
-    shadowHTop: 50,
-    frameTopOffset: 0,
     shadowIntensity: 0.7,
     shadowColor: 'rgb(8,12,28)',
     brightSpotColor: 'rgb(8,12,28)',
     brightSpotOpacity: 0.7,
-    reflectionOpacity: 0,
     lightOpacity: 0,
     lampOpacity: 1,
     isNight: true,
@@ -45,7 +50,7 @@ export function useSunLight() {
   const lampTemp = ref(_saved.lampTemp ?? 30)
   const lampBrightness = ref(_saved.lampBrightness ?? 50)
   const shadowEnabled = ref(_saved.shadowEnabled ?? true)
-  // 阴影深度(个性化滑块 0~100):70 = 出厂默认,此时窗口阴影与 V5.4 以来的观感完全一致
+  // 阴影深度 0~100，默认 70。
   const shadowDepth = ref(_saved.shadowDepth ?? 70)
   const weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const blobsEnabled = ref(_saved.blobsEnabled ?? true)
@@ -76,8 +81,18 @@ export function useSunLight() {
   const lightTestMode = ref(false)
   const lightTestPaused = ref(false)
   const testSpeed = ref(1)
-  const weatherMode = ref('clear')
-  const precipLevel = ref(0)
+  const weather = ref(null)
+  const weatherDetail = ref(null)
+  const previewWeather = ref(null)
+  const activeWeather = computed(() => (lightTestMode.value && previewWeather.value) || (weatherEffectEnabled.value ? weather.value : null))
+  const weatherMode = computed(() => resolveMorningWeather(activeWeather.value))
+  const setWeather = (condition, level = 0) => {
+    previewWeather.value = { condition, precipLevel: level }
+  }
+  const precipLevel = computed({
+    get: () => (['rain', 'snow', 'thunder'].includes(weatherMode.value) ? (activeWeather.value?.precipLevel ?? 1) : 0),
+    set: (level) => setWeather(weatherMode.value, level),
+  })
   let testTimer = null
 
   // 雾/阴(昏暗天气):雾层是「几秒的转瞬雾」——进入即浮现,约 4 秒后淡出消散,不常驻;
@@ -123,16 +138,6 @@ export function useSunLight() {
   let cloudTimer = null
   let cloudTween = null
 
-  const setWeather = (mode, level = 0) => {
-    weatherMode.value = mode
-    precipLevel.value = level
-    if (DIM_MODES.includes(mode)) playTransient()
-    else stopTransient()
-    startCloudFlicker(mode === 'cloud')
-    startLightning(mode === 'thunder')
-    refreshScene()
-  }
-
   // 多云闪烁:每 4~8 秒随机一个目标(0.1~1),GSAP 3~5s 缓慢补间,模拟云彩遮阳
   const startCloudFlicker = (on) => {
     if (cloudTimer) {
@@ -158,38 +163,44 @@ export function useSunLight() {
   // 雷雨闪电:随机间隔触发,瞬间增亮(0→1→0.3→1→0 快速闪烁),模拟打雷闪电光
   const lightningFlash = ref(0)
   let lightningTimer = null
+  let lightningTimeline = null
   const startLightning = (on) => {
     if (lightningTimer) {
       clearTimeout(lightningTimer)
       lightningTimer = null
     }
-    if (!on) {
-      lightningFlash.value = 0
-      return
-    }
+    lightningTimeline?.kill()
+    lightningTimeline = null
+    lightningFlash.value = 0
+    if (!on) return
     const scheduleNext = () => {
-      const isThunder = weatherMode.value === 'thunder'
-      const minMs = isThunder ? 3000 : 10000
-      const rangeMs = isThunder ? 7000 : 30000
       lightningTimer = setTimeout(
         () => {
-          const tl = gsap.timeline()
-          tl.to(lightningFlash, { value: 1, duration: 0.05 })
+          lightningTimeline = gsap.timeline()
+          lightningTimeline
+            .to(lightningFlash, { value: 1, duration: 0.05 })
             .to(lightningFlash, { value: 0.3, duration: 0.1 })
             .to(lightningFlash, { value: 1, duration: 0.05 })
             .to(lightningFlash, { value: 0, duration: 0.4, ease: 'power2.out' })
           scheduleNext()
         },
-        minMs + Math.random() * rangeMs,
+        3000 + Math.random() * 7000,
       )
     }
     scheduleNext()
   }
 
+  watch(weatherMode, (mode) => {
+    startCloudFlicker(mode === 'cloud')
+    startLightning(mode === 'thunder')
+  })
+  watch([weatherMode, activeWeather], ([mode]) => {
+    if (DIM_MODES.includes(mode)) playTransient()
+    else stopTransient()
+  })
+
   const refreshScene = () => {
     if (!sunInfo.value) return
-    // 只设静态属性(调色板/旋转/阴影位置等),不烘焙天气系数
-    // 天气系数(lightOpacity/rays opacity/reflectionOpacity/weatherShadow)由 computed 实时响应 cloudFlicker
     sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
   }
 
@@ -276,11 +287,7 @@ export function useSunLight() {
   }
   const stopLightTest = () => {
     lightTestMode.value = false
-    weatherMode.value = 'clear'
-    precipLevel.value = 0
-    stopTransient()
-    startCloudFlicker(false)
-    startLightning(false)
+    previewWeather.value = null
     if (testTimer) {
       clearInterval(testTimer)
       testTimer = null
@@ -302,7 +309,7 @@ export function useSunLight() {
     // auto 模式:空闲超时关灯优先(人走灯灭),其后昏暗天气(雾/阴)3 秒自动开灯补光,
     // 其余按窗口阴影强度连续取灯光强度(白天 0 → 傍晚渐亮 → 夜间 1,阈值见 windowLight.lampFromShadow)
     if (isIdle.value) return 0
-    if (lampAutoOn.value && weatherEffectEnabled.value) return 1
+    if (lampAutoOn.value) return 1
     return sunScene.value.lampOpacity ?? 0
   })
 
@@ -387,58 +394,28 @@ export function useSunLight() {
     }))
   })
 
-  // 体积光束样式(天气系数实时应用)
-  const rayStyles = computed(() => {
-    const s = sunScene.value
-    const mul = weatherLightMul.value
-    return s.rays.map((ray) => ({
-      width: ray.width + 'px',
-      transform: `translateX(${ray.offset}px) rotate(${s.rotation}deg)`,
-      opacity: ray.opacity * mul,
-      filter: `blur(${ray.blur}px)`,
-      background: `linear-gradient(to bottom, ${s.palette.core} 0%, ${s.palette.mid} 35%, transparent 75%)`,
-    }))
-  })
-
-  // 光源整体不透明度(天气系数实时应用,控制 bloom 辉光)
+  // 同一束直射光决定窗投影和光路中浮尘的可见度。
   const lightLayerOpacity = computed(() => (shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0))
 
-  const sourceStyle = computed(() => ({
-    left: sunScene.value.source.x,
-    top: sunScene.value.source.y,
-  }))
-
-  const bloomStyle = computed(() => ({
-    left: sunScene.value.source.x,
-    top: sunScene.value.source.y,
-    background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
-  }))
-
-  // 高光亮斑:白天下雨/雪/云/雷/阴/雾一律压成 0——云层遮住太阳就不该有直射亮点;
-  // 夜间直接用后端的 brightSpotOpacity(月光/夜景点),不受天气压制
-  const brightSpotStyle = computed(() => ({
-    background: sunScene.value.brightSpotColor || 'transparent',
-    opacity: shadowEnabled.value
-      ? sunScene.value.isNight
-        ? (sunScene.value.brightSpotOpacity ?? 0)
-        : ['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value)
-          ? 0
-          : (sunScene.value.brightSpotOpacity ?? 0)
-      : 0,
-  }))
-  const reflectionStyle = computed(() => ({
-    background: `radial-gradient(ellipse 60% 50% at ${sunScene.value.source.x} ${sunScene.value.source.y}, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`,
-    opacity: shadowEnabled.value ? (sunScene.value.reflectionOpacity ?? 0) * weatherLightMul.value : 0,
-  }))
+  const brightSpotStyle = computed(() => {
+    if (!shadowEnabled.value) return { opacity: 0 }
+    const scene = sunScene.value
+    const mode = weatherMode.value
+    if (scene.isNight || mode === 'clear') {
+      return { background: scene.brightSpotColor, opacity: scene.brightSpotOpacity }
+    }
+    const sky = DIFFUSE_SKY[mode]
+    if (!sky) return { opacity: 0 }
+    return {
+      background: `radial-gradient(ellipse 110% 100% at ${scene.source.x} 0%, ${sky.color} 0%, transparent 100%)`,
+      opacity: sky.opacity * Math.sin(scene.dayProgress * Math.PI),
+      mixBlendMode: 'screen',
+    }
+  })
 
   // 拉取太阳信息并启动时隙更新
   let slotTimer = null
-  let flickerTimer = null
   let weatherTimer = null
-
-  // 天气数据(供 Home.vue 天气面板使用)
-  const weather = ref(null)
-  const weatherDetail = ref(null)
 
   const loadSunInfo = async () => {
     try {
@@ -480,19 +457,7 @@ export function useSunLight() {
     loadWeatherDetail() // 详情(预警+今日高低温)与简版天气并行,供侧边栏迷你天气/首页天气卡片
     try {
       const data = await request.get('/public/weather')
-      if (data) {
-        weather.value = data
-        if (!lightTestMode.value && weatherEffectEnabled.value) {
-          const cond = data.condition
-          if (['rain', 'snow', 'cloud', 'thunder', 'fog'].includes(cond)) {
-            setWeather(cond, data.precipLevel || 1)
-          } else {
-            setWeather('clear', 0)
-          }
-        } else if (!weatherEffectEnabled.value) {
-          setWeather('clear', 0)
-        }
-      }
+      if (data) weather.value = data
     } catch (e) {}
   }
 
@@ -527,7 +492,7 @@ export function useSunLight() {
     resetIdle()
     // 每 5 分钟更新时隙
     slotTimer = setInterval(() => {
-      if (sunInfo.value) {
+      if (sunInfo.value && !lightTestMode.value) {
         const newIdx = currentSlotIndex()
         if (newIdx !== slotIdx.value) {
           slotIdx.value = newIdx
@@ -538,20 +503,6 @@ export function useSunLight() {
         refreshSunInfoIfStale()
       }
     }, 300000)
-    // 每 10 秒微调光柱明暗(天气系数由 computed 实时应用,这里只调基础值)
-    // 所有效果关闭时跳过,避免持续触发 Vue 响应式更新和 CSS transition
-    flickerTimer = setInterval(() => {
-      if (!sunInfo.value) return
-      if (!anyEffectEnabled.value) return
-      const base = getSunScene(sunInfo.value, slotIdx.value)
-      sunScene.value = {
-        ...base,
-        rays: base.rays.map((r) => ({
-          ...r,
-          opacity: Math.max(0.15, Math.min(0.85, r.opacity + (Math.random() - 0.5) * 0.12)),
-        })),
-      }
-    }, 10000)
     // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气数据用于天气预报面板,始终获取
     weatherTimer = setInterval(loadWeather, 1800000)
   })
@@ -563,8 +514,8 @@ export function useSunLight() {
     if (lampAutoTimer) clearTimeout(lampAutoTimer)
     if (fogTimer) clearTimeout(fogTimer)
     if (lightningTimer) clearTimeout(lightningTimer)
+    lightningTimeline?.kill()
     if (slotTimer) clearInterval(slotTimer)
-    if (flickerTimer) clearInterval(flickerTimer)
     if (weatherTimer) clearInterval(weatherTimer)
     if (testTimer) clearInterval(testTimer)
     IDLE_EVENTS.forEach((e) => window.removeEventListener(e, resetIdle))
@@ -660,11 +611,7 @@ export function useSunLight() {
     rainParticles,
     weatherShadowOpacity,
     lightLayerOpacity,
-    rayStyles,
-    sourceStyle,
-    bloomStyle,
     brightSpotStyle,
-    reflectionStyle,
     lightningFlash,
     lightTestMode,
     lightTestPaused,

@@ -1,5 +1,4 @@
-<!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 + 雾霭 -->
-<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→侧栏(60)→音乐(62)→页脚(70)→沉浸层(150)→弹窗(200–260)=UI 栈;bright-spot(270)→window-shadow(272)→reflection(274)→light-layer(276)→fog(278)=背景光影;vignette(300)→dust(302)→snow/rain(304)→lightning(306)→lamp-light(308)=氛围层。**两组光影都盖在弹窗之上**(用户口径:弹窗永远低于光影) -->
+<!-- 全局窗光投影与天气氛围，光影层级随 --z-deco / --z-atmos 盖在弹窗之上。 -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -14,54 +13,29 @@
     <!-- 毛玻璃背景层:全屏固定,半透明米色覆盖色块(不用 backdrop-filter 避免与面板叠加) -->
     <div class="glass-bg"></div>
 
-    <!-- 亮斑图层:multiply 染色,台灯 mask 挖洞(阴影开关关闭时不渲染) -->
+    <!-- 晨暮环境色与台灯补光 -->
     <div
       v-if="shadowEnabled && (brightSpotStyle?.opacity ?? 0) > 0.01"
       class="bright-spot"
       :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"
     ></div>
 
-    <!-- 窗户阴影:6 条 bar + 天气覆盖阴影,multiply,台灯 mask 挖洞(阴影开关可关闭;深度为 0 时整层不渲染) -->
     <div
-      v-if="shadowEnabled && (shadowAlpha ?? 0) > 0.01"
-      class="window-shadow"
-      :style="{
-        '--rot': (sunScene.shadowVRotation || 0) + 'deg',
-        '--htop': (sunScene.shadowHTop || 50) + '%',
-        '--shadow-alpha': shadowAlpha ?? 0.5,
-        '--shadow-color': sunScene.shadowColor || 'rgb(0,0,0)',
-        '--bar-transition': sunScene.isNight ? '0s' : '3s ease',
-        '--frame-top-offset': (sunScene.frameTopOffset ?? 0) + 'vh',
-        '--lamp-mask': lampMask,
-      }"
-    >
-      <div class="shadow-bar frame-h-top"></div>
-      <div class="shadow-bar frame-h-bottom"></div>
-      <div class="shadow-bar shadow-v"></div>
-      <div class="shadow-bar shadow-h"></div>
-      <div class="shadow-bar frame-v-left"></div>
-      <div class="shadow-bar frame-v-right"></div>
-      <!-- 天气覆盖阴影:固定不移动,雨雪常显;多云太阳遮挡时显示 -->
-      <div class="shadow-bar weather-shadow" :style="{ opacity: weatherShadowOpacity }"></div>
-    </div>
-
-    <!-- 反光层:soft-light 高光(opacity 为 0 时完全移除,跳过 blend 计算) -->
-    <div v-if="(reflectionStyle?.opacity ?? 0) > 0.01" class="reflection-layer" :style="reflectionStyle"></div>
+      v-if="shadowEnabled && weatherShadowOpacity > 0 && shadowAlpha > 0"
+      class="weather-shade"
+      :style="{ background: sunScene.shadowColor, opacity: weatherShadowOpacity * shadowAlpha, '--lamp-mask': lampMask }"
+    ></div>
+    <WindowProjection
+      v-if="lightLayerOpacity > 0"
+      :scene="sunScene"
+      :weather="weatherMode"
+      :shadow-alpha="shadowAlpha"
+      :occluders="occluders"
+      :style="{ opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
+    />
 
     <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
     <div v-if="shadowEnabled" class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
-
-    <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
-    <div
-      v-if="(lightLayerOpacity ?? 0) > 0.01"
-      class="light-layer"
-      :style="{ opacity: lightLayerOpacity ?? 0, transition: sunScene.isNight ? 'none' : 'opacity 3s ease' }"
-    >
-      <div class="light-bloom" :style="bloomStyle"></div>
-      <div class="light-source" :style="sourceStyle">
-        <div v-for="(rs, i) in rayStyles" :key="i" class="light-ray" :style="rs"></div>
-      </div>
-    </div>
 
     <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
     <div
@@ -145,7 +119,7 @@
 
     <!-- 雾霭层:高斯噪声雾(进页后几秒内浮现再淡出消散,不常驻;雾/阴的昏暗压光与 3 秒后台灯补光不受影响) -->
     <Transition name="fog">
-      <div v-if="weatherEffectEnabled && fogVisible" class="fog-layer" aria-hidden="true">
+      <div v-if="fogVisible" class="fog-layer" aria-hidden="true">
         <div v-for="b in FOG_LAYERS" :key="b.id" class="fog-noise" :style="fogLayerStyle(b)"></div>
       </div>
     </Transition>
@@ -155,6 +129,9 @@
 <script setup>
 import { inject } from 'vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import WindowProjection from './WindowProjection.vue'
+
+defineProps({ occluders: { type: Array, default: () => [] } })
 
 // 从 App.vue 注入同一 useSunLight 实例(与 AppSidebar 控制台灯共享状态)
 const light = inject(SUN_LIGHT_KEY)
@@ -172,15 +149,11 @@ const {
   weatherShadowOpacity,
   lightLayerOpacity,
   blobsEnabled,
-  weatherEffectEnabled,
   dustParticles,
   snowParticles,
   rainParticles,
-  rayStyles,
-  sourceStyle,
-  bloomStyle,
+  weatherMode,
   brightSpotStyle,
-  reflectionStyle,
   lightningFlash,
   fogVisible,
 } = light || {}
@@ -384,17 +357,6 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 反光层:soft-light 高光 */
-.reflection-layer {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-deco) + 4);
-  pointer-events: none;
-  mix-blend-mode: soft-light;
-  transition: opacity 3s ease;
-  transform: translateZ(0);
-}
-
 /* 台灯光源:氛围层最高(盖在弹窗之上,像灯照在纸面) */
 .lamp-light {
   position: fixed;
@@ -404,115 +366,15 @@ html.dark .blob-5 {
   filter: blur(20px);
 }
 
-/* 窗户阴影:6 条 bar,multiply,台灯 mask 挖洞 */
-.window-shadow {
+/* 阴天和云遮日时，漫射底色独立于直射投影，台灯中心仍透光。 */
+.weather-shade {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--z-deco) + 2);
+  z-index: calc(var(--z-deco) + 1);
   pointer-events: none;
   mix-blend-mode: multiply;
-  opacity: var(--shadow-alpha, 0.7);
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
-}
-.shadow-bar {
-  position: absolute;
-  filter: blur(16px);
-  background: var(--shadow-color, rgb(0, 0, 0));
-}
-.shadow-v {
-  top: -50vh;
-  left: 50%;
-  width: 112px;
-  margin-left: -56px;
-  height: 337.5vh;
-  transform-origin: 50% 60vh;
-  transition: transform var(--bar-transition, 3s ease);
-  transform: rotate(var(--rot, 0deg));
-}
-.frame-v-left {
-  top: -50vh;
-  left: 50%;
-  width: 1400px;
-  margin-left: -1400px;
-  height: 337.5vh;
-  transform-origin: 100% 60vh;
-  transition: transform var(--bar-transition, 3s ease);
-  transform: translateX(-55vw) rotate(var(--rot, 0deg));
-}
-.frame-v-right {
-  top: -50vh;
-  left: 50%;
-  width: 1400px;
-  height: 337.5vh;
-  transform-origin: 0% 60vh;
-  transition: transform var(--bar-transition, 3s ease);
-  transform: translateX(55vw) rotate(var(--rot, 0deg));
-}
-.shadow-h {
-  left: -75%;
-  right: -75%;
-  height: 70px;
-  top: var(--htop, 50%);
-  transition: top var(--bar-transition, 3s ease);
-}
-.frame-h-top {
-  left: -75%;
-  right: -75%;
-  height: 280px;
-  top: calc(10vh - 280px + var(--frame-top-offset, 0vh));
-  transition: top var(--bar-transition, 3s ease);
-}
-.frame-h-bottom {
-  left: -75%;
-  right: -75%;
-  height: 1400px;
-  top: calc(var(--htop, 50%) * 2 + 70px);
-  transition: top var(--bar-transition, 3s ease);
-}
-
-/* 体积光层:丁达尔效应,screen(背景光影,盖在弹窗之上) */
-.light-layer {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-deco) + 6);
-  pointer-events: none;
-  mix-blend-mode: screen;
-  overflow: hidden;
-  transform: translateZ(0);
-}
-.light-bloom {
-  position: absolute;
-  width: 700px;
-  height: 700px;
-  margin-left: -350px;
-  margin-top: -350px;
-  border-radius: 50%;
-  filter: blur(60px);
-  transition:
-    background 3s ease,
-    left 3s ease,
-    top 3s ease;
-}
-.light-source {
-  position: absolute;
-  width: 0;
-  height: 0;
-  transition:
-    left 3s ease,
-    top 3s ease;
-}
-.light-ray {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  height: 200vh;
-  transform-origin: top center;
-  transition:
-    opacity 3s ease,
-    filter 3s ease,
-    transform 3s ease,
-    background 3s ease;
 }
 
 /* 柔和暗角:氛围层,盖在弹窗之上(压边走暗,弹窗居中不受影响) */
@@ -531,14 +393,6 @@ html.dark .blob-5 {
     rgba(45, 25, 8, 0.18) 100%
   );
   transform: translateZ(0);
-}
-
-/* 天气覆盖阴影:与其他 shadow-bar 同色同 blur,固定全屏不移动,随天气显隐 */
-.shadow-bar.weather-shadow {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transition: opacity 2s ease;
 }
 
 /* 灰尘粒子:screen 发光,氛围层 */

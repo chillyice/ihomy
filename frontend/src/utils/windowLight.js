@@ -67,22 +67,10 @@ export function getSunScene(sunInfo, slotIndex) {
 
   // 旋转:基于方位角驱动,az=90°开始(-90°)→ az=180°正中(0°)→ az=270°结束(+90°)
   // 窗角≤0(az<90 或 az>270)时 hold 在对应端点,无直射光不旋转
-  let shadowVRotation
-  if (hasDirectLight) {
-    shadowVRotation = az - 180
-  } else {
-    shadowVRotation = az <= 90 ? -90 : 90
-  }
-  const lightRotation = shadowVRotation
+  const lightRotation = hasDirectLight ? az - 180 : az <= 90 ? -90 : 90
 
   // 光源水平位置:由方位角驱动,夜间 hold 在日出位置(左侧 7.5%)
   const sourceX = isNight ? 7.5 : Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
-
-  // 内框横条 top:太阳越高越靠近顶部
-  const shadowHTop = Math.max(5, Math.min(85, 80 - Math.max(0, alt) * 0.8))
-
-  // 顶框随太阳高度移动:太阳越高顶框越下移(窗口视觉变窄),范围 ±8vh
-  const frameTopOffset = isNight ? 0 : -(Math.max(0, alt) - 45) * 0.18
 
   // 阴影强度:夜间 0.7,正午 0.3,日出日落 0.7(不超过 70%)
   const shadowIntensity = isNight ? 0.7 : 0.7 - Math.sin(dayProgress * Math.PI) * 0.4
@@ -168,11 +156,9 @@ export function getSunScene(sunInfo, slotIndex) {
   // 光柱不透明度:无直射光时 0,有直射光时正弦过渡(正午最强)
   const rayOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * rayBaseOpacity : 0
 
-  // 光源整体不透明度(控制 bloom 辉光):无直射光时 0,正弦过渡
-  const lightOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) : 0
-
-  // 反光层:内容组件被阳光照亮的轻微高光(soft-light,无直射光时 0)
-  const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
+  // 窗面截获的光通量随入射角连续衰减，太阳移到窗侧时投影淡出。
+  const windowIncidence = Math.sin((Math.max(0, windowAngle) * Math.PI) / 180)
+  const lightOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * windowIncidence : 0
 
   // 台灯:由阴影强度驱动(见 lampFromShadow),不再按方位角一刀切
   const lampOpacity = lampFromShadow(shadowIntensity)
@@ -182,14 +168,10 @@ export function getSunScene(sunInfo, slotIndex) {
     rotation: lightRotation,
     palette,
     rays: makeRays(rayOpacity),
-    shadowVRotation,
-    shadowHTop,
-    frameTopOffset,
     shadowIntensity,
     shadowColor,
     brightSpotColor,
     brightSpotOpacity,
-    reflectionOpacity,
     lightOpacity,
     lampOpacity,
     altitude: alt,
