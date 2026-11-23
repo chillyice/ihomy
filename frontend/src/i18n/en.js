@@ -278,6 +278,7 @@ export default {
     window: 'By the Window',
     dawn: 'Dawn',
     dusk: 'Dusk',
+    duskMode: 'Dusk mode',
     autoMode: 'Auto dawn/dusk colors',
   },
   blog: {

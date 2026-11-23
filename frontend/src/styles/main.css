@@ -400,7 +400,6 @@ html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-main {
 }
 
 html.theme-warm .gc-studio:has(.gc-home, .elder-home) .gc-side,
-html.theme-warm .gc-wrap:has(.gc-home, .elder-home) .gc-seg,
 html.theme-warm .mobile-layout:has(.mobile-home, .elder-home) .mobile-tabbar,
 html.theme-warm .mobile-home .filter-bar {
   background-color: var(--color-card-2);

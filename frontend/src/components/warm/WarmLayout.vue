@@ -14,7 +14,7 @@
     ></div>
 
     <div class="gc-wrap">
-      <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
+      <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨暮叠放开关 -->
       <div class="gc-topbar">
         <div v-a11y-click class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
           <img class="gc-logo" :src="familyCover || windowMark" alt="" />
@@ -40,11 +40,7 @@
         </button>
         <div class="gc-pin" :class="{ on: scrolled }"></div>
         <div class="gc-ctl">
-          <div class="gc-seg" ref="segEl">
-            <span ref="segThumb" class="gc-seg-thumb" aria-hidden="true"></span>
-            <button ref="dawnBtn" :class="{ on: segMode === 'dawn' }" @click="themeStore.setMode('dawn')">☀ {{ $t('theme.dawn') }}</button>
-            <button ref="duskBtn" :class="{ on: segMode === 'dusk' }" @click="themeStore.setMode('dusk')">☾ {{ $t('theme.dusk') }}</button>
-          </div>
+          <WarmModeToggle />
         </div>
       </div>
 
@@ -169,6 +165,7 @@ import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import WarmHome from '@/components/warm/WarmHome.vue'
+import WarmModeToggle from '@/components/warm/WarmModeToggle.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
@@ -427,47 +424,6 @@ watch(
     }),
 )
 
-// 晨暮分段开关滑块:选中态(高亮 + thumb)跟随 themeStore.mode,与主题切换同步立即更新
-const segMode = ref(themeStore.mode)
-const segEl = ref(null)
-const segThumb = ref(null)
-const dawnBtn = ref(null)
-const duskBtn = ref(null)
-const positionSegThumb = () => {
-  const seg = segEl.value
-  const thumb = segThumb.value
-  const btn = segMode.value === 'dawn' ? dawnBtn.value : duskBtn.value
-  if (!seg || !thumb || !btn) return
-  const cs = getComputedStyle(seg)
-  const borderL = parseFloat(cs.borderLeftWidth) || 0
-  const borderT = parseFloat(cs.borderTopWidth) || 0
-  const sr = seg.getBoundingClientRect()
-  const br = btn.getBoundingClientRect()
-  thumb.style.left = `${br.left - sr.left - borderL}px`
-  thumb.style.top = `${br.top - sr.top - borderT}px`
-  thumb.style.width = `${br.width}px`
-  thumb.style.height = `${br.height}px`
-}
-watch(
-  () => themeStore.mode,
-  (m) => {
-    segMode.value = m
-    positionSegThumb()
-  },
-)
-onMounted(() => {
-  // 首次定位不播放过渡(否则加载时滑块从 0 尺寸滑入)
-  if (segThumb.value) segThumb.value.style.transition = 'none'
-  positionSegThumb()
-  requestAnimationFrame(() => {
-    if (segThumb.value) segThumb.value.style.transition = ''
-  })
-  // 语言切换等导致按钮宽度变化时重定位
-  const ro = new ResizeObserver(() => positionSegThumb())
-  if (segEl.value) ro.observe(segEl.value)
-  onBeforeUnmount(() => ro.disconnect())
-})
-
 // pinned 跟随 scrolled:正向立即进顶栏,反向延迟回来(等 holder 渐显完成后 toolbar 再回位)
 let pinTimer = null
 watch(scrolled, (val) => {
@@ -656,47 +612,6 @@ watch(
   height: 100%;
   overflow: hidden;
 }
-.gc-seg {
-  position: relative;
-  display: inline-flex;
-  padding: 4px;
-  gap: 4px;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-}
-.gc-seg-thumb {
-  position: absolute;
-  border-radius: 11px;
-  background: var(--color-brand);
-  box-shadow: var(--shadow);
-  transition:
-    left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    top 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
-  z-index: 0;
-}
-.gc-seg button {
-  all: unset;
-  cursor: pointer;
-  position: relative;
-  z-index: 1;
-  padding: 8px 20px;
-  border-radius: 11px;
-  font-size: 13.5px;
-  color: var(--color-text-secondary);
-  transition: color 0.25s;
-}
-.gc-seg button.on {
-  color: var(--color-card);
-}
-.gc-seg:has(button.on:hover) .gc-seg-thumb {
-  background: var(--color-brand-hover);
-}
-
 /* ===== studio 外框(钉在浏览器视口内,内容内部滚动) ===== */
 .gc-studio {
   flex: 1;

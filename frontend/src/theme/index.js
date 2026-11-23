@@ -81,6 +81,7 @@ function sweepVector(sun) {
 function cloneOldTheme(root) {
   const overlay = document.createElement('div')
   overlay.className = 'theme-sweep-old'
+  overlay.inert = true
 
   const app = document.getElementById('app')
   const clone = app ? app.cloneNode(true) : null

@@ -280,6 +280,7 @@ export default {
     window: '窗边',
     dawn: '晨',
     dusk: '暮',
+    duskMode: '暮色模式',
     autoMode: '日出日落自动切换晨幕色彩',
   },
   blog: {
