@@ -8,7 +8,7 @@
 
     <div class="match-card card" v-loading="loading">
       <template v-if="match">
-        <div class="match-head">
+        <div class="match-head paper-heading">
           <el-icon :size="22" class="match-icon"><Trophy /></el-icon>
           <div class="match-title">
             <b>{{ gameName }}</b>

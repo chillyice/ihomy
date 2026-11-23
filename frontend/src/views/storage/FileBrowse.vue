@@ -82,7 +82,7 @@
 
     <!-- 存储设备:未初始化设备时引导添加(仅 OWNER),成员只读提示 -->
     <template v-else>
-      <div v-if="!customDevices.length" class="card browse-empty">
+      <div v-if="!customDevices.length" class="card browse-empty paper-surface">
         <el-empty :description="userStore.isOwner ? $t('storage.noDeviceOwnerHint') : $t('storage.noDevice')">
           <el-button v-if="userStore.isOwner" type="primary" @click="$router.push('/settings')">{{ $t('storage.goSettings') }}</el-button>
         </el-empty>
@@ -209,7 +209,7 @@
               :is-video="previewIsVideo"
               @close="clearPreview"
             />
-            <div v-else class="card pane-empty">{{ $t('storage.previewHint') }}</div>
+            <div v-else class="card pane-empty paper-surface">{{ $t('storage.previewHint') }}</div>
           </div>
         </div>
       </template>

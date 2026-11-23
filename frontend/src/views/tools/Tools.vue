@@ -29,7 +29,7 @@
         <div
           v-else-if="item.type === 'entry'"
           v-a11y-click
-          class="tool-card card tool-entry"
+          class="tool-card card paper-surface tool-entry"
           :class="{ 'is-sorting': sorting }"
           :aria-disabled="sorting ? 'true' : undefined"
           @click="openEntry(item.entry)"
@@ -49,7 +49,7 @@
         <div
           v-else
           v-a11y-click
-          class="tool-card card"
+          class="tool-card card paper-surface"
           :class="{ 'is-sorting': sorting, 'is-dragging': dragId === item.tool.id }"
           :data-tool-id="item.tool.id"
           :aria-disabled="sorting ? 'true' : undefined"

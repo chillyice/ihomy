@@ -148,7 +148,7 @@
               </svg>
             </span>
           </div>
-          <div class="child-tile-info">
+          <div class="child-tile-info paper-surface">
             <span class="child-tile-name">{{ c.name }}</span>
             <span class="child-tile-meta">
               {{ t('album.photoCount', { n: c.photoCount })
@@ -183,7 +183,7 @@
               </svg>
             </span>
           </div>
-          <div class="child-info">
+          <div class="child-info paper-heading">
             <span class="child-name">{{ c.name }}</span>
             <span class="child-meta">
               {{ t('album.photoCount', { n: c.photoCount })

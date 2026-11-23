@@ -30,7 +30,7 @@
             <div v-else class="recommend-img recommend-img-empty">
               <el-icon><Bowl /></el-icon>
             </div>
-            <div class="recommend-name">{{ r.name }}</div>
+            <div class="recommend-name paper-surface">{{ r.name }}</div>
           </div>
         </div>
       </section>
@@ -54,7 +54,7 @@
             <div v-else class="menu-img menu-img-empty">
               <el-icon><Bowl /></el-icon>
             </div>
-            <div class="menu-info">
+            <div class="menu-info paper-surface">
               <div class="menu-name">{{ r.name }}</div>
               <div class="menu-meta">
                 <span v-if="r.cuisine" class="meta-tag">{{ dictText($t, 'recipe_cuisine', r.cuisine) }}</span>
@@ -263,7 +263,7 @@ onMounted(loadMenu)
   }
 }
 
-html.dark .menu-info {
+html.dark:not(.warm-paper-page) .menu-info {
   background: rgba(40, 44, 52, 0.85);
 }
 </style>

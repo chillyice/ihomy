@@ -10,7 +10,7 @@
       </div>
 
       <div class="plant-info">
-        <div class="plant-head">
+        <div class="plant-head paper-heading">
           <span class="species-name">{{ $t('plant.species.' + state.species) }}</span>
           <span class="stage-name">{{ $t('plant.stageName.' + state.stage) }}</span>
           <el-tag v-if="state.wilted" type="danger" effect="plain">{{ $t('plant.wilted') }}</el-tag>
@@ -131,7 +131,7 @@
     </div>
 
     <!-- 未种植:品种选择 + 种下 -->
-    <div v-else class="plant-empty card">
+    <div v-else class="plant-empty card paper-surface">
       <div class="empty-art"><PlantSprite species="SUNFLOWER" stage="FLOWER" /></div>
       <h2 class="empty-title">{{ $t('plant.emptyTitle') }}</h2>
       <p class="empty-desc">{{ $t('plant.emptyDesc') }}</p>

@@ -108,7 +108,7 @@
       </div>
     </div>
 
-    <div v-else class="card color-empty">{{ $t('tools.color.emptyState') }}</div>
+    <div v-else class="card color-empty paper-surface">{{ $t('tools.color.emptyState') }}</div>
   </div>
 </template>
 

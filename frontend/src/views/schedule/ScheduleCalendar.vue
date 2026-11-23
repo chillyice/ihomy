@@ -2,7 +2,7 @@
      农历/节气/节日/休班全部来自后端 /public/calendar,补格日期没有基础数据时只显示日号。 -->
 <template>
   <section class="cal card">
-    <header class="cal-head">
+    <header class="cal-head paper-heading">
       <div class="cal-nav">
         <button type="button" class="cal-arrow" :aria-label="$t('schedule.prevMonth')" @click="$emit('change-month', -1)">
           <el-icon><ArrowLeft /></el-icon>

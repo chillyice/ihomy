@@ -16,7 +16,7 @@
 
     <div v-loading="loading">
       <div v-if="list.length" class="mm-grid">
-        <div v-a11y-click v-for="m in list" :key="m.id" class="mm-card card" @click="openMap(m)">
+        <div v-a11y-click v-for="m in list" :key="m.id" class="mm-card card paper-surface" @click="openMap(m)">
           <el-button class="mm-del" :icon="Delete" circle text size="small" @click.stop="removeMindMap(m)" />
           <img v-if="m.thumbUrl" class="mm-card-thumb" :src="m.thumbUrl" loading="lazy" alt="" />
           <div class="mm-card-title">{{ m.title }}</div>

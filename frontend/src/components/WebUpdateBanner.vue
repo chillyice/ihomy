@@ -7,7 +7,7 @@
 -->
 <template>
   <transition name="web-update">
-    <div v-if="visible" class="web-update" role="status" aria-live="polite">
+    <div v-if="visible" class="web-update paper-surface" role="status" aria-live="polite">
       <span class="web-update__text">{{ $t('appUpdate.webReady', { version: serverVersion }) }}</span>
       <el-button size="small" type="primary" @click="reload">{{ $t('appUpdate.webReload') }}</el-button>
       <el-button size="small" text @click="dismiss">{{ $t('appUpdate.later') }}</el-button>

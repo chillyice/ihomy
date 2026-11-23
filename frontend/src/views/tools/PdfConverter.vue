@@ -36,7 +36,7 @@
         <div
           v-if="!pdfFile"
           v-a11y-click
-          class="pdf-drop"
+          class="pdf-drop paper-surface"
           :class="{ dragging: dragPdf }"
           @click="pickPdf"
           @dragover.prevent="dragPdf = true"
@@ -121,7 +121,7 @@
 
         <div
           v-a11y-click
-          class="pdf-drop"
+          class="pdf-drop paper-surface"
           :class="{ dragging: dragImages }"
           @click="pickImages"
           @dragover.prevent="dragImages = true"
@@ -212,7 +212,7 @@
 
     <!-- 进度与取消 -->
     <div v-if="busy" class="card pdf-progress">
-      <div class="pdf-progress-head">
+      <div class="pdf-progress-head paper-heading">
         <span>{{ phaseText }}</span>
         <el-button size="small" text type="danger" @click="cancel">{{ $t('tools.pdf.cancel') }}</el-button>
       </div>
@@ -222,7 +222,7 @@
 
     <!-- PDF → 图片结果 -->
     <div v-if="tab === 'pdf2img' && results.length" class="card pdf-results">
-      <div class="pdf-results-head">
+      <div class="pdf-results-head paper-heading">
         <span class="section-label">{{ $t('tools.pdf.resultTitle', { n: results.length }) }}</span>
       </div>
       <div class="pdf-result-grid">
@@ -238,7 +238,7 @@
 
     <!-- PDF → 文本结果 -->
     <div v-if="tab === 'pdf2txt' && textPages.length" class="card pdf-results">
-      <div class="pdf-results-head">
+      <div class="pdf-results-head paper-heading">
         <span class="section-label">{{ $t('tools.pdf.textTitle', { n: textPages.length }) }}</span>
       </div>
       <pre class="pdf-text">{{ displayText }}</pre>
@@ -636,6 +636,9 @@ onBeforeUnmount(() => {
 .pdf-drop.dragging {
   border-color: var(--color-accent, var(--color-brand));
   background: rgba(var(--color-brand-rgb, 184, 140, 110), 0.06);
+}
+html.warm-paper-page .pdf-drop:is(:hover, .dragging) {
+  background-image: none;
 }
 .pdf-drop-title {
   font-size: 14px;

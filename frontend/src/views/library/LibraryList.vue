@@ -153,7 +153,7 @@
                   <el-icon><Reading /></el-icon>
                 </span>
               </span>
-              <span class="book-info">
+              <span class="book-info paper-heading">
                 <span class="book-title" :title="b.title">{{ b.title }}</span>
                 <span v-if="b.author" class="book-author" :title="b.author">{{ b.author }}</span>
                 <span class="book-meta">
@@ -939,5 +939,13 @@ onMounted(async () => {
   .book-more {
     min-width: 36px;
   }
+}
+/* 暖居网格的书签与封面分开，列表沿用紧凑行高。 */
+html.warm-paper-page .shelf-book:is(.selected, :hover, :focus-within) .book-info {
+  background-image: none;
+}
+html.warm-paper-page .view-grid .book-info {
+  border-radius: 4px 4px 7px 5px;
+  padding: 4px 6px;
 }
 </style>

@@ -20,7 +20,7 @@
 
     <div v-loading="loading">
       <!-- 还没接入 / 没有可展示的设备 -->
-      <div v-if="!groups.length && !keyword" class="card iot-empty">
+      <div v-if="!groups.length && !keyword" class="card iot-empty paper-surface">
         <div class="iot-empty-title">{{ devices.length ? $t('iot.empty') : $t('iot.notConfigured') }}</div>
         <div class="iot-empty-hint">
           {{ devices.length ? $t('iot.emptyHint') : canManage ? $t('iot.notConfiguredHint') : $t('iot.noPermissionHint') }}
@@ -39,7 +39,7 @@
           </div>
           <div class="iot-grid">
             <div v-for="d in g.items" :key="d.id" class="iot-card card" v-a11y-click @click="openHistory(d)">
-              <div class="iot-card-top">
+              <div class="iot-card-top paper-heading">
                 <span class="iot-name">{{ d.name }}</span>
                 <el-tag v-if="d.visibility === 'PRIVATE'" size="small" type="warning" effect="plain">{{
                   $t('iot.manage.visibilityOwner')

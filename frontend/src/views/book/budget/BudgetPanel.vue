@@ -1,7 +1,7 @@
 <!-- 本月预算卡:总进度 + 各分类进度条(超支标红)+ 未设预算支出提示;「管理预算」弹窗在此收口 -->
 <template>
   <div class="card budget-panel">
-    <div class="budget-head">
+    <div class="budget-head paper-heading">
       <span class="section-label">{{ $t('book.budget.title') }}</span>
       <el-button v-if="!readonly" size="small" text @click="mgrVisible = true">{{ $t('book.budget.manage') }}</el-button>
     </div>

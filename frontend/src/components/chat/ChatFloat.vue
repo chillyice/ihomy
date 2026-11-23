@@ -17,7 +17,7 @@
         >
           <span class="sheet-grip-bar" aria-hidden="true"></span>
         </div>
-        <div class="sheet-head">
+        <div class="sheet-head paper-heading">
           <!-- 在「一起玩」房间里多一个房间页:同一扇浮窗承载两路会话,不再单独起房间聊天浮球 -->
           <div v-if="roomActive" class="float-tabs" role="tablist">
             <button
@@ -62,7 +62,7 @@
 
       <!-- 桌面端:可拖拽缩放面板 -->
       <div v-else class="chat-float-panel" :class="{ pinned: pinnedRoom }" :style="panelStyle">
-        <div class="panel-head" @pointerdown="onPanelDown">
+        <div class="panel-head paper-heading" @pointerdown="onPanelDown">
           <!-- 在「一起玩」房间里多一个房间页:同一扇浮窗承载两路会话,不再单独起房间聊天浮球 -->
           <div v-if="roomActive" class="float-tabs" role="tablist">
             <button

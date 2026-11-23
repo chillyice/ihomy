@@ -19,7 +19,7 @@
     />
   </el-dialog>
   <div v-else class="card library-preview">
-    <div class="library-preview-head">
+    <div class="library-preview-head paper-heading">
       <span>{{ $t('library.detail') }}</span>
       <el-button :icon="Close" size="small" text :aria-label="$t('common.close')" @click="$emit('close')" />
     </div>

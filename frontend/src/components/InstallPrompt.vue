@@ -1,6 +1,6 @@
 <!-- PWA 安装引导:Android/Chrome 弹原生安装条;iOS Safari 显示"添加到主屏幕"提示;已安装/已关闭不再出现 -->
 <template>
-  <div v-if="visible" class="install-prompt">
+  <div v-if="visible" class="install-prompt paper-surface">
     <div class="install-inner">
       <div class="install-text">
         <div class="install-title">{{ $t('pwa.title') }}</div>

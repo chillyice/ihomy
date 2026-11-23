@@ -181,7 +181,7 @@
                     <span v-else class="media-hover-hint">{{ $t('cinema.viewSeries') }}</span>
                   </div>
                 </div>
-                <div class="media-info">
+                <div class="media-info paper-surface">
                   <div class="media-name" :title="w.name">{{ w.name }}</div>
                   <div class="media-meta">
                     <span v-if="w.year">{{ w.year }}</span>
@@ -278,7 +278,7 @@
                   </svg>
                 </span>
               </div>
-              <div class="video-info">
+              <div class="video-info paper-surface">
                 <div class="video-title">{{ v.title }}</div>
                 <div v-if="v.originalTitle" class="video-original">{{ v.originalTitle }}</div>
                 <div v-if="v.genres" class="video-genres">
@@ -1510,5 +1510,10 @@ onBeforeUnmount(() => {
   .resume-card {
     flex: 0 0 132px;
   }
+}
+html.warm-paper-page .media-info {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 4px 4px 8px 6px;
 }
 </style>

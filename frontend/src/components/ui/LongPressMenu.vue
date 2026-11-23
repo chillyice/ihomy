@@ -6,7 +6,7 @@
       <div
         v-if="visible"
         ref="menuRef"
-        class="long-press-menu"
+        class="long-press-menu paper-surface"
         role="menu"
         :style="{ left: pos.x + 'px', top: pos.y + 'px' }"
         @pointerdown.stop

@@ -49,7 +49,7 @@
 
       <!-- 素材 -->
       <div class="form-section">
-        <div class="section-header">
+        <div class="section-header paper-heading">
           <h2>{{ $t('kitchen.ingredients') }}</h2>
           <el-button size="small" @click="addIngredient">
             <el-icon><Plus /></el-icon> {{ $t('kitchen.addIngredient') }}
@@ -67,7 +67,7 @@
 
       <!-- 设备 -->
       <div class="form-section">
-        <div class="section-header">
+        <div class="section-header paper-heading">
           <h2>{{ $t('kitchen.equipment') }}</h2>
           <el-button size="small" @click="addEquipment">
             <el-icon><Plus /></el-icon> {{ $t('kitchen.addEquipment') }}
@@ -83,7 +83,7 @@
 
       <!-- 步骤 -->
       <div class="form-section">
-        <div class="section-header">
+        <div class="section-header paper-heading">
           <h2>{{ $t('kitchen.steps') }}</h2>
           <el-button size="small" @click="addStep">
             <el-icon><Plus /></el-icon> {{ $t('kitchen.addStep') }}
@@ -340,8 +340,14 @@ onMounted(load)
   }
 }
 
-html.dark .form-section {
+html.dark:not(.warm-paper-page) .form-section {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.warm-paper-page .form-section {
+  background-color: var(--color-card);
+  border-color: var(--color-border);
+  backdrop-filter: none;
 }
 </style>

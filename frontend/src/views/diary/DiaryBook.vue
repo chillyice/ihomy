@@ -43,7 +43,7 @@
           </div>
         </div>
 
-        <div class="book-toolbar">
+        <div class="book-toolbar paper-surface">
           <button class="ghost-btn" :disabled="!canPrev" @click="flip(-1)">
             <svg
               viewBox="0 0 24 24"
@@ -395,7 +395,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
 }
 html.dark .book-toolbar {
-  background: rgba(var(--color-card-rgb), 0.45);
+  background-color: rgba(var(--color-card-rgb), 0.45);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }

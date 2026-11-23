@@ -12,7 +12,7 @@
     <el-tabs v-model="activeTab" class="member-tabs">
       <el-tab-pane :label="t('member.tabMembers')" name="members">
         <div v-if="userStore.isOwner" class="card invite-card">
-          <div class="invite-title">{{ t('member.inviteNew') }}</div>
+          <div class="invite-title paper-heading">{{ t('member.inviteNew') }}</div>
           <div class="invite-row">
             <el-select v-model="inviteRole" style="width: 140px">
               <el-option :label="t('member.member')" value="MEMBER" />
@@ -33,7 +33,7 @@
         </div>
 
         <div v-if="userStore.isOwner && applies.length" class="card invite-card">
-          <div class="invite-title">{{ t('member.applyList') }}（{{ applies.length }}）</div>
+          <div class="invite-title paper-heading">{{ t('member.applyList') }}（{{ applies.length }}）</div>
           <div class="apply-row" v-for="a in applies" :key="a.id">
             <el-avatar :size="36">{{ (a.applicantName || 'U').charAt(0) }}</el-avatar>
             <div class="apply-info">
@@ -53,7 +53,7 @@
         </div>
 
         <div v-loading="loading" class="member-list">
-          <div v-for="m in members" :key="m.id" class="member-row card">
+          <div v-for="m in members" :key="m.id" class="member-row card paper-surface">
             <UserPresenceDot :status="statusOf(m)" :size="10">
               <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
             </UserPresenceDot>

@@ -29,7 +29,7 @@
         <div v-a11y-click v-for="b in books" :key="b.authorId" class="notebook" @click="router.push(`/diary/book/${b.authorId}`)">
           <div class="nb-cover">
             <div class="nb-spine"></div>
-            <div class="nb-label">
+            <div class="nb-label paper-surface">
               <div class="nb-name" :title="b.authorName">{{ b.authorName || '-' }}</div>
               <div v-if="b.sharedFrom" class="nb-shared">{{ sharedFromText(b.sharedFrom) }}</div>
               <div class="nb-count">{{ $t('diary.entryCount', { n: b.count }) }}</div>
@@ -180,7 +180,7 @@ onMounted(load)
   left: 13%;
   right: 14%;
   top: 16%;
-  background: rgba(255, 253, 248, 0.94);
+  background-color: rgba(255, 253, 248, 0.94);
   border-radius: 4px;
   padding: 14px 12px 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
@@ -240,7 +240,7 @@ html.dark .nb-cover {
     inset 0 1px 0 rgba(232, 220, 200, 0.08);
 }
 html.dark .nb-label {
-  background: rgba(var(--color-card-rgb), 0.92);
+  background-color: rgba(var(--color-card-rgb), 0.92);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 html.dark .nb-label::after {

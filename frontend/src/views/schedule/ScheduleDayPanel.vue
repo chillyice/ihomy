@@ -1,7 +1,7 @@
 <!-- 当日详情:日程与节日/节气/休班合成一列,每行行首标明自身属性;游客只看登录引导,不发需登录请求。 -->
 <template>
   <section id="schedule-day" class="day card">
-    <header class="day-head">
+    <header class="day-head paper-heading">
       <div class="day-title">
         <span class="day-date">{{ titleText }}</span>
         <span v-if="lunarText" class="day-lunar">{{ lunarText }}</span>

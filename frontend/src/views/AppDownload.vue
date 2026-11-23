@@ -10,7 +10,7 @@
       </div>
     </PageToolbar>
 
-    <section class="card app-hero">
+    <section class="card app-hero paper-surface">
       <div class="app-hero-text">
         <h3 class="app-name">{{ $t('androidApp.name') }}</h3>
         <p class="app-lead">{{ $t('androidApp.lead') }}</p>
@@ -39,14 +39,14 @@
     </section>
 
     <section class="card app-sec">
-      <h3 class="app-h">{{ $t('androidApp.installTitle') }}</h3>
+      <h3 class="app-h paper-heading">{{ $t('androidApp.installTitle') }}</h3>
       <ol class="app-steps">
         <li v-for="(x, i) in $tm('androidApp.installSteps')" :key="i">{{ x }}</li>
       </ol>
     </section>
 
     <section class="card app-sec">
-      <h3 class="app-h">{{ $t('androidApp.permissionTitle') }}</h3>
+      <h3 class="app-h paper-heading">{{ $t('androidApp.permissionTitle') }}</h3>
       <p class="app-p">{{ $t('androidApp.permissionNote') }}</p>
       <ul class="app-list">
         <li v-for="(x, i) in $tm('androidApp.permissions')" :key="i">{{ x }}</li>
@@ -54,12 +54,12 @@
     </section>
 
     <section class="card app-sec">
-      <h3 class="app-h">{{ $t('androidApp.widgetTitle') }}</h3>
+      <h3 class="app-h paper-heading">{{ $t('androidApp.widgetTitle') }}</h3>
       <p class="app-p">{{ $t('androidApp.widgetBody') }}</p>
     </section>
 
     <section class="card app-sec">
-      <h3 class="app-h">{{ $t('androidApp.faqTitle') }}</h3>
+      <h3 class="app-h paper-heading">{{ $t('androidApp.faqTitle') }}</h3>
       <dl class="app-faq">
         <template v-for="(item, i) in $tm('androidApp.faq')" :key="i">
           <dt>{{ item.q }}</dt>

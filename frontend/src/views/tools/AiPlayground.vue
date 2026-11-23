@@ -30,7 +30,7 @@
     <!-- 对话:左参数(系统提示词+更多设置) / 右对话窗口 —— 输入输出对齐全高 -->
     <div v-if="capability === 'chat'" class="pg-split">
       <div class="pg-panel pg-input">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.inputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.inputPanel') }}</div>
         <div class="pg-panel-body">
           <div class="pg-field-block">
             <span class="section-label">{{ $t('tools.aiPlayground.systemPrompt') }}</span>
@@ -67,7 +67,7 @@
       </div>
 
       <div class="pg-panel pg-output">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.outputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.outputPanel') }}</div>
         <div class="pg-panel-body pg-chat-output">
           <div ref="chatListRef" class="pg-chat-list">
             <div v-for="(m, i) in chatMessages" :key="i" class="pg-msg" :class="m.role">
@@ -96,7 +96,7 @@
     <!-- 图片生成:左输入(prompt+参考图+常用参数+更多设置) / 右结果图 —— 输入输出对齐全高 -->
     <div v-else-if="capability === 'image'" class="pg-split">
       <div class="pg-panel pg-input">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.inputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.inputPanel') }}</div>
         <div class="pg-panel-body">
           <div class="pg-field-block">
             <span class="section-label">{{ $t('tools.aiPlayground.imagePrompt') }}</span>
@@ -197,7 +197,7 @@
       </div>
 
       <div class="pg-panel pg-output">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.outputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.outputPanel') }}</div>
         <div class="pg-panel-body pg-image-output">
           <div v-if="imageLoading" v-loading="imageLoading" class="pg-img-loading" />
           <div v-else-if="imageResults.length" class="pg-img-grid">
@@ -215,7 +215,7 @@
     <!-- 语音识别:左输入(音频+语言) / 右转写结果 —— 输入输出对齐全高 -->
     <div v-else class="pg-split">
       <div class="pg-panel pg-input">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.inputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.inputPanel') }}</div>
         <div class="pg-panel-body">
           <input ref="audioInputRef" type="file" accept="audio/*" hidden @change="onAudioPick" />
           <div class="pg-field-block">
@@ -241,7 +241,7 @@
       </div>
 
       <div class="pg-panel pg-output">
-        <div class="pg-panel-head">{{ $t('tools.aiPlayground.outputPanel') }}</div>
+        <div class="pg-panel-head paper-heading">{{ $t('tools.aiPlayground.outputPanel') }}</div>
         <div class="pg-panel-body pg-asr-output">
           <div v-if="asrResult" class="pg-asr-result">{{ asrResult }}</div>
           <div v-else class="pg-empty pg-output-empty">{{ $t('tools.aiPlayground.asrEmpty') }}</div>

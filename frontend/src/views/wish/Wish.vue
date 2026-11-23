@@ -20,7 +20,7 @@
         <div
           v-for="(w, i) in filtered"
           :key="w.id"
-          class="wish-card card anim-rise"
+          class="wish-card card anim-rise paper-surface"
           :style="{ '--i': i }"
           :class="'st' + (w.status === 'ACHIEVED' ? 1 : w.status === 'ABANDONED' ? 2 : 0)"
         >

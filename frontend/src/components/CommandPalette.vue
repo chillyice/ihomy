@@ -47,7 +47,7 @@
             </template>
           </ul>
           <p v-if="!items.length && !searchActive" class="cmd-empty">{{ t('command.empty') }}</p>
-          <div class="cmd-hint">{{ t('command.hint') }}</div>
+          <div class="cmd-hint paper-heading">{{ t('command.hint') }}</div>
         </div>
       </div>
     </Transition>

@@ -4,7 +4,7 @@
     <img v-if="appStore.family?.coverImage" :src="appStore.family.coverImage" class="me-cover" :alt="appStore.familyName" />
 
     <!-- 用户信息 -->
-    <div class="me-header">
+    <div class="me-header paper-surface">
       <el-avatar :size="56" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
       <div class="me-user-info">
         <div class="me-nickname">{{ userInfo?.nickname || $t('home.loginToView') }}</div>
@@ -16,7 +16,7 @@
     </div>
 
     <!-- 家庭切换 -->
-    <div v-if="userStore.isLoggedIn && families.length > 1" class="me-section">
+    <div v-if="userStore.isLoggedIn && families.length > 1" class="me-section paper-surface">
       <div v-a11y-click class="me-row" @click="showFamilySwitch = !showFamilySwitch">
         <span class="me-row-icon">🔄</span>
         <span class="me-row-text">{{ $t('nav.switchFamily') }}</span>
@@ -43,7 +43,7 @@
     </div>
 
     <!-- 设置区 -->
-    <div class="me-section">
+    <div class="me-section paper-surface">
       <div v-a11y-click class="me-row" @click="toggleTheme">
         <span class="me-row-icon">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
@@ -67,7 +67,7 @@
     </div>
 
     <!-- 功能入口 -->
-    <div class="me-section">
+    <div class="me-section paper-surface">
       <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/settings')">
         <span class="me-row-icon">⚙️</span>
         <span class="me-row-text">{{ $t('nav.settings') }}</span>
@@ -86,7 +86,7 @@
     </div>
 
     <!-- 退出 -->
-    <div v-if="userStore.isLoggedIn" class="me-section">
+    <div v-if="userStore.isLoggedIn" class="me-section paper-surface">
       <div v-a11y-click class="me-row logout" @click="doLogout">
         <span class="me-row-text">{{ $t('nav.logout') }}</span>
       </div>
@@ -199,7 +199,7 @@ onMounted(async () => {
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
 html.dark .me-header {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.06);
 }
 .me-user-info {
@@ -242,8 +242,12 @@ html.dark .me-login-btn {
   overflow: hidden;
 }
 html.dark .me-section {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.06);
+}
+html.warm-paper-page :is(.me-header, .me-section) {
+  background-color: var(--color-card);
+  border-color: var(--color-border);
 }
 
 .me-row {

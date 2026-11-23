@@ -87,7 +87,7 @@
 
       <template v-else>
         <!-- 清单与月历共用同一份区间数据,所以翻月放在清单头上,否则进清单后无法换月 -->
-        <div class="list-month card">
+        <div class="list-month card paper-surface">
           <el-button size="small" text :aria-label="$t('schedule.prevMonth')" @click="changeMonth(-1)">
             <el-icon><ArrowLeft /></el-icon>
           </el-button>

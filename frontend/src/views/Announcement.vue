@@ -20,7 +20,7 @@
             <div v-else class="ann-fallback">{{ a.title }}</div>
             <span v-if="userStore.isOwner && statusText(a)" class="ann-status" :class="statusClass(a)">{{ statusText(a) }}</span>
           </div>
-          <div class="ann-body">
+          <div class="ann-body paper-surface">
             <div class="ann-title">
               <span>{{ a.title }}</span>
               <el-icon v-if="a.linkUrl" class="ann-link-icon"><Link /></el-icon>

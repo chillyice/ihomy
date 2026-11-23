@@ -1,6 +1,6 @@
 <!-- 近期日程提醒:未来 7 天、最多 20 条,横向可换行;点一条跳到对应日期。 -->
 <template>
-  <section v-if="items.length" class="upcoming card">
+  <section v-if="items.length" class="upcoming card paper-surface">
     <span class="up-label">
       <el-icon><Bell /></el-icon>
       {{ $t('schedule.upcoming') }}

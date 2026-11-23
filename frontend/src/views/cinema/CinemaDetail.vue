@@ -12,7 +12,7 @@
       </el-empty>
 
       <template v-else-if="detail">
-        <div class="detail-head card">
+        <div class="detail-head card paper-surface">
           <div class="poster-box">
             <img v-if="detail.imageUrl" :src="detail.imageUrl" class="poster" :alt="detail.name" />
             <div v-else class="poster poster-placeholder">🎬</div>

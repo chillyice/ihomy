@@ -13,12 +13,12 @@
 
     <div class="help-list">
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.about.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.about.title') }}</h3>
         <p class="help-p">{{ $t('help.about.body') }}</p>
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.roles.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.roles.title') }}</h3>
         <ul class="help-ul">
           <li v-for="(x, i) in $tm('help.roles.items')" :key="i">{{ x }}</li>
         </ul>
@@ -26,20 +26,20 @@
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.start.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.start.title') }}</h3>
         <ul class="help-ul">
           <li v-for="(x, i) in $tm('help.start.items')" :key="i">{{ x }}</li>
         </ul>
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.phone.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.phone.title') }}</h3>
         <p class="help-p">{{ $t('help.phone.body') }}</p>
       </section>
 
       <!-- 锚点 #health:设置页「健康数据」的「完整步骤」链到这里 -->
       <section id="health" class="card help-sec help-health">
-        <h3 class="help-h">{{ $t('help.health.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.health.title') }}</h3>
         <p class="help-p">{{ $t('help.health.lead') }}</p>
 
         <h4 class="help-sub">{{ $t('help.health.tokenTitle') }}</h4>
@@ -90,7 +90,7 @@
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.visible.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.visible.title') }}</h3>
         <ul class="help-ul">
           <li v-for="(x, i) in $tm('help.visible.items')" :key="i">{{ x }}</li>
         </ul>
@@ -98,14 +98,14 @@
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.trouble.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.trouble.title') }}</h3>
         <ul class="help-ul">
           <li v-for="(x, i) in $tm('help.trouble.items')" :key="i">{{ x }}</li>
         </ul>
       </section>
 
       <section class="card help-sec">
-        <h3 class="help-h">{{ $t('help.ask.title') }}</h3>
+        <h3 class="help-h paper-heading">{{ $t('help.ask.title') }}</h3>
         <p class="help-p">{{ $t('help.ask.body') }}</p>
       </section>
     </div>

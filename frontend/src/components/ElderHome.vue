@@ -11,7 +11,7 @@
     </header>
 
     <section class="elder-card">
-      <div class="elder-section-title">{{ $t('elderHome.today') }}</div>
+      <div class="elder-section-title paper-heading">{{ $t('elderHome.today') }}</div>
       <ul v-if="todayItems.length" class="elder-agenda">
         <li v-for="it in todayItems" :key="it.key" class="elder-agenda-row">
           <span class="ea-time">{{ it.timeLabel }}</span>
@@ -25,7 +25,7 @@
     </section>
 
     <nav class="elder-tiles">
-      <button v-for="tile in tiles" :key="tile.path" type="button" class="elder-tile" @click="go(tile.path)">
+      <button v-for="tile in tiles" :key="tile.path" type="button" class="elder-tile paper-surface" @click="go(tile.path)">
         <span class="et-icon" aria-hidden="true">{{ tile.icon }}</span>
         <span class="et-label">{{ $t(tile.labelKey) }}</span>
       </button>

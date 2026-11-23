@@ -4,7 +4,7 @@
     <Breadcrumb :items="[{ label: $t('points.title') }]" />
 
     <!-- 签到卡(需登录:积分与签到都是「我」的数据) -->
-    <div v-if="userStore.isLoggedIn" class="checkin-card card">
+    <div v-if="userStore.isLoggedIn" class="checkin-card card paper-surface">
       <div class="checkin-info">
         <div class="checkin-balance">
           <b>{{ stats.balance ?? 0 }}</b
@@ -26,7 +26,7 @@
         </PageToolbar>
         <div v-loading="loading">
           <div v-if="products.length" class="product-grid">
-            <div v-for="p in products" :key="p.id" class="product-card card">
+            <div v-for="p in products" :key="p.id" class="product-card card paper-surface">
               <div class="product-icon">{{ p.icon || '🎁' }}</div>
               <div class="product-name">{{ p.name }}</div>
               <div class="product-points">{{ p.points }} {{ $t('points.points') }}</div>
@@ -259,8 +259,6 @@ onMounted(async () => {
   justify-content: space-between;
   padding: 20px 24px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ffb74d, #ff8a65);
-  color: #fff;
   margin-bottom: 20px;
 }
 .checkin-info {
@@ -320,5 +318,13 @@ onMounted(async () => {
   .product-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+}
+
+html:not(.warm-paper-page) .checkin-card {
+  background: linear-gradient(135deg, #ffb74d, #ff8a65);
+  color: #fff;
+}
+html.warm-paper-page :is(.product-limit, .product-off) {
+  color: var(--color-text-secondary);
 }
 </style>

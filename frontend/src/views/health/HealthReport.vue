@@ -18,7 +18,7 @@
           class="card report-card"
           :class="[`report-card--${card.id}`, { 'is-wide': WIDE_CARDS.includes(card.id) }]"
         >
-          <div class="report-head">
+          <div class="report-head paper-heading">
             <span class="section-label">{{ cardTitle($t, card.id) }}</span>
             <span class="report-head-right">
               <span class="report-sub">{{ subText(card) }}</span>

@@ -2,7 +2,7 @@
      点击卡片选中两人 → 计算称谓;图谱不显示"第 N 代",关系线按夫妻/亲子/补充关系区分。 -->
 <template>
   <div class="tree-panel">
-    <div class="tree-head">
+    <div class="tree-head paper-heading">
       <div class="tree-head-text">
         <div class="tree-tip">{{ $t('tree.tip') }}</div>
         <div v-if="graphStats.orphanLinks" class="tree-warn">

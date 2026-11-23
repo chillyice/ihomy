@@ -2,7 +2,7 @@
      只负责展示,不开请求;关闭由外层决定(弹窗关 dialog / 右栏清选中)。 -->
 <template>
   <div class="preview-pane">
-    <div class="pp-head">
+    <div class="pp-head paper-heading">
       <div class="pp-text">
         <span class="pp-title" :title="name">{{ name }}</span>
         <span v-if="meta" class="pp-meta">{{ meta }}</span>

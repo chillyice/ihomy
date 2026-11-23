@@ -34,7 +34,7 @@
     v-for="it in items"
     :key="it.id"
     shadow="hover"
-    class="item-card"
+    class="item-card paper-surface"
     :class="{ 'is-pick': selectMode, selected: selectMode && selectedIds.includes(it.id) }"
     @click="selectMode && $emit('pick', it)"
   >

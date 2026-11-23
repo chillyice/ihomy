@@ -52,7 +52,13 @@
 
     <!-- 分类总览:先挑分类,点进去才看这一类里的游戏(只列当前有游戏的分类) -->
     <div v-if="!activeCategory" v-loading="loading" class="game-cat-grid">
-      <button v-for="c in categoryTiles" :key="c.value" type="button" class="game-cat-card card" @click="activeCategory = c.value">
+      <button
+        v-for="c in categoryTiles"
+        :key="c.value"
+        type="button"
+        class="game-cat-card card paper-surface"
+        @click="activeCategory = c.value"
+      >
         <span class="game-cat-name">{{ c.label }}</span>
         <span class="game-cat-meta">{{ $t('games.categoryGamesCount', { n: c.count }) }}</span>
         <span class="game-cat-samples">{{ c.samples.join(' / ') }}</span>
@@ -72,7 +78,7 @@
 
     <div v-if="activeCategory" v-loading="loading" class="tool-grid">
       <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
-      <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card" @click="$router.push(b.path)">
+      <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card paper-surface" @click="$router.push(b.path)">
         <div class="tool-icon">
           <el-icon :size="30"><component :is="b.icon" /></el-icon>
         </div>
@@ -86,7 +92,7 @@
       </div>
 
       <!-- 导入的小游戏(LINK 为外部网页游戏,点卡片进站内 /games/web/{id} 用 iframe 打开) -->
-      <div v-a11y-click v-for="g in visibleGames" :key="g.id" class="tool-card card" @click="play(g)">
+      <div v-a11y-click v-for="g in visibleGames" :key="g.id" class="tool-card card paper-surface" @click="play(g)">
         <div class="tool-icon">
           <el-icon :size="30">
             <Link v-if="g.type === 'LINK'" />

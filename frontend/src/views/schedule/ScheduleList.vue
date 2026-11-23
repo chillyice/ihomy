@@ -3,7 +3,7 @@
   <section v-loading="loading" class="list-wrap">
     <div v-if="!groups.length" class="empty-card card">{{ $t('schedule.listEmpty') }}</div>
     <div v-for="g in groups" :key="g.date" class="list-group">
-      <div class="group-head">
+      <div class="group-head paper-heading">
         <span class="group-date">{{ dateTitle(g.date) }}</span>
         <span class="group-count">{{ g.items.length }}</span>
       </div>

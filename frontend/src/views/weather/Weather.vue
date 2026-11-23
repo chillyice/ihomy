@@ -12,7 +12,7 @@
         <div class="card wt-hero">
           <div class="wt-hero-top">
             <div class="wt-now">
-              <div class="wt-city">{{ detail?.now?.city || '—' }} · {{ todayLabel }}</div>
+              <div class="wt-city paper-heading">{{ detail?.now?.city || '—' }} · {{ todayLabel }}</div>
               <!-- 图标与温度成组:任何宽度下都保持左右并排,只有「高低温 + 天气」整组可换行到下一行 -->
               <div class="wt-main">
                 <span class="wt-readout">

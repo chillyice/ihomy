@@ -25,7 +25,7 @@
               <el-icon><Picture /></el-icon>
             </div>
           </div>
-          <div class="rc-body">
+          <div class="rc-body paper-surface">
             <div class="rc-title" :title="it.title">{{ it.title }}</div>
             <div class="rc-time">{{ t('recycle.deletedAt') }}：{{ fmt(it.deletedAt) }}</div>
           </div>

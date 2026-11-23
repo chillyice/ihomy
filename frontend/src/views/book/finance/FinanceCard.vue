@@ -1,7 +1,7 @@
 <!-- 理财产品卡:类型/机构、本金与年化、持有进度、预期与已计提、到期与剩余天数、资金来源与入账标记 -->
 <template>
   <div class="fc-card card" :class="{ 'is-redeemed': isRedeemed }">
-    <div class="fc-head">
+    <div class="fc-head paper-heading">
       <div class="fc-title">
         <span class="fc-name" :title="product.name">{{ product.name }}</span>
         <el-tag size="small" :type="statusType" effect="plain">{{ statusLabel }}</el-tag>

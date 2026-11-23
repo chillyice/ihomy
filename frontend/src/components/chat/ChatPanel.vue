@@ -15,7 +15,7 @@
         ></div>
       </div>
       <div class="chat-main">
-        <div class="chat-main-head">
+        <div class="chat-main-head paper-heading">
           <button v-if="singlePane" type="button" class="head-back" @click="emit('contacts')">{{ $t('windowTools.contacts') }}</button>
           <button
             v-else

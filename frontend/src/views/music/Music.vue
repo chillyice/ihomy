@@ -195,7 +195,7 @@
                     </svg>
                   </span>
                 </div>
-                <div class="music-info">
+                <div class="music-info paper-surface">
                   <div class="music-title" :title="t.title">
                     {{ t.title || $t('music.unknownTrack') }}
                     <small v-if="isCurrent(t)">{{ $t(music.playing ? 'music.playerPlaying' : 'music.playerPaused') }}</small>
@@ -1753,5 +1753,14 @@ html.dark .add-album-cover.placeholder {
   .playlist-grid {
     grid-template-columns: 1fr;
   }
+}
+html.warm-paper-page .music-tabs :deep(.el-tabs__item) {
+  color: var(--color-text-secondary);
+}
+html.warm-paper-page .music-tabs :deep(.el-tabs__item:is(:hover, .is-active)) {
+  color: var(--leaf-ink);
+}
+html.warm-paper-page .music-tabs :deep(.el-tabs__active-bar) {
+  background-color: var(--leaf-accent);
 }
 </style>

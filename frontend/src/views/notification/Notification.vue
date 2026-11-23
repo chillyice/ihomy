@@ -11,7 +11,7 @@
       </div>
     </PageToolbar>
 
-    <div v-loading="loading" class="card notify-page">
+    <div v-loading="loading" class="card notify-page paper-surface">
       <div v-if="list.length" class="notify-list">
         <SwipeRow
           v-for="n in list"

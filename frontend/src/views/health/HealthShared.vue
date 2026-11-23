@@ -17,7 +17,7 @@
     </div>
 
     <template v-else-if="data">
-      <div class="card shared-head">
+      <div class="card shared-head paper-surface">
         <div class="shared-title">{{ $t('health.shared.title', { name: ownerName }) }}</div>
         <div class="shared-meta">
           {{ $t('health.shared.by', { name: ownerName }) }} ·

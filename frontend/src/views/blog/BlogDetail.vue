@@ -30,7 +30,7 @@
 
       <!-- 目录导航:右侧 sticky -->
       <aside v-if="toc.length" class="toc-aside">
-        <nav class="toc">
+        <nav class="toc paper-surface">
           <div class="toc-title">{{ $t('blog.toc') }}</div>
           <ul>
             <li v-for="h in toc" :key="h.id" :class="'toc-l' + h.level">

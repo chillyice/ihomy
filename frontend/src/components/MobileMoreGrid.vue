@@ -1,6 +1,6 @@
 <template>
   <div class="mobile-more">
-    <div class="more-section" v-for="(g, gi) in groups" :key="g.category">
+    <div class="more-section paper-surface" v-for="(g, gi) in groups" :key="g.category">
       <div class="more-section-title">{{ g.label }}</div>
       <div class="more-grid">
         <div
@@ -54,6 +54,12 @@ const navigate = (path) => router.push(path)
 
 .more-section {
   margin-bottom: 24px;
+}
+html.warm-paper-page .more-section {
+  padding: 14px 10px 16px;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
 }
 .more-section-title {
   font-size: 14px;

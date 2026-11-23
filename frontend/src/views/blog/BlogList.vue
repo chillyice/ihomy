@@ -105,7 +105,7 @@
 
     <div class="blog-layout" :class="{ 'no-side': !hasSidePanel }">
       <!-- 大屏左侧分类面板 -->
-      <aside v-if="hasSidePanel" class="category-side">
+      <aside v-if="hasSidePanel" class="category-side paper-surface">
         <div class="side-head">
           <span class="side-title">{{ $t('blog.category') }}</span>
           <button v-if="userStore.isLoggedIn" class="side-add-btn" :title="$t('blog.newCategory')" @click="openCategoryDialog('add')">
@@ -624,7 +624,7 @@ html.dark .cat-mgr-btn:hover {
 
 /* ========== 左侧分类面板 ========== */
 .category-side {
-  background: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border-radius: 14px;
@@ -639,7 +639,7 @@ html.dark .cat-mgr-btn:hover {
   flex-direction: column;
 }
 html.dark .category-side {
-  background: rgba(var(--color-card-rgb), 0.45);
+  background-color: rgba(var(--color-card-rgb), 0.45);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }

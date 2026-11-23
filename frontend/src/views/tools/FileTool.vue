@@ -18,7 +18,7 @@
 
     <div class="file-grid">
       <div class="card file-pane">
-        <label class="file-drop">
+        <label class="file-drop paper-surface">
           <input type="file" class="file-input" :accept="accept" :multiple="mode === 'pack'" @change="onFileChange" />
           <span class="file-drop-title">{{ fileLabel }}</span>
           <span class="file-drop-sub">{{ $t('tools.file.hint', { max: formatBytes(MAX_PACK_BYTES) }) }}</span>

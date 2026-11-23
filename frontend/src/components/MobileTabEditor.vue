@@ -1,14 +1,14 @@
 <template>
   <el-drawer v-model="open" direction="btt" size="72%" :with-header="false" class="mobile-tab-editor" append-to-body>
     <div class="editor">
-      <div class="editor-head">
+      <div class="editor-head paper-heading">
         <div class="editor-title">{{ $t('mobile.tabEditTitle') }}</div>
         <el-button text type="primary" @click="close">{{ $t('mobile.tabDone') }}</el-button>
       </div>
       <div class="editor-hint">{{ $t('mobile.tabEditHint') }}</div>
 
       <!-- 五格预览:点一格,再从下面选功能放进去 -->
-      <div class="slot-row">
+      <div class="slot-row paper-surface">
         <div
           v-for="(tab, i) in tabs"
           :key="i"

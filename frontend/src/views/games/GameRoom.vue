@@ -9,7 +9,7 @@
       </div>
 
       <template v-else>
-        <div class="room-hero card">
+        <div class="room-hero card paper-surface">
           <div class="room-hero-main">
             <!-- 玩法 tag 在游戏选择框前(对抗/合作);房主等待中可换游戏与玩法,
                  换游戏按进房顺序重排席位(不踢人),只换玩法不动席位 -->
@@ -51,7 +51,12 @@
 
         <div class="room-members">
           <!-- 参战成员(房主 + 玩家) -->
-          <div v-for="m in seatView.players" :key="m.userId" class="room-member card" :class="{ host: m.userId === room.hostId }">
+          <div
+            v-for="m in seatView.players"
+            :key="m.userId"
+            class="room-member card paper-surface"
+            :class="{ host: m.userId === room.hostId }"
+          >
             <div class="room-avatar">
               <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
               <el-icon v-else :size="22"><UserFilled /></el-icon>
@@ -114,7 +119,7 @@
             </template>
           </div>
           <!-- 观战成员 -->
-          <div v-for="m in seatView.spectators" :key="'sp' + m.userId" class="room-member card">
+          <div v-for="m in seatView.spectators" :key="'sp' + m.userId" class="room-member card paper-surface">
             <div class="room-avatar">
               <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
               <el-icon v-else :size="22"><UserFilled /></el-icon>
@@ -245,7 +250,7 @@
 
         <!-- 房间排行榜:只统计本房间的各局成绩,跨「再来一局」累计 -->
         <div v-if="board && board.rounds && board.rounds.length" class="room-board card">
-          <div class="board-head">
+          <div class="board-head paper-heading">
             <span class="section-label">{{ $t('games.room.boardTitle') }}</span>
             <span class="board-rounds">{{ $t('games.room.boardRounds', { n: board.roundsCount || 0 }) }}</span>
           </div>

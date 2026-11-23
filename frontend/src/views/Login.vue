@@ -7,7 +7,7 @@
       <div class="blob" style="background: #ecc0ac; top: 70%; left: 12%; width: 260px; height: 260px"></div>
       <div class="blob" style="background: #a8c9de; top: 15%; left: 70%; width: 280px; height: 280px"></div>
     </div>
-    <div class="login-card">
+    <div class="login-card paper-surface">
       <div class="login-title"><IhomyWordmark /></div>
       <div class="login-sub">{{ isRegister ? $t('login.registerTitle') : $t('login.welcome') }}</div>
 
@@ -237,7 +237,7 @@ html.dark .blob {
   opacity: 0.1;
 }
 html.dark .login-card {
-  background: rgba(var(--color-card-rgb), 0.55);
+  background-color: rgba(var(--color-card-rgb), 0.55);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }

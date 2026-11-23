@@ -4,7 +4,7 @@
 
     <div v-if="recipe" class="recipe-content">
       <!-- 顶部:封面 + 基础信息 -->
-      <div class="recipe-header">
+      <div class="recipe-header paper-surface">
         <div class="cover-wrap">
           <img v-if="recipe.coverImage" :src="recipe.coverImage" :alt="recipe.name" class="cover" />
           <div v-else class="cover cover-empty">
@@ -342,10 +342,21 @@ onMounted(load)
   }
 }
 
-html.dark .ingredient-item,
-html.dark .equipment-item,
-html.dark .step-body {
+html.dark:not(.warm-paper-page) .ingredient-item,
+html.dark:not(.warm-paper-page) .equipment-item,
+html.dark:not(.warm-paper-page) .step-body {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.warm-paper-page .recipe-header {
+  padding: clamp(12px, 2vw, 20px);
+  border-radius: 14px;
+  background-color: var(--color-card);
+}
+html.warm-paper-page .glass {
+  background-color: var(--color-card);
+  border-color: var(--color-border);
+  backdrop-filter: none;
 }
 </style>

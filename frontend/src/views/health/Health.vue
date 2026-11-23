@@ -32,7 +32,7 @@
           </el-empty>
         </div>
         <div v-else class="tab-body">
-          <div class="report-bar" v-loading="reportLoading">
+          <div class="report-bar paper-heading" v-loading="reportLoading">
             <div class="date-nav">
               <el-button text circle :disabled="!reportAnchor" :title="$t('health.report.prevDay')" @click="reportStep(-1)">
                 <el-icon><ArrowLeft /></el-icon>
@@ -89,7 +89,7 @@
           </div>
 
           <div class="card chart-card">
-            <div class="chart-head">
+            <div class="chart-head paper-heading">
               <span class="section-label">{{ sleepDayMode ? $t('health.sleep.lane') : $t('health.sleep.stats') }}</span>
               <span class="range-note">{{ sleepSpanText }}</span>
             </div>
@@ -272,7 +272,7 @@
           </div>
 
           <div class="card chart-card">
-            <div class="chart-head">
+            <div class="chart-head paper-heading">
               <span class="section-label">{{ metricName($t, selected[pane.name]) }}</span>
               <span class="range-note">{{ rangeText(pane.name) }}</span>
             </div>
@@ -302,7 +302,7 @@
 
           <!-- 活动页补一段训练记录:步态/活动指标是「累加量」,一次训练是什么项目只有表里能看 -->
           <div v-if="pane.name === 'activity'" class="card chart-card">
-            <div class="chart-head">
+            <div class="chart-head paper-heading">
               <span class="section-label">{{ $t('health.workout.title') }}</span>
               <span class="range-note">{{ rangeText('activity') }}</span>
             </div>

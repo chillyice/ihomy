@@ -6,7 +6,7 @@
 
     <div class="settings-layout">
       <!-- 桌面端:分组侧栏 -->
-      <aside v-if="!isMobile" class="settings-side">
+      <aside v-if="!isMobile" class="settings-side paper-surface">
         <el-menu :default-active="activeId" class="settings-menu" @select="openPanel">
           <el-menu-item-group v-for="g in groups" :key="g.key" :title="$t(g.labelKey)">
             <el-menu-item v-for="p in g.items" :key="p.id" :index="p.id">
@@ -21,7 +21,7 @@
       <div v-if="isMobile && !activeId" class="settings-index">
         <div v-for="g in groups" :key="g.key" class="settings-group">
           <div class="group-label">{{ $t(g.labelKey) }}</div>
-          <div class="group-card">
+          <div class="group-card paper-surface">
             <div v-for="p in g.items" :key="p.id" v-a11y-click class="group-row" @click="openPanel(p.id)">
               <span class="row-icon">{{ p.icon }}</span>
               <span class="row-text">{{ $t(p.labelKey) }}</span>
@@ -34,7 +34,7 @@
       <!-- 配置区:移动端单大类带返回条;桌面端全部 v-show 保留状态。
            无权限的大类(pointsRule/ai/backup)连挂载都跳过,组件不发请求也就不弹 403 -->
       <div v-else class="settings-body">
-        <div v-if="isMobile" class="panel-bar">
+        <div v-if="isMobile" class="panel-bar paper-heading">
           <div v-a11y-click class="panel-back" @click="closePanel">
             <el-icon><ArrowLeft /></el-icon>
             <span>{{ $t('settings.allSettings') }}</span>

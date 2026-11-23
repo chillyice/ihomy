@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <div v-else class="card markdown-empty">
+    <div v-else class="card markdown-empty paper-surface">
       <div class="markdown-empty-content">
         <el-icon :size="48" color="var(--color-text-secondary)">
           <Document />

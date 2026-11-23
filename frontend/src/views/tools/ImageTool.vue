@@ -18,7 +18,7 @@
 
     <div class="image-grid">
       <div class="card image-pane">
-        <label class="image-drop">
+        <label class="image-drop paper-surface">
           <input type="file" class="image-file" :accept="accept" @change="onFileChange" />
           <span class="image-drop-title">{{ file ? file.name : $t('tools.image.choose') }}</span>
           <span class="image-drop-sub">{{ file ? formatBytes(file.size) : $t('tools.image.hint') }}</span>

@@ -22,7 +22,7 @@
 
     <!-- 横条列表 -->
     <div v-loading="loading" class="ingredient-list">
-      <div v-a11y-click v-for="item in items" :key="item.id" class="ingredient-bar glass" @click="openTake(item)">
+      <div v-a11y-click v-for="item in items" :key="item.id" class="ingredient-bar glass paper-surface" @click="openTake(item)">
         <!-- 左半:图片 + 透明渐变 -->
         <div class="bar-image-wrap">
           <img v-if="item.image_url" :src="item.image_url" :alt="item.name" class="bar-image" loading="lazy" />
@@ -710,11 +710,11 @@ onMounted(() => {
   padding: 0 6px 10px;
 }
 
-html.dark .ingredient-bar {
+html.dark:not(.warm-paper-page) .ingredient-bar {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
 }
-html.dark .bar-image-overlay {
+html.dark:not(.warm-paper-page) .bar-image-overlay {
   background: linear-gradient(to right, transparent 0%, transparent 40%, rgba(40, 44, 52, 0.9) 100%);
 }
 
@@ -731,5 +731,11 @@ html.dark .bar-image-overlay {
   .bar-name {
     font-size: 16px;
   }
+}
+
+html.warm-paper-page .ingredient-bar {
+  border-color: var(--color-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 </style>

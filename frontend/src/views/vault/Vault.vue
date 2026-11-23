@@ -2,7 +2,7 @@
 <template>
   <div class="page">
     <!-- 指纹门:开启后进页先验证身份(5 分钟内免二次),只是本地遮挡;密码明文仍由服务端校验 -->
-    <div v-if="locked" class="vault-lock card">
+    <div v-if="locked" class="vault-lock card paper-surface">
       <div class="vl-icon">
         <el-icon><Lock /></el-icon>
       </div>
@@ -36,7 +36,7 @@
       <div v-loading="loading">
         <div v-if="filtered.length" class="vault-grid">
           <div v-for="item in filtered" :key="item.id" class="vault-card card">
-            <div class="vc-head">
+            <div class="vc-head paper-heading">
               <span class="vc-name" :title="item.name">{{ item.name }}</span>
               <div class="vc-tags">
                 <el-tag size="small" effect="plain">{{ catText(item.category) }}</el-tag>
@@ -883,5 +883,9 @@ onBeforeUnmount(() => {
   margin: 0 0 8px;
   font-size: 12.5px;
   color: var(--color-text-secondary, #8a8a8a);
+}
+
+html.warm-paper-page :is(.vault-count, .vc-label, .vc-mask, .vc-empty, .vc-foot, .vault-empty-hint, .vault-unlock-hint) {
+  color: var(--color-text-secondary);
 }
 </style>

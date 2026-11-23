@@ -129,6 +129,13 @@ onMounted(() => {
   z-index: 15;
   background: var(--color-bg);
 }
+/* 运维只给导航页签加书布，表格固定列与图表保持各自的实底。 */
+html.theme-warm .ops-tabs > :deep(.el-tabs__header) {
+  background-color: var(--color-card-2);
+  background-image: var(--album-cloth-texture);
+  background-blend-mode: soft-light;
+  background-size: 128px 128px;
+}
 /* 异常预警:标签页角标 */
 .alert-count {
   display: inline-block;
