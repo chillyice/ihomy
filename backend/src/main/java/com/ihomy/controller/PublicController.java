@@ -6,7 +6,6 @@ import com.ihomy.common.AppVersion;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
-import com.ihomy.common.SolarUtil;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.HomeModule;
 import com.ihomy.entity.SysUser;
@@ -46,7 +45,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,41 +99,6 @@ public class PublicController {
             try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
         }
         return Result.success(sunService.getSunInfo(ip, ld, resolveFamilyLocation()));
-    }
-
-    @Operation(summary = "太阳与月亮的高度角、方位角与月相(按给定坐标与时刻,未给坐标取济南、未给时刻取此刻)")
-    @GetMapping("/astro")
-    public Result<Map<String, Object>> astro(
-            @RequestParam(value = "lat", required = false) Double lat,
-            @RequestParam(value = "lng", required = false) Double lng,
-            @RequestParam(value = "at", required = false) String at) {
-        java.time.Instant instant = java.time.Instant.now();
-        if (at != null && !at.isBlank()) {
-            try { instant = java.time.OffsetDateTime.parse(at).toInstant(); } catch (Exception ignored) {}
-        }
-        return Result.success(SolarUtil.astroNow(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180), instant));
-    }
-
-    @Operation(summary = "某日日月运行轨迹与升落时刻(个人主页舞台画全天弧线;默认济南与上海时区,采样步长 5~30 分钟)")
-    @GetMapping("/astro/day")
-    public Result<Map<String, Object>> astroDay(
-            @RequestParam(value = "lat", required = false) Double lat,
-            @RequestParam(value = "lng", required = false) Double lng,
-            @RequestParam(value = "date", required = false) String date,
-            @RequestParam(value = "step", required = false) Integer step) {
-        ZoneId zone = ZoneId.of("Asia/Shanghai");
-        LocalDate ld = LocalDate.now(zone);
-        if (date != null && !date.isBlank()) {
-            try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
-        }
-        return Result.success(SolarUtil.astroDay(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180),
-                ld, zone, step == null ? 10 : step));
-    }
-
-    /** 坐标兜底与越界收敛:非数字/缺失用默认值,越界夹到合法范围 */
-    private static double coord(Double v, double fallback, double bound) {
-        if (v == null || !Double.isFinite(v)) return fallback;
-        return Math.max(-bound, Math.min(bound, v));
     }
 
     @Operation(summary = "日历基础数据(某月农历/节气/传统节日/法定节假日与调休,免登录;month 缺省为当月)")

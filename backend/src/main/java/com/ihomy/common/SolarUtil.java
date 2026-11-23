@@ -74,62 +74,6 @@ public class SolarUtil {
         return m;
     }
 
-    /**
-     * 指定时刻的月球高度角与方位角(度,保留 1 位小数)。与太阳位置同一套地平坐标换算,
-     * 只是月亮要先经 Meeus 47 的月球黄道坐标 → 赤道坐标 → 真时角。
-     */
-    public static Map<String, Double> moonPosition(double lat, double lng, Instant instant) {
-        double[] altAz = moonAltAz(lat, lng, instant);
-        Map<String, Double> m = new LinkedHashMap<>();
-        m.put("altitude", round1(altAz[0]));
-        m.put("azimuth", round1(altAz[1]));
-        return m;
-    }
-
-    /**
-     * 此刻日月位置 + 月相,供个人主页的「日月吊偶」舞台按单一坐标渲染:
-     * sun/moon 各含 altitude/azimuth(度),另附 moonPhase/moonPhaseCode/moonIllumination/moonAge。
-     */
-    public static Map<String, Object> astroNow(double lat, double lng, Instant instant) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("now", instant.toString());
-        m.put("sun", sunPosition(lat, lng, instant));
-        m.put("moon", moonPosition(lat, lng, instant));
-        m.putAll(moonPhaseInfo(instant));
-        return m;
-    }
-
-    /**
-     * 某日日月运行轨迹 + 升落时刻,供个人主页舞台画全天弧线:
-     * sun/moon 各为一组 {t(当地分钟 0~1439), alt, az},按 stepMin 分钟采样(5~30,越界收敛);
-     * times 为 {@link #astroTimes} 的当日日月时刻。
-     */
-    public static Map<String, Object> astroDay(double lat, double lng, LocalDate date, ZoneId tz, int stepMin) {
-        int step = Math.max(5, Math.min(30, stepMin));
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("date", date.toString());
-        m.put("times", astroTimes(lat, lng, date, tz));
-        m.put("sun", track(lat, lng, date, tz, step, true));
-        m.put("moon", track(lat, lng, date, tz, step, false));
-        return m;
-    }
-
-    private static List<Map<String, Object>> track(double lat, double lng, LocalDate date, ZoneId tz,
-                                                   int step, boolean sun) {
-        Instant dayStart = date.atStartOfDay(tz).toInstant();
-        List<Map<String, Object>> points = new ArrayList<>(1440 / step + 1);
-        for (int min = 0; min < 1440; min += step) {
-            Instant instant = dayStart.plusSeconds(min * 60L);
-            double[] altAz = sun ? sunAltAz(lat, lng, instant) : moonAltAz(lat, lng, instant);
-            Map<String, Object> p = new LinkedHashMap<>(3);
-            p.put("t", min);
-            p.put("alt", round1(altAz[0]));
-            p.put("az", round1(altAz[1]));
-            points.add(p);
-        }
-        return points;
-    }
-
     /** 太阳高度角(度),不舍入(时刻求解需亚分钟精度) */
     private static double[] sunAltAz(double lat, double lng, Instant instant) {
         double T = julianCentury(julianDay(instant));

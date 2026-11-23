@@ -125,7 +125,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **工具箱**:元数据唯一源 `tools/registry.js`;12 个开发者工具只在 `/bit-pouch/tools/<id>` 维护(`toolbox:false` + 旧路由重定向);在线目录 24 项另含 7 项只在线页维护(需求 §4.12)。
 - **天文**:`SolarUtil` 唯一来源(`/public/sun-info`),前端只渲染,**禁再移植 NOAA/Meeus**;直射点**西移** 0.25°/min;`useSunLight` 30 分钟换新,**长开页面禁止把启动时那份当此刻**(§4.5)。
 - **健康数据**:本人独占——读接口传别人 `userId` 一律 404,要给别人看只能本人 `POST /health/share` 生成 7 天只读快照(读链接只回冻结 payload,不查业务表,到期/手动删即物理删);报表锚**最新数据日** `asOf`,卡片目录 `common/HealthReportCard` + `views/health/reportCards.js` 同口径,告警口径 `common/HealthAlerts`(参考区间 WARN + 个人基线 ±2σ INFO),卡片偏好 `health.report.v1`;敏感指标入快照要本人同意且本次勾选(需求 §4.20)。
-- **独立产品页**:`/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 必须 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色接管 `html`);**回站内页要补初始化**,否则首页全空(§3.32/§3.8)。
+- **独立产品页**:`/kada`、`/bit-pouch`、`/wallpaper` 必须 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色接管 `html`);**回站内页要补初始化**,否则首页全空(§3.32/§3.8)。
 - **产品统计**:落 `report_product_stat` 日表(落地页打点 + `/public/product/download` 计数后 302),**禁止按 access 日志统计下载**;下载文件名必须纯文件名(`uploads/kada/` 平铺)。
 - **计划提醒单向托管**:时间只存 `family_reminder`(`plan_id`),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务;重复判定共用 `RepeatSchedule.dueToday`。
 - **模拟器与存档**:`game_info.type` 存机种码(扩展名唯一源 `common/GameSystem`,前端 `utils/games/emulatorSystems.js` 同口径);**新增机种=三处同步**(GameSystem、前端注册表、`copy-emulatorjs.mjs`)。存档唯一源 `uploads/games/{游戏名}/saves/u{成员id}/`(**按成员隔离**),ROM 加载前预置最新档,30s/切后台/离开回写;浏览器 IndexedDB 不持久化。**离开/重开 ROM 必须先 `pause()`+`toggleMainLoop(0)` 再拆 DOM**(踩坑速查 §3.52);**禁止存档另存 DB**。细节 需求 §4.13.2。
@@ -162,7 +162,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 12. **全局 UI 统一**:EP 配色/圆角/尺寸/z-index 一律 `main.css` 覆写;只用 `--z-*` 标尺(禁 ≥100 裸值,守门 `zLayers.spec.js`);遮罩 `--overlay-scrim`+`--overlay-blur`;**光影永远在弹窗之上**(`--z-deco` 270–290、`--z-atmos` 300–308 > `--z-overlay` 200);**新弹窗必须声明宽度或 `dialog-sm/md/lg/xl`**(UI §29、坑 §3.15/§3.25/§3.36)。
 13. **按钮/表格**:四类按钮(浅深不共色值)、el-tag 磨砂、el-badge 半透明黑、圆角 button 12 / input 10 / card+dialog 14(UI §18a);**表格操作列只用图标按钮**,**行底色必须实色**(否则 fixed 列透出,UI §18e、坑 §3.69)。
 14. **页面规范**:根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除用 `.section-label`;工具栏 `page-toolbar card`,**单槽操作必须包 `.tb-right`**;多选 `.pick-badge`(**禁左上 checkbox**);**横向内容条不许让滚动条占布局盒**(隐原生条 + 边缘渐隐 + `horizontalWheel.js`,UI §11b、坑 §3.70)。
-15. **位图资产**:装饰图放 `src/assets/` 并 ESM 导入,**不放 `public/`**;宽度按渲染 2 倍封顶(例外:演示素材、`kada-media/`、chillyice 生成图);**`public/` 目录名不得与路由同名**;工具导出 `public/toolbox-data/`。
+15. **位图资产**:装饰图放 `src/assets/` 并 ESM 导入,**不放 `public/`**;宽度按渲染 2 倍封顶(例外:演示素材、`kada-media/`);**`public/` 目录名不得与路由同名**;工具导出 `public/toolbox-data/`。
 16. **富文本消毒**:一律经 `utils/markdown.js` 的 `renderMarkdown()` 再 `v-html`;**禁 `marked.parse` 直接进 `v-html`**,`marked` 只许该文件导入;守门 `htmlSink.spec.js`。
 
 ## 文件存储

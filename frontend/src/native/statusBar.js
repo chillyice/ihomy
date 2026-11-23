@@ -37,7 +37,7 @@ function parseRgb(value) {
 }
 
 // 「状态栏后面那块颜色」= 页面根底色:主站是 --color-bg(随主题),
-// kada / 比特口袋 / chillyice 等独立页各自接管 html 底色。
+// kada / 比特口袋等独立页各自接管 html 底色。
 function pageBackground() {
   for (const el of [document.documentElement, document.body]) {
     const rgb = parseRgb(getComputedStyle(el).backgroundColor)
