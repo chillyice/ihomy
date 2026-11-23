@@ -15,13 +15,23 @@ describe('window-plane projection', () => {
     expect(morningX + paneWidth + eveningX).toBeCloseTo(width)
   })
 
-  it('projects a longer footprint under low sun, with finite limits at grazing and vertical incidence', () => {
-    const lowSun = windowTransform(100, 100, 0, 180)
-    const highSun = windowTransform(100, 100, 90, 180)
-    expect([...lowSun, ...highSun].every(Number.isFinite)).toBe(true)
-    expect(lowSun[2]).toBe(0)
-    expect(highSun[3]).toBeGreaterThan(0)
-    expect(lowSun[3]).toBeGreaterThan(highSun[3])
+  it.each([
+    [15, 2 + Math.sqrt(3)],
+    [30, Math.sqrt(3)],
+    [45, 1],
+    [60, 1 / Math.sqrt(3)],
+    [90, 0],
+  ])('projects the vertical span onto the floor at %i degrees', (altitude, expectedLengths) => {
+    for (const [width, height] of [
+      [1200, 800],
+      [390, 844],
+    ]) {
+      for (const azimuth of [120, 180, 240]) {
+        const [, , dx, dy] = windowTransform(width, height, altitude, azimuth)
+        const windowHeight = 0.76 * height
+        expect(Math.hypot(dx, dy) / windowHeight).toBeCloseTo(expectedLengths, 8)
+      }
+    }
   })
 
   it.each([
@@ -34,5 +44,12 @@ describe('window-plane projection', () => {
     const canvas = { width: 512, height: 256, getContext: () => ({ clearRect }) }
     drawWindowProjection(canvas, { width: 4096, height: 2048, scene: { hasDirectLight }, weather })
     expect(clearRect).toHaveBeenCalledWith(0, 0, 512, 256)
+  })
+
+  it.each([0, 90])('clears the canvas at the solar boundary of %i degrees', (altitude) => {
+    const clearRect = vi.fn()
+    const canvas = { width: 100, height: 100, getContext: () => ({ clearRect }) }
+    drawWindowProjection(canvas, { width: 200, height: 200, scene: { altitude, azimuth: 180, hasDirectLight: true } })
+    expect(clearRect).toHaveBeenCalledWith(0, 0, 100, 100)
   })
 })

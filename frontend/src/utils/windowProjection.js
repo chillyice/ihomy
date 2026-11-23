@@ -1,14 +1,15 @@
-// Window-plane coordinates run from (0, 0) to (1, 1). The projected footprint
-// stretches in the direction opposite the sun; grazing incidence is bounded
-// because only the portion of the receiving surface inside the room is visible.
+// On a horizontal floor, a vertical span H casts a shadow H / tan(altitude).
+// Use the same pixel scale for both floor axes; the viewport clips long shadows.
 export function windowTransform(width, height, altitude, azimuth) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
-  const reach = 1 / (0.65 + Math.tan(Math.min(89.9, Math.max(0, altitude)) * radians))
+  const windowHeight = height * 0.76
+  const reach = altitude > 0 && altitude < 90 ? windowHeight / Math.tan(altitude * radians) : 0
   const paneWidth = width * 0.88
-  const shear = Math.sin(bearing) * reach * width * 0.63
-  const depth = height * (0.43 + Math.cos(bearing) * reach * 0.61)
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, height * 0.075]
+  const shear = Math.sin(bearing) * reach
+  const depth = Math.cos(bearing) * reach
+  // The sill is 0.15 window heights above the floor, along the same light ray.
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, height * 0.075 + depth * 0.15]
 }
 
 // Average a small disk of shifted copies of the aperture. Each sample represents
@@ -36,7 +37,15 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, w, h)
-  if (!scene?.hasDirectLight || ['rain', 'snow', 'thunder'].includes(weather) || width <= 0 || height <= 0) return
+  if (
+    !scene?.hasDirectLight ||
+    scene.altitude <= 0 ||
+    scene.altitude >= 90 ||
+    ['rain', 'snow', 'thunder'].includes(weather) ||
+    width <= 0 ||
+    height <= 0
+  )
+    return
 
   const radius = Math.max(1, Math.min(w, h) * (softness[weather] ?? softness.clear))
   const pad = Math.ceil(radius) + 1
@@ -53,10 +62,15 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  mask.fillRect(0, 0, 1, 1)
+  // Inset the opening to leave a solid perimeter around the glass.
+  const frameX = 0.012
+  const frameY = 0.015
+  mask.fillRect(frameX, frameY, 1 - 2 * frameX, 1 - 2 * frameY)
   mask.globalCompositeOperation = 'destination-out'
-  mask.fillRect(0.48, 0, 0.04, 1)
-  mask.fillRect(0, 0.46, 1, 0.046)
+  const mullionWidth = 0.048
+  const transomHeight = 0.055
+  mask.fillRect(0.5 - mullionWidth / 2, 0, mullionWidth, 1)
+  mask.fillRect(0, 0.483 - transomHeight / 2, 1, transomHeight)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()
 
