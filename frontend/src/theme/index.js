@@ -179,7 +179,9 @@ function beginModeSweep(root, prevDusk) {
   }
 }
 
-export function applyTheme(state) {
+// persist=false:只接管 html 类与 theme-color,不写站点偏好(独立产品页用自己的偏好时用,如壁纸页)
+// sweep=false:首次接管时不做晨暮扫光(此时页面还没铺好,幕布只会白闪一下)
+export function applyTheme(state, { persist = true, sweep = true } = {}) {
   const t = { ...DEFAULT_THEME, ...state }
   const root = document.documentElement
   const nextDusk = t.mode === 'dusk'
@@ -188,14 +190,14 @@ export function applyTheme(state) {
   const withinWarm = _current && _current.theme === 'warm' && t.theme === 'warm'
 
   // 暖居内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
-  const finishSweep = isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
+  const finishSweep = sweep && isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)
   root.classList.toggle('dark', nextDusk)
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', THEMES[t.theme].meta[t.mode])
-  localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t))
+  if (persist) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t))
   _current = { ...t }
 
   if (finishSweep) finishSweep()

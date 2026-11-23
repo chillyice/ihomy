@@ -19,7 +19,9 @@
   代价与前提:壁纸内容就是线上页面,ihomy 改版后壁纸自动跟着更新,无需重新打包;断网时只剩本地时钟。
 
   主题 / 语言:WE 属性面板的 theme / mode / lang 在跳转时作为 URL 查询参数带走
-  (?theme=warm&mode=dawn&lang=zh),由壁纸页 frontend/src/views/Wallpaper.vue 的 applyQueryPrefs() 读取。
+  (?theme=warm&mode=dawn&lang=zh),由壁纸页 frontend/src/views/Wallpaper.vue 的 applyInitialPrefs() 读取。
+  属性面板默认主题为暖居(与壁纸页自己的缺省一致);壁纸页的主题偏好存在它自己的
+  ihomy:wallpaper:theme:v1 里,不覆盖站点的 ihomy-theme。
 
   小组件:本壳页**不传**任何组件配置 —— 壁纸上有哪些小组件(照片轮播 / 纪念日 / 待办 / 动态流 /
   家庭计划 / 提醒,共 6 种)由壁纸页角落的「组件」面板增删(V9.94 起),选择存在 **WE 自己那份**
@@ -43,7 +45,7 @@
   改版自动跟随(受 PWA 预缓存影响时按 README「ihomy 改版后壁纸看起来没更新」清一次缓存)。
 -->
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0F1A2E; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #241A12; }
   body {
     display: flex; align-items: center; justify-content: center;
     color: #F1E7D6; font-family: system-ui, "Segoe UI", sans-serif;

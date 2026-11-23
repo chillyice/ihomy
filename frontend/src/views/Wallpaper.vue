@@ -9,7 +9,9 @@
           (默认开照片/纪念日/待办,与旧版视觉一致;新组件默认关)。新增组件的落点:注册表加一条 +
           模板加 isOn('id') 分支 + 样式补默认坐标;未启用的组件不取数(壁纸请求数不随组件库膨胀)。
           原角落控件里的「复制壁纸令牌」按钮已移除,令牌入口只留设置页一处。
-     主题:复用全局 themeStore(与站点共享 ihomy-theme 偏好);「自动」由太阳高度角驱动(useSunLight 内 applyAuto)。
+     主题:独立产品页自带配色——主题偏好存本页自己的键(缺省暖居),不跟站点 ihomy-theme 走;
+          「自动」由太阳高度角驱动(useSunLight 内 applyAuto)。
+     装帧:暖居主题下与暖居首页同材质(纸纹底 + 水粉卡纸小组件 + 亚麻书布控件);其他主题保持原样。
      体积:本页刻意不引 Element Plus(原生 input/button + 主题 CSS 变量),保证壁纸首屏轻量。
      Wallpaper Engine:壳页(wallpaper-engine/)顶层跳转本页,属性面板的主题/晨暮走查询参数、令牌走 hash(见 onMessage)。 -->
 <template>
@@ -256,7 +258,8 @@ import { useI18n } from 'vue-i18n'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
-import { useThemeStore } from '@/stores/theme'
+import { useThemeStore, setThemePersist } from '@/stores/theme'
+import { DEFAULT_THEME, THEMES, loadTheme } from '@/theme'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { authApi, publicApi, taskApi, planApi, reminderApi } from '@/api'
 import { applyLocale } from '@/i18n'
@@ -655,19 +658,54 @@ const doLogin = async () => {
   }
 }
 
-// ========== Wallpaper Engine 偏好:URL 参数优先于 postMessage ==========
-// WE 桌面壁纸不能再用 iframe 嵌本页(跨域 iframe 会崩 WE 的 CEF,详见 wallpaper-engine/index.html),
-// 壳页改成顶层跳转并把属性面板的 theme/mode/lang 挂在查询串上带过来。普通浏览器访问不受影响(参数可选)。
-// 只做一次、且在挂载时执行:属性本身就是页面加载时一次性送达的,后续改面板需重启预览。
-const applyQueryPrefs = () => {
+// ========== 主题与 WE 偏好(独立产品页:主题偏好自己一份,缺省暖居) ==========
+// 壁纸不跟站点主题走:偏好存本页自己的键 ihomy:wallpaper:theme:v1(缺省暖居),
+// 在角落里改主题/晨暮只影响壁纸,不会覆盖站点的 ihomy-theme(壁纸是独立产品页,自带配色接管 html)。
+// 壳页把属性面板的 theme/mode/lang 挂在查询串上带过来(见 wallpaper-engine/index.html),
+// 有查询参数时以它为准并写回壁纸偏好。初始化在 setup 里同步做,避免首帧先闪一下站点主题。
+// 只做一次:属性本身就是页面加载时一次性送达的,后续改面板需重启预览。
+const WP_THEME_KEY = 'ihomy:wallpaper:theme:v1'
+const loadWpTheme = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WP_THEME_KEY) || 'null')
+    if (!raw || typeof raw !== 'object') return { ...DEFAULT_THEME }
+    return {
+      theme: THEMES[raw.theme] ? raw.theme : DEFAULT_THEME.theme,
+      mode: raw.mode === 'dawn' || raw.mode === 'dusk' ? raw.mode : DEFAULT_THEME.mode,
+      autoMode: typeof raw.autoMode === 'boolean' ? raw.autoMode : DEFAULT_THEME.autoMode,
+    }
+  } catch (e) {
+    return { ...DEFAULT_THEME }
+  }
+}
+const saveWpTheme = () => {
+  try {
+    localStorage.setItem(WP_THEME_KEY, JSON.stringify({ theme: themeStore.theme, mode: themeStore.mode, autoMode: themeStore.autoMode }))
+  } catch (e) {
+    /* 无痕环境:仅本次会话生效 */
+  }
+}
+const applyInitialPrefs = () => {
   const q = route.query
-  if (themeStore.themes.some((theme) => theme.id === q.theme)) themeStore.setTheme(q.theme)
-  if (q.mode === 'auto') themeStore.setAutoMode(true)
-  else if (q.mode === 'dawn' || q.mode === 'dusk') themeStore.setMode(q.mode)
+  const saved = loadWpTheme()
+  const qTheme = THEMES[q.theme] ? q.theme : ''
+  const qMode = q.mode === 'dawn' || q.mode === 'dusk' ? q.mode : ''
+  themeStore.setPreference(
+    {
+      theme: qTheme || saved.theme,
+      mode: qMode || saved.mode,
+      autoMode: q.mode === 'auto' ? true : qMode ? false : saved.autoMode,
+    },
+    { sweep: false },
+  )
   // WE 的 CEF 语言是 en-us,i18n 默认跟随浏览器语言 → 壁纸在 WE 里会走英文,故用属性显式指定
   if (q.lang === 'zh') applyLocale('zh-CN')
   else if (q.lang === 'en') applyLocale('en')
 }
+// 本页一切主题变化(角落控件 / WE 属性 / 日出日落自动切晨暮)都落到壁纸自己的偏好
+setThemePersist(false)
+applyInitialPrefs()
+watch(() => [themeStore.theme, themeStore.mode, themeStore.autoMode], saveWpTheme)
 
 // 角落控件里的语言切换(与 WE 属性面板等效;未登录时也能用)。applyLocale 会一并写进 ihomy-lang。
 const setLang = (l) => applyLocale(l)
@@ -740,7 +778,6 @@ onMounted(async () => {
   window.addEventListener('resize', onWinResize)
   // 注册 WE 属性桥(见 wePropsListener):令牌晚到时还能当场换会话
   window.wallpaperPropertyListener = wePropsListener
-  applyQueryPrefs()
   document.title = 'ihomy'
   syncClock()
   clockTimer = setInterval(syncClock, 1000)
@@ -757,6 +794,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('message', onMessage)
   window.removeEventListener('resize', onWinResize)
   if (window.wallpaperPropertyListener === wePropsListener) delete window.wallpaperPropertyListener
+  // 恢复主题变更落站点偏好(本页是独立产品页,只在停留期间用壁纸自己那份);
+  // 万一是站内 SPA 转进来的,离开时把站点主题放回去(壁纸偏好已存好,不会被覆盖)
+  setThemePersist(true)
+  themeStore.setPreference(loadTheme(), { sweep: false })
   clearInterval(clockTimer)
   clearInterval(photoRefreshTimer)
   clearTimeout(uiHideTimer)
@@ -1244,5 +1285,159 @@ onBeforeUnmount(() => {
 .wp-login-btn[disabled] {
   opacity: 0.6;
   cursor: default;
+}
+
+/* ===== 暖居主题装帧(旧画册水粉材质;光尘/窗边保持上面的通用样式) =====
+   与暖居首页同口径:纸纹大底 + 水粉卡纸小组件 + 亚麻书布控件 + 相纸张贴。
+   暖居永久禁玻璃(main.css 已全局关掉 backdrop-filter),这里也不写毛玻璃。 */
+html.theme-warm .wp-base {
+  background-image: var(--home-paper-ground);
+  background-size: auto, var(--home-grain-size);
+}
+/* 纸面深度:右上窗光 + 左下一点暖影,避免整屏平涂 */
+html.theme-warm .wp-base::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 72% 16%, rgba(255, 238, 200, 0.3), transparent 62%),
+    radial-gradient(ellipse at 14% 92%, rgba(90, 64, 42, 0.16), transparent 70%);
+}
+
+/* 小组件 = 整张水粉卡纸(与首页网格卡同一张边纹;照片堆自带相纸框,不铺卡纸) */
+html.theme-warm .wp-widget:not(.wpw-photos) {
+  isolation: isolate;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 5px;
+  box-shadow: none;
+  padding: 16px 18px 14px;
+}
+html.theme-warm .wp-widget:not(.wpw-photos)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-image: var(--card-art, url('@/assets/materials/painted-card.webp?no-inline'))
+    var(--card-cut, 48 124 72 48 fill / 12px 30px 18px 12px) stretch;
+  filter: var(--painted-card-tone, saturate(0.78));
+}
+html.theme-warm .wp-widget.dragging {
+  box-shadow: none;
+}
+/* 按内容丰富度分纸:列表类用压过的叠层纸,条目类用带压痕的纤维纸(与首页分配一致) */
+html.theme-warm .wpw-feed,
+html.theme-warm .wpw-plan {
+  --card-art: url('@/assets/materials/painted-card-pressed.webp?no-inline');
+  --card-cut: 106 54 46 132 fill / 24px 12px 12px 31px;
+}
+html.theme-warm .wpw-anni,
+html.theme-warm .wpw-task,
+html.theme-warm .wpw-reminder {
+  --card-art: url('@/assets/materials/painted-card-laid.webp?no-inline');
+  --card-cut: 38 38 60 59 fill / 10px 10px 15px 15px;
+}
+/* 卡面标题:色相锚点竖条取该卡的 --chip(--blob-N),与首页卡标题同款 */
+html.theme-warm .wpw-anni,
+html.theme-warm .wpw-reminder {
+  --chip: var(--blob-1);
+}
+html.theme-warm .wpw-task,
+html.theme-warm .wpw-plan {
+  --chip: var(--blob-5);
+}
+html.theme-warm .wpw-feed {
+  --chip: var(--blob-3);
+}
+html.theme-warm .wpw-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+html.theme-warm .wpw-title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: rgba(var(--chip, var(--color-brand-rgb)), 0.9);
+}
+html.theme-warm .wpw-row + .wpw-row {
+  border-top-color: var(--color-line);
+}
+
+/* 照片堆 = 贴在墙上的相纸:卡纸留边 + 上薄下厚的印刷边,底下一层柔影 */
+html.theme-warm .wp-pcard {
+  box-sizing: border-box;
+  padding: 8px 8px 12px;
+  background: var(--color-card);
+  border-radius: 4px;
+  box-shadow:
+    0 18px 38px rgba(74, 53, 32, 0.3),
+    0 2px 4px rgba(74, 53, 32, 0.16);
+}
+html.theme-warm .wp-pcard img {
+  border-radius: 2px;
+}
+/* 照片说明 = 手写便签纸(浅纸底 + 细暖边 + 一点点歪) */
+html.theme-warm .wp-cap {
+  color: var(--color-text);
+  background-image: linear-gradient(rgba(var(--color-card-rgb), 0.9), rgba(var(--color-card-rgb), 0.9)), var(--home-grain);
+  background-size: auto, var(--home-grain-size);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 14px;
+  box-shadow: 0 3px 10px rgba(74, 53, 32, 0.16);
+  transform: rotate(-1.2deg);
+}
+
+/* 角落控件:分段器换成亚麻书布,组件面板是压在书布上的纸签 */
+html.theme-warm .wp-seg {
+  background-color: var(--color-card-2);
+  background-image: var(--album-cloth-texture);
+  background-blend-mode: soft-light;
+  background-size: 128px 128px;
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-inset);
+}
+html.theme-warm .wp-segbtn.on {
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(58, 46, 34, 0.22);
+}
+html.theme-warm .wp-widgets {
+  background-color: var(--color-card);
+  background-image: linear-gradient(rgba(var(--color-card-rgb), 0.9), rgba(var(--color-card-rgb), 0.9)), var(--home-grain);
+  background-size: auto, var(--home-grain-size);
+  border-color: var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-hover);
+}
+
+/* 登录卡:麦色衬纸卡片 + 羊皮输入框(暖居内不做玻璃) */
+html.theme-warm .wp-login {
+  background: var(--overlay-scrim);
+}
+html.theme-warm .wp-login-card {
+  background-color: var(--color-card);
+  background-image: linear-gradient(rgba(var(--color-card-rgb), 0.94), rgba(var(--color-card-rgb), 0.94)), var(--home-grain);
+  background-size: auto, var(--home-grain-size);
+  border-color: var(--color-border);
+  border-radius: 18px;
+  box-shadow:
+    var(--shadow-hover),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+html.theme-warm .wp-login-btn {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 2px 6px rgba(58, 46, 34, 0.24);
 }
 </style>

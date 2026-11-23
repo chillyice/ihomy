@@ -9,10 +9,10 @@
         "order": 0,
         "text": "主题 Theme",
         "type": "combo",
-        "value": "guangchen",
+        "value": "warm",
         "options": [
-          { "label": "光尘 Light & Dust", "value": "guangchen" },
-          { "label": "暖居 Warm Dwelling", "value": "warm" }
+          { "label": "暖居 Warm Dwelling", "value": "warm" },
+          { "label": "光尘 Light & Dust", "value": "guangchen" }
         ]
       },
       "mode": {
