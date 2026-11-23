@@ -44,3 +44,29 @@ export const feedSummary = (t, f, sliceLen = 40) => {
       return ''
   }
 }
+
+// 动态类型 → 图标 / 色相锚点(--blob-N):首页列表芯片与横滑卡片共用,避免两套映射
+const FEED_ICONS = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
+const FEED_CHIPS = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
+export const feedIcon = (type) => FEED_ICONS[type] || '✨'
+export const feedChip = (type) => FEED_CHIPS[type] || 1
+
+// 动态封面:博客/视频/菜谱/图书直接带 coverImage;日记是 images(数组或 JSON 文本),照片是 urls 前几张
+const firstImage = (value) => {
+  if (!value) return ''
+  if (Array.isArray(value)) return value[0] || ''
+  if (typeof value !== 'string') return ''
+  const raw = value.trim()
+  if (!raw) return ''
+  if (raw.startsWith('[') || raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed[0] || ''
+      return parsed?.url || ''
+    } catch (e) {
+      return ''
+    }
+  }
+  return raw
+}
+export const feedCover = (f) => f?.coverImage || firstImage(f?.images) || firstImage(f?.urls) || ''

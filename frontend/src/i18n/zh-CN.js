@@ -4584,6 +4584,21 @@ export default {
       reminder: '今日',
       daily: '每日一图',
     },
+    // 同一功能的多种展示样式(注册表 components/warm/widgets/registry.js 的 styleKey)
+    styleLabel: '样式',
+    switchStyle: '切换样式',
+    style: {
+      feedList: '列表',
+      feedCards: '横向卡片',
+      photoStack: '卡牌切换',
+      photoCarousel: '横向轮播',
+      anniCountdown: '倒计时',
+      anniCards: '横滑卡片',
+      finOverview: '收支概览',
+      finTrend: '半年趋势',
+    },
+    anniArrow: '纪念日 →',
+    daysShort: '天',
     module: {
       blog: '博客',
       diary: '日记本',

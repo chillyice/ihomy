@@ -1,8 +1,9 @@
 <!-- 总账趋势图:纯 CSS 双柱(收入绿 / 支出红),容器宽度自适应,悬停显示当期金额;不引图表库 -->
 <template>
-  <div class="book-trend">
+  <div class="book-trend" :class="{ 'is-compact': compact }">
     <!-- 图例 + 悬停读数:悬停列时顶部显示该列期间与两柱金额,避免逐柱 popover 撑爆 DOM -->
-    <div class="bt-head">
+    <!-- 紧凑档(首页卡片用)只留柱与月份,读数交给卡片自己的汇总行 -->
+    <div v-if="!compact" class="bt-head">
       <div class="bt-legend">
         <span class="bt-dot is-income"></span>{{ $t('book.ledger.legendIncome') }} <span class="bt-dot is-expense"></span
         >{{ $t('book.ledger.legendExpense') }}
@@ -39,9 +40,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { formatYuan } from '@/utils/money'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 
-// rows: [{ key, label, income, expense }],金额单位元
+// rows: [{ key, label, income, expense }],金额单位元;compact = 首页卡片里的紧凑档(隐图例与读数条)
 const props = defineProps({
   rows: { type: Array, default: () => [] },
+  compact: { type: Boolean, default: false },
 })
 
 const hover = ref(-1)
@@ -168,6 +170,13 @@ const hoverBar = computed(() => (hover.value >= 0 ? bars.value[hover.value] : nu
   gap: 3px;
   width: 100%;
   height: 132px;
+}
+/* 首页卡片紧凑档:柱高收到卡片常规内容区,月份字号再降一档 */
+.is-compact .bt-bars {
+  height: 96px;
+}
+.is-compact .bt-label {
+  font-size: 10.5px;
 }
 .bt-bar {
   flex: 1 1 0;

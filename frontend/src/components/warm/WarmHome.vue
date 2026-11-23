@@ -42,17 +42,18 @@
           `gc-c${w.span}`,
           `gc-r${w.row}`,
           {
-            'gc-weather': w.id === 'weather',
-            'gc-overflow': w.id === 'weather',
+            'gc-weather': baseOf(w) === 'weather',
+            'gc-overflow': baseOf(w) === 'weather',
             'gc-card-tile': compact(w),
-            'gc-item-card': w.id === 'item',
-            'gc-photos': w.id === 'photos',
+            'gc-card-styled': Boolean(w.component),
+            'gc-item-card': baseOf(w) === 'item',
+            'gc-photos': baseOf(w) === 'photos',
             'gc-featured': w.featured,
             'gc-card-edit': editMode,
             'gc-card-link': isLinkCard(w),
             'gc-card-preview': w.kind === 'preview',
             'gc-card-dragging': reorderPreview && reorderPreview.id === w.id,
-            'gc-daily-card': w.id === 'daily',
+            'gc-daily-card': baseOf(w) === 'daily',
           },
         ]"
         :style="cardStyle(w)"
@@ -67,6 +68,25 @@
           <button class="gc-del" :title="$t('warm.removeWidget')" @click.stop="removeWidget(w)">✕</button>
           <div class="gc-grip" :title="$t('warm.dragSort')" @pointerdown.stop.prevent="onGripPointerDown($event, w)">⋮⋮</div>
           <div class="gc-resize" :title="$t('warm.resizeWidget')" @pointerdown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
+          <!-- 样式切换:同一功能注册了多种样式才出现(原位换样式,尺寸保留) -->
+          <template v-if="styleOptions(w).length">
+            <button
+              class="gc-style-btn"
+              :class="{ on: styleMenuId === w.id }"
+              :title="$t('warm.switchStyle')"
+              :aria-expanded="styleMenuId === w.id"
+              @click.stop="toggleStyleMenu(w.id)"
+            >
+              {{ $t('warm.styleLabel') }}
+            </button>
+            <div v-if="styleMenuId === w.id" class="gc-style-menu" @click.stop>
+              <div class="gc-style-tip">{{ $t('warm.switchStyle') }}</div>
+              <button v-for="s in styleOptions(w)" :key="s.id" class="gc-style-item" @click.stop="switchStyle(w, s.id)">
+                <span class="gc-style-ic">{{ s.icon }}</span
+                >{{ $t(s.styleKey) }}
+              </button>
+            </div>
+          </template>
         </template>
 
         <!-- 紧凑图标档:1 列纯图标(一行一列),2 列图标 + 最简名称(一行两列) -->
@@ -74,17 +94,20 @@
           <span class="gc-tile-icon">{{ w.icon }}</span>
           <span v-if="w.span >= 2" class="gc-tile-label">{{ w.label }}</span>
         </div>
-        <template v-else-if="cardData[w.id]?.status.value === 'loading'">
+        <template v-else-if="cardData[cardKey(w)]?.status.value === 'loading'">
           <h3 class="gc-card-h3">{{ w.label }}</h3>
           <div class="gc-empty" role="status">{{ $t('common.loading') }}</div>
         </template>
-        <template v-else-if="cardData[w.id]?.status.value === 'error'">
+        <template v-else-if="cardData[cardKey(w)]?.status.value === 'error'">
           <h3 class="gc-card-h3">{{ w.label }}</h3>
           <div class="gc-empty" role="status">
             {{ $t('common.loadFailed') }}
-            <button type="button" class="gc-more" @click.stop="cardData[w.id].retry()">{{ $t('common.retry') }}</button>
+            <button type="button" class="gc-more" @click.stop="cardData[cardKey(w)].retry()">{{ $t('common.retry') }}</button>
           </div>
         </template>
+
+        <!-- 统一渲染出口:注册表里带 component 的样式(新样式只加注册表,这里不用加分支) -->
+        <component :is="w.component" v-else-if="w.component" v-bind="w.props(widgetCtx())" />
 
         <!-- 天气活窗(暖居签名) -->
         <template v-else-if="w.id === 'weather'">
@@ -437,7 +460,7 @@
         <div class="gc-add-label">{{ $t('warm.addWidget') }}</div>
         <button v-for="w in availableWidgets" :key="w.id" class="gc-add-item" @click="addWidget(w.id)">
           <span class="gc-add-icon">{{ w.icon }}</span
-          >{{ w.label }}
+          >{{ w.label }}<span v-if="w.suffix" class="gc-add-style">· {{ w.suffix }}</span>
         </button>
       </div>
     </Transition>
@@ -470,6 +493,8 @@ import { dictText } from '@/utils/dict'
 import { parseWarmLayout } from '@/utils/warmHomeLayout'
 import { showCoverBanner } from '@/utils/shareLanding'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
+import { recentMonthRows } from '@/utils/bookTrend'
+import { MODULE_DEFAULT_WIDGET, WIDGETS as WIDGET_DEFS, WIDGET_MODULE, siblingsOf, widgetById } from './widgets/registry'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -498,37 +523,14 @@ const memberCount = computed(() => appStore.stats.memberCount || 0)
 const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 
 // ========== 组件注册表 + 布局(localStorage 持久化) ==========
-// 9 个富组件(有专属内容模板);span=8/4 对应 12 列栅格分栏
+// 组件与样式定义全在 widgets/registry.js:一个功能(module)可挂多种样式,id 是布局身份
+// (默认样式沿用原 id,新样式 '<默认 id>:<style>');带 component 的条目走模板里的统一 <component :is> 出口,
+// 所以「加一种样式」= 写 SFC + 注册表一行 + i18n,本文件模板不用再加 v-if 分支
 // chip = 该卡的色相锚点(--blob-N:1 陶土 / 2 暖沙 / 3 鼠尾草 / 4 暖米 / 5 暖木),标题竖条与列表图标芯片都取此色
-const WIDGETS = [
-  { id: 'weather', labelKey: 'warm.widget.weather', icon: '🌤', span: 8, chip: 1 },
-  { id: 'feed', labelKey: 'warm.widget.feed', icon: '👥', span: 4, chip: 3 },
-  { id: 'photos', labelKey: 'warm.widget.photos', icon: '📷', span: 4, chip: 2 },
-  { id: 'anni', labelKey: 'warm.widget.anni', icon: '🎂', span: 4, chip: 1 },
-  { id: 'finance', labelKey: 'warm.widget.finance', icon: '💰', span: 4, chip: 3 },
-  { id: 'item', labelKey: 'warm.widget.item', icon: '📦', span: 4, chip: 5 },
-  { id: 'task', labelKey: 'warm.widget.task', icon: '🎯', span: 4, chip: 5 },
-  { id: 'wish', labelKey: 'warm.widget.wish', icon: '⭐', span: 4, chip: 3 },
-  { id: 'reminder', labelKey: 'warm.widget.reminder', icon: '🔔', span: 4, chip: 1 },
-  { id: 'daily', labelKey: 'warm.widget.daily', icon: '🌅', span: 4, chip: 2 },
-]
-const WIDGET_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]))
 const widgetLabel = (base) => t(base.labelKey)
 // 卡片色相锚点 → 内联 --chip,供 .gc-card-h3::before 与 .gc-ic 取色(后代继承)
 const cardStyle = (w) => ({ '--chip': `var(--blob-${w.chip || 1})` })
 
-// 侧栏模块 → 富组件映射;未映射的模块拖入后落为「快捷入口」卡片
-const MODULE_TO_WIDGET = {
-  blog: 'feed',
-  album: 'photos',
-  anniversary: 'anni',
-  book: 'finance',
-  item: 'item',
-  task: 'task',
-  wish: 'wish',
-  reminder: 'reminder',
-  weather: 'weather',
-}
 // 全部模块的入口元信息(标题/路径/图标),快捷入口卡片据此渲染。
 // 必须覆盖侧栏全部可拖入 code(NAV_PATHS 全集),否则 resolveWidget 返回 null → 拖入后无法落位
 const MODULE_META = {
@@ -561,10 +563,12 @@ const MODULE_META = {
   recycle: { titleKey: 'warm.module.recycle', path: '/recycle', icon: '🗑' },
 }
 
-// 布局键:富组件用其 id(如 feed),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整
-const defaultSpan = (id) => WIDGET_BY_ID[id]?.span || 4
-// 行高基准:天气 8 列 × 4 行为基准,家人动态同高 4 行,每日内容 3 行(图+知识),其余 2 行
-const defaultRow = (id) => (id === 'weather' || id === 'feed' ? 4 : id === 'daily' ? 3 : 2)
+// 布局键:组件用其 id(如 feed / photos:carousel),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整
+const defaultSpan = (id) => widgetById(id)?.span || 4
+// 行高基准:各组件定义在注册表里(天气 8×4、家人动态 4×4、每日内容 3 行、其余 2 行)
+const defaultRow = (id) => widgetById(id)?.row || 2
+// base = 所属功能的默认组件 id:同一功能的多种样式共用一份数据/一条「已在首页」标记
+const baseOf = (w) => w?.base || w?.id
 const resolveWidget = (entry) => {
   const id = entry?.id
   if (!id) return null
@@ -584,9 +588,16 @@ const resolveWidget = (entry) => {
       chip: 3,
     }
   }
-  const base = WIDGET_BY_ID[id]
-  if (!base) return null
-  return { ...base, label: widgetLabel(base), span: entry.span || base.span, row, featured: entry.featured === true }
+  const def = widgetById(id)
+  if (!def) return null
+  return {
+    ...def,
+    base: def.module ? MODULE_DEFAULT_WIDGET[def.module] || def.id : def.id,
+    label: widgetLabel(def),
+    span: entry.span || def.span,
+    row,
+    featured: entry.featured === true,
+  }
 }
 
 // 新布局首屏：左侧家庭照片，右侧两张短列表。旧排版继续使用原有卡片样式。
@@ -629,17 +640,21 @@ const applyRemoteLayout = async () => {
   const parsed = parseStoredLayout(raw)
   if (parsed) layout.value = parsed
 }
-// 托盘仅列富组件(含无侧栏入口的天气);入口卡片经侧栏拖入
+// 托盘按「功能 × 样式」列出:同一功能的两种样式各自是一条,可同时加进首页;侧栏入口卡片经拖入
 const availableWidgets = computed(() =>
-  WIDGETS.filter((w) => !layout.value.some((e) => e.id === w.id)).map((w) => ({ ...w, label: widgetLabel(w) })),
+  WIDGET_DEFS.filter((w) => !layout.value.some((e) => e.id === w.id)).map((w) => ({
+    ...w,
+    label: widgetLabel(w),
+    // 同一功能有多种样式时才在托盘里标样式名(单样式功能不挂冗余后缀)
+    suffix: siblingsOf(w.id).length ? t(w.styleKey) : '',
+  })),
 )
 
 // ========== 已添加模块集合(供侧栏在编辑模式标记「已拖入冲突」) ==========
-const WIDGET_TO_MODULE = Object.fromEntries(Object.entries(MODULE_TO_WIDGET).map(([code, wid]) => [wid, code]))
 const computeAddedCodes = () => {
   const codes = new Set()
   for (const e of layout.value) {
-    const code = e.id.startsWith('link:') ? e.id.slice(5) : WIDGET_TO_MODULE[e.id]
+    const code = e.id.startsWith('link:') ? e.id.slice(5) : WIDGET_MODULE[e.id]
     if (code) codes.add(code)
   }
   return codes
@@ -713,6 +728,21 @@ const addWidget = (id) => {
 const removeWidget = (w) => {
   applyLayout(layout.value.filter((e) => e.id !== w.id))
 }
+// ========== 样式切换(编辑态卡上「样式」菜单) ==========
+// 同一功能注册了多种样式才出现;切换 = 原位替换布局项的 id(保留 span/row/featured,经 applyLayout 走 FLIP)
+const styleMenuId = ref(null)
+const styleOptions = (w) => siblingsOf(w.id)
+const toggleStyleMenu = (id) => {
+  styleMenuId.value = styleMenuId.value === id ? null : id
+}
+const switchStyle = (w, targetId) => {
+  styleMenuId.value = null
+  const i = layout.value.findIndex((e) => e.id === w.id)
+  if (i < 0 || !widgetById(targetId)) return
+  const next = [...layout.value]
+  next[i] = { ...layout.value[i], id: targetId }
+  applyLayout(next)
+}
 const resetLayout = () => {
   layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e }))
   ElMessage.success(t('warm.layoutReset'))
@@ -725,16 +755,20 @@ const startEdit = () => appStore.toggleHomeEditMode()
 const finishEdit = () => appStore.toggleHomeEditMode()
 // 编辑期间的增删/拖拽/缩放/恢复默认都只改内存,退出编辑(点「完成」或经侧栏再次点编辑)时才落库
 watch(editMode, (on) => {
-  if (!on) saveLayout()
+  if (!on) {
+    styleMenuId.value = null
+    saveLayout()
+  }
 })
 
 // 卡片点击:仅整卡可跳转的组件(weather/anni/finance);photos 点击翻牌、feed/task/wish/reminder/item 由内部行/按钮跳转
+// 判定按 base(功能的默认组件 id),这样同功能的另一种样式也走同一套点击/图标档行为
 const LINK_IDS = ['weather', 'anni', 'finance']
-const isLinkCard = (w) => LINK_IDS.includes(w.id)
+const isLinkCard = (w) => LINK_IDS.includes(baseOf(w))
 // 紧凑图标档:缩到 1 列(一行一列)/2 列(一行两列)时只渲染图标;2 列再带上名称(最简信息)。
 // span<=2 一律走图标档,避免窄列里塞进完整内容而挤爆
 const compact = (w) => w.span <= 2
-// 图标档点击直达:富组件按其所属模块路径,快捷入口用自身 path(daily 无独立页,不跳转)
+// 图标档点击直达:组件按其所属模块路径,快捷入口用自身 path(daily 无独立页,不跳转)
 const TILE_PATH = {
   weather: '/weather',
   feed: '/blog',
@@ -749,11 +783,11 @@ const TILE_PATH = {
 const onCardClick = (w) => {
   if (editMode.value) return
   if (compact(w)) {
-    const path = w.kind === 'link' ? w.path : TILE_PATH[w.id]
+    const path = w.kind === 'link' ? w.path : TILE_PATH[baseOf(w)]
     if (path) router.push(path)
     return
   }
-  const dest = { weather: '/weather', anni: '/plan?tab=anniversary', finance: '/book' }[w.id]
+  const dest = { weather: '/weather', anni: '/plan?tab=anniversary', finance: '/book' }[baseOf(w)]
   if (dest) router.push(dest)
 }
 
@@ -806,7 +840,7 @@ const displayWidgets = computed(() => {
   // 账本不可读(家长设为 NONE)的成员连收支卡一起隐藏,与光尘首页口径一致
   const hideFinance = hideForGuest || !userStore.canReadBook
   const list = hideFinance
-    ? widgets.value.filter((w) => w.id !== 'finance' && !(hideForGuest && GUEST_HIDDEN_WIDGETS.includes(w.id)))
+    ? widgets.value.filter((w) => baseOf(w) !== 'finance' && !(hideForGuest && GUEST_HIDDEN_WIDGETS.includes(baseOf(w))))
     : [...widgets.value]
   const rp = reorderPreview.value
   const dp = dropPreview.value
@@ -832,11 +866,8 @@ const displayWidgets = computed(() => {
   return list
 })
 const previewMeta = (code) => {
-  const wid = MODULE_TO_WIDGET[code]
-  if (wid) {
-    const base = WIDGET_BY_ID[wid]
-    if (base) return { label: widgetLabel(base), icon: base.icon }
-  }
+  const def = widgetById(MODULE_DEFAULT_WIDGET[code])
+  if (def) return { label: widgetLabel(def), icon: def.icon }
   const meta = MODULE_META[code]
   return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
@@ -867,7 +898,7 @@ const insertionIndexAt = (x, y, current, sourceId) => {
   )
 }
 const insertWidgetAt = (code, idx) => {
-  const id = MODULE_TO_WIDGET[code] || `link:${code}`
+  const id = MODULE_DEFAULT_WIDGET[code] || `link:${code}`
   const resolved = resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })
   if (!resolved) {
     dropPreview.value = null
@@ -1379,8 +1410,12 @@ const itemFloorPlanView = computed(() => {
   }
 })
 
-const visibleCard = (id) => displayWidgets.value.find((w) => w.id === id && !compact(w))
-const hasCard = (id) => () => Boolean(visibleCard(id))
+// 按「功能」判定可见:同一功能的多种样式共用一份数据(如列表 + 横向卡片都吃 feeds)
+const visibleCard = (base) => displayWidgets.value.find((w) => baseOf(w) === base && !compact(w))
+// 按「具体样式」判定可见:只有某个样式需要的数据,别让同功能的其它样式白拉一次
+const visibleCardById = (id) => displayWidgets.value.find((w) => w.id === id && !compact(w))
+const hasCard = (base) => () => Boolean(visibleCard(base))
+const hasCardStyle = (id) => () => Boolean(visibleCardById(id))
 const hasMap = () => Boolean(visibleCard('item') && itemShowFloorPlan(visibleCard('item')))
 const hasItemList = () => Boolean(visibleCard('item') && !itemShowFloorPlan(visibleCard('item')))
 const bindCard = (visible, request, target, initial, transform = (value) => value ?? initial) =>
@@ -1408,11 +1443,16 @@ const itemMapData = useHomeCardData(
   applyItemFloorPlan,
   () => applyItemFloorPlan({}),
 )
-const holdingData = bindCard(hasCard('finance'), () => financeApi.list(), financeList, [])
+// 本月收支概览与理财持仓只有「收支概览」样式会画 → 按样式判定,别让趋势卡多拉一次 summary
+const holdingData = bindCard(hasCardStyle('finance'), () => financeApi.list(), financeList, [])
+// 近半年趋势(记账·趋势样式):byMonth 补零交给 utils/bookTrend 的纯函数
+const ledgerData = ref({})
+const trendRows = computed(() => recentMonthRows(ledgerData.value?.byMonth))
 const cardData = {
   feed: bindCard(hasCard('feed'), fetchFeed, feeds, []),
   reminder: bindCard(hasCard('reminder'), () => planApi.today(), reminders, [], buildAgenda),
-  finance: bindCard(hasCard('finance'), () => bookApi.summary(), bookSummary, {}),
+  finance: bindCard(hasCardStyle('finance'), () => bookApi.summary(), bookSummary, {}),
+  ledger: bindCard(hasCardStyle('finance:trend'), () => bookApi.ledger(), ledgerData, {}),
   wish: bindCard(hasCard('wish'), () => wishApi.list(), wishes, []),
   task: bindCard(
     hasCard('task'),
@@ -1425,6 +1465,8 @@ const cardData = {
     return hasMap() ? itemMapData : itemListData
   },
 }
+// 卡片的加载/错误分支按「数据源」找请求:默认就是 base,个别样式换了数据源在注册表里写 dataKey
+const cardKey = (w) => w.dataKey || baseOf(w)
 watch(
   hasCard('daily'),
   (visible) => {
@@ -1433,13 +1475,21 @@ watch(
   { immediate: true },
 )
 watch(
-  () => Boolean(visibleCard('photos') && photos.value.length > 1),
+  () => Boolean(visibleCardById('photos') && photos.value.length > 1),
   (visible) => {
     if (visible) startPhotoTimer()
     else stopPhotoTimer()
   },
   { immediate: true },
 )
+// 注册表里带 component 的样式组件要的数据,统一在这里交给 props(ctx)
+const widgetCtx = () => ({
+  feeds: feeds.value,
+  photos: photos.value,
+  anni: anniversaries.value,
+  trendRows: trendRows.value,
+  editMode: editMode.value,
+})
 const retryCards = () => {
   for (const data of [...Object.values(cardData), holdingData]) {
     if (data.status.value === 'error') data.retry()
@@ -1844,6 +1894,82 @@ html.theme-warm.dark .gc-home {
   border-bottom: 2px solid var(--color-text-tertiary);
   border-bottom-right-radius: 2px;
 }
+
+/* 样式切换(编辑态):卡左上角的文字键 + 内联菜单。
+ * 不用 el-dropdown —— 它 teleport 到 body,脱出 .gc-card 的 overflow,也带一串 z-index 规则要挪 */
+.gc-style-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  height: 24px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--color-card-2);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow);
+}
+.gc-style-btn:hover,
+.gc-style-btn.on {
+  background: var(--color-accent, var(--color-brand));
+  color: var(--color-card);
+}
+.gc-style-menu {
+  position: absolute;
+  top: 40px;
+  left: 10px;
+  z-index: 3;
+  min-width: 118px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow-hover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gc-style-tip {
+  padding: 2px 8px 4px;
+  font-size: 10.5px;
+  color: var(--color-text-tertiary);
+}
+.gc-style-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text);
+  text-align: left;
+}
+.gc-style-item:hover {
+  background: var(--color-line);
+}
+.gc-style-ic {
+  font-size: 13px;
+}
+@media (pointer: coarse) {
+  .gc-style-btn {
+    top: 6px;
+    left: 6px;
+    height: 32px;
+    padding: 0 11px;
+    font-size: 12.5px;
+  }
+  .gc-style-menu {
+    top: 44px;
+    left: 6px;
+  }
+}
 .gc-edit-hint {
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -1856,6 +1982,11 @@ html.theme-warm.dark .gc-home {
 
 /* 照片卡牌堆:卡片须为 flex 纵向容器,stack 的 flex:1 才能撑满剩余高度(否则子项全 absolute → 高度塌缩为 0 → 照片不可见) */
 .gc-photos {
+  display: flex;
+  flex-direction: column;
+}
+/* 注册表样式组件(轮播/卡片流/趋势图)同理:组件根节点的 flex:1 要落在纵向容器里才撑满卡片 */
+.gc-card-styled {
   display: flex;
   flex-direction: column;
 }
@@ -2226,6 +2357,11 @@ html.theme-warm.dark .gc-home {
 }
 .gc-add-icon {
   font-size: 14px;
+}
+/* 同一功能的多种样式在托盘里按「功能 · 样式」列出,样式名淡一档 */
+.gc-add-style {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
 }
 
 /* 快捷入口卡片 */
