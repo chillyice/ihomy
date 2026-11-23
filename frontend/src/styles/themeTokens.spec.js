@@ -32,6 +32,8 @@ const getCss = (file) => {
 const normalize = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/var\(\s*(--[a-zA-Z0-9_-]+)\s*,[^()]*\)/g, 'var($1)')
 
 const STYLE_FILES = walk(SRC, ['.vue', '.css'])
+// 全仓样式只读一次:三个用例共用「相对路径 -> 归一化后的 CSS」
+const CSS_BY_FILE = new Map(STYLE_FILES.map((f) => [rel(f), normalize(getCss(f))]))
 
 // 运行时由 JS/内联 style 注入的变量:样式里读它们是对的,只是 CSS 里查不到声明
 const RUNTIME_VARS = {
@@ -89,17 +91,16 @@ describe('主题配色守门', () => {
   it('引用的 CSS 变量必须真实存在(拼错 = 样式静默失效)', () => {
     const defined = new Set()
     const refs = []
-    for (const file of STYLE_FILES) {
-      const css = normalize(getCss(file))
+    for (const [path, css] of CSS_BY_FILE) {
       for (const m of css.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1])
-      for (const m of css.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)/g)) refs.push([m[1], rel(file)])
+      for (const m of css.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)/g)) refs.push([m[1], path])
     }
     const offenders = refs.filter(([name]) => !defined.has(name) && !isAllowedVar(name)).map(([name, path]) => `${path}: ${name}`)
     expect(offenders, `引用了未定义的 CSS 变量(运行时会静默取 fallback 或继承父色):\n${offenders.join('\n')}`).toEqual([])
   })
 
   it('每个主题的晨暮色板都定义语义色 token(danger/warning/tertiary/green)', () => {
-    const css = normalize(readFileSync(join(SRC, 'styles/main.css'), 'utf8'))
+    const css = CSS_BY_FILE.get('styles/main.css')
     const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
       selectors: m[1].split(',').map((s) => s.trim().split(/\r?\n/).pop().trim()),
       body: m[2],
@@ -151,10 +152,7 @@ describe('主题配色守门', () => {
 
     // 已有深色/暖居覆写的类名:这些类的浅色声明由 html.dark / html.theme-warm 接管
     const coveredClasses = new Set()
-    const cssByFile = new Map()
-    for (const file of [...STYLE_FILES, join(SRC, 'styles/main.css')]) {
-      const css = normalize(getCss(file))
-      cssByFile.set(rel(file), css)
+    for (const css of CSS_BY_FILE.values()) {
       for (const m of css.matchAll(/([^{}]+)\{/g)) {
         if (!/dark|theme-warm/.test(m[1])) continue
         for (const c of m[1].matchAll(/\.([a-zA-Z0-9_-]+)/g)) coveredClasses.add(c[1])
@@ -179,7 +177,7 @@ describe('主题配色守门', () => {
       ALLOW.some((a) => (a.prefix ? file.startsWith(a.file) : a.file === file && (!a.selector || selector.includes(a.selector))))
 
     const offenders = []
-    for (const [file, css] of cssByFile) {
+    for (const [file, css] of CSS_BY_FILE) {
       if (file === 'styles/main.css') continue
       for (const block of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
         const selector = block[1].trim().split(/\r?\n/).pop().trim()

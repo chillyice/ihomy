@@ -49,12 +49,16 @@ function scriptLines(src) {
 }
 
 describe('用户可见文本无硬编码中文', () => {
+  // 全仓只扫一次:两个用例共用同一份「相对路径 + 内容」
+  const FILES = walk(SRC, ['.vue', '.js']).map((f) => [f.slice(SRC.length + 1), readFileSync(f, 'utf8')])
+
   it('.vue 模板文本/静态属性不含未 i18n 的中文', () => {
     const offenders = []
-    for (const file of walk(SRC, ['.vue'])) {
-      templateUiLines(readFileSync(file, 'utf8')).forEach((line, i) => {
+    for (const [path, src] of FILES) {
+      if (!path.endsWith('.vue')) continue
+      templateUiLines(src).forEach((line, i) => {
         if (!CJK.test(line) || ALLOW.some((a) => line.includes(a))) return
-        offenders.push(`${file.slice(SRC.length + 1)}:${i + 1}: ${line.trim()}`)
+        offenders.push(`${path}:${i + 1}: ${line.trim()}`)
       })
     }
     expect(offenders, `模板硬编码中文(请改用 $t):\n${offenders.join('\n')}`).toEqual([])
@@ -62,11 +66,11 @@ describe('用户可见文本无硬编码中文', () => {
 
   it('ElMessage 等提示字面量不含未 i18n 的中文', () => {
     const offenders = []
-    for (const file of walk(SRC, ['.vue', '.js'])) {
-      if (file.endsWith('.spec.js')) continue
-      scriptLines(readFileSync(file, 'utf8')).forEach((line, i) => {
+    for (const [path, src] of FILES) {
+      if (path.endsWith('.spec.js')) continue
+      scriptLines(src).forEach((line, i) => {
         if (!MSG_API.test(line) || !CJK.test(line) || ALLOW.some((a) => line.includes(a))) return
-        offenders.push(`${file.slice(SRC.length + 1)}:${i + 1}: ${line.trim()}`)
+        offenders.push(`${path}:${i + 1}: ${line.trim()}`)
       })
     }
     expect(offenders, `提示硬编码中文(请改用 t):\n${offenders.join('\n')}`).toEqual([])

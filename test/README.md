@@ -37,16 +37,25 @@ test/
 
 ## 快速导航
 
-- **日常调试**：每改完一个功能点，运行下表中覆盖该行为的用例。跨前后端的改动分别选取两端用例。下一处改动重新选取，避免把工作区其他人的改动也算进来。
+- **日常调试(一条命令挑用例)**:改完一部分后,在仓库根目录跑
+
+  ```bash
+  node scripts/related-tests.mjs                # 读 git 改动,列出将要执行的命令
+  node scripts/related-tests.mjs --run          # 列出并执行
+  node scripts/related-tests.mjs src/utils/date.js backend/src/main/java/com/ihomy/common/AnniversaryDate.java
+  ```
+
+  脚本按改动挑:**前端**沿静态 import 关系找引用该模块的 spec(页面/组件只取直接引用,utils/composables 取两跳),全仓扫描型守门 spec(i18n、样式 token、HTML 注入面、游戏外壳)按改动内容特征触发;**后端**取同名 `XxxTest` + 测试源码里引用该类名的测试类。只跑挑中的用例,**不做全量回归**;"其它"改动(文档、图片、配置)不产生用例。
+- **日常调试(手工挑)**:每改完一个功能点,运行下表中覆盖该行为的用例。跨前后端的改动分别选取两端用例。下一处改动重新选取,避免把工作区其他人的改动也算进来。
 
 | 改动范围 | 执行方式 |
 |---|---|
-| 前端单一功能 | 在 `frontend` 运行 `npm test -- src/utils/scheduleType.spec.js`。同一功能涉及多个 spec 时，把所需路径列在同一条命令中。 |
+| 前端单一功能 | 在 `frontend` 运行 `npm test -- src/utils/scheduleType.spec.js`。同一功能涉及多个 spec 时,把所需路径列在同一条命令中。 |
 | 前端共享逻辑 | 在 `frontend` 运行 `npx vitest related --run src/utils/scheduleType.js`，由静态导入关系选取测试。涉及 Vue 模板、动态加载或扫描文件的守门检查时，按改动显式指定对应 spec。 |
 | 后端 | 在 `backend` 运行 `.\mvnw.cmd -B "-Dtest=RepeatScheduleTest" test`。逗号分隔多个相关类，`类名#方法名` 可限定单个方法。 |
 | 接口或页面交互 | 从 `automation/README.md` 选对应的接口脚本，或在 [功能测试用例](cases/功能测试用例.md) 中选对应场景编号。 |
 
-零匹配时，按被改函数或行为查找调用方测试。仍无自动化覆盖就执行对应手工场景，记录实际执行的用例和结果。
+零匹配时，按被改函数或行为查找调用方测试。仍无自动化覆盖就执行对应手工场景，记录实际执行的用例和结果。**全量回归只在 CI、发布前或用户明确要求时跑**;平时不要 `npm test` / `-B test` 一把梭。
 
 - **要跑全站用例**:看 `cases/功能测试用例.md`——§0.1 测试环境与账号矩阵 → §1~33 各域用例 → §34 风险点与易漏点 → 附录 A 统计。
 - **要跑登录冒烟**:`automation/smoke_login.py`(用法见 `automation/README.md`)。

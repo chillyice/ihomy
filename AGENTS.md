@@ -94,7 +94,7 @@ wallpaper-engine/           Wallpaper Engine 网页壁纸壳页(机制见该目�
 
 ## 构建与验证
 
-**日常调试**：每改完一部分，只运行本次功能及受影响调用方的用例。前端指定 spec，后端指定测试类或方法，手工按用例号选取；未命中时补查覆盖并说明验证范围。命令见 `test/README.md`。全量回归用于 CI 或明确要求跑全量时。
+**日常调试**:改完一部分就在仓库根跑 `node scripts/related-tests.mjs --run`——读 git 改动,前端按静态 import 关系挑 spec(页面/组件只取直接引用,utils/composables 两跳;i18n/样式/HTML 注入面等扫全仓的守门 spec 按改动内容触发),后端挑同名 `XxxTest` + 测试源码里引用该类名的测试类。手动挑时前端指定 spec、后端指定测试类或方法,手工按用例号选取;未命中时补查覆盖并说明验证范围(命令见 `test/README.md`)。**全量回归只在 CI、发布前或明确要求时跑**,平时不要 `npm test` / `-B test` 一把梭。
 
 ```powershell
 cd backend;  .\mvnw.cmd -B clean package      # 编译+测试+打 jar → target/ihomy-backend.jar
@@ -102,7 +102,7 @@ cd backend;  .\mvnw.cmd -B clean package -DskipTests   # 只求编译
 cd frontend; npm run dev                      # 5173,代理 /api → 8080
 cd frontend; npm run lint; npx vitest run; npm run build
 ```
-- **基线**:后端 512 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1572 passed / 141 文件** + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **43 chunk / 1481.00KiB**(V14.4 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
+- **基线**:后端 511 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1687 passed / 159 文件**(`pool: threads`,空载全量约 24s;2026-11-23 实测) + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **43 chunk / 1481.00KiB**(V14.4 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
 - **冒烟**:`GET /api/auth/captcha` 取 id → `POST /api/auth/login {email,password,captchaId,captchaCode:'qwer'}`,code=0 即有 token。**健康检查** `/api/public/health`(UP→200 / DEGRADED→503)、`/api/ops/health`(OPS,含依赖耗时)。
 - **闸门(CI 最先跑)**:`doc-drift-check.sh` + `gen-code-map.sh --check` + `doc-index.sh --check`;随后前后端构建、起库导 schema、登录冒烟。
 - 本机 JDK 21、Node 24 LTS(最低 22.12)、MySQL 8;没装 mvn 用 `C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`,`JAVA_HOME=C:\Program Files\Java\jdk-21`;clean 被锁改跑 `-B test`。

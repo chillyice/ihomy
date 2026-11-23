@@ -97,11 +97,8 @@ describe('handTileTransform 手牌排布', () => {
   it('带 plan 时整行平移/压缩,牌距不小于牌宽(不相交下限)', () => {
     const plan = rowPlan(1, true, [4, 4, 4, 4])
     expect(plan.pitch).toBeGreaterThanOrEqual(TILE.W)
-    const a = handTileTransform(0, 0, 1, plan)
-    const b = handTileTransform(0, 0, 1, plan)
-    expect(a.x).toBeCloseTo(b.x)
     const drawn = drawnTileTransform(0, 1, plan)
-    expect(drawn.x).toBeGreaterThan(a.x)
+    expect(drawn.x).toBeGreaterThan(handTileTransform(0, 0, 1, plan).x)
   })
 })
 

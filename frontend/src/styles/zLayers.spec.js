@@ -40,6 +40,9 @@ function walk(dir, exts, out = []) {
 
 const rel = (file) => file.slice(SRC.length + 1).replace(/\\/g, '/')
 
+// 全仓只扫一次:下面的用例共用同一份「路径 + 内容」,避免每个 it 重新走目录读文件
+const FILES = walk(SRC, ['.vue', '.css']).map((f) => [rel(f), readFileSync(f, 'utf8')])
+
 describe('全局层级标尺守门', () => {
   it('main.css 定义了完整的 --z-* 标尺', () => {
     const css = readFileSync(join(SRC, 'styles/main.css'), 'utf8')
@@ -49,16 +52,13 @@ describe('全局层级标尺守门', () => {
 
   it('组件内不得写 >=100 的裸 z-index(改用 --z-* token)', () => {
     const offenders = []
-    for (const file of walk(SRC, ['.vue', '.css'])) {
-      const path = rel(file)
+    for (const [path, src] of FILES) {
       if (ALLOW_FILES.includes(path)) continue
-      readFileSync(file, 'utf8')
-        .split(/\r?\n/)
-        .forEach((line, i) => {
-          for (const m of line.matchAll(Z_RAW)) {
-            if (Number(m[1]) >= 100) offenders.push(`${path}:${i + 1}: ${line.trim()}`)
-          }
-        })
+      src.split(/\r?\n/).forEach((line, i) => {
+        for (const m of line.matchAll(Z_RAW)) {
+          if (Number(m[1]) >= 100) offenders.push(`${path}:${i + 1}: ${line.trim()}`)
+        }
+      })
     }
     expect(offenders, `组件内裸层级过大(请改用 main.css 的 --z-* token):\n${offenders.join('\n')}`).toEqual([])
   })
@@ -67,16 +67,13 @@ describe('全局层级标尺守门', () => {
     const css = readFileSync(join(SRC, 'styles/main.css'), 'utf8')
     const defined = new Set([...css.matchAll(/(--z-[a-z-]+)\s*:/g)].map((m) => m[1]))
     const offenders = []
-    for (const file of walk(SRC, ['.vue', '.css'])) {
-      const path = rel(file)
+    for (const [path, src] of FILES) {
       if (path === 'styles/main.css') continue
-      readFileSync(file, 'utf8')
-        .split(/\r?\n/)
-        .forEach((line, i) => {
-          for (const m of line.matchAll(/var\(\s*(--z-[a-z-]+)/g)) {
-            if (!defined.has(m[1])) offenders.push(`${path}:${i + 1}: ${m[1]}`)
-          }
-        })
+      src.split(/\r?\n/).forEach((line, i) => {
+        for (const m of line.matchAll(/var\(\s*(--z-[a-z-]+)/g)) {
+          if (!defined.has(m[1])) offenders.push(`${path}:${i + 1}: ${m[1]}`)
+        }
+      })
     }
     expect(offenders, `引用了不存在的层级 token(检查拼写,可用值见 main.css):\n${offenders.join('\n')}`).toEqual([])
   })

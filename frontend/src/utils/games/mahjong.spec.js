@@ -300,14 +300,12 @@ describe('mahjong rules (吃/杠/将牌约束)', () => {
   it('普通副露牌型:碰出后暗手将对判定仍生效', () => {
     const r258 = { pairConstraint: MAHJONG_PAIR_258 }
     // 副露 1 个碰(5筒),暗手 111条 234条 888条 2万对
-    const melds = [{ type: 'pong', kind: 13 }]
     const hand = kindsToTiles([18, 18, 18, 19, 20, 21, 25, 25, 25, 1, 1])
     expect(hand.length).toBe(11)
     expect(canMahjongWin(mahjongCounts(hand), 1, r258)).toBe(true)
     // 将换成 9万:不可胡
     const badHand = kindsToTiles([18, 18, 18, 19, 20, 21, 25, 25, 25, 8, 8])
     expect(canMahjongWin(mahjongCounts(badHand), 1, r258)).toBe(false)
-    expect(melds.length).toBe(1)
   })
 
   it('mahjongChiOptions 组合完整覆盖三种位置,字牌不可吃', () => {

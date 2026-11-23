@@ -26,13 +26,14 @@ function walk(dir, exts, out = []) {
 
 const rel = (file) => file.slice(SRC.length + 1).replace(/\\/g, '/')
 
+// 全仓只扫一次:三个用例共用同一份「路径 + 内容」
+const FILES = walk(SRC, ['.vue', '.js']).map((f) => [rel(f), readFileSync(f, 'utf8')])
+
 describe('HTML 注入面守门', () => {
   it('v-html 只允许出现在引用消毒入口的文件或静态图标白名单里', () => {
     const offenders = []
-    for (const file of walk(SRC, ['.vue'])) {
-      const path = rel(file)
-      if (ALLOW_FILES.includes(path)) continue
-      const src = readFileSync(file, 'utf8')
+    for (const [path, src] of FILES) {
+      if (!path.endsWith('.vue') || ALLOW_FILES.includes(path)) continue
       if (!src.includes('v-html')) continue
       if (SANITIZER_IMPORT.test(src) && SANITIZER_CALL.test(src)) continue
       const line = src.split(/\r?\n/).findIndex((l) => l.includes('v-html')) + 1
@@ -43,10 +44,9 @@ describe('HTML 注入面守门', () => {
 
   it('marked 只能由 utils/markdown.js 导入(消毒入口唯一)', () => {
     const offenders = []
-    for (const file of walk(SRC, ['.vue', '.js'])) {
-      const path = rel(file)
-      if (path === 'utils/markdown.js' || file.endsWith('.spec.js')) continue
-      if (/from\s+['"]marked['"]/.test(readFileSync(file, 'utf8'))) offenders.push(path)
+    for (const [path, src] of FILES) {
+      if (path === 'utils/markdown.js' || path.endsWith('.spec.js')) continue
+      if (/from\s+['"]marked['"]/.test(src)) offenders.push(path)
     }
     expect(offenders, `marked 应只在 utils/markdown.js 里使用:\n${offenders.join('\n')}`).toEqual([])
   })
@@ -55,14 +55,12 @@ describe('HTML 注入面守门', () => {
     const sink = /\b(innerHTML|outerHTML)\s*\+?=/
     const emptyOnly = /\b(innerHTML|outerHTML)\s*\+?=\s*(''|""|``)\s*;?\s*$/
     const offenders = []
-    for (const file of walk(SRC, ['.vue', '.js'])) {
-      if (file.endsWith('.spec.js')) continue
-      readFileSync(file, 'utf8')
-        .split(/\r?\n/)
-        .forEach((line, i) => {
-          if (!sink.test(line) || emptyOnly.test(line)) return
-          offenders.push(`${rel(file)}:${i + 1}: ${line.trim()}`)
-        })
+    for (const [path, src] of FILES) {
+      if (path.endsWith('.spec.js')) continue
+      src.split(/\r?\n/).forEach((line, i) => {
+        if (!sink.test(line) || emptyOnly.test(line)) return
+        offenders.push(`${path}:${i + 1}: ${line.trim()}`)
+      })
     }
     expect(offenders, `非空 innerHTML/outerHTML 注入(请走 v-html + renderMarkdown 或 textContent):\n${offenders.join('\n')}`).toEqual([])
   })
