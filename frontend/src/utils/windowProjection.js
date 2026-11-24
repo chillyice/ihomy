@@ -1,14 +1,17 @@
 export function windowTransform(width, height, altitude, azimuth) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
-  // At northern mid-latitudes the two solstice noon elevations differ by 46.88 degrees.
-  const winterReferenceReach = height * 0.74
-  const reach = altitude > 0 && altitude < 90 ? winterReferenceReach * 2 ** ((25 - altitude) / 46.88) : 0
+  // Calibrate against solar noon in Jinan (36.65° N). Outside noon the
+  // same continuous curve follows the actual solar elevation and bearing.
+  const phase = (90 - 36.65 - altitude) / 23.44
+  const winterSummerRatio = 1.15
+  const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
+  const reach = height * 0.9 * (1 + amplitude * phase)
   const paneWidth = width * 0.88
   const shear = Math.sin(bearing) * reach
   const depth = Math.cos(bearing) * reach
-  // The sill is 0.15 window heights above the floor, along the same light ray.
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, height * 0.075 + depth * 0.15]
+  const top = height * (0.05 + 0.04 * phase)
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, top]
 }
 
 // Average a small disk of shifted copies of the aperture. Each sample represents
@@ -63,8 +66,7 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   mask.fillStyle = '#fff'
   // Inset the opening to leave a solid perimeter around the glass.
   const frameX = 0.012
-  const frameY = 0.015
-  mask.fillRect(frameX, frameY, 1 - 2 * frameX, 1 - 2 * frameY)
+  mask.fillRect(frameX, 0, 1 - 2 * frameX, 1)
   mask.globalCompositeOperation = 'destination-out'
   const mullionWidth = 0.048
   const transomHeight = 0.055

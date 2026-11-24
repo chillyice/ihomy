@@ -15,15 +15,32 @@ const props = defineProps({
 const surface = ref(null)
 let observer
 let frame = 0
+let displayed
+let start
+let target
+let startedAt
 
 // Coalesce a resize, time step and slider change into one paint. Cloud cover
 // and the lamp mask are composited by CSS and never invalidate the aperture.
 function schedulePaint() {
   if (frame) return
-  frame = requestAnimationFrame(() => {
+  frame = requestAnimationFrame((now) => {
     frame = 0
     const canvas = surface.value
-    drawWindowProjection(canvas, { ...props, width: canvas.clientWidth, height: canvas.clientHeight })
+    const scene = props.scene
+    if (!target || target.altitude !== scene.altitude || target.azimuth !== scene.azimuth) {
+      start = displayed ?? scene
+      target = { altitude: scene.altitude, azimuth: scene.azimuth }
+      startedAt = now
+    }
+    const t = start.altitude === target.altitude && start.azimuth === target.azimuth ? 1 : Math.min(1, (now - startedAt) / 600)
+    const blend = t * t * (3 - 2 * t)
+    displayed = {
+      altitude: start.altitude + (target.altitude - start.altitude) * blend,
+      azimuth: start.azimuth + (target.azimuth - start.azimuth) * blend,
+    }
+    drawWindowProjection(canvas, { ...props, scene: { ...scene, ...displayed }, width: canvas.clientWidth, height: canvas.clientHeight })
+    if (t < 1) schedulePaint()
   })
 }
 

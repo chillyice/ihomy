@@ -18,14 +18,16 @@ describe('window-plane projection', () => {
   it.each([
     [1200, 800],
     [390, 844],
-  ])('keeps winter noon twice as tall as summer noon at %i �� %i', (width, height) => {
-    for (const winterAltitude of [20, 26.66, 35]) {
-      const winter = windowTransform(width, height, winterAltitude, 180)
-      const summer = windowTransform(width, height, winterAltitude + 46.88, 180)
-      expect(winter[3]).toBeCloseTo(2 * summer[3])
-      expect(winter[5] + winter[3]).toBeLessThanOrEqual(height)
-      expect(summer[3]).toBeGreaterThan(height * 0.3)
-    }
+  ])('matches the Jinan noon landmarks at %i by %i', (width, height) => {
+    const summer = windowTransform(width, height, 76.79, 180)
+    const equinox = windowTransform(width, height, 53.35, 180)
+    const winter = windowTransform(width, height, 29.91, 180)
+    expect(summer[5] / height).toBeCloseTo(0.01, 8)
+    expect(equinox[5] / height).toBeCloseTo(0.05, 8)
+    expect((equinox[5] + equinox[3]) / height).toBeCloseTo(0.95, 8)
+    expect(winter[5] / height).toBeCloseTo(0.09, 8)
+    expect(winter[3] / summer[3]).toBeCloseTo(1.15, 8)
+    expect((summer[3] + winter[3]) / (2 * height)).toBeCloseTo(0.9, 8)
   })
 
   it.each([
