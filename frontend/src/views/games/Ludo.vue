@@ -599,12 +599,13 @@ async function animateMove(next) {
   if (!move || !move.frames?.length) return
   const token = (animToken += 1)
   const key = `${move.color}:${move.piece}`
+  const keys = [key, ...(move.companions || []).map((piece) => `${move.color}:${piece}`)]
   movingKey.value = key
   animating.value = true
   for (const frame of move.frames) {
     if (token !== animToken) return
     const leap = !!frame.at
-    animSteps.value = { ...animSteps.value, [key]: frame.step }
+    animSteps.value = Object.fromEntries(keys.map((k) => [k, frame.step]))
     await sleep(leap ? LEAP_MS : STEP_MS)
   }
   if (token !== animToken) return

@@ -184,3 +184,24 @@ describe('ludo AI', () => {
     expect(ludoAiPick(state)).toBeNull()
   })
 })
+
+it('consumes a streak only when the player launches', () => {
+  const state = ready({ 0: [4, 0, 0, 0] })
+  state.misses = { 0: 5 }
+  const rolled = ludoRoll(state, 1)
+  const launched = ludoApplyMove(rolled, rolled.moves[1])
+  expect(launched.misses[0]).toBe(0)
+  expect(launched.turn).toBe(1)
+  expect(ludoApplyMove(rolled, rolled.moves[0]).misses[0]).toBe(6)
+})
+
+it.each([
+  [0, 2],
+  [8, 3],
+  [LUDO_TOTAL_STEPS, 2],
+])('limits the formation with fourth plane at %i', (fourth, count) => {
+  const state = ready({ 0: [4, 4, 4, fourth] }, 0, 1)
+  const next = ludoApplyMove(state, state.moves[2])
+  expect(next.pieces[0].filter((step) => step === state.moves[2].to)).toHaveLength(count)
+  expect(next.pieces[0][2]).toBe(state.moves[2].to)
+})

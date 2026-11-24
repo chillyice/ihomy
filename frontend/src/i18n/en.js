@@ -2044,7 +2044,8 @@ export default {
       roll: 'Roll',
       rollHint: 'Roll a 6 to take off, and a 6 earns another roll',
       rulesTitle: 'How to play',
-      ruleRoll: 'Roll a 6 to move a plane out of the hangar; a 6 also earns another roll',
+      ruleRoll:
+        'Roll a 6 to move a plane out of the hangar; a 6 also earns another roll. After six consecutive rolls without a 6, you may launch one plane on that roll or a later roll. Using this launch resets the count and ends your turn. Rolling a 6 also resets the count. With three planes in play, up to two on the same space move together. With four in play, up to three move together.',
       ruleColor: 'Landing on your own color carries the plane 4 cells ahead',
       rulePlane: 'Landing on a plane mark follows the dashed lane 12 cells ahead',
       ruleCapture: 'Landing on a rival sends it back to the hangar; the four take-off cells are safe',
@@ -2066,7 +2067,7 @@ export default {
     runway52: {
       rule1: 'Take turns rolling. A 6 launches a plane or moves one already flying; with a legal move, the turn rolls again after moving.',
       rule2:
-        'After six straight rolls without a 6, the next roll of 1–5 may also send one plane to the take-off pad; that launch ends the turn with no extra roll.',
+        'After six consecutive rolls without a 6, you may launch one plane on that roll or a later roll. Using this launch resets the count and ends your turn. Rolling a 6 also resets the count. With three planes in play, up to two on the same space move together. With four in play, up to three move together.',
       rule3:
         'Landing on your own colour hops 4 cells ahead; landing on your lane cell (⇢) rides the dashed line 12 cells ahead. Home-stretch cells trigger no jumps.',
       rule4:

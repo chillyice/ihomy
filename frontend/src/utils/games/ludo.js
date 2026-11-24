@@ -250,7 +250,7 @@ export function ludoLegalMoves(state) {
     const from = steps[piece] || 0
     if (from >= LUDO_TOTAL_STEPS) continue
     if (from === 0) {
-      if (dice !== 6) continue
+      if (dice !== 6 && (state.misses?.[color] || 0) < 6) continue
       out.push({ piece, from: 0, to: 1, kind: 'launch', frames: [{ step: 1, at: 'launch' }] })
       continue
     }
@@ -277,6 +277,9 @@ export function ludoRoll(state, value = 1 + Math.floor(Math.random() * 6)) {
   if (!state || state.phase !== 'playing' || state.awaiting !== 'roll') return state
   const next = clone(state)
   next.dice = Math.max(1, Math.min(6, Math.round(Number(value) || 1)))
+  const color = next.seats[next.turn]?.color
+  next.misses ??= {}
+  next.misses[color] = next.dice === 6 ? 0 : (next.misses[color] || 0) + 1
   next.rollSeq = (next.rollSeq || 0) + 1
   next.awaiting = 'move'
   next.lastMove = null
@@ -302,7 +305,11 @@ export function ludoApplyMove(state, move) {
   const color = seat.color
   const steps = next.pieces[color] || emptySteps()
   const from = steps[move.piece] || 0
-  steps[move.piece] = move.to
+  const active = steps.filter((step) => step > 0 && step < LUDO_TOTAL_STEPS).length
+  const companions =
+    from === 0 ? [] : steps.flatMap((step, i) => (step === from && i !== move.piece ? [i] : [])).slice(0, Math.max(0, active - 2))
+  for (const piece of [move.piece, ...companions]) steps[piece] = move.to
+  if (from === 0 && next.dice !== 6 && next.misses) next.misses[color] = 0
 
   const captured = []
   if (move.to >= 1 && move.to <= LUDO_RING_STEPS) {
@@ -326,6 +333,7 @@ export function ludoApplyMove(state, move) {
   next.lastMove = {
     color,
     piece: move.piece,
+    companions,
     from,
     to: move.to,
     kind: move.kind,

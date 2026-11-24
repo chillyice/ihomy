@@ -104,7 +104,7 @@ body.in-immersive .top-actions{display:none}
 <dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
 <!-- 规则正文与 Runway52.vue 的 #rules 槽(i18n games.runway52.rule*)是同一份文案,改这里要同步那边 -->
 
-<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>连续六掷都没出 6 点，下一掷开出 1–5 点也能让一架飞机进起飞区；这次起飞后换下一家掷，不额外再掷。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>连续六次没掷出 6，第六次起可用当前点数起飞一架。用后重新计数并换人，掷出 6 也会清零。己方在场三架时，同格最多两架同行；在场四架时最多三架同行。</li><li>落在本色航点上可跳 4 格；落在本家航线格（⇢，在下一家与对家归航跑道口之间）沿虚线飞跃 12 格。归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库；本家飞跃航线斜穿对角颜色的归航跑道，扫到停在「从内向外第 4 格」上的飞机也会把它撞回机库。机场旁的起飞区是本家私有位，不会被撞。</li><li>绕完公共航线后转入本色跑道，终点是盘心深色圆心。点数超过到圆心的距离时照样能动：先走到圆心，多出的点数再从圆心往回折返（还差 2 格却掷出 5，就到圆心用 2 格、再退回 3 格）；刚好落在圆心才算归航。没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
 <div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
 <dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
 <div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
@@ -206,8 +206,6 @@ function walkFrames(c,from,land,to,kind){
 }
 function movesFor(g,face=g.face) {
  const c=last(g);
- /* 豁免起飞:连续六掷未出 6 点,掷出 1-5 点也能让一架飞机进起飞区(与掷 6 的起飞同款,
-    只是起飞后换下一家,不额外再掷);六连中之后每一掷都保留这份资格,直到掷出 6 归零 */
  const pity=face!==6&&(g.misses?.[c]||0)>=6;
  return g.planes[c].flatMap((from,piece)=>{
   if (from===GOAL || (from===HANGAR&&face!==6&&!pity)) return [];
@@ -228,7 +226,9 @@ function movesFor(g,face=g.face) {
   }
   // 飞跃航线扫过对角颜色的归航跑道:停在被扫过那一格上的飞机同样撞回机库
   if(kind==='跨场飞跃')g.planes[(c+2)%4].forEach((p,i)=>{if(p===LEAP_CROSS)captures.push([(c+2)%4,i]);});
-  return [{piece,to,kind,captures,frames:walkFrames(c,from,land,to,kind)}];
+   const active=g.planes[c].filter(p=>p>=0&&p<GOAL).length;
+  const companions=from===HANGAR?[]:g.planes[c].flatMap((p,i)=>p===from&&i!==piece?[i]:[]).slice(0,Math.max(0,active-2));
+  return [{piece,companions,to,kind,captures,frames:walkFrames(c,from,land,to,kind)}];
  });
 }
 function note(g, line) {g.log.unshift(line);g.log=g.log.slice(0,4);}
@@ -247,7 +247,8 @@ function play(g,index) {
  if(g.phase!=='move') return false;
  const c=last(g), move=movesFor(g).find(m=>m.piece===index);
  if(!move) return false;
- g.planes[c][index]=move.to;
+ if(move.kind==='起飞'&&g.face!==6)g.misses[c]=0;
+ for(const piece of [index,...move.companions])g.planes[c][piece]=move.to;
  for(const [r,p] of move.captures) g.planes[r][p]=HANGAR;
  const action=TEAMS[c].name+' '+(index+1)+' 号'+move.kind+(move.captures.length?'，撞回 '+move.captures.length+' 架飞机':'');
  if(arrivals(g,c)===4){g.phase='won';g.winner=c;note(g,action+'，全队归航！');}
@@ -434,8 +435,14 @@ async function act(i,focus=false){
  if(!move)return;
  clearTimeout(timer);
  moving=true;sync();
+ const group=[i,...move.companions];
+ const sameSpace=game.planes[c].flatMap((p,index)=>p===game.planes[c][i]&&p!==HANGAR?[index]:[]);
+ const remaining=sameSpace.filter(index=>!group.includes(index));
+ for(const index of sameSpace)delete tokenMap.get(c+':'+index).dataset.stack;
+ if(remaining.length>1)tokenMap.get(c+':'+remaining.at(-1)).dataset.stack=remaining.length;
+ if(group.length>1)tokenMap.get(c+':'+Math.max(...group)).dataset.stack=group.length;
  try{
-  await glide(c,i,game.planes[c][i],move,()=>game!==snapshot||blocked);
+  await Promise.all(group.map(piece=>glide(c,piece,game.planes[c][piece],move,()=>game!==snapshot||blocked)));
  }finally{
   moving=false;
  }

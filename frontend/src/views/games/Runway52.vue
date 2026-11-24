@@ -31,7 +31,7 @@ const Ludo = defineAsyncComponent(() => import('./Ludo.vue'))
 const route = useRoute()
 const router = useRouter()
 const roomId = computed(() => Number(route.query.room) || 0)
-const tableUrl = `${import.meta.env.BASE_URL}runway-52.html`
+const tableUrl = `${import.meta.env.BASE_URL}runway-52.html?v=${__APP_VERSION__}`
 
 const shellEl = ref(null)
 const frameEl = ref(null)
