@@ -38,6 +38,24 @@
     <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
     <div v-if="shadowEnabled" class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
 
+    <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
+    <div
+      v-if="themeStore.theme === 'warm' && lightLayerOpacity > 0"
+      class="light-layer"
+      :style="{ opacity: lightLayerOpacity ?? 0, transition: sunScene.isNight ? 'none' : 'opacity 3s ease' }"
+    >
+      <div
+        class="light-bloom"
+        :style="{
+          ...sourceStyle,
+          background: `radial-gradient(circle, ${sunScene.palette.bloom}, ${sunScene.palette.mid} 35%, transparent 70%)`,
+        }"
+      ></div>
+      <div class="light-source" :style="sourceStyle">
+        <div v-for="(rs, i) in rayStyles" :key="i" class="light-ray" :style="rs"></div>
+      </div>
+    </div>
+
     <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
     <div
       v-if="(lampDivOpacity ?? 0) > 0.01"
@@ -128,10 +146,12 @@
 </template>
 
 <script setup>
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
+import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import WindowProjection from './WindowProjection.vue'
 
+const themeStore = useThemeStore()
 defineProps({ occluders: { type: Array, default: () => [] } })
 
 // 从 App.vue 注入同一 useSunLight 实例(与 AppSidebar 控制台灯共享状态)
@@ -189,6 +209,17 @@ const fogLayerStyle = (b) => ({
   animationDelay: b.delay + 's',
   '--dx': b.dx,
   '--dy': b.dy,
+})
+const sourceStyle = computed(() => ({ left: sunScene.value.source.x, top: sunScene.value.source.y }))
+const rayStyles = computed(() => {
+  const { rays, rotation, palette } = sunScene.value
+  return rays.map((ray) => ({
+    width: ray.width + 'px',
+    transform: `translateX(${ray.offset}px) rotate(${rotation}deg)`,
+    opacity: ray.opacity,
+    filter: `blur(${ray.blur}px)`,
+    background: `linear-gradient(to bottom, ${palette.core}, ${palette.mid} 35%, transparent 75%)`,
+  }))
 })
 </script>
 
@@ -380,6 +411,50 @@ html.dark .blob-5 {
 }
 
 /* 柔和暗角:氛围层,盖在弹窗之上(压边走暗,弹窗居中不受影响) */
+/* 体积光层:丁达尔效应,screen(背景光影,盖在弹窗之上) */
+.light-layer {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-deco) + 6);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+.light-bloom {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  margin-left: -350px;
+  margin-top: -350px;
+  border-radius: 50%;
+  filter: blur(60px);
+  transition:
+    background 3s ease,
+    left 3s ease,
+    top 3s ease;
+}
+.light-source {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transition:
+    left 3s ease,
+    top 3s ease;
+}
+.light-ray {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 200vh;
+  transform-origin: top center;
+  transition:
+    opacity 3s ease,
+    filter 3s ease,
+    transform 3s ease,
+    background 3s ease;
+}
+
 .vignette {
   position: fixed;
   inset: 0;
