@@ -280,6 +280,9 @@ export default {
     dawn: 'Dawn',
     dusk: 'Dusk',
     duskMode: 'Dusk mode',
+    lamp: 'Lamp',
+    lampOn: 'Turn on the lamp',
+    lampOff: 'Turn off the lamp',
     autoMode: 'Auto dawn/dusk colors',
   },
   blog: {
@@ -6714,7 +6717,7 @@ export default {
     },
   },
   lastDoing: {
-    title: 'Last activity',
+    title: 'Last at…',
     book: 'Book',
     cinema: 'Cinema',
     blog: 'Blog',

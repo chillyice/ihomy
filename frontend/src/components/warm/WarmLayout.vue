@@ -37,7 +37,10 @@
         </button>
         <div class="gc-pin" :class="{ on: scrolled }"></div>
         <div class="gc-ctl">
-          <WarmModeToggle />
+          <div class="gc-lightpair">
+            <WarmLampToggle v-if="lampAvailable" />
+            <WarmModeToggle />
+          </div>
         </div>
       </div>
 
@@ -162,6 +165,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { initWarmBg, warmBgLayer, warmBgState } from '@/utils/warmBackground'
 import WarmHome from '@/components/warm/WarmHome.vue'
+import WarmLampToggle from '@/components/warm/WarmLampToggle.vue'
 import WarmModeToggle from '@/components/warm/WarmModeToggle.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
@@ -195,6 +199,9 @@ const showDockCard = computed(
 const familyName = computed(() => appStore.familyName)
 const familyDescription = computed(() => appStore.family?.description || '')
 const familyCover = computed(() => appStore.family?.coverImage || '')
+
+// 台灯开关:光影总开关全关时没有灯可开,不摆一颗永远暗着的按钮
+const lampAvailable = computed(() => !!sunLight?.effectsEnabled?.value)
 
 // 当前登录用户信息(侧栏顶部 .user 位置:头像 + 昵称 + 所在家庭)
 const userInfo = computed(() => userStore.userInfo)
@@ -473,6 +480,11 @@ watch(
 .gc-ctl {
   display: flex;
   gap: 10px;
+  align-items: center;
+}
+/* 台灯开关紧贴晨暮开关(灯泡要从盘面后面探出),这一对内不许留 gap */
+.gc-lightpair {
+  display: flex;
   align-items: center;
 }
 /* 返回按钮(历史返回,无历史时隐藏) */

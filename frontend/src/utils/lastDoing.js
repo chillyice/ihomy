@@ -1,4 +1,4 @@
-// 「上次在做」:记录账号最近一次续做的内容(读书 / 看片 / 写博客 / 写日记)。
+// 「上次在…」:记录账号最近一次续做的内容(读书 / 看片 / 写博客 / 写日记),只在 24 小时内展示。
 // - 内容数据源:各功能在续做发生点显式 recordDoing,不依赖 updated_at(博客/日记的 updated_at
 //   会被浏览/点赞计数刷新,读书借阅也没有「我的借阅按最近阅读」接口)。
 // - 存储:本机 localStorage 立即生效,登录后经 sys_user_pref 的 recent.doing.v1 跟账号走;
@@ -12,8 +12,8 @@ export const LAST_DOING_LOCAL_KEY = 'ihomy:last-doing:v1'
 export const LAST_DOING_PREF_KEY = 'recent.doing.v1'
 /** 最多留 8 条(卡片只展示前几条,留点余量给跨设备合并) */
 export const MAX_DOING_ITEMS = 8
-/** 30 天没再续做的条目不再展示(记录仍留着,重新续做会刷新) */
-export const DOING_VISIBLE_DAYS = 30
+/** 超过 24 小时没再续做的条目不再展示(记录仍留着,重新续做会刷新) */
+export const DOING_VISIBLE_HOURS = 24
 /** 关闭阅读器时 close() 与 onBeforeUnmount 会先后各存一次,1 秒内同一目标只记一次 */
 const REPEAT_GUARD_MS = 1000
 
@@ -99,9 +99,9 @@ export function mergeDoing(items, entry, max = MAX_DOING_ITEMS) {
   return sortAndSlice([...map.values()], max)
 }
 
-/** 卡片实际展示的条目:lastDays 天内(默认 30 天) */
-export function visibleDoing(items, now = Date.now(), days = DOING_VISIBLE_DAYS) {
-  const cutoff = now - days * 24 * 60 * 60 * 1000
+/** 卡片实际展示的条目:最近 hours 小时内(默认 24 小时) */
+export function visibleDoing(items, now = Date.now(), hours = DOING_VISIBLE_HOURS) {
+  const cutoff = now - hours * 60 * 60 * 1000
   return (Array.isArray(items) ? items : []).filter((it) => {
     const at = Number(it?.at)
     return Number.isFinite(at) && at >= cutoff && at <= now + 5 * 60 * 1000

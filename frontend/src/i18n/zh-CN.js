@@ -282,6 +282,9 @@ export default {
     dawn: '晨',
     dusk: '暮',
     duskMode: '暮色模式',
+    lamp: '台灯',
+    lampOn: '开灯',
+    lampOff: '关灯',
     autoMode: '日出日落自动切换晨幕色彩',
   },
   blog: {
@@ -6649,7 +6652,7 @@ export default {
     },
   },
   lastDoing: {
-    title: '上次在做',
+    title: '上次在…',
     book: '电子书',
     cinema: '放映厅',
     blog: '博客',

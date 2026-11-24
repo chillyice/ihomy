@@ -1,5 +1,5 @@
 <!--
-  「上次在做」:暖居手机全部动态首条(warm-mobile)/ 手机首页顶部(mobile)/ 侧栏停靠(dock)/ 平板浮卡(float)。
+  「上次在…」:暖居手机全部动态首条(warm-mobile)/ 手机首页顶部(mobile)/ 侧栏停靠(dock)/ 平板浮卡(float)。
   数据来自 utils/lastDoing(跟账号走)，没有可续做记录时隐藏。
   相对时间每分钟刷新一次(模板里不读 Date.now 做 computed)。
 -->

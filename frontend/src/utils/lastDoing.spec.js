@@ -155,14 +155,15 @@ describe('mergeDoing', () => {
 })
 
 describe('visibleDoing', () => {
-  it('30 天前的记录不再展示,未来时钟偏移容忍 5 分钟', () => {
+  it('超过 24 小时的记录不再展示,未来时钟偏移容忍 5 分钟', () => {
     const items = [
       { ...book, id: 1, at: NOW },
-      { ...book, id: 2, at: NOW - 31 * 24 * HOUR },
-      { ...book, id: 3, at: NOW + 2 * 60 * 1000 },
-      { ...book, id: 4, at: NOW + 10 * 60 * 1000 },
+      { ...book, id: 2, at: NOW - 23 * HOUR },
+      { ...book, id: 3, at: NOW - 25 * HOUR },
+      { ...book, id: 4, at: NOW + 2 * 60 * 1000 },
+      { ...book, id: 5, at: NOW + 10 * 60 * 1000 },
     ]
-    expect(visibleDoing(items, NOW).map((it) => it.id)).toEqual([1, 3])
+    expect(visibleDoing(items, NOW).map((it) => it.id)).toEqual([1, 2, 4])
   })
 })
 
