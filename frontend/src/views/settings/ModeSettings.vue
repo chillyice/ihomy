@@ -56,8 +56,10 @@
 
     <div class="display-note">{{ $t('displayMode.note') }}</div>
 
-    <!-- 设置退出密码:点「未成年模式」时弹出;成人/儿童都只能给自己设,家长可选目标成员 -->
-    <el-dialog v-model="pinDialog" width="dialog-sm" :title="$t('displayMode.pinTitle')" append-to-body @closed="newPin = ''">
+    <!-- 设置退出密码:点「未成年模式」时弹出;成人/儿童都只能给自己设,家长可选目标成员。
+         宽度走 class(dialog-sm = 420px):width="dialog-sm" 会把 --el-dialog-width 设成非法值,
+         弹窗按 auto 宽度铺满内容栏(踩坑速查 §3.25) -->
+    <el-dialog v-model="pinDialog" class="dialog-sm" :title="$t('displayMode.pinTitle')" append-to-body @closed="newPin = ''">
       <p class="dlg-tip">{{ $t('displayMode.setPinFor', { name: targetName }) }}</p>
       <el-input
         v-model="newPin"
@@ -221,6 +223,10 @@ watch(isOwner, (owner) => {
 </script>
 
 <style scoped>
+.settings-card {
+  margin-bottom: 24px;
+  background: var(--color-card);
+}
 .display-lead {
   margin: 0 0 12px;
 }
@@ -258,7 +264,7 @@ watch(isOwner, (owner) => {
 .pin-box {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px dashed color-mix(in srgb, var(--color-border) 45%, var(--color-text-secondary));
 }
 .pin-title {
   font-weight: 600;

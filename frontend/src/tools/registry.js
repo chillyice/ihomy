@@ -2,7 +2,8 @@
 // 只放纯数据(不 import 组件/运行时),Node 侧 scripts/export-tools.mjs 直接导入本文件。
 // icon 为 Element Plus 图标名,Tools.vue 负责映射成组件。
 // bitPouch 记录该工具在 bit_pouch 仓的现状,用于导出「新功能列表」时区分新增/有更新/已存在。
-// toolbox:false = 只在比特口袋在线工具里维护,ihomy 工具箱不再出卡片(旧 /tools/<id> 路由重定向过去)。
+// toolbox:false = ihomy 工具箱不再出卡片。开发者工具只在比特口袋在线工具维护(旧路由重定向过去);
+// light-lab 是「入口已并入设置页」,路由保留直达。
 
 export const TOOL_REGISTRY = [
   {
@@ -54,6 +55,8 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 30,
     kernel: null,
+    // 入口已并入「外观与显示 → 光影」旁的光影实验台按钮,工具箱不再出卡片(路由保留直达)
+    toolbox: false,
     bitPouch: { status: 'out-of-scope', note: 'Three.js 体积较大,暂不进入 bit_pouch' },
   },
   {

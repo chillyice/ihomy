@@ -120,6 +120,60 @@
         ><input type="range" min="0" max="100" v-model.number="light.shadowDepth.value" class="lt-slider"
       /></label>
     </div>
+
+    <!-- 光影控制:设置页里能调的开关/按钮/滑条都在这里,测试时不用来回跳页 -->
+    <div class="lt-section">
+      <div class="lt-section-title">{{ $t('lightTest.controls') }}</div>
+      <div class="lt-toggles">
+        <label class="lt-toggle"
+          ><input type="checkbox" v-model="light.effectsEnabled.value" /><span>{{ $t('settings.lightEffectsOn') }}</span></label
+        >
+        <label v-if="themeStore.theme !== 'warm'" class="lt-toggle"
+          ><input type="checkbox" v-model="light.blobsEnabled.value" /><span>{{ $t('settings.blobs') }}</span></label
+        >
+        <label v-if="themeStore.theme !== 'warm'" class="lt-toggle"
+          ><input type="checkbox" v-model="light.glassEnabled.value" /><span>{{ $t('settings.glass') }}</span></label
+        >
+        <label class="lt-toggle"
+          ><input type="checkbox" v-model="light.shadowEnabled.value" /><span>{{ $t('settings.shadowEffect') }}</span></label
+        >
+        <label class="lt-toggle"
+          ><input type="checkbox" v-model="light.weatherEffectEnabled.value" /><span>{{ $t('settings.weatherEffect') }}</span></label
+        >
+      </div>
+
+      <div class="lt-mode-row">
+        <span class="lt-label">{{ $t('settings.lampMode') }}</span>
+        <button
+          v-for="m in LAMP_MODES"
+          :key="m.value"
+          class="lt-btn lt-mode"
+          :class="{ active: light.lampMode.value === m.value }"
+          @click="light.lampMode.value = m.value"
+        >
+          {{ $t(m.labelKey) }}
+        </button>
+      </div>
+
+      <div class="lt-mode-row">
+        <span class="lt-label">{{ $t('settings.projectionStandard') }}</span>
+        <button
+          v-for="p in PROJECTION_STANDARDS"
+          :key="p.value"
+          class="lt-btn lt-mode"
+          :class="{ active: light.projectionStandard.value === p.value }"
+          @click="light.projectionStandard.value = p.value"
+        >
+          {{ $t(p.labelKey) }}
+        </button>
+      </div>
+
+      <label class="lt-slider-row"
+        ><span>{{ $t('settings.idleLabel') }}</span
+        ><input type="number" min="1" max="120" step="1" v-model.number="light.idleMinutes.value" class="lt-num"
+      /></label>
+    </div>
+
     <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: (light.slotIdx.value / 288) * 100 + '%' }"></div></div>
   </div>
 </template>
@@ -129,11 +183,22 @@ import { inject, computed, ref, watch } from 'vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useI18n } from 'vue-i18n'
 import { useDragResize } from '@/utils/useDragResize'
+import { useThemeStore } from '@/stores/theme'
 
 const { t } = useI18n()
 const light = inject(SUN_LIGHT_KEY)
+const themeStore = useThemeStore()
 
 const speeds = [0.5, 1, 2, 4, 8]
+const LAMP_MODES = [
+  { value: 'auto', labelKey: 'lightTest.lampAuto' },
+  { value: 'on', labelKey: 'lightTest.lampOn' },
+  { value: 'off', labelKey: 'lightTest.lampOff' },
+]
+const PROJECTION_STANDARDS = [
+  { value: 'corrected', labelKey: 'lightTest.corrected' },
+  { value: 'real', labelKey: 'lightTest.real' },
+]
 
 const initY = typeof window !== 'undefined' ? Math.max(42, window.innerHeight - 360) : 100
 const { pos, onDragStart } = useDragResize({ x: 240, y: initY, minY: 42 })
@@ -190,6 +255,8 @@ const onDateChange = () => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   color: #fff;
   min-width: 280px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
 }
 .lt-header {
   display: flex;
@@ -281,6 +348,9 @@ const onDateChange = () => {
   font-size: 11px;
   opacity: 0.8;
 }
+.lt-slider-row > span {
+  min-width: 52px;
+}
 .lt-slider {
   flex: 1;
   cursor: pointer;
@@ -311,6 +381,63 @@ const onDateChange = () => {
 }
 .lt-btn.lt-reset:hover {
   background: rgba(244, 67, 54, 0.5);
+}
+
+/* 光影控制区:开关(复选框)+ 台灯模式/窗影标准(按钮)+ 夜间关灯(数字框) */
+.lt-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+.lt-section-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.lt-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+.lt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  opacity: 0.85;
+  cursor: pointer;
+}
+.lt-toggle input {
+  accent-color: var(--color-brand);
+  cursor: pointer;
+}
+.lt-mode-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.lt-label {
+  margin-right: 2px;
+  opacity: 0.75;
+}
+.lt-btn.lt-mode {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.lt-num {
+  width: 64px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  color-scheme: dark;
 }
 .lt-progress {
   height: 3px;

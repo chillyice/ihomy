@@ -33,17 +33,19 @@
 
         <div v-for="panel in mountedPanels" :key="panel.id" v-show="activeId === panel.id">
           <component :is="panel.component" v-if="panel.component" />
-          <!-- 首页内容:每日内容 + 天气(天气仅家长可配) -->
+          <!-- 首页内容:每日内容 + 画面布局 + 天气(天气仅家长可配) -->
           <template v-else-if="panel.id === 'content'">
             <div id="settings-daily"><DailySettings /></div>
+            <div id="settings-layout"><PanelLayoutSettings /></div>
             <div v-if="userStore.hasPerm('family:manage')" id="settings-weather"><WeatherSettings /></div>
           </template>
           <!-- 外观与显示:主题(含主题专属设置)→ 光影 → 每日早安 → 屏幕保护 → 显示模式 → Wallpaper Engine -->
           <template v-else-if="panel.id === 'appearance'">
             <div id="settings-theme"><ThemeSettings /></div>
-            <!-- 背景作用于桌面暖居外壳(WarmLayout),手机端走 MobileLayout 看不到效果,故不在手机设置里露出 -->
-            <div v-if="themeStore.theme === 'warm' && !isMobile" id="settings-warmbg"><WarmBackgroundSettings /></div>
-            <WindowDeskSettings v-if="activeId === 'appearance'" :show-objects="isTablet || (isWide && !isMobile)" />
+            <!-- 暖居 = 背景(仅桌面端暖居外壳)+ 窗下桌面小物 -->
+            <div id="settings-warmbg">
+              <WarmBackgroundSettings :show-objects="isTablet || (isWide && !isMobile)" />
+            </div>
             <div id="settings-light"><LightSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
             <div id="settings-screensaver"><ScreensaverSettings /></div>
@@ -61,7 +63,6 @@ import { computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import { useThemeStore } from '@/stores/theme'
 import { useDevice } from '@/composables/useDevice'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import StorageView from '@/views/storage/Storage.vue'
@@ -72,13 +73,13 @@ import AiSettings from './settings/AiSettings.vue'
 import BackupSettings from './settings/BackupSettings.vue'
 import PointsRuleSettings from './settings/PointsRuleSettings.vue'
 import DailySettings from './settings/DailySettings.vue'
+import PanelLayoutSettings from './settings/PanelLayoutSettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
 import ThemeSettings from './settings/ThemeSettings.vue'
 import WallpaperSettings from './settings/WallpaperSettings.vue'
 import WarmBackgroundSettings from './settings/WarmBackgroundSettings.vue'
-import WindowDeskSettings from './settings/WindowDeskSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
 import MorningSettings from './settings/MorningSettings.vue'
 import ScreensaverSettings from './settings/ScreensaverSettings.vue'
@@ -88,7 +89,6 @@ import SettingsIcon from './settings/SettingsIcon.vue'
 import { isNativeApp } from '@/utils/platform'
 
 const userStore = useUserStore()
-const themeStore = useThemeStore()
 const route = useRoute()
 const router = useRouter()
 const { isMobile, isTablet, isWide } = useDevice()

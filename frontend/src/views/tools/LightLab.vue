@@ -283,7 +283,7 @@ const SUN_BASE_INTENSITY = 6
 const { t } = useI18n()
 const canvasRef = ref(null)
 const router = useRouter()
-const goBack = () => router.push('/tools')
+const goBack = () => router.push('/settings?tab=appearance')
 const mode = ref('sun')
 const lightType = ref('directional')
 const shadowOn = ref(true)

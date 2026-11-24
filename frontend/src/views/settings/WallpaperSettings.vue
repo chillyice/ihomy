@@ -55,7 +55,7 @@ onMounted(() => {
 
 <style scoped>
 .settings-card {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   background: var(--color-card);
 }
 .form-footer {

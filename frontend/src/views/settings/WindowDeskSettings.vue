@@ -1,5 +1,6 @@
+<!-- 窗下桌面:爪印与桌边小物。embedded=true 时只出内容块,由父卡(暖居)负责卡面与间距。 -->
 <template>
-  <section class="card settings-card">
+  <div :class="embedded ? 'desk-block' : 'card settings-card'">
     <div class="section-label">{{ $t('windowDesk.title') }}</div>
     <el-form label-position="top" class="settings-form">
       <el-form-item>
@@ -27,7 +28,7 @@
         <el-button @click="desk.arrangement++">{{ $t('windowDesk.shuffle') }}</el-button>
       </template>
     </el-form>
-  </section>
+  </div>
 </template>
 
 <script setup>
@@ -37,7 +38,7 @@ import { useAppStore } from '@/stores/app'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { DESK_DEFAULT_PATHS, DESK_DESTINATIONS, deskPathAllowed } from '@/utils/deskObjects'
 
-const props = defineProps({ showObjects: Boolean })
+const props = defineProps({ showObjects: Boolean, embedded: Boolean })
 const switchLabel = computed(() => (props.showObjects ? 'windowDesk.enabled' : 'windowDesk.pawsEnabled'))
 const desk = useWindowDeskStore()
 const app = useAppStore()
@@ -52,6 +53,15 @@ const setTarget = (path) => desk.setDestination(kind.value, path === DESK_DEFAUL
 </script>
 
 <style scoped>
+.settings-card {
+  margin-bottom: 24px;
+  background: var(--color-card);
+}
+/* 嵌在暖居卡里:标题降一档,不另起卡面(分隔线由父组件的 el-divider 画) */
+.desk-block .section-label {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
 .desk-bindings {
   display: flex;
   align-items: center;

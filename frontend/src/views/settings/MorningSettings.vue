@@ -148,9 +148,9 @@ const onPreview = () => {
 </script>
 
 <style scoped>
-/* 与上面的「显示模式」框拉开一档距离(反馈:贴太近) */
+/* 外观与显示的每张设置卡统一 24px 底距,组与组之间不再贴在一起 */
 .mo-settings {
-  margin-top: 16px;
+  margin-bottom: 24px;
 }
 
 /* 控件行:开关/下拉/分段按钮统一水平排列,窄屏自动换行 */
@@ -196,6 +196,11 @@ const onPreview = () => {
 .settings-form .el-form-item {
   margin-bottom: 16px;
   padding: 6px 0;
+}
+/* 组内分隔:相邻设置行之间一条淡虚线 */
+.settings-form .el-form-item + .el-form-item {
+  border-top: 1px dashed color-mix(in srgb, var(--color-border) 55%, var(--color-text-secondary));
+  padding-top: 14px;
 }
 
 @media (max-width: 768px) {
