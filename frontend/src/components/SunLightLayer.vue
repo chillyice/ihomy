@@ -32,6 +32,7 @@
       :standard="projectionStandard"
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
+      :desk-casters="deskCasters"
       :style="{ opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
     />
 
@@ -161,6 +162,7 @@ if (!light) {
 }
 const {
   sunScene,
+  deskCasters,
   lampMask,
   lampDivOpacity,
   lampRadius,

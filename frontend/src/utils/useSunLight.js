@@ -2,7 +2,7 @@
 // 从 Home.vue 提取,供 SunLightLayer.vue 和全局使用
 // 用法:App.vue 调用 useSunLight() 并 provide(SUN_LIGHT_KEY, state)
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
 import { resolveMorningWeather } from '@/utils/morningWeather'
@@ -23,6 +23,7 @@ const DIFFUSE_SKY = {
 
 export function useSunLight() {
   const themeStore = useThemeStore()
+  const deskCasters = shallowRef([])
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
@@ -617,6 +618,7 @@ export function useSunLight() {
   }
 
   return {
+    deskCasters,
     sunInfo,
     sunInfoAt,
     sunInfoAge,

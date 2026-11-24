@@ -1,6 +1,12 @@
 // 光线与天气:基于太阳位置(高度角/方位角/日出日落)生成光影参数
 // 被 useSunLight.js 调用,提供全页面共享的光影状态
 
+// Screen axes for a south-facing window: +x to the right, +y into the room.
+export function floorShadowDirection(azimuth) {
+  const bearing = ((180 - azimuth) * Math.PI) / 180
+  return { x: Math.sin(bearing), y: Math.cos(bearing) }
+}
+
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return null
   const parts = String(timeStr).split(':').map(Number)

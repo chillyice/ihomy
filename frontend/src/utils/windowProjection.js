@@ -1,7 +1,8 @@
 import { drawWindowFoliage } from './windowFoliage'
+import { applyDeskShadowMask } from './deskShadowMask'
+import { floorShadowDirection } from './windowLight'
 
-// Clear glass in normalized window coordinates, shared with the desktop objects'
-// lighting calculation so a mullion casts shade in both places.
+// Clear glass in normalized window coordinates. Everything else blocks transmission.
 const halfMullion = 0.072 / 2
 const halfTransom = 0.0825 / 2
 export const WINDOW_PANES = [
@@ -14,7 +15,7 @@ export const WINDOW_PANES = [
 
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
-  const bearing = (180 - azimuth) * radians
+  const direction = floorShadowDirection(azimuth)
   // Calibrate against solar noon in Jinan (36.65° N). Outside noon the
   // same continuous curve follows the actual solar elevation and bearing.
   const phase = (90 - 36.65 - altitude) / 23.44
@@ -25,10 +26,10 @@ export function windowTransform(width, height, altitude, azimuth, realWeight = 0
   const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 2) / Math.tan(altitude * radians) : 0
   const reach = correctedReach + (realReach - correctedReach) * realWeight
   const paneWidth = width * 0.88
-  const shear = Math.sin(bearing) * reach
-  const depth = Math.cos(bearing) * reach
+  const shear = direction.x * reach
+  const depth = direction.y * reach
   const correctedTop = height * (0.05 + 0.04 * phase)
-  const top = correctedTop + (0.15 * realReach * Math.cos(bearing) - correctedTop) * realWeight
+  const top = correctedTop + (0.15 * realReach * direction.y - correctedTop) * realWeight
   return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, top]
 }
 
@@ -51,7 +52,7 @@ function resize(canvas, width, height) {
 // coordinates. Overlapping silhouettes block the same light only once.
 export function drawWindowProjection(
   canvas,
-  { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, foliageTime = 0, occluders = [] },
+  { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, foliageTime = 0, occluders = [], deskCasters = [] },
 ) {
   const scale = Math.min(0.5, 512 / Math.max(1, width, height))
   const w = Math.max(1, Math.round(width * scale))
@@ -98,6 +99,7 @@ export function drawWindowProjection(
   ctx.globalAlpha = 1 / samples.length
   for (const [dx, dy] of samples) ctx.drawImage(scratch, dx * radius - pad, dy * radius - pad)
   ctx.restore()
+  applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height)
 
   mask.clearRect(0, 0, scratch.width, scratch.height)
   mask.drawImage(canvas, 0, 0)

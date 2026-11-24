@@ -1,3 +1,5 @@
+import { DESK_OBJECT_PROFILES } from './deskObjectProfiles'
+
 // 贴图随机歪放的最大角度（±）。超过 45° 就成了「斜着挂」，观感不对，所以封顶在这里。
 const MAX_TILT = 30
 
@@ -69,24 +71,9 @@ function turnedRadius(size, angle = 0) {
   return Math.ceil((size / 2) * tiltSpread(angle)) + 5
 }
 
-// 914px 高时，大件的画布边长为 381px。小件保留各自的相对尺度。
-const ITEM_SCALE = {
-  journal: 1,
-  record: 0.98,
-  recipe: 0.94,
-  photo: 0.88,
-  cup: 0.83,
-  envelope: 0.8,
-  note: 0.75,
-  phone: 0.72,
-  fruit: 0.7,
-  bookmark: 0.65,
-  leaf: 0.58,
-}
-
 function* deskSeats(item, slot, lanes, obstacles, cards) {
   const { right: width, bottom: height } = lanes[1]
-  const scale = ITEM_SCALE[item.kind] ?? 0.85
+  const scale = DESK_OBJECT_PROFILES[item.kind]?.sizeRatio ?? 0.85
   const preferred = Math.round(Math.min(480, Math.max(180, height * (381 / 914))) * scale)
   const spread = tiltSpread(slot.angle)
   const maxRadius = turnedRadius(preferred, slot.angle)
