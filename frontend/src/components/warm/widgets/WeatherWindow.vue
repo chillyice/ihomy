@@ -1,7 +1,7 @@
 <template>
   <div class="weather-window" :class="{ short: row <= 2, strip: row === 1 }">
     <header class="window-head">
-      <h3>{{ current?.city ? $t('warm.weatherWindow', { city: current.city }) : $t('warm.widget.weather') }}</h3>
+      <h3>{{ current?.city ? current.city : $t('warm.widget.weather') }}</h3>
       <span aria-hidden="true">↗</span>
     </header>
     <div class="observation">
@@ -17,17 +17,8 @@
           <span v-if="today.tempMin != null">↓ {{ today.tempMin }}°</span>
         </div>
       </div>
-      <div aria-hidden="true" class="casement">
-        <div class="glass">
-          <img
-            v-if="scene"
-            :key="scene"
-            :src="scene"
-            alt=""
-            draggable="false"
-            @error="failedScenes.add($event.target.getAttribute('src'))"
-          />
-        </div>
+      <div aria-hidden="true" class="landscape">
+        <img v-if="scene" :key="scene" :src="scene" alt="" draggable="false" @error="failedScenes.add($event.target.getAttribute('src'))" />
       </div>
     </div>
     <dl v-if="span === 12 && metrics.length" class="metrics">
@@ -91,8 +82,6 @@ const metrics = computed(() => {
 
 <style scoped>
 .weather-window {
-  --wood: color-mix(in srgb, rgb(var(--blob-5)) 66%, var(--color-card));
-  --frame-edge: color-mix(in srgb, var(--color-text) 26%, var(--wood));
   --ink-soft: color-mix(in srgb, var(--color-text) 82%, var(--color-card));
   display: flex;
   flex-direction: column;
@@ -124,11 +113,12 @@ const metrics = computed(() => {
 .observation {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.65fr);
-  grid-template-rows: minmax(0, 1fr);
-  align-items: stretch;
-  gap: clamp(8px, 3cqi, 24px);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  padding-inline: clamp(4px, 2cqi, 16px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 .reading {
   align-self: center;
@@ -175,59 +165,18 @@ const metrics = computed(() => {
   font-size: 13px;
   color: var(--ink-soft);
 }
-.casement {
-  position: relative;
-  min-height: 0;
-  margin: 2px 3px 5px;
-  padding: clamp(4px, 0.95cqi, 8px);
-  border: 1px solid var(--frame-edge);
-  border-radius: 48% 48% 2px 2px / 18% 18% 2px 2px;
-  background:
-    linear-gradient(color-mix(in srgb, var(--wood) 88%, transparent), color-mix(in srgb, var(--wood) 84%, transparent)),
-    var(--album-cloth-texture);
-  background-size: auto, 110px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
-    0 2px 4px rgba(58, 36, 19, 0.14);
-}
-.casement::after {
-  content: '';
+.landscape {
   position: absolute;
-  inset: auto -4px -4px;
-  height: 5px;
-  border-radius: 2px;
-  background: var(--wood);
-  border-bottom: 2px solid var(--frame-edge);
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(155deg, var(--color-card), rgb(var(--blob-5)));
+  mask-image: linear-gradient(90deg, transparent 12%, rgba(0, 0, 0, 0.08) 32%, black 70%);
 }
-.glass {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  border-radius: inherit;
-  background: var(--home-paper-ground);
-  background-size: auto, var(--home-grain-size);
-}
-.glass img {
+.landscape img {
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
   object-fit: cover;
-}
-.glass::before,
-.glass::after {
-  content: '';
-  position: absolute;
-  z-index: 1;
-  background: var(--wood);
-  box-shadow: 1px 1px 1px var(--frame-edge);
-}
-.glass::before {
-  inset: 0 auto 0 50%;
-  width: 3px;
-}
-.glass::after {
-  inset: 32% 0 auto;
-  height: 3px;
 }
 .forecast,
 .metrics {
@@ -331,10 +280,6 @@ const metrics = computed(() => {
   font-size: 24px;
 }
 @container (max-width: 310px) {
-  .observation {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: 6px;
-  }
   .outlook {
     font-size: 11px;
     gap: 2px;

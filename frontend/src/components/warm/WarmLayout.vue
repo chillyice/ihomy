@@ -482,7 +482,6 @@ watch(
   gap: 10px;
   align-items: center;
 }
-/* 台灯开关紧贴晨暮开关(灯泡要从盘面后面探出),这一对内不许留 gap */
 .gc-lightpair {
   display: flex;
   align-items: center;
