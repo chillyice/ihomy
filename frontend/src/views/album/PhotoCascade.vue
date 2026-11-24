@@ -3,7 +3,7 @@
 <template>
   <div v-if="visible" class="pc-overlay">
     <div class="pc-head">
-      <span class="pc-title">{{ $t('cascade.title') }}</span>
+      <span class="pc-title paper-surface">{{ $t('cascade.title') }}</span>
       <span class="pc-hint">{{ $t('cascade.hint') }}</span>
       <span class="pc-close" v-a11y-click :title="$t('common.close')" @click="close">
         <el-icon><Close /></el-icon>
@@ -195,6 +195,12 @@ onBeforeUnmount(clearTimers)
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
+}
+html.warm-paper-page .pc-title {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--color-card);
 }
 .pc-hint {
   font-size: 12px;

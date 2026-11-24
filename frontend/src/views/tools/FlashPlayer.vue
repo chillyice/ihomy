@@ -28,7 +28,7 @@
       <div
         v-a11y-click
         v-if="!fileName && !src"
-        class="drop-zone"
+        class="drop-zone game-file-paper"
         :class="{ dragging }"
         @click="pick"
         @dragover.prevent="dragging = true"
@@ -42,7 +42,7 @@
 
       <!-- 已加载:播放器 + 操作条 -->
       <template v-else>
-        <div class="flash-bar">
+        <div class="flash-bar game-file-paper">
           <span class="flash-name">{{ fileName }}</span>
           <el-button v-if="!src" size="small" round @click="pick">{{ $t('tools.flash.reselect') }}</el-button>
           <el-button v-if="!src" size="small" round text type="danger" @click="close">{{ $t('tools.flash.close') }}</el-button>

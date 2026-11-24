@@ -509,6 +509,12 @@ html.warm-paper-page .el-message-box__header {
   background-size: auto, var(--home-grain-size);
 }
 
+/* 游戏路由使用独立舞台，只有选文件与文件信息栏沿用暖居纸面。 */
+html.theme-warm .game-file-paper:not(.drop-zone:hover, .dragging) {
+  background-image: var(--home-paper-ground);
+  background-size: auto, var(--home-grain-size);
+}
+
 /* 资源清单与图注用薄卡纸；选中、悬停仍由各页面的状态底色表达。 */
 html.warm-paper-page .page :is(.rl-row.card, .blog-item.card, .album-card.card):not(.selected, :hover),
 html.warm-paper-page .page .album-header.card,

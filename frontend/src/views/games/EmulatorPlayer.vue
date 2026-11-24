@@ -77,7 +77,7 @@
       <div
         v-a11y-click
         v-if="!fileName && !src"
-        class="drop-zone"
+        class="drop-zone game-file-paper"
         :class="{ dragging }"
         @click="pick"
         @dragover.prevent="dragging = true"
@@ -90,7 +90,7 @@
       </div>
 
       <template v-else>
-        <div class="gba-bar">
+        <div class="gba-bar game-file-paper">
           <span v-if="systemLabel" class="gba-sys">{{ systemLabel }}</span>
           <span class="gba-name">{{ fileName }}</span>
           <el-popover

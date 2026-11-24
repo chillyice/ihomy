@@ -57,7 +57,7 @@
 
         <!-- 顶部信息栏 -->
         <div class="pv-topbar">
-          <div class="pv-counter">
+          <div class="pv-counter paper-surface">
             <span class="pv-cur">{{ index + 1 }}</span>
             <span class="pv-sep">/</span>
             <span class="pv-total">{{ photos.length }}</span>
@@ -612,6 +612,13 @@ onBeforeUnmount(() => {
 }
 .pv-cur {
   font-size: 22px;
+}
+html.warm-paper-page .pv-counter {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--color-card);
+  color: var(--color-text);
+  white-space: nowrap;
 }
 .pv-sep {
   margin: 0 4px;

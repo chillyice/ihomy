@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div class="reader-overlay" :class="{ fullscreen: isFullscreen }">
       <!-- Top Bar -->
-      <div class="reader-bar">
+      <div class="reader-bar paper-surface">
         <div class="bar-left">
           <button class="r-btn" @click="toggleToc" :title="$t('library.toc')">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -69,7 +69,7 @@
         <!-- Left: TOC Drawer -->
         <transition name="slide-left">
           <div v-if="showToc" class="toc-drawer">
-            <div class="drawer-head">{{ $t('library.toc') }}</div>
+            <div class="drawer-head paper-heading">{{ $t('library.toc') }}</div>
             <div class="toc-list">
               <div
                 v-a11y-click
@@ -137,7 +137,7 @@
         <transition name="slide-right">
           <div v-if="showSidebar" class="side-drawer">
             <div v-if="activePanel === 'settings'" class="drawer-content">
-              <div class="drawer-head">{{ $t('library.fontSize') }}</div>
+              <div class="drawer-head paper-heading">{{ $t('library.fontSize') }}</div>
               <div class="setting-row">
                 <span class="set-label">{{ $t('library.fontSize') }}</span>
                 <div class="set-controls">
@@ -164,7 +164,7 @@
               </div>
             </div>
             <div v-else-if="activePanel === 'bookmarks'" class="drawer-content">
-              <div class="drawer-head">{{ $t('library.bookmark') }}</div>
+              <div class="drawer-head paper-heading">{{ $t('library.bookmark') }}</div>
               <div class="bm-list">
                 <div v-a11y-click v-for="bm in bookmarks" :key="bm.id" class="bm-item" @click="goToBookmark(bm)">
                   <span class="bm-label">{{ bm.label || $t('library.bookmark') }}</span>
@@ -179,7 +179,7 @@
               </div>
             </div>
             <div v-else class="drawer-content">
-              <div class="drawer-head">{{ $t('library.metadata') }}</div>
+              <div class="drawer-head paper-heading">{{ $t('library.metadata') }}</div>
               <div class="meta-item">
                 <span class="mi-label">{{ $t('library.bookTitle') }}</span
                 ><span class="mi-val">{{ book?.title }}</span>

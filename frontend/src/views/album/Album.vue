@@ -268,7 +268,9 @@
     </el-dialog>
     <SyncDialog v-model="syncVisible" @synced="load" />
     <!-- 照片瀑布:原独立页已并入相册,由本页按钮唤起(兼容旧链接 /album?cascade=1) -->
-    <PhotoCascade v-model:visible="cascadeVisible" />
+    <Teleport to="body">
+      <PhotoCascade v-model:visible="cascadeVisible" />
+    </Teleport>
   </div>
 </template>
 
