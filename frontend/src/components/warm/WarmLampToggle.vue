@@ -42,7 +42,7 @@ const toggle = () => {
 <style>
 /* 只服务暖居顶栏,规则统一挂 html.theme-warm,不与光尘/窗边的按钮混色 */
 html.theme-warm .warm-lamp {
-  --lamp-bulb: 30px;
+  --lamp-bulb: 24px;
   --lamp-peek: 0.25; /* 灯泡露出比例:随开关状态覆写 */
   --lamp-press: 0px; /* 按住时的右移量(推进盘面) */
   position: relative;
