@@ -38,7 +38,10 @@ export function drawWindowFoliage(mask, timeSeconds = 0) {
   silhouettes ??= Object.fromEntries(Object.entries(paths).map(([name, path]) => [name, new Path2D(path)]))
   const breeze = Math.sin(timeSeconds * 0.9) + 0.38 * Math.sin(timeSeconds * 1.57)
   mask.save()
-  mask.scale(0.01, 0.01)
+  // The drawing runs from lintel to sill. On the floor the sill is the
+  // near edge (0) and the lintel is the far edge (1), even under oblique sun.
+  mask.translate(0, 1)
+  mask.scale(0.01, -0.01)
 
   mask.save()
   mask.translate(0, 7)
