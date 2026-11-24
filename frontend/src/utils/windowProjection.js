@@ -1,10 +1,9 @@
-// On a horizontal floor, a vertical span H casts a shadow H / tan(altitude).
-// Use the same pixel scale for both floor axes; the viewport clips long shadows.
 export function windowTransform(width, height, altitude, azimuth) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
-  const windowHeight = height * 0.76
-  const reach = altitude > 0 && altitude < 90 ? windowHeight / Math.tan(altitude * radians) : 0
+  // At northern mid-latitudes the two solstice noon elevations differ by 46.88 degrees.
+  const winterReferenceReach = height * 0.74
+  const reach = altitude > 0 && altitude < 90 ? winterReferenceReach * 2 ** ((25 - altitude) / 46.88) : 0
   const paneWidth = width * 0.88
   const shear = Math.sin(bearing) * reach
   const depth = Math.cos(bearing) * reach

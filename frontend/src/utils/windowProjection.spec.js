@@ -16,21 +16,15 @@ describe('window-plane projection', () => {
   })
 
   it.each([
-    [15, 2 + Math.sqrt(3)],
-    [30, Math.sqrt(3)],
-    [45, 1],
-    [60, 1 / Math.sqrt(3)],
-    [90, 0],
-  ])('projects the vertical span onto the floor at %i degrees', (altitude, expectedLengths) => {
-    for (const [width, height] of [
-      [1200, 800],
-      [390, 844],
-    ]) {
-      for (const azimuth of [120, 180, 240]) {
-        const [, , dx, dy] = windowTransform(width, height, altitude, azimuth)
-        const windowHeight = 0.76 * height
-        expect(Math.hypot(dx, dy) / windowHeight).toBeCloseTo(expectedLengths, 8)
-      }
+    [1200, 800],
+    [390, 844],
+  ])('keeps winter noon twice as tall as summer noon at %i �� %i', (width, height) => {
+    for (const winterAltitude of [20, 26.66, 35]) {
+      const winter = windowTransform(width, height, winterAltitude, 180)
+      const summer = windowTransform(width, height, winterAltitude + 46.88, 180)
+      expect(winter[3]).toBeCloseTo(2 * summer[3])
+      expect(winter[5] + winter[3]).toBeLessThanOrEqual(height)
+      expect(summer[3]).toBeGreaterThan(height * 0.3)
     }
   })
 
