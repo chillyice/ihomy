@@ -123,7 +123,8 @@ app:
   webrtc:
     ice-servers: "stun:stun.l.google.com:19302"
   # 同类异常聚合预警(运维页「异常预警」):同类问题在窗口内达到阈值时汇总成一条并提醒 OPS。
-  # 采集端是 logback 的 LogAlertAppender(见 logback-spring.xml),计数在内存,落库/发信走后台单线程。
+  # 采集端是 logback 的 LogAlertAppender(见 logback-spring.xml),计数在内存,落库走后台单线程;
+  # 邮件不逐条发,由定时汇总把待推送的预警合并成一封(间隔 mail-interval-seconds)。
   log-alert:
     enabled: true
     # 参与聚合的级别(逗号分隔);含 WARN 会连访问慢请求一起统计,故默认只 ERROR
@@ -141,7 +142,12 @@ app:
     # 预警记录保留天数
     retention-days: 30
     # 配好邮件通道(spring.mail.host)时是否发提醒邮件;未配置则只在运维页展示
+    # 运维页「异常预警」页签另有运行时开关(sys_parameter ops.alert.mail-enabled),两者都开才发信
     mail-enabled: true
+    # 邮件合并间隔(秒):这期间触发的预警合并成一封摘要邮件,避免同类问题密集刷邮箱
+    mail-interval-seconds: 600
+    # 合并窗口上限(秒):超过仍未发出的预警(通知长时间关闭/通道未配)不再补发
+    mail-max-age-seconds: 3600
     # 收件人(逗号分隔);为空时回退取系统级 OPS 角色的邮箱
     mail-to: chillyice@live.com
   # Android 客户端版本(/public/app/latest 返回,App 内更新检查用):

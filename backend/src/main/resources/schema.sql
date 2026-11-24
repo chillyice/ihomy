@@ -1747,7 +1747,7 @@ CREATE TABLE `report_alert` (
   `first_seen`       DATETIME      NOT NULL COMMENT '窗口内首次出现时间',
   `last_seen`        DATETIME      NOT NULL COMMENT '窗口内末次出现时间',
   `status`           VARCHAR(20)   NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN待处理/ACKED已处理',
-  `notified`         TINYINT       NOT NULL DEFAULT 0 COMMENT '0未推送 1已推送邮件',
+  `notified`         TINYINT       NOT NULL DEFAULT 0 COMMENT '0待推送 1已汇总推送 2跳过(通知关闭/超出合并窗口)',
   `acked_by`         BIGINT        DEFAULT NULL COMMENT '处理人ID',
   `acked_at`         DATETIME      DEFAULT NULL COMMENT '处理时间',
   `created_at`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

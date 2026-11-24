@@ -3762,6 +3762,11 @@ export default {
     alertSummaryTotal: '累计',
     alertTimes: '{n} 次',
     alertSeconds: '{n} 秒',
+    alertMailLabel: '预警邮件通知',
+    alertMailHint: '同类问题会合并成一封摘要邮件，约每 {n} 分钟最多发一封；关闭后只在运维页展示',
+    alertMailUnavailable: '邮件通道未配置，暂不能发送预警邮件',
+    alertMailOn: '已开启预警邮件通知',
+    alertMailOff: '已关闭预警邮件通知',
     // 咔哒卡带社区发布审核：机审只提示等级与法务关键词，是否上架由人决定
     kada: {
       title: '咔哒卡带',

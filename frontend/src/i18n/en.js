@@ -3797,6 +3797,11 @@ export default {
     alertSummaryTotal: 'Total',
     alertTimes: '{n} times',
     alertSeconds: '{n} s',
+    alertMailLabel: 'Alert email',
+    alertMailHint: 'Recurring problems are merged into one digest, at most once every {n} minutes; when off, alerts stay on this page only',
+    alertMailUnavailable: 'Mail channel is not configured, so alert emails cannot be sent',
+    alertMailOn: 'Alert email turned on',
+    alertMailOff: 'Alert email turned off',
     // Kada snippet publishing review: machine scan only labels risk; a human decides
     kada: {
       title: 'Kada packs',

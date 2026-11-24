@@ -575,6 +575,9 @@ export const opsApi = {
   alertSummary: () => request.get('/ops/alerts/summary'),
   ackAlert: (id) => request.post(`/ops/alerts/${id}/ack`),
   ackAllAlerts: () => request.post('/ops/alerts/ack-all'),
+  // 预警邮件通知:多条预警按间隔合并成一封,可在运维页单独开关
+  alertMailSetting: () => request.get('/ops/alerts/mail-setting'),
+  updateAlertMailSetting: (enabled) => request.put('/ops/alerts/mail-setting', { enabled }),
   // 咔哒卡带社区发布审核（V10.76）：列表 / 概览 / 详情 / 通过 / 驳回（已上架=下架）
   kadaSnippets: (params) => request.get('/ops/kada/snippets', { params }),
   kadaSnippetSummary: () => request.get('/ops/kada/snippets/summary'),

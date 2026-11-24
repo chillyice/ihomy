@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +51,22 @@ public class OpsAlertController {
     @GetMapping("/summary")
     public Result<Map<String, Object>> summary() {
         return Result.success(logAlertService.summary());
+    }
+
+    @Operation(summary = "预警邮件通知设置(开关/通道是否就绪/合并间隔/收件人)")
+    @RequirePermission("ops:view")
+    @GetMapping("/mail-setting")
+    public Result<Map<String, Object>> mailSetting() {
+        return Result.success(logAlertService.mailSetting());
+    }
+
+    @Operation(summary = "打开或关闭预警邮件通知(预警仍照常汇总展示)")
+    @RequirePermission("ops:view")
+    @OperationLog(module = "OPS", operationType = "UPDATE", description = "设置预警邮件通知开关")
+    @PutMapping("/mail-setting")
+    public Result<Map<String, Object>> updateMailSetting(@RequestBody Map<String, Boolean> body) {
+        logAlertService.updateMailSetting(Boolean.TRUE.equals(body.get("enabled")));
+        return Result.success(logAlertService.mailSetting());
     }
 
     @Operation(summary = "标记单条异常预警已处理")

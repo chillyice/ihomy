@@ -11,6 +11,13 @@
     </el-select>
     <el-button type="primary" @click="loadAlerts(alertPageNum)">{{ $t('ops.query') }}</el-button>
     <el-button :disabled="!summary.open" @click="ackAllAlerts">{{ $t('ops.alertAckAll') }}</el-button>
+    <div class="alert-mail">
+      <el-switch v-model="mail.enabled" :loading="mailSaving" :disabled="!mail.available" @change="saveMailSwitch" />
+      <span class="alert-mail-label">{{ $t('ops.alertMailLabel') }}</span>
+      <el-tooltip :content="mailHint" placement="top" :show-after="300">
+        <el-icon class="alert-mail-icon"><QuestionFilled /></el-icon>
+      </el-tooltip>
+    </div>
   </div>
   <div class="alert-summary">
     <div class="alert-sum-item">
@@ -78,11 +85,11 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
+import { Check, QuestionFilled } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['navigate-trace', 'refresh-summary'])
 
@@ -101,6 +108,32 @@ const alertTotal = ref(0)
 const alertPageNum = ref(1)
 const alertPageSize = ref(20)
 const alertFilter = reactive({ status: 'OPEN', level: '' })
+
+// 预警邮件通知:多条预警按间隔合并成一封,开关状态存服务端(sys_parameter),换设备也一致
+const mail = ref({ enabled: false, available: false, intervalSeconds: 600 })
+const mailSaving = ref(false)
+const mailMinutes = computed(() => Math.max(1, Math.round((mail.value.intervalSeconds || 600) / 60)))
+const mailHint = computed(() => (mail.value.available ? t('ops.alertMailHint', { n: mailMinutes.value }) : t('ops.alertMailUnavailable')))
+
+const loadMailSetting = async () => {
+  try {
+    mail.value = await opsApi.alertMailSetting()
+  } catch {
+    mail.value = { ...mail.value, available: false }
+  }
+}
+const saveMailSwitch = async (enabled) => {
+  mailSaving.value = true
+  try {
+    mail.value = await opsApi.updateAlertMailSetting(enabled)
+    ElMessage.success(enabled ? t('ops.alertMailOn') : t('ops.alertMailOff'))
+  } catch {
+    // 保存失败把开关拨回去,避免界面与服务端不一致
+    mail.value = { ...mail.value, enabled: !enabled }
+  } finally {
+    mailSaving.value = false
+  }
+}
 
 const loadAlerts = async (page = alertPageNum.value) => {
   alertsLoading.value = true
@@ -140,6 +173,7 @@ const levelTagType = (l) => (l === 'ERROR' ? 'danger' : l === 'WARN' ? 'warning'
 
 onMounted(() => {
   loadAlerts(1)
+  loadMailSetting()
   emit('refresh-summary')
 })
 
@@ -161,6 +195,20 @@ watch(
   flex-wrap: wrap;
   margin-bottom: 16px;
   align-items: center;
+}
+.alert-mail {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+.alert-mail-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.alert-mail-icon {
+  color: var(--color-text-secondary);
+  cursor: help;
 }
 .alert-summary {
   display: flex;
