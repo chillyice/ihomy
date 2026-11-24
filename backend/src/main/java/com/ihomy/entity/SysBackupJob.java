@@ -21,6 +21,9 @@ public class SysBackupJob {
     private String triggerType;
     private String status;
     private Long familyId;
+    private Long policyId;
+    /** 策略备份的模块码(逗号分隔);手动基础/内容/全量/迁移包为 NULL */
+    private String modules;
     private Long operatorId;
     private String dirName;
     private Long sizeBytes;

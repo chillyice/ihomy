@@ -69,6 +69,23 @@ class BackupRetentionTest {
     }
 
     @Test
+    void policySelectionPurgesOlderThanDaysButAlwaysKeepsNewest() {
+        List<SysBackupJob> jobs = List.of(
+                job(9, "2026-11-16T09:00:00"),
+                job(8, "2026-11-15T09:00:00"),
+                job(7, "2026-10-01T09:00:00"),
+                job(6, "2020-01-01T09:00:00"));
+        var selection = BackupRetention.selectByDays(jobs, 7, LocalDateTime.parse("2026-11-16T12:00:00"));
+        assertThat(selection.keep()).containsExactly(9L, 8L);
+        assertThat(selection.purge()).containsExactly(7L, 6L);
+
+        var expired = BackupRetention.selectByDays(
+                List.of(job(1, "2020-01-01T09:00:00")), 7, LocalDateTime.parse("2026-11-16T12:00:00"));
+        assertThat(expired.keep()).containsExactly(1L);
+        assertThat(expired.purge()).isEmpty();
+    }
+
+    @Test
     void familySelectionAlwaysKeepsNewestEvenIfExpired() {
         List<SysBackupJob> jobs = List.of(job(9, "2020-01-01T09:00:00"));
         var selection = BackupRetention.selectFamily(jobs, 3, 30, LocalDateTime.parse("2026-11-16T12:00:00"));

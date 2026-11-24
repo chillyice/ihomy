@@ -2,6 +2,7 @@ package com.ihomy.service.backup;
 
 import com.ihomy.common.BizException;
 import com.ihomy.entity.SysBackupJob;
+import com.ihomy.entity.SysBackupPolicy;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,13 +12,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * 定时备份调度器:启动时读取 sys_parameter.backup.policy,按 cron 注册三种任务;
- * 策略保存后调用 reload() 取消旧任务再按新 cron 注册。
+ * 定时备份调度器:启动时读取 sys_backup_policy 中启用的策略,每条策略按自己的 cron 注册任务;
+ * 策略增删改后调用 reload() 取消旧任务再按新配置注册。
  *
  * <p>独立单线程调度器(线程名 ihomy-backup),避免与业务 @Scheduled 抢同一个默认调度池。
  * 任务体只负责 create + 异步执行,真正的转储在工作线程里跑。</p>
@@ -31,7 +32,7 @@ public class BackupScheduler {
     private final BackupService backupService;
     private final BackupJobRunner runner;
 
-    private final Map<BackupKind, ScheduledFuture<?>> futures = new EnumMap<>(BackupKind.class);
+    private final Map<Long, ScheduledFuture<?>> futures = new HashMap<>();
     private ThreadPoolTaskScheduler scheduler;
     private ScheduledFuture<?> purgeFuture;
 
@@ -44,12 +45,12 @@ public class BackupScheduler {
         scheduler.initialize();
         try {
             backupService.markInterrupted();
+            reload();
         } catch (Exception e) {
-            // 升级后忘了跑 migrations 时表不存在:这时不注册任何备份任务,业务照常启动
+            // 升级后忘了跑 migrations 时策略表不存在:这时不注册任何备份任务,业务照常启动
             log.error("backup table not ready, scheduled backup disabled until restart", e);
             return;
         }
-        reload();
         // 每天 05:00 独立清理一次:即使某天没跑备份,过期文件也能按时释放
         purgeFuture = scheduler.schedule(() -> {
             try {
@@ -66,37 +67,39 @@ public class BackupScheduler {
         if (scheduler == null) return;
         futures.values().forEach(f -> f.cancel(false));
         futures.clear();
-        BackupPolicy policy = policyService.load();
-        if (!policy.isEnabled()) {
-            log.info("backup scheduler disabled by policy");
+        var policies = policyService.listEnabled();
+        for (SysBackupPolicy policy : policies) {
+            schedule(policy);
+        }
+        log.info("backup scheduler reloaded: {} enabled policies", policies.size());
+    }
+
+    private void schedule(SysBackupPolicy policy) {
+        String cron = policyService.cron(policy);
+        if (cron == null) {
+            log.warn("skip backup policy id={} name={}: invalid schedule", policy.getId(), policy.getName());
             return;
         }
-        schedule(BackupKind.BASIC, policy.getBasic());
-        schedule(BackupKind.CONTENT, policy.getContent());
-        schedule(BackupKind.FULL, policy.getFull());
-        log.info("backup scheduler reloaded: basic={} content={} full={}",
-                policy.getBasic().getCron(), policy.getContent().getCron(), policy.getFull().getCron());
-    }
-
-    private void schedule(BackupKind kind, BackupPolicy.Task task) {
-        if (task == null || !task.isEnabled()) return;
         try {
-            ScheduledFuture<?> future = scheduler.schedule(() -> trigger(kind), new CronTrigger(task.getCron().trim()));
-            futures.put(kind, future);
+            ScheduledFuture<?> future = scheduler.schedule(() -> trigger(policy.getId()), new CronTrigger(cron));
+            futures.put(policy.getId(), future);
         } catch (Exception e) {
-            log.error("register backup cron failed kind={} cron={}", kind, task.getCron(), e);
+            log.error("register backup policy failed id={} name={} cron={}",
+                    policy.getId(), policy.getName(), cron, e);
         }
     }
 
-    private void trigger(BackupKind kind) {
+    private void trigger(Long policyId) {
         try {
-            SysBackupJob job = backupService.create(kind, BackupScope.INSTANCE, null, null, "SCHEDULED");
+            SysBackupPolicy policy = policyService.mustGet(policyId);
+            if (Boolean.FALSE.equals(policy.getEnabled())) return;
+            SysBackupJob job = backupService.createPolicy(policy, null, "SCHEDULED");
             runner.run(job.getId());
         } catch (BizException e) {
             // 已有手动任务在跑/磁盘不足:跳过这一轮,下一轮照常
-            log.warn("scheduled backup skipped kind={}: {}", kind, e.getMessage());
+            log.warn("scheduled backup skipped policy={}: {}", policyId, e.getMessage());
         } catch (Exception e) {
-            log.error("scheduled backup failed kind={}", kind, e);
+            log.error("scheduled backup failed policy={}", policyId, e);
         }
     }
 

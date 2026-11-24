@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.SysBackupPolicyMapper">
+
+    <!-- 每条策略最近一次任务:策略列表一次取回,避免按策略逐条查 -->
+    <select id="selectLatestJobs" resultType="com.ihomy.entity.SysBackupJob">
+        SELECT j.*
+        FROM `sys_backup_job` j
+        JOIN (
+            SELECT `policy_id`, MAX(`id`) AS `id`
+            FROM `sys_backup_job`
+            WHERE `policy_id` IN
+            <foreach collection="policyIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
+            GROUP BY `policy_id`
+        ) latest ON latest.`id` = j.`id`
+    </select>
+</mapper>

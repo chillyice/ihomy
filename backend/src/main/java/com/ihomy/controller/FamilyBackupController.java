@@ -61,7 +61,7 @@ public class FamilyBackupController {
     public Result<IPage<SysBackupJob>> jobs(
             @RequestParam(defaultValue = "1") int current,
             @RequestParam(defaultValue = "10") int size) {
-        return Result.success(backupService.page(current, size, null, null, BackupScope.FAMILY, familyId()));
+        return Result.success(backupService.page(current, size, null, null, BackupScope.FAMILY, familyId(), null));
     }
 
     @Operation(summary = "导出本家庭数据(后台生成迁移包)")

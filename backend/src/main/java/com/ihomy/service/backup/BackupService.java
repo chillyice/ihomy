@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.SysBackupJob;
+import com.ihomy.entity.SysBackupPolicy;
 import com.ihomy.mapper.SysBackupJobMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -117,6 +119,22 @@ public class BackupService {
      * 执行结束(成功/失败)才释放占位。
      */
     public SysBackupJob create(BackupKind kind, BackupScope scope, Long familyId, Long operatorId, String triggerType) {
+        return create(kind, scope, familyId, operatorId, triggerType, null, null);
+    }
+
+    /** 按策略执行:模块决定导出的表与是否带 uploads 文件 */
+    public SysBackupJob createPolicy(SysBackupPolicy policy, Long operatorId, String triggerType) {
+        if (policy == null) throw new BizException(ResultCode.BAD_REQUEST, "备份策略不存在");
+        String modules = BackupModule.csv(BackupModule.parse(policy.getModules()));
+        if (modules.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "策略未选择备份模块,请先编辑策略");
+        }
+        return create(BackupKind.POLICY, BackupScope.INSTANCE, null, operatorId, triggerType,
+                policy.getId(), modules);
+    }
+
+    private SysBackupJob create(BackupKind kind, BackupScope scope, Long familyId, Long operatorId,
+                                String triggerType, Long policyId, String modules) {
         if (kind == null || scope == null) throw new BizException(ResultCode.BAD_REQUEST, "备份类型或范围不正确");
         if (scope == BackupScope.FAMILY && familyId == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "家庭导出缺少家庭信息");
@@ -136,6 +154,8 @@ public class BackupService {
             job.setTriggerType(triggerType == null ? "MANUAL" : triggerType);
             job.setStatus(BackupStatus.RUNNING.name());
             job.setFamilyId(familyId);
+            job.setPolicyId(policyId);
+            job.setModules(modules);
             job.setOperatorId(operatorId);
             job.setDirName(dirName);
             job.setSizeBytes(0L);
@@ -170,6 +190,11 @@ public class BackupService {
 
             BackupDumpWriter.DumpResult dump;
             BackupFileSnapshot.Result files = null;
+            List<String> modules = BackupModule.parse(job.getModules());
+            Set<String> policyTables = kind == BackupKind.POLICY ? BackupModule.tablesFor(modules) : null;
+            boolean withFiles = kind == BackupKind.POLICY
+                    ? BackupModule.includesFiles(modules)
+                    : kind.includesFiles();
             if (scope == BackupScope.FAMILY) {
                 dump = dumpWriter.write(dir.resolve("db").resolve("family-data.sql.gz"), kind, job.getFamilyId());
                 if (!dump.fileRefs().isEmpty()) {
@@ -179,10 +204,11 @@ public class BackupService {
                 String dbName = switch (kind) {
                     case BASIC -> "basic";
                     case CONTENT -> "content";
+                    case POLICY -> "policy";
                     default -> "full";
                 };
-                dump = dumpWriter.write(dir.resolve("db").resolve(dbName + ".sql.gz"), kind, null);
-                if (kind.includesFiles()) {
+                dump = dumpWriter.write(dir.resolve("db").resolve(dbName + ".sql.gz"), kind, null, policyTables);
+                if (withFiles) {
                     Path previous = previousFilesDir(job);
                     files = fileSnapshot.snapshot(uploadRoot, dir.resolve("files"), previous, excludePrefixes());
                 }
@@ -227,10 +253,11 @@ public class BackupService {
     }
 
     public IPage<SysBackupJob> page(int current, int size, String kind, String status,
-                                    BackupScope scope, Long familyId) {
+                                    BackupScope scope, Long familyId, Long policyId) {
         LambdaQueryWrapper<SysBackupJob> w = new LambdaQueryWrapper<SysBackupJob>()
                 .eq(scope != null, SysBackupJob::getScope, scope == null ? null : scope.name())
                 .eq(familyId != null, SysBackupJob::getFamilyId, familyId)
+                .eq(policyId != null, SysBackupJob::getPolicyId, policyId)
                 .eq(kind != null && !kind.isBlank(), SysBackupJob::getKind, kind)
                 .eq(status != null && !status.isBlank(), SysBackupJob::getStatus, status)
                 .orderByDesc(SysBackupJob::getId);
@@ -238,12 +265,13 @@ public class BackupService {
     }
 
     public Map<String, Object> overview() {
-        BackupPolicy policy = policyService.load();
+        List<SysBackupPolicy> policies = policyService.list();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("root", backupRoot.toString());
         out.put("running", running.get());
-        out.put("policy", policy);
-        out.put("nextRuns", policyService.nextRuns(policy));
+        out.put("policyCount", policies.size());
+        out.put("policyEnabledCount", policies.stream()
+                .filter(p -> !Boolean.FALSE.equals(p.getEnabled())).count());
         Map<String, Object> limits = new LinkedHashMap<>();
         limits.put("minFreeGb", minFreeGb);
         limits.put("maxTotalGb", maxTotalGb);
@@ -270,7 +298,7 @@ public class BackupService {
         }
 
         Map<String, Object> lastSuccess = new LinkedHashMap<>();
-        for (BackupKind kind : List.of(BackupKind.BASIC, BackupKind.CONTENT, BackupKind.FULL, BackupKind.MIGRATION)) {
+        for (BackupKind kind : BackupKind.values()) {
             SysBackupJob job = jobMapper.selectOne(new LambdaQueryWrapper<SysBackupJob>()
                     .eq(SysBackupJob::getScope, BackupScope.INSTANCE.name())
                     .eq(SysBackupJob::getKind, kind.name())
@@ -433,20 +461,46 @@ public class BackupService {
 
     /** 日常清理入口(每个任务成功后 + 每天 05:00 定时各跑一次) */
     public void purgeByRetention() {
-        BackupPolicy policy = policyService.load();
-        BackupPolicy.Retention r = policy.getRetention();
         LocalDateTime now = LocalDateTime.now();
 
-        List<SysBackupJob> instance = jobMapper.selectList(new LambdaQueryWrapper<SysBackupJob>()
+        // 1) 每条策略按自己的保留天数清理;留空 = 不自动清理
+        List<SysBackupPolicy> policies = policyService.list();
+        Set<Long> policyIds = new java.util.HashSet<>();
+        for (SysBackupPolicy policy : policies) {
+            policyIds.add(policy.getId());
+            if (policy.getRetentionDays() == null) continue;
+            List<SysBackupJob> jobs = policyJobs(policy.getId());
+            purge(BackupRetention.selectByDays(jobs, policy.getRetentionDays(), now).purge());
+        }
+
+        // 2) 已被删除策略的历史任务:按 30 天兜底,避免文件永远占空间(策略全删时也照此清理)
+        LambdaQueryWrapper<SysBackupJob> orphanQuery = new LambdaQueryWrapper<SysBackupJob>()
                 .eq(SysBackupJob::getScope, BackupScope.INSTANCE.name())
                 .eq(SysBackupJob::getStatus, BackupStatus.SUCCESS.name())
+                .isNotNull(SysBackupJob::getPolicyId)
+                .orderByDesc(SysBackupJob::getStartedAt)
+                .orderByDesc(SysBackupJob::getId);
+        if (!policyIds.isEmpty()) orphanQuery.notIn(SysBackupJob::getPolicyId, policyIds);
+        Map<Long, List<SysBackupJob>> byPolicy = new LinkedHashMap<>();
+        for (SysBackupJob job : jobMapper.selectList(orphanQuery)) {
+            byPolicy.computeIfAbsent(job.getPolicyId(), k -> new ArrayList<>()).add(job);
+        }
+        for (List<SysBackupJob> list : byPolicy.values()) {
+            purge(BackupRetention.selectByDays(list, 30, now).purge());
+        }
+
+        // 3) 旧版固定策略(policy_id IS NULL):沿用 GFS 默认保留,迁移包永不自动清理
+        List<SysBackupJob> legacy = jobMapper.selectList(new LambdaQueryWrapper<SysBackupJob>()
+                .eq(SysBackupJob::getScope, BackupScope.INSTANCE.name())
+                .eq(SysBackupJob::getStatus, BackupStatus.SUCCESS.name())
+                .isNull(SysBackupJob::getPolicyId)
                 .orderByDesc(SysBackupJob::getStartedAt)
                 .orderByDesc(SysBackupJob::getId));
-        purge(selectFor(instance, BackupKind.BASIC.name(), r.getBasicDaily(), r.getBasicWeekly(), r.getBasicMonthly()));
-        purge(selectFor(instance, BackupKind.CONTENT.name(), r.getContentDaily(), r.getContentWeekly(), r.getContentMonthly()));
-        purge(selectFor(instance, BackupKind.FULL.name(), 0, r.getFullWeekly(), r.getFullMonthly()));
-        // MIGRATION:手动生成的迁移包不自动清理
+        purge(selectFor(legacy, BackupKind.BASIC.name(), 7, 4, 3));
+        purge(selectFor(legacy, BackupKind.CONTENT.name(), 7, 4, 3));
+        purge(selectFor(legacy, BackupKind.FULL.name(), 0, 8, 12));
 
+        // 4) 旧版家庭导出:每个家庭最多 3 份、只保留最近 30 天
         List<SysBackupJob> family = jobMapper.selectList(new LambdaQueryWrapper<SysBackupJob>()
                 .eq(SysBackupJob::getScope, BackupScope.FAMILY.name())
                 .eq(SysBackupJob::getStatus, BackupStatus.SUCCESS.name())
@@ -457,8 +511,17 @@ public class BackupService {
             byFamily.computeIfAbsent(job.getFamilyId(), k -> new ArrayList<>()).add(job);
         }
         for (List<SysBackupJob> list : byFamily.values()) {
-            purge(BackupRetention.selectFamily(list, r.getFamilyKeep(), r.getFamilyDays(), now).purge());
+            purge(BackupRetention.selectFamily(list, 3, 30, now).purge());
         }
+    }
+
+    private List<SysBackupJob> policyJobs(Long policyId) {
+        return jobMapper.selectList(new LambdaQueryWrapper<SysBackupJob>()
+                .eq(SysBackupJob::getScope, BackupScope.INSTANCE.name())
+                .eq(SysBackupJob::getPolicyId, policyId)
+                .eq(SysBackupJob::getStatus, BackupStatus.SUCCESS.name())
+                .orderByDesc(SysBackupJob::getStartedAt)
+                .orderByDesc(SysBackupJob::getId));
     }
 
     private List<Long> selectFor(List<SysBackupJob> all, String kind, int daily, int weekly, int monthly) {
@@ -529,18 +592,22 @@ public class BackupService {
         }
     }
 
+    /** 找最近一份真正带 uploads 快照的任务作为硬链接基线(策略可能只备数据库) */
     private Path previousFilesDir(SysBackupJob current) {
-        SysBackupJob prev = jobMapper.selectOne(new LambdaQueryWrapper<SysBackupJob>()
+        List<SysBackupJob> prevs = jobMapper.selectList(new LambdaQueryWrapper<SysBackupJob>()
                 .eq(SysBackupJob::getScope, BackupScope.INSTANCE.name())
                 .eq(SysBackupJob::getStatus, BackupStatus.SUCCESS.name())
                 .in(SysBackupJob::getKind, List.of(
-                        BackupKind.CONTENT.name(), BackupKind.FULL.name(), BackupKind.MIGRATION.name()))
+                        BackupKind.CONTENT.name(), BackupKind.FULL.name(), BackupKind.MIGRATION.name(),
+                        BackupKind.POLICY.name()))
                 .lt(SysBackupJob::getId, current.getId())
                 .orderByDesc(SysBackupJob::getId)
-                .last("LIMIT 1"));
-        if (prev == null) return null;
-        Path files = backupRoot.resolve(prev.getDirName()).resolve("files");
-        return Files.isDirectory(files) ? files : null;
+                .last("LIMIT 20"));
+        for (SysBackupJob prev : prevs) {
+            Path files = backupRoot.resolve(prev.getDirName()).resolve("files");
+            if (Files.isDirectory(files)) return files;
+        }
+        return null;
     }
 
     private java.util.Set<String> excludePrefixes() {
@@ -561,6 +628,8 @@ public class BackupService {
         meta.put("scope", job.getScope());
         if (BackupScope.FAMILY.name().equals(job.getScope())) meta.put("privateDiariesExcluded", true);
         meta.put("familyId", job.getFamilyId());
+        meta.put("policyId", job.getPolicyId());
+        if (job.getModules() != null) meta.put("modules", BackupModule.parse(job.getModules()));
         meta.put("startedAt", job.getStartedAt().format(HUMAN));
         meta.put("finishedAt", finished.format(HUMAN));
 
@@ -601,6 +670,7 @@ public class BackupService {
                 ? "db/family-data.sql.gz" : "db/" + switch (BackupKind.valueOf(job.getKind())) {
             case BASIC -> "basic";
             case CONTENT -> "content";
+            case POLICY -> "policy";
             default -> "full";
         } + ".sql.gz";
         StringBuilder sb = new StringBuilder();
@@ -627,6 +697,10 @@ public class BackupService {
             sb.append("4. 本包只含基础数据,不含上传文件;文件请从同一时期的 CONTENT/FULL 备份恢复。\n");
         } else if ("CONTENT".equals(job.getKind())) {
             sb.append("4. 本包只含内容表与上传文件;基础数据请从同一时期的 BASIC/FULL 备份恢复。\n");
+        } else if ("POLICY".equals(job.getKind())) {
+            sb.append("4. 本包由备份策略生成,只含勾选的模块:");
+            sb.append(job.getModules() == null ? "—" : job.getModules());
+            sb.append(";需要独立恢复整站时请使用包含全部模块的策略或迁移包。\n");
         } else {
             sb.append("4. 本包含全量数据库与上传文件,可独立恢复整站。\n");
         }

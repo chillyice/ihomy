@@ -3965,3 +3965,52 @@ SET @photo_caption_ddl = (SELECT IF(COUNT(*) = 0,
 PREPARE photo_caption_stmt FROM @photo_caption_ddl;
 EXECUTE photo_caption_stmt;
 DEALLOCATE PREPARE photo_caption_stmt;
+
+-- 2026-11-24: 备份策略化(V14.51):策略表 + 任务归属策略 + 默认每日全量策略
+CREATE TABLE IF NOT EXISTS `sys_backup_policy` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`            VARCHAR(60)  NOT NULL COMMENT '策略名称',
+  `modules`         VARCHAR(255) NOT NULL COMMENT '备份模块码,逗号分隔(见 BackupModule)',
+  `schedule_type`   VARCHAR(10)  NOT NULL DEFAULT 'DAILY' COMMENT '周期:DAILY每天/WEEKLY每周/MONTHLY每月',
+  `schedule_time`   VARCHAR(5)   NOT NULL DEFAULT '03:30' COMMENT '执行时间 HH:mm',
+  `schedule_day`    TINYINT      DEFAULT NULL COMMENT '每周1-7(周一=1)或每月1-28,每天为NULL',
+  `retention_days`  INT          DEFAULT NULL COMMENT '保留天数,NULL=不自动清理',
+  `enabled`         TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用:0否 1是',
+  `created_by`      BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份策略';
+
+SET @backup_policy_id_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `sys_backup_job` ADD COLUMN `policy_id` BIGINT DEFAULT NULL COMMENT ''来源备份策略ID(手动固定类型为NULL)'' AFTER `family_id`',
+  'SELECT 1') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'sys_backup_job' AND COLUMN_NAME = 'policy_id');
+PREPARE backup_policy_id_stmt FROM @backup_policy_id_ddl;
+EXECUTE backup_policy_id_stmt;
+DEALLOCATE PREPARE backup_policy_id_stmt;
+
+SET @backup_job_modules_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `sys_backup_job` ADD COLUMN `modules` VARCHAR(255) DEFAULT NULL COMMENT ''策略备份勾选的模块码(逗号分隔)'' AFTER `policy_id`',
+  'SELECT 1') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'sys_backup_job' AND COLUMN_NAME = 'modules');
+PREPARE backup_job_modules_stmt FROM @backup_job_modules_ddl;
+EXECUTE backup_job_modules_stmt;
+DEALLOCATE PREPARE backup_job_modules_stmt;
+
+SET @backup_policy_idx_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `sys_backup_job` ADD KEY `idx_policy` (`policy_id`, `started_at`)',
+  'SELECT 1') FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'sys_backup_job' AND INDEX_NAME = 'idx_policy');
+PREPARE backup_policy_idx_stmt FROM @backup_policy_idx_ddl;
+EXECUTE backup_policy_idx_stmt;
+DEALLOCATE PREPARE backup_policy_idx_stmt;
+
+-- 只在策略表为空时插入默认策略,避免覆盖运维已建好的策略
+INSERT INTO `sys_backup_policy` (`name`, `modules`, `schedule_type`, `schedule_time`, `schedule_day`, `retention_days`, `enabled`)
+SELECT '每日全量备份',
+       'MEMBER,LIFE,SCHEDULE,BOOK,CONTENT,CHAT,HEALTH,GAME,REPORT,CONFIG,FILES',
+       'DAILY', '03:30', NULL, 7, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_backup_policy`);

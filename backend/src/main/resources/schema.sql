@@ -2427,6 +2427,7 @@ CREATE TABLE `family_announcement` (
 
 -- 家庭文件:通用文件入口(分享收件「存到文件」与文件页上传都落这里);
 -- 与相册/图书馆/放映厅并列,不参与游客公开(FileAccessMapper 刻意不登记)
+DROP TABLE IF EXISTS `family_file`;
 CREATE TABLE `family_file` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
@@ -3100,11 +3101,13 @@ CREATE TABLE `family_game_room_round` (
 DROP TABLE IF EXISTS `sys_backup_job`;
 CREATE TABLE `sys_backup_job` (
   `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `kind`            VARCHAR(20)  NOT NULL COMMENT '类型:BASIC基础/CONTENT内容/FULL全量/MIGRATION迁移包',
+  `kind`            VARCHAR(20)  NOT NULL COMMENT '类型:BASIC基础/CONTENT内容/FULL全量/MIGRATION迁移包/POLICY策略备份',
   `scope`           VARCHAR(20)  NOT NULL DEFAULT 'INSTANCE' COMMENT '范围:INSTANCE全实例/FAMILY单家庭',
   `trigger_type`    VARCHAR(20)  NOT NULL DEFAULT 'MANUAL' COMMENT '触发:MANUAL手动/SCHEDULED定时',
   `status`          VARCHAR(20)  NOT NULL DEFAULT 'RUNNING' COMMENT '状态:RUNNING执行中/SUCCESS成功/FAILED失败/PURGED已清理',
   `family_id`       BIGINT       DEFAULT NULL COMMENT '家庭导出时的家庭ID(全实例为NULL)',
+  `policy_id`       BIGINT       DEFAULT NULL COMMENT '来源备份策略ID(手动固定类型为NULL)',
+  `modules`         VARCHAR(255) DEFAULT NULL COMMENT '策略备份勾选的模块码(逗号分隔)',
   `operator_id`     BIGINT       DEFAULT NULL COMMENT '发起人用户ID(定时任务为NULL)',
   `dir_name`        VARCHAR(120) NOT NULL COMMENT '备份目录名(位于备份根目录下)',
   `size_bytes`      BIGINT       NOT NULL DEFAULT 0 COMMENT '快照逻辑字节(含增量硬链接)',
@@ -3121,8 +3124,36 @@ CREATE TABLE `sys_backup_job` (
   PRIMARY KEY (`id`),
   KEY `idx_kind_status` (`kind`, `status`),
   KEY `idx_scope_family` (`scope`, `family_id`, `created_at`),
+  KEY `idx_policy` (`policy_id`, `started_at`),
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份与迁移任务记录';
+
+-- ------------------------------------------------------------
+-- 85a. sys_backup_policy 备份策略(V14.51):一条策略 = 模块 + 周期 + 保留天数 + 启停。
+--     模块码见 BackupModule;保留天数 NULL 表示不自动清理;执行记录仍落 sys_backup_job。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_backup_policy`;
+CREATE TABLE `sys_backup_policy` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`            VARCHAR(60)  NOT NULL COMMENT '策略名称',
+  `modules`         VARCHAR(255) NOT NULL COMMENT '备份模块码,逗号分隔(见 BackupModule)',
+  `schedule_type`   VARCHAR(10)  NOT NULL DEFAULT 'DAILY' COMMENT '周期:DAILY每天/WEEKLY每周/MONTHLY每月',
+  `schedule_time`   VARCHAR(5)   NOT NULL DEFAULT '03:30' COMMENT '执行时间 HH:mm',
+  `schedule_day`    TINYINT      DEFAULT NULL COMMENT '每周1-7(周一=1)或每月1-28,每天为NULL',
+  `retention_days`  INT          DEFAULT NULL COMMENT '保留天数,NULL=不自动清理',
+  `enabled`         TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用:0否 1是',
+  `created_by`      BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份策略';
+
+-- 默认策略:每天 03:30 备份全部模块与上传文件,保留 7 天;运维可在列表里调整
+INSERT INTO `sys_backup_policy` (`name`, `modules`, `schedule_type`, `schedule_time`, `schedule_day`, `retention_days`, `enabled`)
+VALUES ('每日全量备份',
+        'MEMBER,LIFE,SCHEDULE,BOOK,CONTENT,CHAT,HEALTH,GAME,REPORT,CONFIG,FILES',
+        'DAILY', '03:30', NULL, 7, 1);
 
 -- ------------------------------------------------------------
 -- 86. 健康数据(V12.88):家庭成员睡眠与体征(设计见 docs/设计想法/功能/健康数据接入-计划.md)

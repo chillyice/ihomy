@@ -63,12 +63,17 @@ public class BackupDumpWriter {
     ) {
     }
 
-    /**
-     * @param target   输出 .sql.gz
-     * @param kind     备份类型(决定基础/内容/全量)
-     * @param familyId 非空 = 单家庭导出(沿用全量分类,但按家庭过滤)
-     */
     public DumpResult write(Path target, BackupKind kind, Long familyId) throws Exception {
+        return write(target, kind, familyId, null);
+    }
+
+    /**
+     * @param target     输出 .sql.gz
+     * @param kind       备份类型(决定基础/内容/全量)
+     * @param familyId   非空 = 单家庭导出(沿用全量分类,但按家庭过滤)
+     * @param onlyTables 非空 = 只导出这些表(策略备份按模块显式指定)
+     */
+    public DumpResult write(Path target, BackupKind kind, Long familyId, Set<String> onlyTables) throws Exception {
         Files.createDirectories(target.getParent());
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         CountingOutputStream counting = new CountingOutputStream(Files.newOutputStream(target));
@@ -93,8 +98,13 @@ public class BackupDumpWriter {
             for (String table : listTables(conn)) {
                 Set<String> columns = columns(conn, table);
                 BackupTableSpec.FamilyFilter filter = null;
+                if (BackupTableSpec.isNeverDump(table)) continue;
                 if (familyId == null) {
-                    if (!BackupTableSpec.includeInDump(table, kind)) continue;
+                    if (onlyTables != null) {
+                        if (!onlyTables.contains(table)) continue;
+                    } else if (!BackupTableSpec.includeInDump(table, kind)) {
+                        continue;
+                    }
                 } else {
                     filter = BackupTableSpec.familyFilter(table, columns);
                     if (filter == null) continue;

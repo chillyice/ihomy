@@ -1,42 +1,7 @@
-// 备份策略与展示的纯函数:UI 只负责把时间控件/数字映射到 cron 与保留份数。
-// 后端策略是所有校验的唯一事实来源,这里只做「能解析就回显、不能解析就保留原文」的轻量转换。
-
-const DAILY = /^0\s+(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/
-const WEEKLY = /^0\s+(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+(\d)$/
+// 备份策略展示的纯函数:周期/保留/模块文案由这里统一拼装,页面只渲染。
+// 时间与周期在后端校验(cron 的唯一事实来源是 sys_backup_policy),这里只负责本地化展示。
 
 const pad = (n) => String(n).padStart(2, '0')
-
-/** 每天 HH:mm → Spring 六段 cron */
-export function dailyCron(hour, minute) {
-  return `0 ${Number(minute) || 0} ${Number(hour) || 0} * * *`
-}
-
-/** 每周几 HH:mm(dow 0=周日) → cron */
-export function weeklyCron(dow, hour, minute) {
-  return `0 ${Number(minute) || 0} ${Number(hour) || 0} * * ${Number(dow) || 0}`
-}
-
-/** 解析每天 cron;不是「每天」形状返回 null */
-export function parseDailyCron(cron) {
-  const m = DAILY.exec(String(cron || '').trim())
-  if (!m) return null
-  // cron 六段式的字段顺序是 秒 分 时,前面固定 0 秒,所以第一组是分、第二组是时
-  const minute = Number(m[1])
-  const hour = Number(m[2])
-  if (hour > 23 || minute > 59) return null
-  return { hour, minute, text: `${pad(hour)}:${pad(minute)}` }
-}
-
-/** 解析每周 cron;不是「每周」形状返回 null */
-export function parseWeeklyCron(cron) {
-  const m = WEEKLY.exec(String(cron || '').trim())
-  if (!m) return null
-  const minute = Number(m[1])
-  const hour = Number(m[2])
-  const dow = Number(m[3])
-  if (hour > 23 || minute > 59 || dow > 6) return null
-  return { dow, hour, minute, text: `${pad(hour)}:${pad(minute)}` }
-}
 
 /** 用户可读体积(备份列表/概览) */
 export function formatBytes(bytes) {
@@ -60,13 +25,45 @@ export function durationText(ms, t) {
   return t('ops.backup.durHour', { h: hour, m: min % 60 })
 }
 
-/** 备份文件/数据库大小的策略摘要数据(文案交给 i18n) */
-export function retentionPlan(policy) {
-  const r = policy?.retention || {}
-  return {
-    basic: { daily: r.basicDaily ?? 0, weekly: r.basicWeekly ?? 0, monthly: r.basicMonthly ?? 0 },
-    content: { daily: r.contentDaily ?? 0, weekly: r.contentWeekly ?? 0, monthly: r.contentMonthly ?? 0 },
-    full: { weekly: r.fullWeekly ?? 0, monthly: r.fullMonthly ?? 0 },
-    family: { days: r.familyDays ?? 0, keep: r.familyKeep ?? 0 },
+/** 每周/每月下拉:周一=1 … 周日=7;每月 1–28 */
+export function scheduleDays(type) {
+  if (type === 'WEEKLY') return [1, 2, 3, 4, 5, 6, 7]
+  if (type === 'MONTHLY') return Array.from({ length: 28 }, (_, i) => i + 1)
+  return []
+}
+
+/** 策略周期摘要;缺字段时回退到「每天」 */
+export function scheduleText(policy, t) {
+  const time = String(policy?.scheduleTime || '03:30')
+  const type = policy?.scheduleType || 'DAILY'
+  if (type === 'WEEKLY') {
+    const day = Number(policy?.scheduleDay) || 7
+    return t('ops.backup.everyWeekAt', { day: t(`ops.backup.weekday.${day}`), time })
   }
+  if (type === 'MONTHLY') {
+    const day = Number(policy?.scheduleDay) || 1
+    return t('ops.backup.everyMonthAt', { day, time })
+  }
+  return t('ops.backup.everyDayAt', { time })
+}
+
+/** 保留天数摘要;留空 = 不自动清理 */
+export function retentionText(days, t) {
+  const n = Number(days)
+  if (!Number.isFinite(n) || n <= 0) return t('ops.backup.keepForever')
+  return t('ops.backup.keepDays', { n })
+}
+
+/** 模块码 → 本地化名称;未知码原样显示,避免静默丢失 */
+export function moduleText(code, t) {
+  const key = `ops.backup.module.${String(code || '').toLowerCase()}`
+  const text = t(key)
+  return text === key ? String(code || '') : text
+}
+
+/** 时间显示补齐两位(策略列表/表单) */
+export function timeText(time) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(time || ''))
+  if (!m) return String(time || '—')
+  return `${pad(Number(m[1]))}:${m[2]}`
 }

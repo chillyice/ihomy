@@ -617,10 +617,14 @@ export const opsApi = {
   ossIgnore: (id, ignored) => request.put(`/ops/oss/${id}/ignore`, null, { params: { ignored } }),
   ossAssess: (id) => request.post(`/ops/oss/${id}/assess`, null, { timeout: 120000 }),
   ossUpgrade: (id) => request.post(`/ops/oss/${id}/upgrade`),
-  // 备份与迁移(V12.54):全实例备份、定时策略、下载/校验/删除
+  // 备份与迁移(V14.51):策略列表 + 按策略执行 + 任务记录/下载/校验/删除
   backupOverview: () => request.get('/ops/backup/overview'),
-  backupPolicy: () => request.get('/ops/backup/policy'),
-  saveBackupPolicy: (data) => request.put('/ops/backup/policy', data),
+  backupPolicies: () => request.get('/ops/backup/policies'),
+  createBackupPolicy: (data) => request.post('/ops/backup/policies', data),
+  updateBackupPolicy: (id, data) => request.put(`/ops/backup/policies/${id}`, data),
+  deleteBackupPolicy: (id) => request.delete(`/ops/backup/policies/${id}`),
+  runBackupPolicy: (id) => request.post(`/ops/backup/policies/${id}/run`),
+  backupModules: () => request.get('/ops/backup/modules'),
   backupJobs: (params) => request.get('/ops/backup/jobs', { params }),
   createBackupJob: (kind) => request.post('/ops/backup/jobs', { kind }),
   verifyBackupJob: (id) => request.post(`/ops/backup/jobs/${id}/verify`),

@@ -45,13 +45,18 @@ public final class BackupTableSpec {
         return table.startsWith("content_") || table.startsWith("report_") || table.startsWith("game_");
     }
 
-    /** 某类备份是否包含该表 */
+    /** 永不进入任何备份(运维产物 / 一次性敏感令牌) */
+    public static boolean isNeverDump(String table) {
+        return table == null || NEVER_DUMP.contains(table);
+    }
+
+    /** 某类备份是否包含该表;POLICY 由调用方传显式表清单,这里按全量处理 */
     public static boolean includeInDump(String table, BackupKind kind) {
         if (table == null || kind == null) return false;
         if (NEVER_DUMP.contains(table)) return false;
         if (kind == BackupKind.BASIC) return !isContentTable(table);
         if (kind == BackupKind.CONTENT) return isContentTable(table);
-        return true; // FULL / MIGRATION
+        return true; // FULL / MIGRATION / POLICY(显式清单由 writer 再过滤)
     }
 
     /**

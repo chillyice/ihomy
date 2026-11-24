@@ -70,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`。**业务运行用 `ihomy` 账号**(仅 DML on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序 踩坑速查 §2.7。
-- **113 张表**:`sys_` 34、`report_` 5、`family_` 51、`content_` 22、`game_` 1(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
+- **114 张表**:`sys_` 35、`report_` 5、`family_` 51、`content_` 22、`game_` 1(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量 `common/DictConst.java`,前端 `utils/dict.js`;**禁止 0/1/2 判断**。
 - **可见范围四档** `PUBLIC > CIRCLE > FAMILY > PRIVATE`(顺序即界面顺序):`content_blog/diary/photo/video/wish/book`、`content_photo_album`、`game_info`、`family_item` 四档;`family_vault_item`、`sys_iot_device` 只两档(PRIVATE/FAMILY)。清单 需求 §6.4。
@@ -186,7 +186,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **Redis 只绑回环 + 强密码**:`-p 127.0.0.1:6379:6379` + `--requirepass`(写在**镜像名之后**);镜像固定 tag(当前 `redis:8.10.3`),缺 tag 经 daocloud 拉取后 `docker tag` 回原名;**改密顺序**:external.yml → 停后端 → 重建容器 → 起后端 → 冒烟(踩坑速查 §7.17)。
 - SSH 统一 **19068**(禁 22),ssh/scp 带 `-p 19068`;配 fail2ban 与自动安全更新。证书已转 **acme.sh**(`/etc/ihomy-cert/`,crontab 续期),别再手改 certbot 路径(排障 踩坑速查 §7.18/§13.5)。
 - 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑;恢复 `prod-restore.sh <dump> <目标库>`。
-- **站内备份与迁移**:运维页配策略(基础每天 / 内容每天 + uploads 硬链接增量 / 全量每周;GFS 保留,迁移包不自动清理),产物落 uploads 同级 `backups/`(**不进 nginx `/files/`**);**只导出,恢复按包内 `RESTORE.md` 在服务器做**,不做全库覆盖;家庭导出 `family:manage`,恢复需全新空实例(保留原始 ID)。细则 `docs/数据备份与迁移.md`。
+- **站内备份与迁移**:策略是独立对象(`sys_backup_policy`:勾选模块 + 每天/每周/每月 + HH:mm + 可选保留天数 + 启停,可建多条),列表直接看最近执行/下次执行;模块↔表是显式映射(`BackupModule`,新增表必须归模块),`FILES` 模块带 uploads 硬链接增量;产物落 uploads 同级 `backups/`(**不进 nginx `/files/`**);**只导出,恢复按包内 `RESTORE.md` 在服务器做**,不做全库覆盖;家庭导出 `family:manage`,恢复需全新空实例(保留原始 ID)。细则 `docs/数据备份与迁移.md`。
 - **生产只留构建产物**:`jar`、`dist`、`config/external.yml`(+`mysql/my.cnf`)、`uploads/`、`backups/`、`logs/`、`VERSION`、两个备份脚本;源码/docs/.git 不在服务器,构建上传走本地 `scripts/deploy.ps1`。
 - **重装/新服务器四条必查**(nginx `mime.types` 有 `.mjs`、站点 conf 有 gzip、静态缓存排除 `/api/`+`/files/`、媒体地址同为 HTTPS:踩坑速查 §7.1/§7.3/§7.10);**部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**,冒烟前 unregister SW + 清 caches,不带哈希的运行时文件必须 `?v=` 破缓存(§7.2/§3.55)。
 - **多端发版(强制)**:`VERSION` 唯一源,每端各有通道——网页/PWA `scripts/deploy.ps1`(dist)、Android `scripts/release-app.ps1`(APK;**`/public/app/latest` 以 `uploads/app/` 最高版本包为准,上传即生效**,`latest-notes` 仅在配置与磁盘一致时输出,`min-supported-version` 由配置)、iOS 走 App Store。**壳内前端打进 APK,只发 dist 客户端不会变**;`app:sync` 会覆盖 `dist`,发完必须 `npm run build` 复原。站内 `/public/version` 比对 bundle 并提示刷新。清单 `docs/部署指导-Linux.md` §8·补.5。

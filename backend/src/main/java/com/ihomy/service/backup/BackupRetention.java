@@ -65,6 +65,27 @@ public final class BackupRetention {
         return new Selection(keep, purge);
     }
 
+    /**
+     * 策略备份:只保留最近 days 天内且不是最新一份的;最新一份永不自动清理。
+     * days 来自策略的 retention_days,为空时调用方不应调用本方法。
+     */
+    public static Selection selectByDays(List<SysBackupJob> successDesc, int days, LocalDateTime now) {
+        Set<Long> keep = new LinkedHashSet<>();
+        if (successDesc == null || successDesc.isEmpty()) return new Selection(keep, List.of());
+        keep.add(successDesc.get(0).getId());
+        LocalDateTime cutoff = now.minusDays(Math.max(1, days));
+        for (SysBackupJob job : successDesc) {
+            if (job.getStartedAt() != null && !job.getStartedAt().isBefore(cutoff)) {
+                keep.add(job.getId());
+            }
+        }
+        List<Long> purge = new ArrayList<>();
+        for (SysBackupJob job : successDesc) {
+            if (!keep.contains(job.getId())) purge.add(job.getId());
+        }
+        return new Selection(keep, purge);
+    }
+
     private static Set<Long> pick(List<SysBackupJob> jobs, int limit, BucketFn fn) {
         Set<Long> out = new LinkedHashSet<>();
         if (limit <= 0) return out;

@@ -1,5 +1,5 @@
-<!-- 备份与迁移(V12.54):全实例备份策略、立即备份、任务列表与下载/校验/删除。
-     规则:基础数据每天、内容数据每天(文件硬链接增量)、全量每周;按日/周/月分代保留。 -->
+<!-- 备份与迁移(V14.51):备份策略列表(模块 + 周期 + 清理 + 启停 + 最近执行),
+     新建/编辑策略弹窗,以及执行记录/下载/校验/删除;迁移包仍为一次性手动生成。 -->
 <template>
   <div v-loading="loading">
     <div class="backup-summary">
@@ -16,12 +16,12 @@
         </div>
       </div>
       <div class="backup-stat card">
-        <div class="backup-stat-label">{{ $t('ops.backup.nextRun') }}</div>
+        <div class="backup-stat-label">{{ $t('ops.backup.policyCount') }}</div>
         <div class="backup-stat-value">
           <el-tag v-if="overview.running" type="warning" size="small">{{ $t('ops.backup.running') }}</el-tag>
-          <template v-else>{{ nextRunText }}</template>
+          <template v-else>{{ overview.policyEnabledCount || 0 }} / {{ overview.policyCount || 0 }}</template>
         </div>
-        <div class="backup-stat-hint">{{ $t('ops.backup.nextRunHint') }}</div>
+        <div class="backup-stat-hint">{{ $t('ops.backup.policyCountHint') }}</div>
       </div>
       <div class="backup-stat card">
         <div class="backup-stat-label">{{ $t('ops.backup.lastSuccess') }}</div>
@@ -30,180 +30,228 @@
       </div>
     </div>
 
-    <div class="filter-row backup-actions">
-      <el-button type="primary" :disabled="overview.running" @click="run('BASIC')">{{ $t('ops.backup.runBasic') }}</el-button>
-      <el-button :disabled="overview.running" @click="run('CONTENT')">{{ $t('ops.backup.runContent') }}</el-button>
-      <el-button :disabled="overview.running" @click="run('FULL')">{{ $t('ops.backup.runFull') }}</el-button>
-      <el-button :disabled="overview.running" @click="run('MIGRATION')">{{ $t('ops.backup.runMigration') }}</el-button>
+    <div class="filter-row backup-toolbar">
+      <el-button type="primary" @click="openCreate">
+        <el-icon><Plus /></el-icon>{{ $t('ops.backup.createPolicy') }}
+      </el-button>
+      <el-button :disabled="overview.running" @click="runMigration">{{ $t('ops.backup.runMigration') }}</el-button>
       <el-button :loading="loading" @click="refreshAll">{{ $t('ops.backup.refresh') }}</el-button>
+      <span v-if="overview.running" class="backup-hint">{{ $t('ops.backup.runningHint') }}</span>
     </div>
 
-    <div class="card backup-policy">
-      <div class="section-label">{{ $t('ops.backup.policyTitle') }}</div>
-      <el-form label-width="150px" label-position="left">
+    <div class="card backup-policies">
+      <div class="section-label">{{ $t('ops.backup.policies') }}</div>
+      <el-table :data="policies" border stripe size="small" row-key="id" :empty-text="$t('ops.backup.noPolicies')">
+        <el-table-column :label="$t('ops.backup.name')" min-width="150">
+          <template #default="{ row }">
+            <div class="policy-name">{{ row.name }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.modules')" min-width="230">
+          <template #default="{ row }">
+            <div class="module-tags">
+              <el-tag v-for="m in row.modules" :key="m" size="small" class="module-tag">
+                {{ moduleText(m, t) }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.schedule')" min-width="170">
+          <template #default="{ row }">
+            <div>{{ scheduleText(row, t) }}</div>
+            <div class="backup-sub">
+              {{ row.enabled ? $t('ops.backup.nextRunAt', { time: row.nextRunAt || '—' }) : $t('ops.backup.disabled') }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.retention')" width="120">
+          <template #default="{ row }">{{ retentionText(row.retentionDays, t) }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.lastRun')" min-width="150">
+          <template #default="{ row }">
+            <template v-if="row.lastJob">
+              <el-tag size="small" :type="statusTag(row.lastJob.status)">{{ statusLabel(row.lastJob.status) }}</el-tag>
+              <div class="backup-sub">{{ formatDateTime(row.lastJob.startedAt) || '—' }}</div>
+            </template>
+            <span v-else class="backup-sub">{{ $t('ops.backup.neverRun') }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.enabled')" width="92" align="center">
+          <template #default="{ row }">
+            <el-switch :model-value="row.enabled" @change="(v) => togglePolicy(row, v)" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('common.actions')" width="128" fixed="right">
+          <template #default="{ row }">
+            <el-tooltip :content="$t('ops.backup.runPolicy')" placement="top" :show-after="300">
+              <el-button size="small" text :disabled="overview.running" @click="runPolicy(row)">
+                <el-icon><VideoPlay /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEdit(row)">
+                <el-icon><Edit /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="removePolicy(row)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <div class="card backup-jobs">
+      <div class="section-label">{{ $t('ops.backup.jobs') }}</div>
+      <div class="filter-row">
+        <el-select v-model="filter.policyId" clearable :placeholder="$t('ops.backup.allPolicies')" class="filter-select">
+          <el-option v-for="p in policies" :key="p.id" :value="p.id" :label="p.name" />
+        </el-select>
+        <el-select v-model="filter.kind" clearable :placeholder="$t('ops.backup.kind')" class="filter-select">
+          <el-option value="BASIC" :label="$t('ops.backup.kindBasic')" />
+          <el-option value="CONTENT" :label="$t('ops.backup.kindContent')" />
+          <el-option value="FULL" :label="$t('ops.backup.kindFull')" />
+          <el-option value="MIGRATION" :label="$t('ops.backup.kindMigration')" />
+          <el-option value="POLICY" :label="$t('ops.backup.kindPolicy')" />
+        </el-select>
+        <el-select v-model="filter.status" clearable :placeholder="$t('ops.backup.status')" class="filter-select">
+          <el-option value="RUNNING" :label="$t('ops.backup.statusRunning')" />
+          <el-option value="SUCCESS" :label="$t('ops.backup.statusSuccess')" />
+          <el-option value="FAILED" :label="$t('ops.backup.statusFailed')" />
+          <el-option value="PURGED" :label="$t('ops.backup.statusPurged')" />
+        </el-select>
+        <el-button type="primary" @click="loadJobs(1)">{{ $t('ops.query') }}</el-button>
+      </div>
+
+      <el-table v-loading="jobsLoading" :data="jobs.records" border stripe size="small" :empty-text="$t('ops.backup.noJobs')">
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column :label="$t('ops.backup.kind')" width="105">
+          <template #default="{ row }">
+            <el-tag size="small" :type="kindTag(row.kind)">{{ kindLabel(row.kind) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.policy')" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ policyName(row.policyId) }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.trigger')" width="90">
+          <template #default="{ row }">{{ $t('ops.backup.trigger_' + String(row.triggerType).toLowerCase()) }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.status')" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.startedAt')" width="165">
+          <template #default="{ row }">{{ formatDateTime(row.startedAt) || '—' }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.duration')" width="105">
+          <template #default="{ row }">{{ durationText(row.durationMs, t) }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.size')" width="100">
+          <template #default="{ row }">{{ formatBytes(row.sizeBytes) }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.fileCount')" width="85">
+          <template #default="{ row }">{{ row.fileCount || 0 }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.backup.rowCount')" width="95">
+          <template #default="{ row }">{{ row.dbRowCount || 0 }}</template>
+        </el-table-column>
+        <el-table-column prop="message" :label="$t('ops.backup.message')" min-width="180" show-overflow-tooltip />
+        <el-table-column :label="$t('common.actions')" width="130" fixed="right">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.status === 'SUCCESS'" :content="$t('ops.backup.download')" placement="top" :show-after="300">
+              <el-button size="small" text @click="download(row)"
+                ><el-icon><Download /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip v-if="row.status === 'SUCCESS'" :content="$t('ops.backup.verify')" placement="top" :show-after="300">
+              <el-button size="small" text @click="verify(row)"
+                ><el-icon><CircleCheck /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip v-if="row.status !== 'RUNNING'" :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="removeJob(row)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination
+        v-if="total > pageSize"
+        v-model:current-page="pageNum"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, pager, next"
+        class="backup-pager"
+        @current-change="loadJobs"
+        @size-change="loadJobs(1)"
+      />
+    </div>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingId ? $t('ops.backup.editPolicy') : $t('ops.backup.createPolicy')"
+      width="min(720px, 94vw)"
+      append-to-body
+      destroy-on-close
+    >
+      <el-form label-width="110px" label-position="left">
+        <el-form-item :label="$t('ops.backup.name')">
+          <el-input v-model="form.name" maxlength="60" :placeholder="$t('ops.backup.namePlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="$t('ops.backup.modules')">
+          <el-checkbox-group v-model="form.modules" class="module-grid">
+            <el-checkbox v-for="m in moduleCatalog" :key="m.code" :value="m.code" class="module-check">
+              <span class="module-name">{{ moduleText(m.code, t) }}</span>
+              <span class="module-meta">
+                {{ m.withFiles ? $t('ops.backup.modulesFiles') : $t('ops.backup.modulesCount', { n: m.tableCount }) }}
+              </span>
+            </el-checkbox>
+          </el-checkbox-group>
+          <div class="backup-hint backup-hint-block">{{ $t('ops.backup.modulesHint') }}</div>
+        </el-form-item>
+        <el-form-item :label="$t('ops.backup.schedule')">
+          <el-radio-group v-model="form.scheduleType" @change="onScheduleTypeChange">
+            <el-radio-button value="DAILY">{{ $t('ops.backup.everyDay') }}</el-radio-button>
+            <el-radio-button value="WEEKLY">{{ $t('ops.backup.everyWeek') }}</el-radio-button>
+            <el-radio-button value="MONTHLY">{{ $t('ops.backup.everyMonth') }}</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item :label="$t('ops.backup.time')">
+          <el-time-picker v-model="form.scheduleTime" format="HH:mm" value-format="HH:mm" :clearable="false" class="time-input" />
+          <template v-if="form.scheduleType !== 'DAILY'">
+            <el-select v-model="form.scheduleDay" class="day-input">
+              <el-option v-for="d in scheduleDays(form.scheduleType)" :key="d" :value="d" :label="dayLabel(d)" />
+            </el-select>
+          </template>
+        </el-form-item>
+        <el-form-item :label="$t('ops.backup.retention')">
+          <el-checkbox v-model="form.autoClean">{{ $t('ops.backup.autoClean') }}</el-checkbox>
+          <el-input-number
+            v-if="form.autoClean"
+            v-model="form.retentionDays"
+            :min="1"
+            :max="3650"
+            :controls="false"
+            class="retention-input"
+          />
+          <span v-if="form.autoClean" class="backup-hint">{{ $t('ops.backup.retentionHint') }}</span>
+          <span v-else class="backup-hint">{{ $t('ops.backup.keepForever') }}</span>
+        </el-form-item>
         <el-form-item :label="$t('ops.backup.enabled')">
-          <el-switch v-model="policy.enabled" />
+          <el-switch v-model="form.enabled" />
           <span class="backup-hint">{{ $t('ops.backup.enabledHint') }}</span>
         </el-form-item>
-
-        <el-form-item :label="$t('ops.backup.basicTask')">
-          <el-switch v-model="policy.basic.enabled" />
-          <template v-if="basicAdvanced">
-            <el-input v-model="policy.basic.cron" class="cron-input mono" :placeholder="$t('ops.backup.cronPlaceholder')" />
-          </template>
-          <template v-else>
-            <el-time-picker v-model="basicTime" format="HH:mm" value-format="HH:mm" :clearable="false" class="time-input" />
-          </template>
-          <span class="backup-hint">{{ $t('ops.backup.basicHint') }}</span>
-        </el-form-item>
-
-        <el-form-item :label="$t('ops.backup.contentTask')">
-          <el-switch v-model="policy.content.enabled" />
-          <template v-if="contentAdvanced">
-            <el-input v-model="policy.content.cron" class="cron-input mono" :placeholder="$t('ops.backup.cronPlaceholder')" />
-          </template>
-          <template v-else>
-            <el-time-picker v-model="contentTime" format="HH:mm" value-format="HH:mm" :clearable="false" class="time-input" />
-          </template>
-          <span class="backup-hint">{{ $t('ops.backup.contentHint') }}</span>
-        </el-form-item>
-
-        <el-form-item :label="$t('ops.backup.fullTask')">
-          <el-switch v-model="policy.full.enabled" />
-          <template v-if="fullAdvanced">
-            <el-input v-model="policy.full.cron" class="cron-input mono" :placeholder="$t('ops.backup.cronPlaceholder')" />
-          </template>
-          <template v-else>
-            <el-select v-model="fullDow" class="dow-input">
-              <el-option v-for="d in 7" :key="d - 1" :value="d - 1" :label="$t('ops.backup.dow.' + (d - 1))" />
-            </el-select>
-            <el-time-picker v-model="fullTime" format="HH:mm" value-format="HH:mm" :clearable="false" class="time-input" />
-          </template>
-          <span class="backup-hint">{{ $t('ops.backup.fullHint') }}</span>
-        </el-form-item>
-
-        <el-form-item :label="$t('ops.backup.retentionBasic')">
-          <div class="retention-row">
-            <span>{{ $t('ops.backup.keepDaily') }}</span>
-            <el-input-number v-model="policy.retention.basicDaily" :min="1" :max="90" size="small" />
-            <span>{{ $t('ops.backup.keepWeekly') }}</span>
-            <el-input-number v-model="policy.retention.basicWeekly" :min="0" :max="52" size="small" />
-            <span>{{ $t('ops.backup.keepMonthly') }}</span>
-            <el-input-number v-model="policy.retention.basicMonthly" :min="0" :max="24" size="small" />
-          </div>
-        </el-form-item>
-        <el-form-item :label="$t('ops.backup.retentionContent')">
-          <div class="retention-row">
-            <span>{{ $t('ops.backup.keepDaily') }}</span>
-            <el-input-number v-model="policy.retention.contentDaily" :min="1" :max="90" size="small" />
-            <span>{{ $t('ops.backup.keepWeekly') }}</span>
-            <el-input-number v-model="policy.retention.contentWeekly" :min="0" :max="52" size="small" />
-            <span>{{ $t('ops.backup.keepMonthly') }}</span>
-            <el-input-number v-model="policy.retention.contentMonthly" :min="0" :max="24" size="small" />
-          </div>
-        </el-form-item>
-        <el-form-item :label="$t('ops.backup.retentionFull')">
-          <div class="retention-row">
-            <span>{{ $t('ops.backup.keepWeekly') }}</span>
-            <el-input-number v-model="policy.retention.fullWeekly" :min="1" :max="52" size="small" />
-            <span>{{ $t('ops.backup.keepMonthly') }}</span>
-            <el-input-number v-model="policy.retention.fullMonthly" :min="0" :max="36" size="small" />
-          </div>
-        </el-form-item>
-        <el-form-item :label="$t('ops.backup.retentionFamily')">
-          <div class="retention-row">
-            <span>{{ $t('ops.backup.familyDays') }}</span>
-            <el-input-number v-model="policy.retention.familyDays" :min="1" :max="365" size="small" />
-            <span>{{ $t('ops.backup.familyKeep') }}</span>
-            <el-input-number v-model="policy.retention.familyKeep" :min="1" :max="20" size="small" />
-          </div>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="saving" @click="savePolicy">{{ $t('ops.backup.savePolicy') }}</el-button>
-          <el-button @click="loadPolicy">{{ $t('ops.backup.resetPolicy') }}</el-button>
-        </el-form-item>
       </el-form>
-      <div class="backup-rule">{{ ruleText }}</div>
-    </div>
-
-    <div class="filter-row">
-      <el-select v-model="filter.kind" clearable :placeholder="$t('ops.backup.kind')" class="filter-select">
-        <el-option value="BASIC" :label="$t('ops.backup.kindBasic')" />
-        <el-option value="CONTENT" :label="$t('ops.backup.kindContent')" />
-        <el-option value="FULL" :label="$t('ops.backup.kindFull')" />
-        <el-option value="MIGRATION" :label="$t('ops.backup.kindMigration')" />
-      </el-select>
-      <el-select v-model="filter.status" clearable :placeholder="$t('ops.backup.status')" class="filter-select">
-        <el-option value="RUNNING" :label="$t('ops.backup.statusRunning')" />
-        <el-option value="SUCCESS" :label="$t('ops.backup.statusSuccess')" />
-        <el-option value="FAILED" :label="$t('ops.backup.statusFailed')" />
-        <el-option value="PURGED" :label="$t('ops.backup.statusPurged')" />
-      </el-select>
-      <el-button type="primary" @click="loadJobs(1)">{{ $t('ops.query') }}</el-button>
-    </div>
-
-    <el-table v-loading="jobsLoading" :data="jobs.records" border stripe size="small">
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column :label="$t('ops.backup.kind')" width="105">
-        <template #default="{ row }">
-          <el-tag size="small" :type="kindTag(row.kind)">{{ kindLabel(row.kind) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.trigger')" width="90">
-        <template #default="{ row }">{{ $t('ops.backup.trigger_' + String(row.triggerType).toLowerCase()) }}</template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.status')" width="90">
-        <template #default="{ row }">
-          <el-tag size="small" :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.startedAt')" width="165">
-        <template #default="{ row }">{{ formatDateTime(row.startedAt) || '—' }}</template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.duration')" width="105">
-        <template #default="{ row }">{{ durationText(row.durationMs, t) }}</template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.size')" width="100">
-        <template #default="{ row }">{{ formatBytes(row.sizeBytes) }}</template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.fileCount')" width="85">
-        <template #default="{ row }">{{ row.fileCount || 0 }}</template>
-      </el-table-column>
-      <el-table-column :label="$t('ops.backup.rowCount')" width="95">
-        <template #default="{ row }">{{ row.dbRowCount || 0 }}</template>
-      </el-table-column>
-      <el-table-column prop="message" :label="$t('ops.backup.message')" min-width="180" show-overflow-tooltip />
-      <el-table-column :label="$t('common.actions')" width="130" fixed="right">
-        <template #default="{ row }">
-          <el-tooltip v-if="row.status === 'SUCCESS'" :content="$t('ops.backup.download')" placement="top" :show-after="300">
-            <el-button size="small" text @click="download(row)"
-              ><el-icon><Download /></el-icon
-            ></el-button>
-          </el-tooltip>
-          <el-tooltip v-if="row.status === 'SUCCESS'" :content="$t('ops.backup.verify')" placement="top" :show-after="300">
-            <el-button size="small" text @click="verify(row)"
-              ><el-icon><CircleCheck /></el-icon
-            ></el-button>
-          </el-tooltip>
-          <el-tooltip v-if="row.status !== 'RUNNING'" :content="$t('common.delete')" placement="top" :show-after="300">
-            <el-button size="small" text type="danger" @click="remove(row)"
-              ><el-icon><Delete /></el-icon
-            ></el-button>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      v-if="total > pageSize"
-      v-model:current-page="pageNum"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50]"
-      :total="total"
-      layout="total, sizes, prev, pager, next"
-      class="backup-pager"
-      @current-change="loadJobs"
-      @size-change="loadJobs(1)"
-    />
+      <template #footer>
+        <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="savePolicy">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -211,9 +259,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CircleCheck, Delete, Download } from '@element-plus/icons-vue'
+import { CircleCheck, Delete, Download, Edit, Plus, VideoPlay } from '@element-plus/icons-vue'
 import { opsApi } from '@/api'
-import { durationText, dailyCron, formatBytes, parseDailyCron, parseWeeklyCron, retentionPlan, weeklyCron } from '@/utils/backupRules'
+import { durationText, formatBytes, moduleText, retentionText, scheduleDays, scheduleText } from '@/utils/backupRules'
 import { saveBlobResponse } from '@/utils/download'
 import { formatDateTime } from '@/utils/datetime'
 
@@ -223,110 +271,58 @@ const loading = ref(false)
 const jobsLoading = ref(false)
 const saving = ref(false)
 const overview = ref({})
-const policy = ref(defaultPolicy())
+const policies = ref([])
+const moduleCatalog = ref([])
 const jobs = ref({ records: [] })
 const total = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(20)
-const filter = reactive({ kind: '', status: '' })
+const filter = reactive({ kind: '', status: '', policyId: null })
 
-const basicTime = ref('02:30')
-const contentTime = ref('03:30')
-const fullTime = ref('04:30')
-const fullDow = ref(0)
-const basicAdvanced = ref(false)
-const contentAdvanced = ref(false)
-const fullAdvanced = ref(false)
+const dialogVisible = ref(false)
+const editingId = ref(null)
+const form = reactive({
+  name: '',
+  modules: [],
+  scheduleType: 'DAILY',
+  scheduleTime: '03:30',
+  scheduleDay: 7,
+  autoClean: true,
+  retentionDays: 7,
+  enabled: true,
+})
 
 let pollTimer = null
 
-function defaultPolicy() {
-  return {
-    enabled: true,
-    basic: { enabled: true, cron: '0 30 2 * * *' },
-    content: { enabled: true, cron: '0 30 3 * * *' },
-    full: { enabled: true, cron: '0 30 4 * * 0' },
-    retention: {
-      basicDaily: 7,
-      basicWeekly: 4,
-      basicMonthly: 3,
-      contentDaily: 7,
-      contentWeekly: 4,
-      contentMonthly: 3,
-      fullWeekly: 8,
-      fullMonthly: 12,
-      familyDays: 30,
-      familyKeep: 3,
-    },
-  }
-}
-
-const nextRunText = computed(() => {
-  const runs = overview.value.nextRuns || {}
-  const first = runs.BASIC || runs.CONTENT || runs.FULL
-  return first || '—'
-})
-
 const lastSuccessText = computed(() => {
-  const map = overview.value.lastSuccess || {}
-  const latest = ['BASIC', 'CONTENT', 'FULL']
-    .map((k) => map[k])
+  const list = Object.values(overview.value.lastSuccess || {})
+  const latest = list
+    .map((j) => j?.startedAt)
     .filter(Boolean)
-    .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)))[0]
-  return latest ? latest.startedAt || '—' : '—'
+    .sort()
+    .pop()
+  return latest || '—'
 })
 
-const ruleText = computed(() => {
-  const plan = retentionPlan(policy.value)
-  const bt = basicAdvanced.value ? policy.value.basic.cron : basicTime.value
-  const ct = contentAdvanced.value ? policy.value.content.cron : contentTime.value
-  const ft = fullAdvanced.value ? policy.value.full.cron : `${t('ops.backup.dow.' + fullDow.value)} ${fullTime.value}`
-  return t('ops.backup.ruleText', {
-    basicTime: bt,
-    basicDaily: plan.basic.daily,
-    basicWeekly: plan.basic.weekly,
-    basicMonthly: plan.basic.monthly,
-    contentTime: ct,
-    contentDaily: plan.content.daily,
-    contentWeekly: plan.content.weekly,
-    contentMonthly: plan.content.monthly,
-    fullTime: ft,
-    fullWeekly: plan.full.weekly,
-    fullMonthly: plan.full.monthly,
-    familyDays: plan.family.days,
-    familyKeep: plan.family.keep,
-  })
-})
+const policyName = (id) => policies.value.find((p) => p.id === id)?.name || '—'
+
+const dayLabel = (d) => (form.scheduleType === 'WEEKLY' ? t(`ops.backup.weekday.${d}`) : String(d))
 
 const kindLabel = (kind) => t('ops.backup.kind' + kind.charAt(0) + kind.slice(1).toLowerCase())
-const kindTag = (kind) => ({ BASIC: 'primary', CONTENT: 'success', FULL: 'warning', MIGRATION: 'info' })[kind] || 'info'
+const kindTag = (kind) => ({ BASIC: 'primary', CONTENT: 'success', FULL: 'warning', MIGRATION: 'info', POLICY: 'success' })[kind] || 'info'
 const statusTag = (status) => ({ RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger', PURGED: 'info' })[status] || 'info'
 const statusLabel = (status) => t('ops.backup.status' + status.charAt(0) + status.slice(1).toLowerCase())
 
-const applyPolicy = (data) => {
-  policy.value = { ...defaultPolicy(), ...(data || {}) }
-  policy.value.retention = { ...defaultPolicy().retention, ...(data?.retention || {}) }
-  const b = parseDailyCron(policy.value.basic?.cron)
-  basicAdvanced.value = !b
-  if (b) basicTime.value = b.text
-  const c = parseDailyCron(policy.value.content?.cron)
-  contentAdvanced.value = !c
-  if (c) contentTime.value = c.text
-  const f = parseWeeklyCron(policy.value.full?.cron)
-  fullAdvanced.value = !f
-  if (f) {
-    fullTime.value = f.text
-    fullDow.value = f.dow
-  }
-}
-
-const loadPolicy = async () => {
-  const data = await opsApi.backupPolicy()
-  applyPolicy(data)
-}
-
 const loadOverview = async () => {
   overview.value = await opsApi.backupOverview()
+}
+
+const loadPolicies = async () => {
+  policies.value = await opsApi.backupPolicies()
+}
+
+const loadModules = async () => {
+  moduleCatalog.value = await opsApi.backupModules()
 }
 
 const loadJobs = async (page = pageNum.value) => {
@@ -337,6 +333,7 @@ const loadJobs = async (page = pageNum.value) => {
       size: pageSize.value,
       kind: filter.kind || null,
       status: filter.status || null,
+      policyId: filter.policyId || null,
     })
     jobs.value = data
     total.value = data.total || 0
@@ -349,37 +346,116 @@ const loadJobs = async (page = pageNum.value) => {
 const refreshAll = async () => {
   loading.value = true
   try {
-    await Promise.all([loadOverview(), loadPolicy(), loadJobs(pageNum.value)])
+    await Promise.all([loadOverview(), loadPolicies(), loadModules(), loadJobs(pageNum.value)])
   } finally {
     loading.value = false
   }
 }
 
+const openCreate = () => {
+  editingId.value = null
+  form.name = ''
+  form.modules = moduleCatalog.value.map((m) => m.code)
+  form.scheduleType = 'DAILY'
+  form.scheduleTime = '03:30'
+  form.scheduleDay = 7
+  form.autoClean = true
+  form.retentionDays = 7
+  form.enabled = true
+  dialogVisible.value = true
+}
+
+const openEdit = (row) => {
+  editingId.value = row.id
+  form.name = row.name
+  form.modules = [...(row.modules || [])]
+  form.scheduleType = row.scheduleType || 'DAILY'
+  form.scheduleTime = row.scheduleTime || '03:30'
+  form.scheduleDay = row.scheduleDay || (form.scheduleType === 'WEEKLY' ? 7 : 1)
+  form.autoClean = row.retentionDays != null
+  form.retentionDays = row.retentionDays ?? 7
+  form.enabled = row.enabled !== false
+  dialogVisible.value = true
+}
+
+const onScheduleTypeChange = (type) => {
+  if (type === 'WEEKLY') form.scheduleDay = Math.min(Math.max(form.scheduleDay || 7, 1), 7)
+  if (type === 'MONTHLY') form.scheduleDay = Math.min(Math.max(form.scheduleDay || 1, 1), 28)
+}
+
+const retentionOf = (source) => {
+  if (source.autoClean === false) return null
+  if (source.autoClean === true) return source.retentionDays || 7
+  return source.retentionDays ?? null
+}
+
+const payloadOf = (source, enabled) => ({
+  name: source.name,
+  modules: source.modules,
+  scheduleType: source.scheduleType,
+  scheduleTime: source.scheduleTime,
+  scheduleDay: source.scheduleType === 'DAILY' ? null : source.scheduleDay,
+  retentionDays: retentionOf(source),
+  enabled: enabled == null ? source.enabled !== false : enabled,
+})
+
 const savePolicy = async () => {
-  if (!basicAdvanced.value) policy.value.basic.cron = dailyCron(...basicTime.value.split(':').map(Number))
-  if (!contentAdvanced.value) policy.value.content.cron = dailyCron(...contentTime.value.split(':').map(Number))
-  if (!fullAdvanced.value) policy.value.full.cron = weeklyCron(fullDow.value, ...fullTime.value.split(':').map(Number))
+  if (!form.name.trim()) {
+    ElMessage.warning(t('ops.backup.nameRequired'))
+    return
+  }
+  if (!form.modules.length) {
+    ElMessage.warning(t('ops.backup.modulesRequired'))
+    return
+  }
   saving.value = true
   try {
-    const saved = await opsApi.saveBackupPolicy(policy.value)
-    applyPolicy(saved)
-    await loadOverview()
+    const payload = payloadOf(form)
+    if (editingId.value) await opsApi.updateBackupPolicy(editingId.value, payload)
+    else await opsApi.createBackupPolicy(payload)
     ElMessage.success(t('ops.backup.policySaved'))
+    dialogVisible.value = false
+    await Promise.all([loadPolicies(), loadOverview()])
   } finally {
     saving.value = false
   }
 }
 
-const run = async (kind) => {
-  if (kind === 'FULL' || kind === 'MIGRATION') {
-    await ElMessageBox.confirm(t('ops.backup.runConfirm', { kind: kindLabel(kind) }), t('common.tip'), {
-      type: 'warning',
-    })
+const togglePolicy = async (row, enabled) => {
+  try {
+    await opsApi.updateBackupPolicy(row.id, payloadOf(row, enabled))
+    await Promise.all([loadPolicies(), loadOverview()])
+  } catch (e) {
+    ElMessage.error(e?.message || t('ops.backup.policySaveFailed'))
+    await loadPolicies()
   }
-  await opsApi.createBackupJob(kind)
+}
+
+const runPolicy = async (row) => {
+  await ElMessageBox.confirm(t('ops.backup.runPolicyConfirm', { name: row.name }), t('common.tip'), {
+    type: 'warning',
+  })
+  await opsApi.runBackupPolicy(row.id)
+  ElMessage.success(t('ops.backup.jobStarted'))
+  await Promise.all([loadOverview(), loadPolicies(), loadJobs(1)])
+  startPolling()
+}
+
+const runMigration = async () => {
+  await ElMessageBox.confirm(t('ops.backup.runConfirm', { kind: kindLabel('MIGRATION') }), t('common.tip'), {
+    type: 'warning',
+  })
+  await opsApi.createBackupJob('MIGRATION')
   ElMessage.success(t('ops.backup.jobStarted'))
   await Promise.all([loadOverview(), loadJobs(1)])
   startPolling()
+}
+
+const removePolicy = async (row) => {
+  await ElMessageBox.confirm(t('ops.backup.deletePolicyConfirm'), t('common.tip'), { type: 'warning' })
+  await opsApi.deleteBackupPolicy(row.id)
+  ElMessage.success(t('ops.backup.policyDeleted'))
+  await Promise.all([loadPolicies(), loadOverview(), loadJobs(pageNum.value)])
 }
 
 const download = async (row) => {
@@ -400,19 +476,18 @@ const verify = async (row) => {
   else ElMessage.error(text)
 }
 
-const remove = async (row) => {
+const removeJob = async (row) => {
   await ElMessageBox.confirm(t('ops.backup.deleteConfirm'), t('common.tip'), { type: 'warning' })
   await opsApi.deleteBackupJob(row.id)
   ElMessage.success(t('ops.backup.deleted'))
-  await Promise.all([loadOverview(), loadJobs()])
+  await Promise.all([loadOverview(), loadPolicies(), loadJobs()])
 }
 
 const startPolling = () => {
   stopPolling()
   pollTimer = setInterval(async () => {
     try {
-      await loadJobs(pageNum.value)
-      await loadOverview()
+      await Promise.all([loadJobs(pageNum.value), loadOverview(), loadPolicies()])
       if (!(jobs.value.records || []).some((j) => j.status === 'RUNNING')) stopPolling()
     } catch (e) {
       stopPolling()
@@ -458,10 +533,11 @@ onUnmounted(stopPolling)
   color: var(--color-text-secondary);
   word-break: break-all;
 }
-.backup-actions {
+.backup-toolbar {
   margin-bottom: 16px;
 }
-.backup-policy {
+.backup-policies,
+.backup-jobs {
   margin-bottom: 18px;
   padding: 16px 18px;
 }
@@ -470,38 +546,66 @@ onUnmounted(stopPolling)
   color: var(--color-text-secondary);
   font-size: 12px;
 }
-.retention-row {
+.backup-hint-block {
+  display: block;
+  margin-left: 0;
+  margin-top: 4px;
+  line-height: 1.6;
+}
+.backup-sub {
+  margin-top: 3px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.policy-name {
+  font-weight: 600;
+}
+.module-tags {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  gap: 4px;
+}
+.module-tag {
+  margin: 0;
+}
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px;
-  color: var(--color-text-secondary);
+  width: 100%;
+}
+.module-check {
+  height: auto;
+  margin-right: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.module-check :deep(.el-checkbox__label) {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+.module-name {
   font-size: 13px;
 }
-.retention-row :deep(.el-input-number) {
-  width: 92px;
+.module-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .time-input {
-  width: 120px !important;
+  width: 128px !important;
 }
-.dow-input {
+.day-input {
+  width: 128px;
+  margin-left: 8px;
+}
+.retention-input {
   width: 120px;
-  margin-right: 8px;
-}
-.cron-input {
-  width: 220px;
+  margin-left: 8px;
 }
 .filter-select {
   width: 150px;
-}
-.backup-rule {
-  margin-top: 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--color-card-2);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
 }
 .backup-pager {
   margin-top: 14px;
