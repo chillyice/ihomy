@@ -72,8 +72,8 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   const frameX = 0.012
   mask.fillRect(frameX, 0, 1 - 2 * frameX, 1)
   mask.globalCompositeOperation = 'destination-out'
-  const mullionWidth = 0.048
-  const transomHeight = 0.055
+  const mullionWidth = 0.072
+  const transomHeight = 0.0825
   mask.fillRect(0.5 - mullionWidth / 2, 0, mullionWidth, 1)
   mask.fillRect(0, 0.483 - transomHeight / 2, 1, transomHeight)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
