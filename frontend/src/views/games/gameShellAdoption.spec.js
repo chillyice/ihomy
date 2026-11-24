@@ -30,6 +30,7 @@ const MIGRATED = [
   'Match3Game.vue',
   'Minesweeper.vue',
   'PetLinkLink.vue',
+  'Pool.vue',
   'ReversiGame.vue',
   'Runway52.vue',
   'Snake.vue',

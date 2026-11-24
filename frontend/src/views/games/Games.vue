@@ -389,6 +389,13 @@ const builtinGames = [
     category: 'ARCADE',
   },
   {
+    key: 'pool',
+    titleKey: 'games.pool.title',
+    descKey: 'games.pool.desc',
+    path: '/games/pool',
+    category: 'CASUAL',
+  },
+  {
     key: 'mahjong',
     titleKey: 'games.mahjong.title',
     descKey: 'games.mahjong.desc',

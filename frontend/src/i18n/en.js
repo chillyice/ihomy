@@ -1940,6 +1940,24 @@ export default {
       buGang: 'Added kong',
       gangHint: 'You can kong this discard — kong or pass?',
     },
+    pool: {
+      title: 'Pool',
+      desc: 'Line up your shot and pocket all 15 balls in as few strokes as possible.',
+      rules:
+        'Pocket the 15 object balls in any order. The lowest stroke count wins. Pocketing the cue ball adds one penalty stroke. It returns to the table when the balls stop.',
+      controls:
+        'Tap or drag on the table to aim, set the power, then shoot. Use the left and right arrow keys to fine-tune your aim and Space to shoot.',
+      shots: 'Strokes',
+      cleared: 'Pocketed',
+      best: 'Personal best',
+      power: 'Power',
+      shoot: 'Shoot',
+      ready: 'Tap the table to aim',
+      rolling: 'Balls in motion',
+      scratch: 'Cue ball pocketed (+1 stroke)',
+      won: 'Table cleared',
+      aimLabel: 'Pool table aiming area',
+    },
     ludo: {
       title: 'Ludo',
       desc: 'Roll a 6 to take off, jump along your own color and ride the flight lanes — the first to bring all four planes home wins',
