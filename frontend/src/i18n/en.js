@@ -10,9 +10,7 @@ export default {
   windowDisplay,
   windowDesk: {
     title: 'The desk by the window',
-    enabled: 'Show paw prints and desk objects',
-    pawsEnabled: 'Show cat and dog paw prints',
-    pawHint: 'A trail of light gray paw prints appears every 3 minutes and pauses during fullscreen playback.',
+    pawToggle: 'Paw prints',
     hint: 'Objects sometimes rest in the margins or peek in from the edges on tablets. These preferences stay on this device.',
     bind: 'Open when an object is selected',
     chooseObject: 'Choose a desk object',

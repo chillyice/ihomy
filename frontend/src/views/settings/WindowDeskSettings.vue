@@ -4,8 +4,10 @@
     <div class="section-label">{{ $t('windowDesk.title') }}</div>
     <el-form label-position="top" class="settings-form">
       <el-form-item>
-        <el-switch v-model="desk.enabled" :aria-label="$t(switchLabel)" :active-text="$t(switchLabel)" />
-        <div class="share-tip">{{ $t('windowDesk.pawHint') }}</div>
+        <div class="setting-row">
+          <el-switch v-model="desk.enabled" :aria-label="$t('windowDesk.pawToggle')" />
+          <span class="setting-label">{{ $t('windowDesk.pawToggle') }}</span>
+        </div>
       </el-form-item>
       <template v-if="desk.enabled && showObjects">
         <div class="share-tip">{{ $t('windowDesk.hint') }}</div>
@@ -38,8 +40,7 @@ import { useAppStore } from '@/stores/app'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { DESK_DEFAULT_PATHS, DESK_DESTINATIONS, deskPathAllowed } from '@/utils/deskObjects'
 
-const props = defineProps({ showObjects: Boolean, embedded: Boolean })
-const switchLabel = computed(() => (props.showObjects ? 'windowDesk.enabled' : 'windowDesk.pawsEnabled'))
+defineProps({ showObjects: Boolean, embedded: Boolean })
 const desk = useWindowDeskStore()
 const app = useAppStore()
 const { isChild } = useDisplayMode()
@@ -68,6 +69,17 @@ const setTarget = (path) => desk.setDestination(kind.value, path === DESK_DEFAUL
   flex-wrap: wrap;
   gap: 8px;
   color: var(--color-text-secondary);
+}
+/* 开关 + 文案同一行:文案常显,关掉时也不会只剩一颗无名开关 */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.setting-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
 }
 .desk-bindings .el-select {
   width: 9em;

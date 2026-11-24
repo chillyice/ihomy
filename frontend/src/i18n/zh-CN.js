@@ -13,9 +13,7 @@ export default {
   windowDisplay,
   windowDesk: {
     title: '窗下桌面',
-    enabled: '显示爪印和桌边小物',
-    pawsEnabled: '显示猫狗爪印',
-    pawHint: '每 3 分钟出现一串淡灰色爪印，全屏播放时暂停。',
+    pawToggle: '踩一踩',
     hint: '桌边有空时会摆放小物。在平板上，小物会从页面边缘探出。摆放偏好保存在这台设备上。',
     bind: '点击物品时打开',
     chooseObject: '选择桌面物品',

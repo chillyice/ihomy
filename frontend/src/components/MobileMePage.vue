@@ -49,11 +49,6 @@
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
         <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
-      <div v-a11y-click class="me-row" @click="toggleLightEffect">
-        <span class="me-row-icon">✨</span>
-        <span class="me-row-text">{{ $t('mobile.lightEffect') }}</span>
-        <el-switch :model-value="lightEffectOn" size="small" />
-      </div>
       <div v-a11y-click class="me-row" @click="toggleLang">
         <span class="me-row-icon">🌐</span>
         <span class="me-row-text">{{ $t('mobile.language') }}</span>
@@ -95,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Check } from '@element-plus/icons-vue'
@@ -105,12 +100,10 @@ import { authApi } from '@/api'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { useMobileTabs } from '@/composables/useMobileTabs'
-import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const { locale, t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
-const sunLight = inject(SUN_LIGHT_KEY)
 const { openEditor } = useMobileTabs()
 
 const userInfo = computed(() => userStore.userInfo)
@@ -118,28 +111,8 @@ const themeStore = useThemeStore()
 const families = ref([])
 const showFamilySwitch = ref(false)
 
-const lightEffectOn = computed(() => sunLight?.shadowEnabled?.value ?? false)
-
 const toggleTheme = () => {
   themeStore.toggleMode()
-}
-// 光影总开关:关掉时级联关掉整组特效(云团/天气/台灯/毛玻璃),开时恢复。
-// 不能只切 shadowEnabled——那样会出现「总开关已关、其他特效仍在跑」(与 AppSidebar 同款开关踩过的坑)。
-// 注意:本处重新打开时不回置 glassEnabled(与 AppSidebar 的实现略有差异),改动时留意保持三端语义一致。
-const toggleLightEffect = () => {
-  if (sunLight?.shadowEnabled) {
-    sunLight.shadowEnabled.value = !sunLight.shadowEnabled.value
-    if (sunLight.shadowEnabled.value) {
-      sunLight.blobsEnabled.value = true
-      sunLight.weatherEffectEnabled.value = true
-      sunLight.lampMode.value = 'auto'
-    } else {
-      sunLight.blobsEnabled.value = false
-      sunLight.weatherEffectEnabled.value = false
-      sunLight.lampMode.value = 'off'
-      sunLight.glassEnabled.value = false
-    }
-  }
 }
 const toggleLang = () => {
   const next = locale.value === 'en' ? 'zh-CN' : 'en'

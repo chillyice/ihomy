@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deskLanes, pawTrailFits, placeDeskItems, placePawTrail, sampleDeskPlan } from './deskSpace'
+import { deskLanes, pawStepCount, pawTrailDelay, pawTrailFits, placeDeskItems, placePawTrail, sampleDeskPlan } from './deskSpace'
 
 const photos = Array.from({ length: 5 }, (_, i) => ({ kind: 'photo', key: i }))
 const large = deskLanes(1920, 900, 220, { left: 520, right: 1620 })
@@ -137,6 +137,42 @@ describe('window desk margins', () => {
     const trail = placePawTrail(lanes, objects, () => 0.4)
     expect(trail).toHaveLength(8)
     expect(pawTrailFits(trail, lanes, objects)).toBe(true)
+  })
+
+  it('randomises the step count as an even number between 4 and 12', () => {
+    expect(pawStepCount(() => 0)).toBe(4)
+    expect(pawStepCount(() => 0.99)).toBe(12)
+    const seq = (values) => {
+      let i = 0
+      return () => values[i++ % values.length]
+    }
+    // 座位/弯曲固定,第 7 个随机值决定步数
+    for (const roll of [0, 0.19, 0.2, 0.59, 0.99]) {
+      const trail = placePawTrail(large, [], seq([0.4, 0.4, 0.4, 0.4, 0.6, 0.4, roll]))
+      expect(trail.length % 2).toBe(0)
+      expect(trail.length).toBeGreaterThanOrEqual(4)
+      expect(trail.length).toBeLessThanOrEqual(12)
+    }
+  })
+
+  it('keeps every paw facing the way the steps walk, and flips the trail when it heads the other way', () => {
+    const seq = (values) => {
+      let i = 0
+      return () => values[i++ % values.length]
+    }
+    // 第 6 个随机值决定走向:0.6 往下走、0.4 往上走
+    const down = placePawTrail(large, [], seq([0.4, 0.4, 0.4, 0.4, 0.6, 0.6, 0.4]))
+    const up = placePawTrail(large, [], seq([0.4, 0.4, 0.4, 0.4, 0.6, 0.4, 0.4]))
+    expect(down.length).toBeGreaterThan(0)
+    expect(up.length).toBeGreaterThan(0)
+    expect(Math.min(...down.map(({ angle }) => Math.abs(angle)))).toBeGreaterThan(150)
+    expect(Math.max(...up.map(({ angle }) => Math.abs(angle)))).toBeLessThan(30)
+  })
+
+  it('waits at least five random minutes between two trails', () => {
+    expect(pawTrailDelay(() => 0)).toBe(5 * 60_000)
+    expect(pawTrailDelay(() => 0.5)).toBe(7.5 * 60_000)
+    expect(pawTrailDelay(() => 0.99)).toBeLessThanOrEqual(10 * 60_000)
   })
 
   it.each([

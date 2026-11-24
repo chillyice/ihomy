@@ -15,9 +15,8 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
-import { DESK_FLOATS, deskLanes, pawTrailFits, placePawTrail } from '@/utils/deskSpace'
+import { DESK_FLOATS, deskLanes, pawTrailDelay, pawTrailFits, placePawTrail } from '@/utils/deskSpace'
 
-const INTERVAL = 3 * 60_000
 const PLAYBACK = '.photo-viewer,.el-image-viewer__wrapper,.pc-overlay,.ss,.call-overlay,.morning-overlay'
 const OBSTACLES = [DESK_FLOATS, '.app-sidebar', '.window-rail', '.desk-object', '[role="dialog"]'].join(',')
 const steps = shallowRef([])
@@ -73,13 +72,24 @@ function showTrail() {
     attributes: true,
     attributeFilter: ['class', 'style', 'hidden', 'open'],
   })
-  fadeTimer = setTimeout(clearTrail, 4800)
+  // 末尾一步要跑完 3.8s 的落爪动画再收,步数越多等得越久(最多 12 步)
+  const lastDelay = trail[trail.length - 1]?.delay ?? 0
+  fadeTimer = setTimeout(clearTrail, lastDelay * 1000 + 4000)
+}
+
+function schedule() {
+  clearTimeout(timer)
+  // 每次出现后重新掷一次间隔(≥5 分钟),不做固定节拍
+  timer = setTimeout(() => {
+    showTrail()
+    schedule()
+  }, pawTrailDelay())
 }
 
 function restart() {
-  clearInterval(timer)
+  clearTimeout(timer)
   clearTrail()
-  if (!document.hidden && !reduced.matches) timer = setInterval(showTrail, INTERVAL)
+  if (!document.hidden && !reduced.matches) schedule()
 }
 
 onMounted(() => {
@@ -94,7 +104,7 @@ onMounted(() => {
   restart()
 })
 onBeforeUnmount(() => {
-  clearInterval(timer)
+  clearTimeout(timer)
   clearTrail()
   reduced.removeEventListener('change', restart)
   document.removeEventListener('visibilitychange', restart)

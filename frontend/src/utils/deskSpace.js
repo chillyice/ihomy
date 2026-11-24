@@ -169,10 +169,21 @@ export function placeDeskItems(items, plan, lanes, obstacles, cards = []) {
   return result.length === 2 ? spreadDeskPair(result, plan, lanes, obstacles, cards) : result
 }
 
-// 一串爪印的步数与步距:8 步、横向 0.2 / 纵向 0.44 个物件尺寸(间距是旧版的两倍)。
-const PAW_STEPS = 8
+// 一串爪印的步距:横向 0.2 / 纵向 0.44 个物件尺寸(间距是旧版的两倍)。
 const PAW_STEP_X = 0.2
 const PAW_STEP_Y = 0.44
+
+// 步数 4–12 的偶数随机:猫狗四只脚交替落地,奇数会落成「单脚」
+export function pawStepCount(random = Math.random) {
+  return 4 + 2 * Math.floor(random() * 5)
+}
+
+// 两串爪印之间至少 5 分钟,再随机加 0–5 分钟,避免固定节拍
+export const PAW_MIN_INTERVAL = 5 * 60_000
+
+export function pawTrailDelay(random = Math.random) {
+  return PAW_MIN_INTERVAL + random() * PAW_MIN_INTERVAL
+}
 
 export function placePawTrail(lanes, obstacles, random = Math.random) {
   const slot = { side: Math.floor(random() * 2), u: random(), v: random() }
@@ -187,18 +198,26 @@ export function placePawTrail(lanes, obstacles, random = Math.random) {
   const curve = (random() - 0.5) * 2 * seats[0].size * 0.16
   const turning = random() < 0.5 ? 1 : -1
   const vertical = random() < 0.5 ? 1 : -1
-  const middle = (PAW_STEPS - 1) / 2
-  const build = (seat, bend, side, up) =>
-    Array.from({ length: PAW_STEPS }, (_, i) => {
-      const k = i / middle
-      const drift = Math.sin((k * Math.PI) / 2) * bend
+  const steps = pawStepCount(random)
+  const middle = (steps - 1) / 2
+  const build = (seat, bend, side, up) => {
+    // 先算中轴上的落点,再左右交替偏移成两只脚的脚印
+    const center = Array.from({ length: steps }, (_, i) => ({
+      x: seat.x + Math.sin((i / middle) * (Math.PI / 2)) * bend,
+      y: seat.y + (middle - i) * seat.size * PAW_STEP_Y * up,
+    }))
+    return center.map((point, i) => {
+      const prev = center[i - 1] ?? point
+      const next = center[i + 1] ?? point
       return {
-        x: Math.round(seat.x + (i % 2 ? 1 : -1) * seat.size * PAW_STEP_X * side + drift),
-        y: Math.round(seat.y + (middle - i) * seat.size * PAW_STEP_Y * up),
-        angle: side * 19 + Math.round((drift / seat.size) * 90),
+        x: Math.round(point.x + (i % 2 ? 1 : -1) * seat.size * PAW_STEP_X * side),
+        y: Math.round(point.y),
+        // 爪尖朝向跟脚步同向:取相邻两步的切线,0° 朝上,往回走时整串翻过来
+        angle: Math.round((Math.atan2(next.x - prev.x, prev.y - next.y) * 180) / Math.PI),
         delay: Math.round(i * 0.18 * 100) / 100,
       }
     })
+  }
   // 弯着的放不下(窄边/桌沿被占)就退回直串;横向翻不进去再试纵向翻转
   const attempts = [
     [curve, turning, vertical],
