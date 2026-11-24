@@ -80,6 +80,36 @@
       <rect x="9.7" y="6" width="12.6" height="17.5" rx="1.3" fill="var(--icon-paper)" />
       <path d="M13.7 26.1h4.5m-5.9-8.5 7.4-7.4m-5.2 8.5 4.1-4.1" />
     </g>
+    <g v-else-if="name === 'dawn'">
+      <path d="M16 3v3m8.8.8-2 2.2m5.7 6.7h-3.1m-20.8 0H2.9m3.7-9 2.2 2.2" />
+      <circle cx="16" cy="16" r="7" fill="var(--icon-honey)" />
+      <path d="M3.3 20.8q5-2.8 11.6-.8 7.1 2.3 13.8-1.6l-.6 5q-5.3 3.2-13 1Q8.4 22.2 4.3 25Z" fill="var(--icon-sage)" />
+    </g>
+    <g v-else-if="name === 'dusk'">
+      <path d="M18.4 4.2A11.7 11.7 0 1 0 27.1 21a10.5 10.5 0 0 1-8.7-16.8Z" fill="var(--icon-honey)" />
+      <path d="m24.7 5.3 1.1 3.3 3.2 1.2-3.2 1.1-1.1 3.3-1.2-3.3-3.1-1.1 3.1-1.2Z" fill="var(--icon-paper)" />
+    </g>
+    <g v-else-if="name === 'language'">
+      <path d="M23 3.8A12 12 0 0 1 10.3 24m5.5.9v2.5m-6 1.1q6.1-2.4 12.1 0Z" fill="var(--icon-honey)" />
+      <g transform="rotate(-18 15.5 13.4)">
+        <circle cx="15.5" cy="13.4" r="9.5" fill="var(--icon-sage)" />
+        <ellipse cx="15.5" cy="13.4" rx="4" ry="9.4" />
+        <path d="M6 13.4h19" />
+      </g>
+    </g>
+    <g v-else-if="name === 'settings'" transform="rotate(-5 16 16)">
+      <rect x="5" y="4" width="22" height="24" rx="3" fill="var(--icon-paper)" />
+      <path d="M9 10.5h14m-14 5.7h14m-14 5.7h14" />
+      <circle cx="12" cy="10.5" r="2.3" fill="var(--icon-clay)" />
+      <circle cx="20" cy="16.2" r="2.3" fill="var(--icon-honey)" />
+      <circle cx="14" cy="21.9" r="2.3" fill="var(--icon-sage)" />
+    </g>
+    <g v-else-if="name === 'members'">
+      <circle cx="21.5" cy="10.3" r="4.3" fill="var(--icon-honey)" />
+      <path d="M14.4 25.8v-3.1c.3-4.3 2.7-7.1 7.2-7.1s7.2 3.3 7.3 7.5v2.7Z" fill="var(--icon-sage)" />
+      <circle cx="11.5" cy="12.2" r="4.8" fill="var(--icon-paper)" />
+      <path d="M3.2 27.7v-2.4c.2-4.8 3.7-7.6 8.3-7.6s8.1 2.8 8.3 7.6v2.4Z" fill="var(--icon-clay)" />
+    </g>
   </svg>
 </template>
 

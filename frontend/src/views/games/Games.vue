@@ -79,10 +79,7 @@
     <div v-if="activeCategory" v-loading="loading" class="tool-grid">
       <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
       <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card paper-surface" @click="$router.push(b.path)">
-        <div v-if="b.icon" class="tool-icon">
-          <el-icon :size="30"><component :is="b.icon" /></el-icon>
-        </div>
-        <GameIcon v-else :code="b.key" class="builtin-icon" />
+        <GameIcon :code="b.key" class="builtin-icon" />
         <div class="tool-name">{{ $t(b.titleKey) }}</div>
         <div class="tool-desc">{{ $t(b.descKey) }}</div>
         <div class="tool-meta">
@@ -254,11 +251,6 @@ import {
   MagicStick,
   Collection,
   Promotion,
-  Flag,
-  GoldMedal,
-  Star,
-  Grape,
-  Compass,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -316,25 +308,15 @@ watch(activeCategory, (v) => {
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
 
-/** 开源小游戏卡片的图标(玩法已本地化,元数据仍见 utils/games/embeddedGames.js) */
-const EMBEDDED_ICONS = {
-  xiangqi: Flag,
-  reversi: GoldMedal,
-  match3: Star,
-  bubble: Grape,
-  'space-cadet': Promotion,
-  trex: Compass,
-}
 const embeddedEntries = EMBEDDED_GAMES.map((g) => ({
-  key: `embed-${g.slug}`,
+  key: g.slug,
   titleKey: g.titleKey,
   descKey: g.descKey,
-  icon: EMBEDDED_ICONS[g.slug] || MagicStick,
   path: `/games/embed/${g.slug}`,
   category: g.category,
 }))
 
-/** 自研游戏的 key 同时对应暖居图标文件名。 */
+/** 固定入口的 key 同时对应暖居图标文件名。 */
 const builtinGames = [
   {
     key: 'garden',

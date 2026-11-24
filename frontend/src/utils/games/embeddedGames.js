@@ -1,4 +1,4 @@
-// 站内开源小游戏的卡片元数据(slug/标题/描述/分类):新增一款 = 这里加一行 + i18n 两条文案。
+// 站内开源小游戏的卡片元数据。新增时同步 i18n 文案与 assets/games/icons/{slug}.svg。
 // 玩法分两种:中国象棋/黑白棋/消消乐/泡泡龙/小恐龙已本地化为 Vue 组件(`views/games/embedded/`,
 // 引擎在 utils/games/,精灵与音效在 src/assets/games/),走统一游戏外壳;
 // 只保留三维弹球·太空军校生为整包静态页(`public/mini-games/space-cadet/`)站内 iframe 直跑——

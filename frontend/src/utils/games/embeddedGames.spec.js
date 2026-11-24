@@ -14,6 +14,13 @@ describe('embeddedGames', () => {
     }
   })
 
+  it('has a game icon for every catalog entry', () => {
+    const artwork = import.meta.glob('/src/assets/games/icons/*.svg')
+    for (const { slug } of EMBEDDED_GAMES) {
+      expect(Object.hasOwn(artwork, `/src/assets/games/icons/${slug}.svg`), slug).toBe(true)
+    }
+  })
+
   it('builds a same-origin static path instead of an external url', () => {
     // 末尾带不带 `?v=` 都算对:版本号由构建注入,测试环境里可能为空
     expect(embeddedGameSrc('space-cadet')).toMatch(/^\/mini-games\/space-cadet\/index\.html(\?v=.+)?$/)

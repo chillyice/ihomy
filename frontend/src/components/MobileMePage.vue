@@ -18,7 +18,8 @@
     <!-- 家庭切换 -->
     <div v-if="userStore.isLoggedIn && families.length > 1" class="me-section paper-surface">
       <div v-a11y-click class="me-row" @click="showFamilySwitch = !showFamilySwitch">
-        <span class="me-row-icon">🔄</span>
+        <SettingsIcon v-if="isWarm" name="family" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">🔄</span>
         <span class="me-row-text">{{ $t('nav.switchFamily') }}</span>
         <el-icon class="me-row-arrow" :class="{ open: showFamilySwitch }"><ArrowRight /></el-icon>
       </div>
@@ -45,17 +46,20 @@
     <!-- 设置区 -->
     <div class="me-section paper-surface">
       <div v-a11y-click class="me-row" @click="toggleTheme">
-        <span class="me-row-icon">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
+        <SettingsIcon v-if="isWarm" :name="themeStore.isDusk ? 'dusk' : 'dawn'" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
         <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
       <div v-a11y-click class="me-row" @click="toggleLang">
-        <span class="me-row-icon">🌐</span>
+        <SettingsIcon v-if="isWarm" name="language" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">🌐</span>
         <span class="me-row-text">{{ $t('mobile.language') }}</span>
         <span class="me-row-value">{{ locale === 'en' ? 'EN' : '中' }}</span>
       </div>
       <div v-a11y-click class="me-row" @click="openEditor">
-        <span class="me-row-icon">📱</span>
+        <SettingsIcon v-if="isWarm" name="client" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">📱</span>
         <span class="me-row-text">{{ $t('mobile.tabEditTitle') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
@@ -64,17 +68,20 @@
     <!-- 功能入口 -->
     <div class="me-section paper-surface">
       <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/settings')">
-        <span class="me-row-icon">⚙️</span>
+        <SettingsIcon v-if="isWarm" name="settings" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">⚙️</span>
         <span class="me-row-text">{{ $t('nav.settings') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
       <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/member')">
-        <span class="me-row-icon">👥</span>
+        <SettingsIcon v-if="isWarm" name="members" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">👥</span>
         <span class="me-row-text">{{ $t('mobile.members') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
       <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push({ path: '/settings', query: { tab: 'profile' } })">
-        <span class="me-row-icon">👤</span>
+        <SettingsIcon v-if="isWarm" name="profile" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">👤</span>
         <span class="me-row-text">{{ $t('settings.profile') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
@@ -100,6 +107,7 @@ import { authApi } from '@/api'
 import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { useMobileTabs } from '@/composables/useMobileTabs'
+import SettingsIcon from '@/views/settings/SettingsIcon.vue'
 
 const { locale, t } = useI18n()
 const appStore = useAppStore()
@@ -108,6 +116,7 @@ const { openEditor } = useMobileTabs()
 
 const userInfo = computed(() => userStore.userInfo)
 const themeStore = useThemeStore()
+const isWarm = computed(() => themeStore.theme === 'warm')
 const families = ref([])
 const showFamilySwitch = ref(false)
 
@@ -251,6 +260,10 @@ html.dark .me-row:active {
   width: 24px;
   text-align: center;
   transition: transform 0.18s var(--ease-spring);
+}
+svg.me-row-icon {
+  width: 28px;
+  height: 28px;
 }
 .me-row:active .me-row-icon {
   transform: scale(0.88);
