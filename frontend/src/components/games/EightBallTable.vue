@@ -1,27 +1,27 @@
 <template>
   <GameShell
-    :title="$t(prefix + 'title')"
+    :title="$t('games.eightBall.title')"
     :new-game="!online"
-    :new-game-confirm="shots > 0 && phase !== 'won'"
+    :new-game-confirm="game.shots > 0 && phase !== 'won'"
     :room-mode="online"
     :default-wide="online"
     @new-game="newGame"
     @back="goBack"
   >
     <template #rules>
-      <p>{{ $t(prefix + 'rules') }}</p>
-      <p>{{ $t(prefix + 'controls') }}</p>
+      <p>{{ $t('games.eightBall.rules') }}</p>
+      <p>{{ $t('games.eightBall.controls') }}</p>
     </template>
     <template v-if="!room?.watching" #settings>
       <label class="pool-power">
-        <span>{{ $t('games.pool.power') }}</span>
+        <span>{{ $t('games.eightBall.power') }}</span>
         <input
           v-model.number="power"
           type="range"
           min="5"
           max="100"
           step="1"
-          :aria-label="$t('games.pool.power')"
+          :aria-label="$t('games.eightBall.power')"
           :aria-valuetext="power + '%'"
           :disabled="!canAct"
           @input="redraw"
@@ -30,29 +30,13 @@
       </label>
     </template>
     <template v-if="!room?.watching" #actions>
-      <el-button v-if="eightBall && !online" :loading="openingRoom" @click="$emit('onlinePlay')">{{
-        $t('games.eightBall.onlinePlay')
-      }}</el-button>
+      <el-button v-if="!online" :loading="openingRoom" @click="$emit('onlinePlay')">{{ $t('games.eightBall.onlinePlay') }}</el-button>
       <el-button v-if="canAct && game.ballInHand" :aria-pressed="placing" @click="togglePlace">
         {{ $t(placing ? 'games.eightBall.shootMode' : 'games.eightBall.placeMode') }}
       </el-button>
-      <el-button type="primary" :disabled="!canAct || placing" @click="shoot">{{ $t('games.pool.shoot') }}</el-button>
+      <el-button type="primary" :disabled="!canAct || placing" @click="shoot">{{ $t('games.eightBall.shoot') }}</el-button>
     </template>
-    <template v-if="!eightBall" #stats>
-      <span class="gh-chip"
-        ><span>{{ $t('games.pool.shots') }}</span
-        ><b>{{ shots }}</b></span
-      >
-      <span class="gh-chip"
-        ><span>{{ $t('games.pool.cleared') }}</span
-        ><b>{{ cleared }} / 15</b></span
-      >
-      <span class="gh-chip"
-        ><span>{{ $t('games.pool.best') }}</span
-        ><b>{{ best || '—' }}</b></span
-      >
-    </template>
-    <template v-else #stats>
+    <template #stats>
       <span
         v-for="(label, seat) in names"
         :key="seat"
@@ -67,7 +51,7 @@
       </span>
     </template>
 
-    <div class="pool-stage" :class="{ 'is-match': eightBall }">
+    <div class="pool-stage">
       <div ref="table" class="pool-table">
         <canvas ref="cloth" class="pool-cloth" aria-hidden="true"></canvas>
         <canvas
@@ -76,8 +60,8 @@
           :class="{ 'can-aim': canAct }"
           role="application"
           tabindex="0"
-          :aria-label="$t('games.pool.aimLabel')"
-          :aria-description="$t(prefix + 'controls')"
+          :aria-label="$t('games.eightBall.aimLabel')"
+          :aria-description="$t('games.eightBall.controls')"
           @pointerdown="beginAim"
           @pointermove="moveAim"
           @pointerup="endAim"
@@ -89,15 +73,14 @@
         <div v-if="phase === 'won' || roomEnded" class="pool-result game-overlay">
           <div class="game-overlay-card">
             <strong class="game-overlay-title">{{ resultTitle }}</strong>
-            <div v-if="!eightBall" class="game-overlay-meta">{{ $t('games.pool.shots') }} · {{ shots }}</div>
-            <div v-else-if="game.winner != null" class="game-overlay-meta">{{ $t(prefix + game.lastResult) }}</div>
+            <div v-if="game.winner != null" class="game-overlay-meta">{{ $t('games.eightBall.' + game.lastResult) }}</div>
             <el-button v-if="online" type="primary" round @click="goBack">{{ $t('games.room.backRoom') }}</el-button>
             <el-button v-else type="primary" round @click="newGame">{{ $t('games.newGame') }}</el-button>
           </div>
         </div>
       </div>
       <div class="pool-status" role="status" aria-live="polite">
-        <strong v-if="eightBall && (!room || room.ready) && !roomEnded && phase !== 'won'"
+        <strong v-if="(!room || room.ready) && !roomEnded && phase !== 'won'"
           >{{ $t('games.eightBall.turn', { player: names[game.player] }) }} ·
         </strong>
         {{ caption }}
@@ -112,7 +95,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import GameShell from '@/components/games/GameShell.vue'
 import { useEightBallRoom } from '@/composables/useEightBallRoom'
-import { createPoolGame, restorePoolGame, shootPool, stepPool } from '@/utils/games/pool'
 import {
   createEightBallGame,
   restoreEightBallGame,
@@ -123,43 +105,32 @@ import {
 } from '@/utils/games/eightBall'
 import { drawPlay, drawTable, prepareCanvas, tablePoint } from './poolCanvas'
 
-const props = defineProps({ eightBall: Boolean, openingRoom: Boolean })
+defineProps({ openingRoom: Boolean })
 defineEmits(['onlinePlay'])
 const { t } = useI18n()
 const route = useRoute()
-const online = props.eightBall && Number(route.query.room) > 0
-const prefix = props.eightBall ? 'games.eightBall.' : 'games.pool.'
-const createGame = props.eightBall ? createEightBallGame : createPoolGame
-const restoreGame = props.eightBall ? restoreEightBallGame : restorePoolGame
-const shootBall = props.eightBall ? shootEightBall : shootPool
-const stepBall = props.eightBall ? stepEightBall : stepPool
-const STATE_KEY = props.eightBall ? 'ihomy:games:eight-ball:state:v1' : 'ihomy:games:pool:state:v1'
-const BEST_KEY = 'ihomy:games:pool:best:v1'
+const online = Number(route.query.room) > 0
+const STATE_KEY = 'ihomy:games:eight-ball:state:v1'
 const router = useRouter()
 const table = ref(null)
 const cloth = ref(null)
 const surface = ref(null)
 const power = ref(80)
-const status = ref('ready')
-const best = ref(0)
 const placing = ref(false)
 const invalidPlace = ref(false)
 
 // Keep moving balls outside Vue's render loop. The UI only observes scoring and turn changes.
-const game = shallowRef(createGame())
+const game = shallowRef(createEightBallGame())
 let angle = 0
 let drawing = null
 let resizeObserver = null
 let frame = 0
 let lastTime = 0
 let aimPointer = null
-let penaltiesAtShot = 0
 let candidate = null
 
 const room = online ? useEightBallRoom({ getGame: () => game.value, applyState, applyShot, applyPlacement }) : null
 const phase = computed(() => game.value.phase)
-const shots = computed(() => game.value.shots + (props.eightBall ? 0 : game.value.penalties))
-const cleared = computed(() => game.value.balls.filter((ball) => ball.id && ball.pocketed).length)
 const names = computed(() => [0, 1].map((seat) => room?.names[seat] || t('games.eightBall.player' + (seat + 1))))
 const remaining = computed(() =>
   game.value.groups.map(
@@ -169,7 +140,6 @@ const remaining = computed(() =>
 const roomEnded = computed(() => !!(room?.play.ended || room?.play.gone))
 const canAct = computed(() => phase.value === 'ready' && (!room || (room.ready && room.canAct && !roomEnded.value)))
 const resultTitle = computed(() => {
-  if (!props.eightBall) return t('games.pool.won')
   const winnerId = room?.play.room?.winnerId
   if (winnerId != null) {
     const member = room.play.members.find((m) => String(m.userId) === String(winnerId))
@@ -179,14 +149,13 @@ const resultTitle = computed(() => {
   return t('games.room.status.finished')
 })
 const caption = computed(() => {
-  if (!props.eightBall) return t('games.pool.' + status.value)
   if (roomEnded.value || phase.value === 'won') return resultTitle.value
-  if (room && !room.ready) return t(prefix + 'waiting')
+  if (room && !room.ready) return t('games.eightBall.waiting')
   let key = game.value.lastResult || 'breakShot'
-  if (phase.value === 'rolling') return t('games.pool.rolling')
+  if (phase.value === 'rolling') return t('games.eightBall.rolling')
   if (invalidPlace.value) key = 'placementInvalid'
-  if (room?.watching) return t(prefix + 'watching') + ' · ' + t(prefix + key)
-  return t(prefix + key)
+  const message = t('games.eightBall.' + key)
+  return room?.watching ? t('games.eightBall.watching') + ' · ' + message : message
 })
 
 function goBack() {
@@ -198,32 +167,19 @@ function saveTable() {
   if (online) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(game.value))
-    if (!props.eightBall && phase.value === 'won') {
-      const previous = readBest()
-      if (previous > 0) best.value = Math.min(previous, best.value)
-      localStorage.setItem(BEST_KEY, String(best.value))
-    }
   } catch {
     // Play can continue with storage disabled.
   }
 }
 
-function readBest() {
-  const score = Number(localStorage.getItem(BEST_KEY))
-  return Number.isSafeInteger(score) && score > 0 ? score : 0
-}
-
 function restoreTable() {
   if (online) return
   try {
-    if (!props.eightBall) best.value = readBest()
-    const saved = restoreGame(JSON.parse(localStorage.getItem(STATE_KEY)))
+    const saved = restoreEightBallGame(JSON.parse(localStorage.getItem(STATE_KEY)))
     if (saved) applyState(saved)
   } catch {
     // An unreadable snapshot starts a fresh table.
   }
-  if (!props.eightBall && phase.value === 'won') best.value = best.value ? Math.min(best.value, shots.value) : shots.value
-  status.value = phase.value
 }
 
 function redraw() {
@@ -248,7 +204,7 @@ function resizeTable() {
 
 function newGame() {
   if (online) return
-  applyState(createGame())
+  applyState(createEightBallGame())
   saveTable()
 }
 
@@ -262,14 +218,13 @@ function applyState(next) {
   candidate = null
   invalidPlace.value = false
   game.value = next
-  status.value = 'ready'
   redraw()
 }
 
 function animate(now) {
   const dt = Math.min(0.06, Math.max(0, (now - lastTime) / 1000))
   lastTime = now
-  stepBall(game.value, dt)
+  stepEightBall(game.value, dt)
   redraw()
   if (game.value.phase === 'rolling') {
     frame = requestAnimationFrame(animate)
@@ -278,12 +233,6 @@ function animate(now) {
   frame = 0
   placing.value = !!game.value.ballInHand
   triggerRef(game)
-  if (!props.eightBall && phase.value === 'won') {
-    best.value = best.value ? Math.min(best.value, shots.value) : shots.value
-    status.value = 'won'
-  } else {
-    status.value = game.value.penalties > penaltiesAtShot ? 'scratch' : 'ready'
-  }
   if (room) room.settled()
   else saveTable()
   redraw()
@@ -296,15 +245,13 @@ function shoot() {
 }
 
 function applyShot(direction, force) {
-  if (!shootBall(game.value, direction, force)) return false
+  if (!shootEightBall(game.value, direction, force)) return false
   angle = direction
   aimPointer = null
   candidate = null
   placing.value = false
   invalidPlace.value = false
-  penaltiesAtShot = game.value.penalties
   triggerRef(game)
-  status.value = 'rolling'
   lastTime = performance.now()
   redraw()
   frame = requestAnimationFrame(animate)
@@ -447,15 +394,12 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 .pool-stage {
-  --caption-space: 27px;
+  --caption-space: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   width: min(100cqw, calc((100cqh - var(--caption-space)) * 864 / 464));
-}
-.pool-stage.is-match {
-  --caption-space: 48px;
 }
 .pool-seat {
   min-width: 0;

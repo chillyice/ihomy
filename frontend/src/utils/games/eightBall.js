@@ -1,4 +1,4 @@
-import { canPlacePoolBall, createPoolGame, respotPoolBall, restoreSettledPoolTable, shootPool, stepPool } from './pool.js'
+import { canPlacePoolBall, createPoolTable, respotPoolBall, restoreSettledPoolTable, shootPool, stepPool } from './pool.js'
 
 const FOUL_RESULTS = ['foulScratch', 'foulBreak', 'foulContact', 'foulRail']
 const TURN_RESULTS = ['continue', 'switch', ...FOUL_RESULTS]
@@ -11,7 +11,9 @@ function groupOf(id) {
 
 export function createEightBallGame() {
   return {
-    ...createPoolGame(),
+    ...createPoolTable(),
+    // V1 saved tables and room packets include the number of cue-ball scratches.
+    penalties: 0,
     player: 0,
     groups: [null, null],
     ballInHand: false,
@@ -25,6 +27,9 @@ export function restoreEightBallGame(saved) {
   const table = restoreSettledPoolTable(saved)
   if (
     !table ||
+    !Number.isSafeInteger(saved.penalties) ||
+    saved.penalties < 0 ||
+    saved.penalties > saved.shots ||
     ![0, 1].includes(saved.player) ||
     typeof saved.ballInHand !== 'boolean' ||
     !Array.isArray(saved.groups) ||
@@ -66,6 +71,7 @@ export function restoreEightBallGame(saved) {
     return null
   return {
     ...table,
+    penalties: saved.penalties,
     player: saved.player,
     groups: [a, b],
     ballInHand: saved.ballInHand,
@@ -135,7 +141,10 @@ export function ruleEightBallShot(game, targets, events) {
 export function stepEightBall(game, seconds) {
   if (game.phase !== 'rolling') return
   const { targets, events } = game.stroke
-  stepPool(game, seconds, (type, id) => events.push({ type, id }))
+  stepPool(game, seconds, (type, id) => {
+    events.push({ type, id })
+    if (type === 'pocket' && id === 0) game.penalties++
+  })
   if (game.phase === 'rolling') return
   if (game.shots === 1 && game.balls[8].pocketed) respotPoolBall(game.balls, 8)
   Object.assign(game, ruleEightBallShot(game, targets, events))

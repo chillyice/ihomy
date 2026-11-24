@@ -1,4 +1,4 @@
-import { BALL_RADIUS, CUSHIONS, POCKETS, TABLE_HEIGHT, TABLE_WIDTH, tracePoolBoundary } from '@/utils/games/pool'
+import { BALL_RADIUS, CUSHIONS, POCKETS, TABLE_HEIGHT, TABLE_WIDTH, tracePoolBoundary } from '@/utils/games/poolGeometry'
 
 // Canvas coordinates use the engine's playing surface. The extra margin holds the rails.
 const PAD = 32

@@ -22,7 +22,7 @@ function makeBall(id, x, y) {
   return { id, x, y, vx: 0, vy: 0, pocketed: false }
 }
 
-export function createPoolGame() {
+export function createPoolTable() {
   const balls = [makeBall(0, HEAD_SPOT.x, HEAD_SPOT.y)]
   const spacing = DIAMETER + 0.08
   for (let column = 0; column < 5; column++) {
@@ -32,7 +32,7 @@ export function createPoolGame() {
     }
   }
   balls.sort((a, b) => a.id - b.id)
-  return { balls, shots: 0, penalties: 0, phase: 'ready', remainder: 0 }
+  return { balls, shots: 0, phase: 'ready', remainder: 0 }
 }
 
 // Only a settled table can be resumed. Rebuild the balls so a stored object
@@ -43,9 +43,6 @@ export function restoreSettledPoolTable(saved) {
     !['ready', 'won'].includes(saved.phase) ||
     !Number.isSafeInteger(saved.shots) ||
     saved.shots < 0 ||
-    !Number.isSafeInteger(saved.penalties) ||
-    saved.penalties < 0 ||
-    saved.penalties > saved.shots ||
     !Array.isArray(saved.balls) ||
     saved.balls.length !== 16
   )
@@ -75,13 +72,7 @@ export function restoreSettledPoolTable(saved) {
     balls[ball.id] = { ...makeBall(ball.id, ball.x, ball.y), pocketed: ball.pocketed }
   }
   if (balls[0].pocketed) return null
-  return { balls, shots: saved.shots, penalties: saved.penalties, phase: saved.phase, remainder: 0 }
-}
-
-export function restorePoolGame(saved) {
-  const game = restoreSettledPoolTable(saved)
-  if (!game || game.balls.slice(1).every((b) => b.pocketed) !== (game.phase === 'won')) return null
-  return game
+  return { balls, shots: saved.shots, phase: saved.phase, remainder: 0 }
 }
 
 export function shootPool(game, angle, power) {
@@ -206,11 +197,11 @@ function advanceToContacts(game, onEvent) {
     }
     if (!ball) break
     if (boundary) {
-      applyPoolBoundaryHit(ball, boundary, game, onEvent)
+      applyPoolBoundaryHit(ball, boundary, onEvent)
     } else {
       collide(ball, other, onEvent)
-      resolvePoolBoundaryOverlap(ball, game, onEvent)
-      resolvePoolBoundaryOverlap(other, game, onEvent)
+      resolvePoolBoundaryOverlap(ball, onEvent)
+      resolvePoolBoundaryOverlap(other, onEvent)
     }
   }
   // At the contact cap leave the balls at their last resolved positions. Rolling
@@ -236,7 +227,7 @@ function tick(game, onEvent) {
   }
   if (!moving) {
     if (balls[0].pocketed) respotPoolBall(balls, 0)
-    game.phase = balls.slice(1).every((ball) => ball.pocketed) ? 'won' : 'ready'
+    game.phase = 'ready'
     game.remainder = 0
   }
 }

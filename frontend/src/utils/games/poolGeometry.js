@@ -161,13 +161,12 @@ export function tracePoolBoundary(x, y, dx, dy, maxDistance = Infinity) {
   return hit
 }
 
-export function applyPoolBoundaryHit(ball, hit, game, onEvent) {
+export function applyPoolBoundaryHit(ball, hit, onEvent) {
   if (ball.pocketed) return
   if (hit.type === 'pocket') {
     ball.vx = 0
     ball.vy = 0
     ball.pocketed = true
-    if (ball.id === 0) game.penalties++
     onEvent?.('pocket', ball.id)
     return
   }
@@ -181,7 +180,7 @@ export function applyPoolBoundaryHit(ball, hit, game, onEvent) {
 
 // Pair-separation corrections can push a disk a fraction into a facing or
 // across the drop line. Resolve this separately from free-flight raycasts.
-export function resolvePoolBoundaryOverlap(ball, game, onEvent) {
+export function resolvePoolBoundaryOverlap(ball, onEvent) {
   if (ball.pocketed || innerBed(ball.x, ball.y, R)) return
   for (const s of faces) {
     const { dx, dy, distance } = nearestOnSegment(s, ball.x, ball.y)
@@ -190,7 +189,7 @@ export function resolvePoolBoundaryOverlap(ball, game, onEvent) {
     const ny = distance > EPS ? dy / distance : s.ny
     ball.x += nx * (R - distance)
     ball.y += ny * (R - distance)
-    applyPoolBoundaryHit(ball, { type: 'rail', nx, ny }, game, onEvent)
+    applyPoolBoundaryHit(ball, { type: 'rail', nx, ny }, onEvent)
   }
-  if (pastThroat(ball.x, ball.y)) applyPoolBoundaryHit(ball, { type: 'pocket' }, game, onEvent)
+  if (pastThroat(ball.x, ball.y)) applyPoolBoundaryHit(ball, { type: 'pocket' }, onEvent)
 }

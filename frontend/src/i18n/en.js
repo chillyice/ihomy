@@ -1992,7 +1992,8 @@ export default {
       desc: 'Share a table or play in a room. Clear your solids or stripes, then pocket the 8-ball.',
       rules:
         'On the break, pocket a ball or drive four different object balls to a rail. The break leaves the table open. An 8-ball made on the break is spotted again. The first solid or stripe pocketed on a legal shot after the break sets the groups. Hit a legal object ball first, then pocket a ball or reach a rail. Pocketing your own ball keeps your turn. A foul gives your opponent ball in hand anywhere on the table. After clearing your group, legally pocket the 8-ball on a later shot to win. Any pocket counts. An early 8-ball or a foul on the shot that pockets it loses the game.',
-      controls: 'Tap or drag to aim, set the power, then shoot. With ball in hand, tap a clear spot to place the cue ball before aiming.',
+      controls:
+        'Tap or drag to aim, set the power, then shoot. Use the left and right arrow keys to fine-tune your aim and Space to shoot. With ball in hand, tap a clear spot to place the cue ball before aiming.',
       player1: 'Player 1',
       player2: 'Player 2',
       turn: '{player} to shoot',
@@ -2018,24 +2019,10 @@ export default {
       winEight: '8-ball pocketed',
       loseEight: '8-ball pocketed early or on a foul',
       onlinePlay: 'Play in a room',
-    },
-    pool: {
-      title: 'Pool',
-      desc: 'Line up your shot and pocket all 15 balls in as few strokes as possible.',
-      rules:
-        'Pocket the 15 object balls in any order. The lowest stroke count wins. Pocketing the cue ball adds one penalty stroke. It returns to the table when the balls stop.',
-      controls:
-        'Tap or drag on the table to aim, set the power, then shoot. Use the left and right arrow keys to fine-tune your aim and Space to shoot.',
-      shots: 'Strokes',
-      cleared: 'Pocketed',
-      best: 'Personal best',
       power: 'Power',
       shoot: 'Shoot',
-      ready: 'Tap the table to aim',
       rolling: 'Balls in motion',
-      scratch: 'Cue ball pocketed (+1 stroke)',
-      won: 'Table cleared',
-      aimLabel: 'Pool table aiming area',
+      aimLabel: '8-ball table aiming area',
     },
     ludo: {
       title: 'Ludo',

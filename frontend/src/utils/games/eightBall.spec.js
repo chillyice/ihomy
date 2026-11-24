@@ -52,6 +52,7 @@ describe('eight-ball house rules', () => {
       expect(g.balls[8].pocketed).toBe(false)
       expect(g.winner).toBeNull()
       expect(g.lastResult).toBe(scratch ? 'foulScratch' : 'continue')
+      expect(g.penalties).toBe(scratch ? 1 : 0)
       expect(g.ballInHand).toBe(scratch)
       expect(restoreEightBallGame(g)).toEqual(g)
     }

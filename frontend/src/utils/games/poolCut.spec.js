@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createPoolGame, shootPool, stepPool } from './pool'
+import { createPoolTable, shootPool, stepPool } from './pool'
 
 const TICK = 1 / 240
 
 function table(...positions) {
-  const game = createPoolGame()
+  const game = createPoolTable()
   game.balls.forEach((ball, i) => {
     if (i < positions.length) [ball.x, ball.y] = positions[i]
     else ball.pocketed = true

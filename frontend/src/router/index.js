@@ -214,7 +214,7 @@ const routes = [
   { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
-  { path: '/games/pool', name: 'Pool', component: () => import('@/views/games/Pool.vue'), meta: { requiresAuth: true } },
+  { path: '/games/pool', redirect: '/games/eight-ball' },
   {
     path: '/games/chinese-checkers',
     name: 'ChineseCheckers',

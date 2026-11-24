@@ -403,13 +403,6 @@ const builtinGames = [
     category: 'BOARD',
   },
   {
-    key: 'pool',
-    titleKey: 'games.pool.title',
-    descKey: 'games.pool.desc',
-    path: '/games/pool',
-    category: 'CASUAL',
-  },
-  {
     key: 'eight_ball',
     titleKey: 'games.eightBall.title',
     descKey: 'games.eightBall.desc',

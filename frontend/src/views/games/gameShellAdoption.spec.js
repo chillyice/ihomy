@@ -21,6 +21,7 @@ const MIGRATED = [
   'Cards.vue',
   'ChineseCheckers.vue',
   'Doudizhu.vue',
+  'EightBall.vue',
   'EmbedGame.vue',
   'Game2048.vue',
   'Gomoku.vue',
@@ -32,7 +33,6 @@ const MIGRATED = [
   'Match3Game.vue',
   'Minesweeper.vue',
   'PetLinkLink.vue',
-  'Pool.vue',
   'ReversiGame.vue',
   'Runway52.vue',
   'Snake.vue',
@@ -57,7 +57,8 @@ const read = (file) => readFileSync(file, 'utf8')
 const vueFiles = (dir) => readdirSync(dir).filter((n) => n.endsWith('.vue'))
 
 /** 页面在 views/games 之外时按 embedded/ 解析(MIGRATED 名单同时覆盖两处) */
-const pagePath = (name) => {
+const stagePath = (name) => {
+  if (name === 'EightBall.vue') return join(SRC, 'components/games/EightBallTable.vue')
   try {
     readFileSync(join(GAME_DIR, name))
     return join(GAME_DIR, name)
@@ -68,22 +69,22 @@ const pagePath = (name) => {
 
 describe('统一游戏外壳守门', () => {
   it('每个游戏页都必须在迁移名单里挂号', () => {
-    const known = new Set([...MIGRATED, ...PENDING, ...EXEMPT, ...CARD_BOARD, 'EightBall.vue'])
+    const known = new Set([...MIGRATED, ...PENDING, ...EXEMPT, ...CARD_BOARD])
     const unknown = [...vueFiles(GAME_DIR), ...vueFiles(CARDS_DIR), ...vueFiles(EMBEDDED_DIR)].filter(
       (name) => !known.has(name) && !(name === 'CardDragGhost.vue'),
     )
     expect(unknown, `新游戏页请决定是否用 GameShell 并登记到本文件:\n${unknown.join('\n')}`).toEqual([])
   })
 
-  it('八球路由复用桌球舞台', () => {
-    const src = read(pagePath('EightBall.vue'))
-    expect(src).toContain("import Pool from './Pool.vue'")
-    expect(src).toMatch(/<Pool\b[^>]*\beight-ball\b/)
+  it('八球切换房间时重建对局舞台', () => {
+    const src = read(join(GAME_DIR, 'EightBall.vue'))
+    expect(src).toContain("import EightBallTable from '@/components/games/EightBallTable.vue'")
+    expect(src).toMatch(/<EightBallTable\b[^>]*:key="[^"]*route\.query\.room/)
   })
 
   it('已迁移页不再自己拼头部,也不用魔法数算高度', () => {
     for (const name of MIGRATED) {
-      const src = read(pagePath(name))
+      const src = read(stagePath(name))
       expect(src, `${name} 应使用 GameShell`).toContain("from '@/components/games/GameShell.vue'")
       expect(src, `${name} 不应再引入 PageToolbar`).not.toContain('components/PageToolbar.vue')
       expect(src, `${name} 不应再引入 GameHeader`).not.toContain('components/games/GameHeader.vue')
@@ -95,7 +96,7 @@ describe('统一游戏外壳守门', () => {
   it('带「新游戏」键的页面必须声明进行中确认', () => {
     // 外壳在 new-game-confirm 为真时先弹确认框;不声明就会一键清掉进行中的对局
     for (const name of MIGRATED) {
-      const src = read(pagePath(name))
+      const src = read(stagePath(name))
       if (!src.includes(':new-game=')) continue
       expect(src, `${name} 的「新游戏」要配 :new-game-confirm,否则进行中的对局会被直接重开`).toMatch(/:new-game-confirm="/)
     }

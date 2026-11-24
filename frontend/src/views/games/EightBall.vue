@@ -1,5 +1,5 @@
 <template>
-  <Pool :key="String(route.query.room || '')" eight-ball :opening-room="opening" @online-play="openRoom" />
+  <EightBallTable :key="String(route.query.room || '')" :opening-room="opening" @online-play="openRoom" />
 </template>
 
 <script setup>
@@ -10,7 +10,7 @@ import { ElMessage } from 'element-plus'
 import { roomApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { rememberRoomGame } from '@/utils/gameRoom'
-import Pool from './Pool.vue'
+import EightBallTable from '@/components/games/EightBallTable.vue'
 
 const route = useRoute()
 const router = useRouter()
