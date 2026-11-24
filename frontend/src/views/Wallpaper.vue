@@ -1371,29 +1371,91 @@ html.theme-warm .wpw-row + .wpw-row {
   border-top-color: var(--color-line);
 }
 
-/* 照片堆 = 贴在墙上的相纸:卡纸留边 + 上薄下厚的印刷边,底下一层柔影 */
+/* 照片轮播 = 摊开的一页家庭相册:纸面册页 + 书布书脊,照片用相角贴住,说明写在册页下缘 */
+html.theme-warm .wpw-photos {
+  padding: 16px 16px 12px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-card-2);
+  background-image: linear-gradient(rgba(var(--color-card-rgb), 0.55), rgba(var(--color-card-rgb), 0.55)), var(--home-grain);
+  background-size: auto, var(--home-grain-size);
+  box-shadow:
+    0 22px 48px rgba(74, 53, 32, 0.26),
+    0 2px 6px rgba(74, 53, 32, 0.14);
+}
+/* 书脊:亚麻书布压条,与角落分段器同一块布 */
+html.theme-warm .wpw-photos::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  border-radius: 6px 0 0 6px;
+  background-color: var(--color-card-2);
+  background-image: var(--album-cloth-texture);
+  background-blend-mode: soft-light;
+  background-size: 128px 128px;
+  box-shadow: var(--shadow-inset);
+}
+html.theme-warm .wpw-photos.dragging {
+  box-shadow: 0 26px 60px rgba(74, 53, 32, 0.34);
+}
+/* 照片 = 相册里的印片:暖白留边、上薄下厚,四角用相角压住 */
 html.theme-warm .wp-pcard {
   box-sizing: border-box;
-  padding: 8px 8px 12px;
+  padding: 9px 9px 13px;
   background: var(--color-card);
-  border-radius: 4px;
+  border-radius: 3px;
   box-shadow:
-    0 18px 38px rgba(74, 53, 32, 0.3),
-    0 2px 4px rgba(74, 53, 32, 0.16);
+    0 14px 30px rgba(74, 53, 32, 0.26),
+    0 1px 3px rgba(74, 53, 32, 0.18);
 }
 html.theme-warm .wp-pcard img {
-  border-radius: 2px;
+  border-radius: 1px;
 }
-/* 照片说明 = 手写便签纸(浅纸底 + 细暖边 + 一点点歪) */
+/* 相角:四枚三角压在照片四角(渐变画,不加 DOM) */
+html.theme-warm .wp-pcard::before {
+  content: '';
+  position: absolute;
+  inset: 9px 9px 13px;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to bottom right, rgba(138, 106, 78, 0.55) 0 50%, transparent 50%),
+    linear-gradient(to bottom left, rgba(138, 106, 78, 0.55) 0 50%, transparent 50%),
+    linear-gradient(to top right, rgba(138, 106, 78, 0.55) 0 50%, transparent 50%),
+    linear-gradient(to top left, rgba(138, 106, 78, 0.55) 0 50%, transparent 50%);
+  background-size: 16px 16px;
+  background-position:
+    left top,
+    right top,
+    left bottom,
+    right bottom;
+  background-repeat: no-repeat;
+}
+/* 说明 = 写在册页下缘的一行小字(细线压头,不做纸签) */
 html.theme-warm .wp-cap {
-  color: var(--color-text);
-  background-image: linear-gradient(rgba(var(--color-card-rgb), 0.9), rgba(var(--color-card-rgb), 0.9)), var(--home-grain);
-  background-size: auto, var(--home-grain-size);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 6px 14px;
-  box-shadow: 0 3px 10px rgba(74, 53, 32, 0.16);
-  transform: rotate(-1.2deg);
+  margin-top: 10px;
+  padding: 0;
+  max-width: 100%;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  transform: none;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+html.theme-warm .wp-cap::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 1px;
+  margin: 0 auto 6px;
+  background: var(--color-line);
 }
 
 /* 角落控件:分段器换成亚麻书布,组件面板是压在书布上的纸签 */
