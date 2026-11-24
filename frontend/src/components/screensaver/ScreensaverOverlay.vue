@@ -1,9 +1,9 @@
-<!-- 手机端空闲屏保:长时间不动后盖一层全屏页,两种模式(设置里可切、看板卡片可勾选)
-       - 背景模式:全屏家庭照片轮播 + 时钟/日期/星期/家庭名(有天气时带一行小字)
-       - 看板模式:只读信息板,卡片按时钟天气/今日待办/未来日程/纪念日/照片勾选渲染
-     交互口径:轻点任意处唤醒,这一下只用于关屏保——根节点吞掉 click/pointerdown,
+<!-- 统一屏保:长期不动后盖一层全屏页。
+     背景三选(纯黑 / 天气图 / 我的图片),卡片可勾选(时间天气 / 今日待办 / 未来日程 / 纪念日 / 家庭照片);
+     原先的手机屏保、暖居背景待机浮现与窗边常亮看板合并到这里(见 utils/screensaver.js)。
+     交互口径:轻点/移动/按键任意一种都只做唤醒——根节点吞掉 click/pointerdown,
        背后页面的按钮与链接收不到这次事件(不穿透);滚动/右键/长按菜单同样拦下。
-     只读:屏保内不发任何写请求(不做待办勾选),避免误触改数据。 -->
+     只读:屏保内不发任何写请求(待办不可勾选),避免误触改数据。 -->
 <template>
   <Teleport to="body">
     <div
@@ -11,25 +11,26 @@
       class="ss"
       ref="overlay"
       tabindex="-1"
-      :class="[isBoard ? 'ss-board' : 'ss-photo-mode', { 'ss-window': windowTheme, 'clock-only': !currentPhoto }]"
       role="dialog"
       aria-modal="true"
       :aria-label="$t('screensaver.overlayLabel')"
       @click.stop="wake"
       @pointerdown.stop
+      @pointermove="onOverlayMove"
       @wheel.stop.prevent
       @touchmove.stop.prevent
       @contextmenu.prevent
     >
-      <!-- 背景模式 -->
-      <template v-if="!isBoard">
-        <div class="ss-photo" aria-hidden="true">
-          <transition name="ss-fade">
-            <img v-if="currentPhoto" :key="currentPhoto.id || currentPhoto.url" :src="currentPhoto.url" alt="" />
-          </transition>
-        </div>
-        <div class="ss-photo-scrim" aria-hidden="true"></div>
-        <div class="ss-photo-info">
+      <div
+        v-if="bg.kind === 'image'"
+        class="ss-bg"
+        aria-hidden="true"
+        :style="{ backgroundImage: bg.image, backgroundSize: bg.size, opacity: bg.opacity }"
+      ></div>
+      <div v-if="bg.kind === 'image' && hasContent" class="ss-scrim" aria-hidden="true"></div>
+
+      <div class="ss-stage" :style="stageStyle">
+        <header v-if="cards.clock" class="ss-head">
           <div class="ss-clock">{{ clock.time }}</div>
           <div class="ss-meta">
             {{ clock.date }} · {{ clock.week }}
@@ -40,28 +41,14 @@
             <span>{{ weather.text }}</span>
             <span v-if="weather.city">{{ weather.city }}</span>
           </div>
-        </div>
-      </template>
+          <div v-if="topWarning" class="ss-warn" :style="{ '--warn-color': topWarning.severityColor || 'var(--color-warning)' }">
+            <span class="ss-warn-type">{{ topWarning.typeName || topWarning.title }}</span>
+            <span class="ss-warn-title">{{ topWarning.title || topWarning.typeName }}</span>
+          </div>
+        </header>
 
-      <!-- 看板模式 -->
-      <template v-else>
-        <div class="ss-board-head">
-          <template v-if="cardOn('clock')">
-            <div class="ss-clock">{{ clock.time }}</div>
-            <div class="ss-meta">
-              {{ clock.date }} · {{ clock.week }}
-              <span v-if="familyName"> · {{ familyName }}</span>
-            </div>
-            <div v-if="weather" class="ss-weather">
-              <span class="ss-temp">{{ Math.round(Number(weather.temp) || 0) }}°</span>
-              <span>{{ weather.text }}</span>
-              <span v-if="weather.city">{{ weather.city }}</span>
-            </div>
-          </template>
-        </div>
-
-        <div class="ss-cards">
-          <section v-if="cardOn('todo') && todayTodos.length" class="ss-card">
+        <div v-if="hasContent" class="ss-cards" :class="{ 'ss-cards-single': !cards.clock }">
+          <section v-if="cards.todo && todayTodos.length" class="ss-card">
             <div class="ss-card-title">{{ $t('screensaver.todayTodo') }}</div>
             <ul class="ss-list">
               <li v-for="item in todayTodos.slice(0, 5)" :key="item.key" class="ss-row">
@@ -72,7 +59,7 @@
             </ul>
           </section>
 
-          <section v-if="cardOn('schedule') && agenda.length" class="ss-card">
+          <section v-if="cards.schedule && agenda.length" class="ss-card">
             <div class="ss-card-title">{{ $t('screensaver.upcoming') }}</div>
             <ul class="ss-list">
               <li v-for="item in agenda.slice(0, 6)" :key="item.key" class="ss-row">
@@ -83,7 +70,7 @@
             </ul>
           </section>
 
-          <section v-if="cardOn('anni') && events.length" class="ss-card">
+          <section v-if="cards.anni && events.length" class="ss-card">
             <div class="ss-card-title">{{ $t('screensaver.anniversary') }}</div>
             <ul class="ss-list">
               <li v-for="(ev, i) in events.slice(0, 4)" :key="`${ev.label}-${i}`" class="ss-row">
@@ -94,14 +81,14 @@
             </ul>
           </section>
 
-          <section v-if="cardOn('photos') && currentPhoto" class="ss-card ss-card-photo">
+          <section v-if="cards.photos && currentPhoto" class="ss-card ss-card-photo">
             <div class="ss-card-title">{{ $t('screensaver.photos') }}</div>
             <transition name="ss-fade">
               <img :key="currentPhoto.id || currentPhoto.url" :src="currentPhoto.url" alt="" />
             </transition>
           </section>
         </div>
-      </template>
+      </div>
 
       <div class="ss-hint">{{ $t('screensaver.exitHint') }}</div>
     </div>
@@ -116,13 +103,21 @@ import { useUserStore } from '@/stores/user'
 import { useCallStore } from '@/stores/call'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { useIdle } from '@/composables/useIdle'
-import { useDevice } from '@/composables/useDevice'
-import { useWindowDisplay } from '@/composables/useWindowDisplay'
+import { useWeatherBg } from '@/composables/useWeatherBg'
 import { isVoiceCaptureActive } from '@/composables/useVoiceRecorder'
-import { activeStandbyTask, protectedStandbyRoute } from '@/utils/windowStandby'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { publicApi, scheduleApi } from '@/api'
-import { isBusyScreen, loadPrefs, MODES, prefsTick, previewTick, shouldSuppress } from '@/utils/screensaver'
+import {
+  BG,
+  activeStandbyTask,
+  isBusyScreen,
+  loadPrefs,
+  prefsTick,
+  previewTick,
+  protectedStandbyRoute,
+  screensaverBgLayer,
+  shouldSuppress,
+} from '@/utils/screensaver'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -131,20 +126,25 @@ const callStore = useCallStore()
 const { isChild } = useDisplayMode()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const weather = computed(() => sunLight?.weather?.value || null)
+const weatherDetail = computed(() => sunLight?.weatherDetail?.value || null)
+// 预警条只取第一条(和风按严重度返回);无预警时整条不渲染
+const topWarning = computed(() => {
+  const list = weatherDetail.value?.warning
+  return Array.isArray(list) && list.length ? list[0] : null
+})
 
 const PHOTO_INTERVAL_MS = 8000
 const REFRESH_MS = 600000
 const DATA_TTL_MS = 300000
+// 防烧屏:内容和时钟每 60 秒在 ±8px 之间挪一次(与旧看板同口径)
+const SHIFT_INTERVAL_MS = 60000
 
-const display = useWindowDisplay()
-const { windowTheme } = display
-const { isMobile } = useDevice()
-const wide = computed(() => windowTheme.value && !isMobile.value)
-const prefs = reactive(loadPrefs(wide.value))
+const prefs = reactive(loadPrefs())
 const visible = ref(false)
 const overlay = ref(null)
 let previousFocus = null
 let keyToRelease = null
+let shownAt = 0
 let loadSequence = 0
 const clock = ref({ time: '', date: '', week: '' })
 const todayStr = ref('')
@@ -153,17 +153,20 @@ const photos = ref([])
 const photoIndex = ref(0)
 const events = ref([])
 const scheduleItems = ref([])
+const shift = ref({ x: 0, y: 0 })
+let shiftFlip = false
 
-const isBoard = computed(() => prefs.mode === MODES.BOARD)
-const cardOn = (id) => {
-  if (windowTheme.value && id === 'clock' && !photos.value.length && !scheduleItems.value.length) return true
-  return prefs.board[id] !== false
-}
+const cards = computed(() => prefs.cards)
+// 天气图按需取(不选天气图时不触发生图);暖居外壳/首页也共用同一份缓存
+const { weatherBg, load: loadWeatherBg } = useWeatherBg()
+const bg = computed(() => screensaverBgLayer(prefs, { weatherUrl: weatherBg.value, isLoggedIn: userStore.isLoggedIn }))
+const stageStyle = computed(() => ({ transform: `translate(${shift.value.x}px, ${shift.value.y}px)` }))
 
 // 取数缓存:屏保反复进出不重复打接口(5 分钟内拿缓存)
 const cache = { at: 0, photos: [], familyName: '', events: [], schedule: [] }
 let clockTimer = 0
 let photoTimer = 0
+let shiftTimer = 0
 let refreshTimer = 0
 
 const currentPhoto = computed(() => photos.value[photoIndex.value] || null)
@@ -198,16 +201,29 @@ const dayLabel = (dateStr) => {
 
 const toAgendaItem = (it) => ({
   key: it.key || `${it.kind}:${it.id}:${it.date}`,
+  kind: it.kind,
   date: it.date,
   dayLabel: dayLabel(it.date),
   timeLabel: it.time ? String(it.time).slice(0, 5) : t('screensaver.allDay'),
   title: it.title || '',
-  sourceLabel: t(`kiosk.kind.${it.kind || 'REMINDER'}`),
+  sourceLabel: t(`screensaver.kind.${it.kind || 'REMINDER'}`),
 })
 
 const mappedItems = computed(() => scheduleItems.value.map(toAgendaItem).filter((it) => it.title))
 const todayTodos = computed(() => mappedItems.value.filter((it) => it.date && it.date === todayStr.value))
 const agenda = computed(() => mappedItems.value.filter((it) => it.date !== todayStr.value))
+
+// 有卡片要显示才铺压暗层:纯背景图 + 只看图片时保持画面干净
+const hasContent = computed(() => {
+  const c = prefs.cards
+  return !!(
+    (c.clock && (clock.value.time || weather.value)) ||
+    (c.todo && todayTodos.value.length) ||
+    (c.schedule && agenda.value.length) ||
+    (c.anni && events.value.length) ||
+    (c.photos && currentPhoto.value)
+  )
+})
 
 const applyCache = () => {
   photos.value = cache.photos
@@ -219,31 +235,21 @@ const applyCache = () => {
 
 const loadData = async (force = false) => {
   if (!userStore.isLoggedIn) return
-  const sequence = ++loadSequence
-  if (windowTheme.value) {
-    const [pictures, schedule] = await Promise.all([
-      !isBoard.value || cardOn('photos') ? display.loadPhotos().catch(() => []) : [],
-      isBoard.value ? display.loadSchedule().catch(() => []) : [],
-    ])
-    if (sequence !== loadSequence || !visible.value) return
-    photos.value = pictures
-    scheduleItems.value = schedule
-    events.value = schedule.filter((it) => it.kind === 'ANNIVERSARY').map((it) => ({ label: it.title, date: it.date }))
-    familyName.value = ''
-    photoIndex.value = 0
-    return
-  }
   if (!force && cache.at && Date.now() - cache.at < DATA_TTL_MS) {
     applyCache()
     return
   }
+  const sequence = ++loadSequence
   // 两个接口互不依赖:并行;任一失败不拖垮整个屏保(照片/日程各自留空)
   const [home, upcoming] = await Promise.all([publicApi.getHome().catch(() => null), scheduleApi.upcoming(7).catch(() => null)])
   if (sequence !== loadSequence || !visible.value) return
   const list = Array.isArray(upcoming) ? upcoming : Array.isArray(upcoming?.items) ? upcoming.items : []
   cache.photos = Array.isArray(home?.photos) ? home.photos.filter((p) => p && p.url) : []
   cache.familyName = home?.family?.name || ''
-  cache.events = Array.isArray(home?.stats?.upcomingEvents) ? home.stats.upcomingEvents : []
+  const homeEvents = Array.isArray(home?.stats?.upcomingEvents) ? home.stats.upcomingEvents : []
+  cache.events = homeEvents.length
+    ? homeEvents
+    : list.filter((it) => it.kind === 'ANNIVERSARY').map((it) => ({ label: it.title, date: it.date }))
   cache.schedule = list
   cache.at = Date.now()
   applyCache()
@@ -261,25 +267,48 @@ const startPhoto = () => {
   }, PHOTO_INTERVAL_MS)
 }
 
+const stopShift = () => {
+  if (shiftTimer) clearInterval(shiftTimer)
+  shiftTimer = 0
+  shift.value = { x: 0, y: 0 }
+}
+const startShift = () => {
+  stopShift()
+  shiftTimer = setInterval(() => {
+    shiftFlip = !shiftFlip
+    shift.value = shiftFlip ? { x: -8, y: -6 } : { x: 8, y: 6 }
+  }, SHIFT_INTERVAL_MS)
+}
+
 const stopTimers = () => {
   if (clockTimer) clearInterval(clockTimer)
   if (refreshTimer) clearInterval(refreshTimer)
   clockTimer = 0
   refreshTimer = 0
   stopPhoto()
+  stopShift()
 }
 
-const syncPrefs = () => Object.assign(prefs, loadPrefs(wide.value))
+const syncPrefs = () => Object.assign(prefs, loadPrefs())
 
-// 进入屏保:时钟/照片轮播/数据刷新一起起来,退出时统一 stopTimers
+// 照片面板只在勾了照片时才轮播
+const syncPhotoTimer = () => {
+  if (prefs.cards.photos) startPhoto()
+  else stopPhoto()
+}
+
+// 进入屏保:时钟/位移/照片轮播/数据刷新一起起来,退出时统一 stopTimers
 const enter = () => {
   stopTimers()
   visible.value = true
+  shownAt = Date.now()
   previousFocus = document.activeElement
   nextTick(() => overlay.value?.focus({ preventScroll: true }))
   syncClock()
   clockTimer = setInterval(syncClock, 1000)
+  startShift()
   syncPhotoTimer()
+  if (bg.value.kind === 'image' && prefs.bg === BG.WEATHER && !weatherBg.value) loadWeatherBg(weather.value)
   loadData()
   refreshTimer = setInterval(() => loadData(true), REFRESH_MS)
 }
@@ -306,6 +335,12 @@ const wake = () => {
   poke()
 }
 
+// 桌面端没有「轻点」这一步:鼠标一动就该醒;刚进入的 600ms 内忽略合成事件,避免刚盖上就被自己关掉
+const onOverlayMove = () => {
+  if (Date.now() - shownAt < 600) return
+  wake()
+}
+
 const context = () => ({
   isLoggedIn: userStore.isLoggedIn,
   isChild: isChild.value,
@@ -313,31 +348,17 @@ const context = () => ({
   routeMeta: route.meta,
   busy:
     isBusyScreen() ||
-    (windowTheme.value &&
-      (isVoiceCaptureActive() ||
-        protectedStandbyRoute(route.path) ||
-        activeStandbyTask(document) ||
-        userStore.mustChangePassword ||
-        userStore.isPureOps)),
+    isVoiceCaptureActive() ||
+    protectedStandbyRoute(route.path) ||
+    activeStandbyTask(document) ||
+    userStore.mustChangePassword ||
+    userStore.isPureOps,
   hidden: typeof document !== 'undefined' && document.visibilityState !== 'visible',
 })
 
 const { isIdle, poke } = useIdle({
   idleMs: () => (prefs.enabled ? prefs.idleMinutes * 60000 : 0),
   canTrigger: () => !shouldSuppress(context()),
-})
-
-// 照片面板只在看板模式勾了照片、或背景模式下才需要轮播
-const syncPhotoTimer = () => {
-  if (isBoard.value && !cardOn('photos')) stopPhoto()
-  else startPhoto()
-}
-watch([isBoard, () => prefs.board.photos], () => {
-  if (visible.value) syncPhotoTimer()
-})
-// 照片是异步取回来的:进屏保时先起来的那份可能还是空数组,数据到货后补上轮播
-watch(photos, () => {
-  if (visible.value) syncPhotoTimer()
 })
 
 watch(isIdle, (idle) => {
@@ -350,7 +371,18 @@ watch(previewTick, () => {
   if (!visible.value && !callStore.inCall && !isChild.value && !userStore.mustChangePassword && !userStore.isPureOps) enter()
 })
 
-// 设置页改了时长/模式/卡片:重读偏好,useIdle 会按时长变化重新武装计时
+// 照片是异步取回来的:进屏保时先起来的那份可能还是空数组,数据到货后补上轮播
+watch(photos, () => {
+  if (visible.value) syncPhotoTimer()
+})
+watch(
+  () => prefs.cards.photos,
+  () => {
+    if (visible.value) syncPhotoTimer()
+  },
+)
+
+// 设置页改了时长/背景/卡片:重读偏好,useIdle 会按时长变化重新武装计时
 const resetDisplay = () => {
   loadSequence++
   cache.at = 0
@@ -362,7 +394,7 @@ const resetDisplay = () => {
   poke()
   syncPrefs()
 }
-watch([prefsTick, wide, windowTheme, display.scope], resetDisplay, { flush: 'sync' })
+watch([prefsTick], resetDisplay, { flush: 'sync' })
 
 // 关闭条件:离开普通页面、登出、进通话、切儿童模式
 watch(
@@ -389,7 +421,16 @@ watch(isChild, (v) => {
   if (v) hide()
 })
 
-// 回到前台重新读偏好(设置页刚改的时长/模式立即生效);切后台时屏保本身也该收起
+// 天气到货后补取天气图(只在「天气图」背景时)
+watch(
+  () => weather.value,
+  (w) => {
+    if (w && prefs.bg === BG.WEATHER) loadWeatherBg(w)
+  },
+  { immediate: true },
+)
+
+// 回到前台重新读偏好(设置页刚改的时长/背景立即生效);切后台时屏保本身也该收起
 const onVisibility = () => {
   if (document.visibilityState === 'visible') {
     syncPrefs()
@@ -436,80 +477,49 @@ onBeforeUnmount(() => {
   overscroll-behavior: contain;
   user-select: none;
   -webkit-user-select: none;
-  cursor: default;
-}
-
-/* 长开页不用 backdrop-filter(前端规范 7):背景模式压暗照片,看板模式走主题底色 */
-.ss-photo-mode {
-  background: var(--overlay-scrim-strong);
+  /* 屏保自带深色底:纯黑即整屏留黑;图片背景也压在这层之上,不随站点晨暮变化 */
+  background: #000;
   color: #fff;
+  cursor: none;
 }
 
-.ss-board {
-  background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-2) 100%);
-  color: var(--color-text);
-  padding: clamp(18px, 4vw, 32px) clamp(16px, 4vw, 28px) calc(clamp(18px, 4vw, 32px) + env(safe-area-inset-bottom, 0px));
-  box-sizing: border-box;
+/* 背景图:自身浓度由用户设置(天气图固定满浓度),压暗层只负责文字可读性 */
+.ss-bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-position: center;
+}
+.ss-scrim {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.16) 46%, rgba(0, 0, 0, 0.44) 100%);
+}
+
+.ss-stage {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(12px, 2vh, 26px);
+  padding: clamp(20px, 4vw, 56px);
+  transition: transform 2s ease;
 }
 
-/* ===== 背景模式 ===== */
-.ss-photo {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  /* 无照片时的兜底:主题渐变,不留白也不留纯黑 */
-  background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-2) 100%);
+.ss-head {
+  flex: 0 0 auto;
 }
-.ss-photo img {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.ss-fade-enter-active,
-.ss-fade-leave-active {
-  transition: opacity 1.4s ease;
-}
-.ss-fade-enter-from,
-.ss-fade-leave-to {
-  opacity: 0;
-}
-.ss-fade-leave-active {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-.ss-photo-scrim {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.12) 45%, rgba(0, 0, 0, 0.3) 100%);
-}
-.ss-photo-info {
-  position: absolute;
-  left: clamp(20px, 6vw, 40px);
-  right: clamp(20px, 6vw, 40px);
-  bottom: calc(clamp(48px, 12vh, 96px) + env(safe-area-inset-bottom, 0px));
-}
-
-/* ===== 共用排版 ===== */
 .ss-clock {
   font-family: inherit;
-  font-size: clamp(58px, 18vw, 132px);
+  font-size: clamp(56px, 12vw, 168px);
   font-weight: 200;
   line-height: 0.95;
   letter-spacing: 0.02em;
@@ -517,7 +527,7 @@ onBeforeUnmount(() => {
 }
 .ss-meta {
   margin-top: 8px;
-  font-size: clamp(14px, 4vw, 20px);
+  font-size: clamp(14px, 1.8vw, 24px);
   opacity: 0.82;
 }
 .ss-weather {
@@ -525,46 +535,63 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: clamp(13px, 3.6vw, 18px);
+  font-size: clamp(13px, 1.4vw, 20px);
   opacity: 0.82;
 }
 .ss-temp {
-  font-size: clamp(22px, 6vw, 34px);
+  font-size: clamp(22px, 2.4vw, 40px);
   font-weight: 600;
   opacity: 1;
 }
-
-/* ===== 看板模式 ===== */
-.ss-board-head {
+/* 天气预警条:左色条沿用预警自身色,两行文字不抢视线 */
+.ss-warn {
+  --warn-color: var(--color-warning);
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: max-content;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-left: 4px solid var(--warn-color, var(--color-warning));
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.36);
+  font-size: clamp(12px, 1.3vw, 17px);
+  overflow: hidden;
+}
+.ss-warn-type {
   flex: 0 0 auto;
-  min-height: 0;
+  font-weight: 700;
+  color: var(--warn-color, var(--color-warning));
+  white-space: nowrap;
 }
-.ss-board-head .ss-clock {
-  font-size: clamp(48px, 14vw, 96px);
-}
-.ss-board-head .ss-meta,
-.ss-board-head .ss-weather {
-  color: var(--color-text-secondary);
-  opacity: 1;
-}
-.ss-board-head .ss-temp {
-  color: var(--color-text);
+.ss-warn-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.9;
 }
 
 .ss-cards {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   grid-auto-rows: minmax(0, auto);
-  gap: 10px;
+  gap: clamp(10px, 1.4vw, 18px);
+  align-content: start;
   overflow: hidden;
 }
+/* 时间天气关掉时卡片从顶部铺开,不留一整块空白 */
+.ss-cards-single {
+  flex: 0 0 auto;
+}
 .ss-card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 12px 14px;
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -574,7 +601,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 6px;
 }
 .ss-list {
@@ -590,9 +617,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(var(--color-brand-rgb), 0.12);
-  font-size: clamp(12.5px, 3.4vw, 15px);
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: clamp(13px, 1.4vw, 17px);
   min-width: 0;
 }
 .ss-row:last-child {
@@ -600,7 +627,7 @@ onBeforeUnmount(() => {
 }
 .ss-time {
   flex: 0 0 auto;
-  color: var(--color-text-secondary);
+  opacity: 0.66;
   font-variant-numeric: tabular-nums;
 }
 .ss-title {
@@ -613,11 +640,11 @@ onBeforeUnmount(() => {
 .ss-source {
   flex: 0 0 auto;
   font-size: 11.5px;
-  color: var(--color-text-tertiary);
+  opacity: 0.5;
 }
 .ss-card-photo {
   padding: 10px;
-  min-height: 150px;
+  min-height: 180px;
   position: relative;
 }
 .ss-card-photo img {
@@ -625,8 +652,23 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-height: 0;
   object-fit: cover;
-  border-radius: calc(var(--radius) - 4px);
+  border-radius: 10px;
   display: block;
+}
+.ss-fade-enter-active,
+.ss-fade-leave-active {
+  transition: opacity 1.4s ease;
+}
+.ss-fade-enter-from,
+.ss-fade-leave-to {
+  opacity: 0;
+}
+.ss-fade-leave-active {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
 }
 
 /* 唤醒提示:不抢注意力,淡在底部 */
@@ -637,85 +679,38 @@ onBeforeUnmount(() => {
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   text-align: center;
   font-size: 12px;
-  opacity: 0.55;
+  opacity: 0.5;
   pointer-events: none;
-}
-.ss-photo-mode .ss-hint {
   color: #fff;
 }
-.ss-board .ss-hint {
-  color: var(--color-text-secondary);
-}
-.ss-window.ss-photo-mode {
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-.ss-window .ss-photo {
-  top: 42%;
-}
-.ss-window .ss-photo-scrim {
-  display: none;
-}
-.ss-window .ss-photo-info {
-  top: 7%;
-  bottom: auto;
-}
-.ss-window.ss-photo-mode .ss-hint {
-  background: var(--color-card);
-  color: var(--color-text-secondary);
-  width: max-content;
-  margin: auto;
-  border-radius: 12px;
-  padding: 6px 14px;
-  opacity: 1;
-}
-.ss-window .ss-clock {
-  animation: ss-shift 4min steps(1, end) infinite;
-}
-@keyframes ss-shift {
-  25% {
-    transform: translateX(4px);
+
+/* 手机竖屏:卡片单列、时钟略小,避免和卡片挤在一屏 */
+@media (max-width: 760px) {
+  .ss-cards {
+    grid-template-columns: 1fr;
   }
-  50% {
-    transform: translate(4px, 4px);
-  }
-  75% {
-    transform: translateY(4px);
+  .ss-clock {
+    font-size: clamp(48px, 16vw, 96px);
   }
 }
-@media (orientation: landscape) {
-  .ss-window .ss-photo {
-    top: 0;
-    left: 44%;
+/* 手机横屏/矮屏:时钟再压一档,卡片保持两列 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ss-stage {
+    padding: clamp(12px, 2vw, 24px);
+    gap: 8px;
   }
-  .ss-window .ss-photo-info {
-    top: 50%;
-    left: 5%;
-    right: 57%;
-    transform: translateY(-50%);
+  .ss-clock {
+    font-size: clamp(36px, 8vw, 88px);
   }
-  .ss-window .ss-clock {
-    font-size: clamp(42px, 10vw, 140px);
+  .ss-cards {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ss-window .ss-clock,
-  .ss-window .ss-photo img {
-    animation: none;
+  .ss-stage,
+  .ss-fade-enter-active,
+  .ss-fade-leave-active {
     transition: none;
   }
-}
-.ss-window.ss-photo-mode.clock-only .ss-photo {
-  display: none;
-}
-.ss-window.ss-photo-mode.clock-only .ss-photo-info {
-  top: 50%;
-  left: 5%;
-  right: 5%;
-  transform: translateY(-50%);
-  text-align: center;
-}
-.ss-window.ss-photo-mode.clock-only .ss-weather {
-  justify-content: center;
 }
 </style>

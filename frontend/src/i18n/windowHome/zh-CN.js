@@ -41,6 +41,5 @@ export default {
     notifications: '消息通知',
     login: '登录 / 注册',
     appDownload: '下载应用',
-    kiosk: '家庭看板',
   },
 }

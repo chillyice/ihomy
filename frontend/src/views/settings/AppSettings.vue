@@ -187,16 +187,6 @@
 
     <div class="opt">
       <div class="opt-main">
-        <div class="opt-title">{{ $t('appSettings.kioskTitle') }}</div>
-        <div class="opt-desc">{{ $t('appSettings.kioskDesc') }}</div>
-        <div class="opt-extra">
-          <el-button @click="router.push('/kiosk')">{{ $t('appSettings.kioskOpen') }}</el-button>
-        </div>
-      </div>
-    </div>
-
-    <div class="opt">
-      <div class="opt-main">
         <div class="opt-title">{{ $t('appSettings.diagnosticsTitle') }}</div>
         <div class="opt-desc">{{ $t('appSettings.diagnosticsDesc') }}</div>
         <div class="opt-meta">
@@ -247,14 +237,12 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWebVersion, isAndroidApp, isIOSApp } from '@/utils/platform'
 import { haptic, hapticsEnabled, setHapticsEnabled } from '@/utils/haptics'
 
 const { t } = useI18n()
-const router = useRouter()
 /** 平台能力差异只在原生壳内出现:Android 有 APK 自更新,其余更新一律走 App Store */
 const isAndroid = isAndroidApp()
 const isIOS = isIOSApp()

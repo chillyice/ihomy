@@ -39,7 +39,6 @@ export function windowEntries(modules, { hasOps, child, loggedIn, allows, label 
     entries.push({ code: 'notifications', path: '/notification', label: label('notifications'), category: 'system', icon: 'announcement' })
   if (!loggedIn) entries.push({ code: 'login', path: '/login', label: label('login'), category: 'system', icon: 'member' })
   entries.push({ code: 'appDownload', path: '/app', label: label('appDownload'), category: 'system', icon: 'tools' })
-  if (loggedIn && !child) entries.push({ code: 'kiosk', path: '/kiosk', label: label('kiosk'), category: 'system', icon: 'ops' })
   return entries
 }
 

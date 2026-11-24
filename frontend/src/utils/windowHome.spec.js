@@ -29,11 +29,11 @@ describe('window directory', () => {
     const child = make({ child: true }).map((i) => i.code)
     expect(child).toContain('music')
     expect(child).not.toContain('assistant')
-    expect(child).not.toContain('kiosk')
+    expect(child).not.toContain('notifications')
     const restricted = make({ loggedIn: false, allows: (it) => !['book', 'chat'].includes(it.code) }).map((i) => i.code)
     expect(restricted).not.toContain('book')
     expect(restricted).not.toContain('assistant')
-    expect(restricted).not.toContain('kiosk')
+    expect(restricted).not.toContain('notifications')
     expect(restricted).toContain('login')
     expect(restricted).toContain('appDownload')
     expect(windowEntries([{ code: 'chat', enabled: 0 }], { allows: () => true, label: (c) => c }).map((i) => i.code)).not.toContain(

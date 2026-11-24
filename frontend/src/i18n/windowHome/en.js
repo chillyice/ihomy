@@ -41,6 +41,5 @@ export default {
     notifications: 'Notifications',
     login: 'Log in / Register',
     appDownload: 'Download app',
-    kiosk: 'Family display',
   },
 }

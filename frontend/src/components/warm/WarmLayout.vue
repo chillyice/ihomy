@@ -2,16 +2,12 @@
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
   <div class="gc-root" :class="{ scrolled: scrolled }">
-    <!-- 全屏氛围底图层(最底,压在 SunLightLayer 之下):默认每日天气 AI 生图,也可换成用户自己的背景;
-         指针静止 1 分钟浮到最前,轻点/滑动即收起 -->
+    <!-- 全屏氛围底图层(最底,压在 SunLightLayer 之下):默认每日天气 AI 生图,也可换成用户自己的背景。
+         长时间不动的整屏展示改由统一屏保负责(设置 → 外观与显示 → 屏保) -->
     <div
       v-if="bgLayer"
       class="gc-weatherbg"
-      :class="{ revealed: bgRevealed }"
       :style="{ backgroundImage: bgLayer.image, backgroundSize: bgLayer.size, '--bg-base-opacity': bgLayer.opacity }"
-      @pointerdown="onRevealPointerDown"
-      @pointermove="onRevealPointerMove"
-      @click.stop.prevent="dismissBgReveal"
     ></div>
 
     <div class="gc-wrap">
@@ -224,107 +220,8 @@ watch(
 initWarmBg()
 const bgLayer = computed(() => warmBgLayer(warmBgState, { weatherUrl: weatherBg.value, isLoggedIn: userStore.isLoggedIn }))
 
-// 背景照片待机浮现:只有指针停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
-// 静止超过 1 分钟 → 背景浮到最前;移动/触摸 → 恢复原始状态。
-// 浮现中的图片自己接管点击(见模板 @click):这一下只用于把图片收回去,
-// 绝不穿透到图片后面的卡片/按钮 —— 触屏平板没有「移动鼠标」这一步,穿透就是误触。
-const bgRevealed = ref(false)
-const BG_IDLE_MS = 60000
-// 触屏轻点会紧跟一个合成 mousemove:若它先把图片收起,这一下的 click 就会落到下面的按钮上。
-// 所以最近一次触摸后这段时间内的 mousemove 一律不参与复位/计时(触屏活动改由 pointer 事件处理)。
-const TOUCH_GUARD_MS = 800
-let lastTouchAt = 0
-// 命中判定:studio 外框内(含侧栏/主区/卡片/间隙)与顶栏内容、浮层都不是背景板。
-// 顶栏整条都算控件区(含胞吐进来的工具栏 .gc-pin):返回键、晨暮开关、工具栏按钮都贴在
-// 照片边上,漏掉任一处鼠标经过按钮时就会闪一下背景
-const CONTENT_SELECTOR = '.gc-topbar, .gc-pin, .el-overlay, .el-popper, .el-message'
-const isBackgroundArea = (x, y) => {
-  const el = document.elementFromPoint(x, y)
-  if (!el) return false
-  if (el.closest('.gc-studio')) return false // studio 外框盖住天气照片,内里一律不算背景
-  if (el.closest(CONTENT_SELECTOR)) return false // 顶栏内容/浮层不算背景
-  return true
-}
-let bgIdleTimer = null
-// 一次指针活动:收起浮现 + 若仍在背景板上则从这一刻重新起算静止
-const bgActivity = (x, y) => {
-  if (bgIdleTimer) {
-    clearTimeout(bgIdleTimer)
-    bgIdleTimer = null
-  }
-  if (bgRevealed.value) bgRevealed.value = false
-  if (!bgLayer.value) return // 无背景图片时不触发
-  if (!isBackgroundArea(x, y)) return // 不是背景板不触发
-  bgIdleTimer = setTimeout(() => {
-    bgIdleTimer = null
-    bgRevealed.value = true
-  }, BG_IDLE_MS)
-}
-// 鼠标:mousemove 即活动;触摸合成的 mousemove 不参与(见 TOUCH_GUARD_MS)
-const onMouseActivity = (e) => {
-  if (Date.now() - lastTouchAt < TOUCH_GUARD_MS) return
-  bgActivity(e.clientX, e.clientY)
-}
-// 触屏没有 mousemove:轻点 / 滑动本身就是活动,轻点空白处则从这一下起算静止
-let lastTouchMoveAt = 0
-const onTouchActivity = (e) => {
-  if (e.pointerType === 'mouse') return
-  const now = Date.now()
-  lastTouchAt = now
-  if (bgRevealed.value) return // 这一下落在浮现中的图片上:留给 click 收起,别在这里先撤掉让点击穿透
-  if (e.type === 'pointermove') {
-    if (!bgIdleTimer) return // 没有待触发的浮现,滑动无需复位
-    if (now - lastTouchMoveAt < 250) return
-    lastTouchMoveAt = now
-  }
-  bgActivity(e.clientX, e.clientY)
-}
-// 浮现中的图片被点:只收起图片,不执行后面的任何操作
-const dismissBgReveal = () => {
-  if (!bgRevealed.value) return
-  if (bgIdleTimer) {
-    clearTimeout(bgIdleTimer)
-    bgIdleTimer = null
-  }
-  bgRevealed.value = false
-}
-// 浮现中的图片还会被「划」:触屏上一划若什么都不发生,会以为页面卡住了 ——
-// 超过点击容差(浏览器这时不会再补 click)就直接收图,收完下一次滑动就能正常滚页面。
-const SWIPE_SLOP = 18
-const SWALLOW_CLICK_MS = 500
-let revealTouchFrom = null
-let swallowClickUntil = 0
-const onRevealPointerDown = (e) => {
-  revealTouchFrom = bgRevealed.value && e.pointerType !== 'mouse' ? { x: e.clientX, y: e.clientY } : null
-}
-const onRevealPointerMove = (e) => {
-  const from = revealTouchFrom
-  if (!from || !bgRevealed.value) return
-  if (Math.abs(e.clientX - from.x) <= SWIPE_SLOP && Math.abs(e.clientY - from.y) <= SWIPE_SLOP) return
-  revealTouchFrom = null
-  swallowClickUntil = Date.now() + SWALLOW_CLICK_MS
-  dismissBgReveal()
-}
-// 手势尾随的 click 一律吃掉(捕获阶段,先于任何页面元素),别让它落到图片后面的按钮上
-const swallowTrailingClick = (e) => {
-  if (!swallowClickUntil || Date.now() > swallowClickUntil) return
-  swallowClickUntil = 0
-  e.stopPropagation()
-  e.preventDefault()
-}
-onMounted(() => {
-  window.addEventListener('mousemove', onMouseActivity, { passive: true })
-  window.addEventListener('pointerdown', onTouchActivity, { passive: true })
-  window.addEventListener('pointermove', onTouchActivity, { passive: true })
-  window.addEventListener('click', swallowTrailingClick, true)
-})
-onBeforeUnmount(() => {
-  clearTimeout(bgIdleTimer)
-  window.removeEventListener('mousemove', onMouseActivity)
-  window.removeEventListener('pointerdown', onTouchActivity)
-  window.removeEventListener('pointermove', onTouchActivity)
-  window.removeEventListener('click', swallowTrailingClick, true)
-})
+// 背景照片待机浮现已并入统一屏保(components/screensaver/ScreensaverOverlay.vue):
+// 长时间不动整屏展示、轻点退出;此处只保留常驻的氛围底图。
 
 // 折叠状态:默认只展开内容组,其余组收起(点击组头切换)
 const expanded = ref({ content: true })
@@ -499,7 +396,7 @@ watch(
 }
 
 /* 全屏氛围底图(最底层,压在 SunLightLayer 之下):基础浓度由用户设置(默认=天气图的 30%);
-   浓度走自定义属性,内联只覆写变量,浮现态的 opacity:1 仍能压过基础值 */
+   浓度走自定义属性,内联只覆写变量。长时间不动的整屏展示由统一屏保接管 */
 .gc-weatherbg {
   position: fixed;
   inset: 0;
@@ -509,16 +406,6 @@ watch(
   background-position: center;
   opacity: var(--bg-base-opacity);
   pointer-events: none;
-  transition: opacity 1.2s ease;
-}
-/* 待机浮现:静止 1 分钟后浮到最前(盖过内容层)。浮现期间图片自己接管点击/滑动:
-   轻点只收起图片、不穿透到后面的卡片/按钮(触屏最容易误触),滑动超过 18px 也收起;
-   touch-action:none 保证手势不被浏览器接管,pointermove 才能稳定收到。指针一动即移除该类恢复 */
-.gc-weatherbg.revealed {
-  z-index: 30;
-  opacity: 1;
-  pointer-events: auto;
-  touch-action: none;
 }
 
 /* ===== 预览壳 ===== */

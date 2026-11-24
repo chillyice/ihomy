@@ -27,7 +27,7 @@
       <MusicPlayer v-if="!isWindow && (isMobile || !immersive) && floatsStore.music" />
       <LightTestConsole v-if="!isMobile && lightTestMode" />
       <SiteFooter v-if="!isMobile && !immersive" />
-      <ScreensaverOverlay v-if="userStore.isLoggedIn && (isMobile || windowShell)" />
+      <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
     </template>
     <WindowDesk
       v-if="
@@ -43,7 +43,7 @@
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
     />
-    <PawTrail v-if="routeReady && desk.enabled && route.name !== 'Wallpaper' && route.name !== 'Kiosk'" />
+    <PawTrail v-if="routeReady && desk.enabled && route.name !== 'Wallpaper'" />
     <div v-if="route.name === 'Home' && appStore.loadFailed && !userStore.mustChangePassword" class="home-load-error" role="status">
       <span>{{ $t('home.familyLoadFailed') }}</span>
       <el-button text :loading="appStore.loading" @click="appStore.init()">{{ $t('common.retry') }}</el-button>

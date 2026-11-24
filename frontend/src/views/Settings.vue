@@ -46,7 +46,7 @@
             <WindowDeskSettings v-if="activeId === 'appearance'" :show-objects="isTablet || (isWide && !isMobile)" />
             <div id="settings-display"><ModeSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
-            <div v-if="isMobile || themeStore.theme === 'window'" id="settings-screensaver"><ScreensaverSettings /></div>
+            <div id="settings-screensaver"><ScreensaverSettings /></div>
           </template>
         </div>
       </div>
