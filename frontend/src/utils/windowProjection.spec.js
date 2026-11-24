@@ -32,11 +32,11 @@ describe('window-plane projection', () => {
 
   it('projects a south-facing vertical window onto the floor using both solar angles', () => {
     const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1)
-    expect(Math.hypot(dx, dy)).toBeCloseTo(760 * Math.sqrt(3))
-    expect(dy).toBeCloseTo((760 * Math.sqrt(3)) / 2)
-    expect(dx).toBeCloseTo(1140)
+    expect(Math.hypot(dx, dy)).toBeCloseTo(2000 * Math.sqrt(3))
+    expect(dy).toBeCloseTo((2000 * Math.sqrt(3)) / 2)
+    expect(dx).toBeCloseTo(3000)
     expect(top).toBeCloseTo(dy * 0.15)
-    expect(windowTransform(1200, 1000, 45, 180, 1)[3]).toBeCloseTo(760)
+    expect(windowTransform(1200, 1000, 45, 180, 1)[3]).toBeCloseTo(2000)
   })
 
   it.each([

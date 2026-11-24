@@ -7,8 +7,8 @@ export function windowTransform(width, height, altitude, azimuth, realWeight = 0
   const winterSummerRatio = 1.15
   const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
   const correctedReach = height * 0.9 * (1 + amplitude * phase)
-  // The upright opening spans 76% of the viewport height. Its sill is 15% of the opening above the floor.
-  const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 0.76) / Math.tan(altitude * radians) : 0
+  // The 1.5 m opening spans two viewport heights (0.75 m per viewport). Its sill is 15% of the opening above the floor.
+  const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 2) / Math.tan(altitude * radians) : 0
   const reach = correctedReach + (realReach - correctedReach) * realWeight
   const paneWidth = width * 0.88
   const shear = Math.sin(bearing) * reach
