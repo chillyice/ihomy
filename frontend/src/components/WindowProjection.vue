@@ -8,6 +8,7 @@ import { drawWindowProjection } from '@/utils/windowProjection'
 
 const props = defineProps({
   scene: { type: Object, required: true },
+  standard: { type: String, default: 'corrected' },
   weather: { type: String, required: true },
   shadowAlpha: { type: Number, required: true },
   occluders: { type: Array, default: () => [] },
@@ -28,18 +29,29 @@ function schedulePaint() {
     frame = 0
     const canvas = surface.value
     const scene = props.scene
-    if (!target || target.altitude !== scene.altitude || target.azimuth !== scene.azimuth) {
-      start = displayed ?? scene
-      target = { altitude: scene.altitude, azimuth: scene.azimuth }
+    const realWeight = props.standard === 'real' ? 1 : 0
+    if (!target || target.realWeight !== realWeight || target.altitude !== scene.altitude || target.azimuth !== scene.azimuth) {
+      start = displayed ?? { ...scene, realWeight }
+      target = { altitude: scene.altitude, azimuth: scene.azimuth, realWeight }
       startedAt = now
     }
-    const t = start.altitude === target.altitude && start.azimuth === target.azimuth ? 1 : Math.min(1, (now - startedAt) / 600)
+    const t =
+      start.altitude === target.altitude && start.azimuth === target.azimuth && start.realWeight === target.realWeight
+        ? 1
+        : Math.min(1, (now - startedAt) / 600)
     const blend = t * t * (3 - 2 * t)
     displayed = {
+      realWeight: start.realWeight + (target.realWeight - start.realWeight) * blend,
       altitude: start.altitude + (target.altitude - start.altitude) * blend,
       azimuth: start.azimuth + (target.azimuth - start.azimuth) * blend,
     }
-    drawWindowProjection(canvas, { ...props, scene: { ...scene, ...displayed }, width: canvas.clientWidth, height: canvas.clientHeight })
+    drawWindowProjection(canvas, {
+      ...props,
+      realWeight: displayed.realWeight,
+      scene: { ...scene, ...displayed },
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+    })
     if (t < 1) schedulePaint()
   })
 }
@@ -48,7 +60,7 @@ onMounted(() => {
   observer = new ResizeObserver(schedulePaint)
   observer.observe(surface.value)
 })
-watch(() => [props.scene, props.weather, props.shadowAlpha, ...props.occluders], schedulePaint, { flush: 'post' })
+watch(() => [props.standard, props.scene, props.weather, props.shadowAlpha, ...props.occluders], schedulePaint, { flush: 'post' })
 onBeforeUnmount(() => {
   observer?.disconnect()
   cancelAnimationFrame(frame)

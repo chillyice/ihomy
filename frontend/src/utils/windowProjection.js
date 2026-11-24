@@ -1,4 +1,4 @@
-export function windowTransform(width, height, altitude, azimuth) {
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
   // Calibrate against solar noon in Jinan (36.65° N). Outside noon the
@@ -6,11 +6,15 @@ export function windowTransform(width, height, altitude, azimuth) {
   const phase = (90 - 36.65 - altitude) / 23.44
   const winterSummerRatio = 1.15
   const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
-  const reach = height * 0.9 * (1 + amplitude * phase)
+  const correctedReach = height * 0.9 * (1 + amplitude * phase)
+  // The upright opening spans 76% of the viewport height. Its sill is 15% of the opening above the floor.
+  const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 0.76) / Math.tan(altitude * radians) : 0
+  const reach = correctedReach + (realReach - correctedReach) * realWeight
   const paneWidth = width * 0.88
   const shear = Math.sin(bearing) * reach
   const depth = Math.cos(bearing) * reach
-  const top = height * (0.05 + 0.04 * phase)
+  const correctedTop = height * (0.05 + 0.04 * phase)
+  const top = correctedTop + (0.15 * realReach * Math.cos(bearing) - correctedTop) * realWeight
   return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, top]
 }
 
@@ -31,7 +35,7 @@ function resize(canvas, width, height) {
 
 // occluders accepts filled SVG path strings or Path2D objects in window-plane
 // coordinates. Overlapping silhouettes block the same light only once.
-export function drawWindowProjection(canvas, { width, height, scene, weather = 'clear', shadowAlpha = 0, occluders = [] }) {
+export function drawWindowProjection(canvas, { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, occluders = [] }) {
   const scale = Math.min(0.5, 512 / Math.max(1, width, height))
   const w = Math.max(1, Math.round(width * scale))
   const h = Math.max(1, Math.round(height * scale))
@@ -60,7 +64,7 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   const mask = scratch.getContext('2d')
   if (!mask) return
   mask.clearRect(0, 0, scratch.width, scratch.height)
-  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth)
+  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight)
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'

@@ -50,6 +50,12 @@
           <span class="setting-label">{{ $t('settings.shadowEffect') }}</span>
         </div>
       </el-form-item>
+      <el-form-item v-if="shadowEnabled" :label="$t('settings.projectionStandard')">
+        <el-radio-group v-model="projectionStandard">
+          <el-radio-button value="corrected">{{ $t('settings.correctedStandard') }}</el-radio-button>
+          <el-radio-button value="real">{{ $t('settings.realStandard') }}</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item v-if="shadowEnabled" :label="$t('settings.shadowDepth')">
         <el-slider v-model.number="shadowDepth" :min="0" :max="100" show-input />
       </el-form-item>
@@ -128,6 +134,7 @@ const {
   lampTemp,
   lampBrightness,
   shadowEnabled,
+  projectionStandard,
   shadowDepth,
   weatherEffectEnabled,
   blobsEnabled,

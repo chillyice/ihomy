@@ -29,6 +29,7 @@
       v-if="lightLayerOpacity > 0"
       :scene="sunScene"
       :weather="weatherMode"
+      :standard="projectionStandard"
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
       :style="{ opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
@@ -145,6 +146,7 @@ const {
   lampRadius,
   lampColor,
   shadowEnabled,
+  projectionStandard,
   shadowAlpha,
   weatherShadowOpacity,
   lightLayerOpacity,

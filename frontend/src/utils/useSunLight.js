@@ -51,11 +51,12 @@ export function useSunLight() {
   const lampBrightness = ref(_saved.lampBrightness ?? 50)
   const shadowEnabled = ref(_saved.shadowEnabled ?? true)
   // 阴影深度 0~100，默认 70。
+  const projectionStandard = ref(_saved.projectionStandard === 'real' ? 'real' : 'corrected')
   const shadowDepth = ref(_saved.shadowDepth ?? 70)
   const weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const blobsEnabled = ref(_saved.blobsEnabled ?? true)
   const glassEnabled = ref(_saved.glassEnabled ?? true)
-  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, shadowDepth, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
+  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, shadowDepth, projectionStandard, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
     // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
     // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
     if (_suspended) return
@@ -66,6 +67,7 @@ export function useSunLight() {
         lampTemp: lampTemp.value,
         lampBrightness: lampBrightness.value,
         shadowEnabled: shadowEnabled.value,
+        projectionStandard: projectionStandard.value,
         shadowDepth: shadowDepth.value,
         weatherEffectEnabled: weatherEffectEnabled.value,
         blobsEnabled: blobsEnabled.value,
@@ -591,6 +593,7 @@ export function useSunLight() {
     lampTemp,
     lampBrightness,
     shadowEnabled,
+    projectionStandard,
     shadowDepth,
     shadowAlpha,
     weatherEffectEnabled,
