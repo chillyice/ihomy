@@ -50,9 +50,9 @@
 | el-popper / dropdown / tooltip | 240 | 全局下拉/日期/悬浮卡(`--z-popup`) |
 | ElMessage / ElNotification | 260 | 轻提示(`--z-toast`) |
 | **背景光影(270–290,盖在弹窗之上)** | | |
-| bright-spot(光源辉光) | 270 | 体积光源核心光晕(`--z-deco`) |
-| window-shadow(窗框阴影) | 272 | 上下分层窗框阴影 |
-| reflection(反光高光) | 274 | 内容反光 |
+| bright-spot（日照色调） | 270 | 全屏日照色调（`--z-deco`） |
+| weather-shade（天气遮光） | 271 | 阴天、雾等环境减光 |
+| window-projection（窗面与桌面投影） | 272 | 四格窗光、窗外剪影和桌沿物件共用遮罩 |
 | light-layer(体积光) | 276 | 丁达尔射线 |
 | fog(雾霭) | 278 | 雾团慢漂移 |
 | **氛围层(300–308,光影最上层)** | | |
@@ -103,7 +103,7 @@
 - **hover 3D 翻开**(V9.53):`.album-book.open` 时封面以 `transform-origin: left center` 沿书脊转到 `rotateY(-145deg)` 露出内页,封面正/背两面各自 `opacity` 淡出(1.5s);内页 `.album-page` 为历史照片轮播(`historyPhotos`,静躺 2s → 翻阅 1.5s,`ALBUM_PAGE_MS=3500`),翻页卡片 `preserve-3d` + 正/背面分别淡出(避免 opacity 压平 `preserve-3d`),CSS `transition 1.5s` 与 JS 定时器同节奏;无历史照片时内页显示「去添加家庭照片」空态。
 - 点击跳 `/album`。
 
-## 3. 体积光系统(light-layer,z-index 48)
+## 3. 暖居体积光系统
 
 `position: fixed; inset: 0; mix-blend-mode: screen; pointer-events: none; overflow: hidden`。基于真实太阳位置(`/api/public/sun-info` 返回 288 个 5 分钟时隙,前端取当前时隙)。
 
@@ -114,7 +114,7 @@
 - **窗角** `windowAngle = 90 - Math.abs(az - 180)`,90°=太阳正对窗户(正午),0°=太阳平行窗户(日出/日落方向)。窗角≤0 时无直射光。
 - **直射光门控** `hasDirectLight = !isNight && windowAngle > 0 && alt > 0`,太阳不直射窗户时(az<90° 或 az>270°),体积光/辉光/反光全部关闭。
 - **日昼进度** `dayProgress = (currentMin - sunriseMin) / (sunsetMin - sunriseMin)`,0=日出→1=日落,夜间 hold 在端点(日出前=0,日落后=1)。
-- **旋转**:`shadowVRotation = az - 180` → az=90° 时 -90°(开始)→ az=180° 正午 0°→ az=270° +90°(结束)。窗角≤0 时 hold 在对应端点(-90° 或 +90°)。光柱角度 = 阴影角度(同向)。
+- **旋转**随太阳方位角变化。暖居光束使用 `azimuth - 180°`，地面投影使用 §6 的地面方向。
 - **光柱不透明度**:无直射光时 0,有直射光时 `sin(dayProgress * π) * rayBaseOpacity`(正弦过渡,正午最强)。
 - **无直射光调色板全 transparent**:bloom/core/mid/ambient 均为 `transparent`,rayBaseOpacity=0 → 光源辉光和光束都不可见。
 
@@ -125,25 +125,25 @@
 - 夜间 bloom=transparent → 不可见。无直射光(窗角≤0)时同样 transparent。
 
 ### 光束(7 条羽毛状,makeRays)
-每条 `position: absolute; top: 0; left: 50%; height: 160vh; transform-origin: top center`。
+暖居光源在视口上方 15% 处。七条光束长 200vh，绕顶部中心随太阳转动，强度随入射角和天气变化。
 | # | width | offset | opacity | blur |
 |---|-------|--------|---------|------|
 | 1 | 90px | -210 | 0.45 | 45 |
 | 2 | 60px | -120 | 0.6 | 35 |
 | 3 | 110px | -30 | 0.5 | 55 |
 | 4 | 50px | 60 | 0.65 | 30 |
-| 5 | 80px | 150 | 0.55 | 40 |
-| 6 | 40px | 240 | 0.7 | 25 |
-| 7 | 100px | -270 | 0.4 | 50 |
+| 5 | 80px | 150 | 0.4 | 50 |
+| 6 | 45px | 240 | 0.35 | 40 |
+| 7 | 130px | 0 | 0.25 | 80 |
 
-- `transform: translateX(<offset>px) rotate(<rotation>deg)`,`rotation` = 阴影同角度。
+- 光束先按各自的水平偏移排开，再绕光源旋转。
 - `background: linear-gradient(to bottom, <core> 0%, <mid> 35%, transparent 75%)`。
 - 夜间 opacity 全 0 → 不可见。无直射光时同样全 0。
 
 ### 光源水平位置
 - 日间:`sourceX = clamp(7.5, 92.5, ((az - 90) / 180) * 100)`%(东=左 7.5%,南=中 50%,西=右 92.5%)。
 - 夜间:hold 在日出位置(左侧 7.5%)。
-- `sourceY`:高度角 <6° 时 `2%`(地平线附近),否则 `-2%`(窗外)。
+- 光源纵坐标固定为 −15%，低角度时由入射强度控制渐隐。
 
 ### 日间 4 档调色板(按太阳高度角 alt)
 | 档位 | 条件 | bloom | core | mid | ambient | rayBaseOpacity |
@@ -153,7 +153,7 @@
 | 日间 | alt<60° | rgba(255,230,180,0.68) | rgba(255,222,160,0.9) | rgba(255,210,140,0.48) | rgba(255,225,170,0.06) | 1.05 |
 | 正午 | alt≥60° | rgba(255,242,210,0.62) | rgba(255,238,195,0.9) | rgba(255,228,170,0.42) | rgba(255,240,200,0.05) | 0.95 |
 
-## 4. 亮斑图层(bright-spot,z-index 32)
+## 4. 日照色调（bright-spot）
 
 `position: fixed; inset: 0; mix-blend-mode: multiply; pointer-events: none`。模拟阳光照耀强度,在内容之上、阴影之下。multiply 让白色=透明(日间无影响)、黑色=压暗(夜间)、彩色=染色(日出日落)。
 
@@ -167,46 +167,17 @@
 | 傍晚 | 0.7~0.9 | 白→橙 lerp | 0→0.5 |
 | 日落 | 0.9~1.0 | 橙→红 lerp | 0.5→0.7 |
 
-## 5. 反光层(reflection-layer,z-index 42)
+## 5. 天气遮光
 
-`position: fixed; inset: 0; mix-blend-mode: soft-light; pointer-events: none`。内容组件被阳光照亮的轻微高光。
+`SunLightLayer.vue` 在日照色调上绘制天气遮光。天气浓度和阴影深度共同决定压暗幅度，台灯蒙版在亮区减弱天气阴影。窗内受光的渐变随当前太阳配色绘入窗面。
 
-- `background: radial-gradient(ellipse 60% 50% at <source.x> <source.y>, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`。
-- 不透明度:无直射光时 0,有直射光时 `sin(dayProgress * π) * 0.22`(正午最强,轻微)。
-- soft-light 模式:效果极其微妙,只给内容组件顶部边缘加一点暖光。
+## 6. 窗格、窗外枝叶和桌面物件投影
 
-## 6. 窗户阴影(z-index 68)
-
-**现行实现(V10.23 口径)**:单个 `.window-shadow` 层(fixed 全屏,`mix-blend-mode: multiply`,整层 `opacity: var(--shadow-alpha)`,台灯 mask 统一挖洞),内含 6 条 `filter: blur(16px)` 的 bar(颜色 `--shadow-color`:夜间 `rgb(8,12,28)`、其余 `rgb(0,0,0)`)+ 1 条固定不移动、随天气显隐的天气覆盖阴影。
-
-### 强度与深度(关键)
-- 阴影强度 `shadowIntensity`:`isNight ? 0.7 : 0.7 - sin(π·dayProgress) × 0.4`(夜间 0.7 最深 → 正午 0.3 最浅)。
-- 层不透明度 `--shadow-alpha = min(1, shadowIntensity × shadowDepth / 70)`;`shadowDepth` = **个性化设置「阴影深度」滑块 0~100(V10.23 起可手动调)**,默认 70 即乘数 1(与旧版观感一致),深度 0 时整层不渲染;上限 clamp 1 防与暗角/天气阴影叠成全黑。
-- 台灯 mask(`--lamp-mask`)仍整层挖洞,不随深度变化。
-
-> 下文各 bar 的「下层 z=35 / 上层 z=49」「不透明灰 + `mix-blend-mode: darken` 幂等」是 V5.x 分层重构期的写法——后已合并为单层 `multiply` + 层不透明度(不再依赖 darken 幂等,重叠也不加深);bar 尺寸与旋转参数大体沿用,新增/改动一律以 `components/SunLightLayer.vue` 为准。
-
-### 下层(window-shadow-lower,z=35):4 条 bar
-- **shadow-v**(内框竖):`top: -50vh; left: 50%; width: 112px; margin-left: -56px; height: 337.5vh; transform-origin: 50% 40vh; transform: rotate(var(--rot))`。
-- **shadow-h**(内框横):`height: 70px; top: var(--htop); left: -75%; right: -75%`(不旋转)。
-- **frame-h-top**(顶框):`height: 140px; top: calc(-10vh - 140px); left: -75%; right: -75%`(不旋转,底边在旋转原点水平线 y=-10vh)。
-- **frame-h-bottom**(底框):`height: 1400px; top: calc(var(--htop) * 2 + 70px); left: -75%; right: -75%`(不旋转)。
-
-### 上层(window-shadow-upper,z=49):2 条 bar(最顶层,盖住光柱)
-- **frame-v-left**(左框):`top: -50vh; left: 50%; width: 1400px; margin-left: -1400px; height: 337.5vh; transform-origin: 100% 40vh; transform: translateX(-42.5vw) rotate(var(--rot))`。
-- **frame-v-right**(右框):`top: -50vh; left: 50%; width: 1400px; height: 337.5vh; transform-origin: 0% 40vh; transform: translateX(42.5vw) rotate(var(--rot))`。
-
-### 三条竖直 bar 原点对齐(关键)
-全部对齐到 **(页面 50% X, 页面 -10vh Y)**:
-- `top: -50vh; height: 337.5vh; transform-origin Y: 40vh` → 页面 Y = -50+40 = -10vh(原点在页面上方)。
-- X 对齐:shadow-v `50%`(中心)、frame-v-left `100%`(右边缘)、frame-v-right `0%`(左边缘)→ 全部在页面 50%。
-
-### 旋转参数
-- `--rot: (az - 180) deg` → az=90° 时 -90°(开始旋转)→ az=180° 正午 0°→ az=270° +90°(结束旋转)。窗角≤0(az<90 或 az>270)时 hold 在对应端点。
-- 内框横/顶框/底框不旋转(始终水平)。
-- `--htop: clamp(5, 85, 80 - max(0,alt) * 0.8)`%(太阳越高→内框横越靠近顶部)。
-- 窗户开口 85%:左右框 `translateX(±42.5vw)`。
-- `--frame-top-offset: (alt - 45) × 0.045 vh`(±2vh,太阳越高顶框越低)。
+- `WindowProjection.vue` 绘制四格窗，窗宽为视口宽度的 88%。中间竖棂宽为窗宽的 7.2%，横棂厚为窗高的 8.25%。两种标准共用同一扇窗、遮挡轮廓、天气半影与阴影深度。
+- **修正标准**以济南春分正午为基准，窗光近沿、远沿分别在自页面顶部 5%、95% 处。夏至和冬至正午的近沿分别约为 1% 和 9%，冬至与夏至的投影纵深比约为 1.15。上下沿随高度角连续移动。
+- **真实标准**取所选经纬度的太阳高度角和方位角。窗高 1.5 米对应两个视口高度，即每个视口高度代表 0.75 米。窗台距地为窗高的 15%。以窗高除以太阳高度角的正切求光在地面的投射距离，再按相对窗面的方位分解成横向和进深。切换标准和更新时刻沿当前画面平滑过渡。
+- **窗外轮廓**按立面高度映射到地面。正午右侧盆底贴近窗光上沿，叶尖向页面下方伸展，左侧高处的树枝落在远端。枝叶错相轻摆，花盆固定，页面隐藏时停绘，系统减少动态效果时保留静态枝叶。
+- **桌沿物件**按页面上实际摆放、旋转、裁切后的轮廓接光。书签、便签只留短影，水果、杯具随有效高度增加而投下长影。太阳越低，影子越长，朝向与当前地面日照方向一致。透光区域内的物影与窗棂共用同一深度，重叠处保持同色。新增素材、有效高度、点击行为及验收详见[桌沿物件接入规范](桌沿物件接入规范.md)。
 
 ## 7. 暗角(vignette,z-index 44)
 
@@ -387,7 +358,7 @@ color: #3A2E22;
 - 信息面板:地区/日期/高度角/方位角/窗角度/日出/日落/时段标签(9 段:深夜/凌晨/日出/清晨/上午/正午/下午/日落/黄昏)+ 进度条。
 - 播放控件:后退/暂停/前进/停止 + **速度控制** 5 档(0.5x/1x/2x/4x/8x,间隔 `208/testSpeed` ms)。
 - 天气控制:☀️/☁️/🌧️/❄️/⛈️ + 降水等级滑块(雨雪雷专用)。
-- 台灯模式:自动/开/关按钮 + 色温/亮度/阴影深度滑块(色温/亮度/阴影深度与个性化设置同一状态)。
+- 光影测试与设置共用总开关、氛围色块、毛玻璃、天气光影、台灯模式与色温亮度、夜间超时关灯、阴影开关、深度和投影标准。设置中的「光影实验台」进入 3D 预览。
 - 循环 288 时隙,停止=重置真实时间+关闭控制台。
 - `useSunLight.js` provide/inject 全局共享光影状态。
 
@@ -402,8 +373,8 @@ color: #3A2E22;
 - 色温可调:lampTemp 0-100 滑块,warm rgba(255,180,100)→cool rgba(220,230,255)。
 - 亮度可调:lampBrightness 0-100 滑块,控制 mask 透明区域比例。
 - 钟摆运动:CSS `@keyframes lampSwing` 驱动(8 秒周期),不经过 Vue 响应式。横向 ±1.5vw,两侧 scaleX 0.97/1.03。
-- **mask 祛除阴影**:`.window-shadow`/`.bright-spot`/`.vignette` 三层都加 `mask-image: var(--lamp-mask)`,台灯开启时 mask 中心透明挖洞祛除阴影,关闭时 `mask: none`。
-- **mask 中心固定**(不随钟摆变化),避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
+- 日照色调、天气遮光、窗面投影与暗角共用 `--lamp-mask`。开灯时蒙版中心逐渐透明，桌面亮区的阴影随之减弱。
+- **mask 中心固定**(不随钟摆变化),避免每帧重栅格化 全屏光影层;只有台灯 div 本身做钟摆。
 - **开关灯 2s 渐变**:mask-image 不支持 CSS transition,用 GSAP 补间驱动 `lampAnim`(reactive),`lampDivOpacity` 和 `lampMask` 同步 2s 渐变(ease `power2.out`);mask 挖洞半径随强度缩放(开灯洞从 0 放大,关灯洞缩到 0)。
 
 ## 14. 天气特效
@@ -413,8 +384,8 @@ color: #3A2E22;
 - `cloudFlicker` GSAP 每 4-8s 随机补间 0.1-1,模拟云彩遮阳。
 - `weatherShadowOpacity`:多云=`1-cloudFlicker`,阴=`0.85`(常驻),晴/雨/雪/雷/雾=0——**雨雪雷粒子常驻但不压暗页面**。
 - **雾/阴(V11.63 → V11.66 定稿)**:昏暗常驻 + 3 秒自动开灯补光(见 §13)。`.fog-layer`(z=`--z-deco`+8,当前 278):9 个静态配置不规则雾团,预模糊 `radial-gradient`(**禁 `filter:blur`**,与 `.bg-blobs` 同一周期性重栅格化坑)+ translate-only CSS 漂移;进入 0.4s、转晴离场 1.4s(Vue Transition)。`weatherLightMul` 雾/阴=0.15、阴天压暗常驻;`brightSpotStyle` 压 0 列表包含雾/阴(昏暗天无直射亮斑)。
-- `.shadow-bar.weather-shadow` 在 window-shadow 内,继承同色同 blur。
-- `weatherMultiplier`(晴 1.0/多云 0.55/雨 0.25/雪 0.4)实时驱动 rayStyles/lightLayerOpacity/reflectionStyle。
+- `.weather-shade` 位于日照色调与窗面投影之间，使用当前阴影颜色，透明度为 `weatherShadowOpacity × shadowAlpha`。
+- 阴影开启时，直射日光强度乘以天气系数 `weatherLightMul` 得到 `lightLayerOpacity`，同步控制窗光和暖居体积光。
 - 雪花/雨滴 CSS keyframes + `translateZ(0)` 合成层隔离。
 - bright-spot:雨雪时 opacity=0 隐藏;雾/阴同(无直射亮斑)。
 
@@ -443,8 +414,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 ## 17. 数据流
 
 - 页面 mount 时并发请求 `/public/sun-info` + `/public/weather` + `/public/home` + `/public/feed`。
-- sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowColor, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, dayProgress, windowAngle, hasDirectLight}`。
-- 旋转由方位角驱动(`az - 180`),窗角≤0(无直射光)时 hold 在端点;光柱/辉光/反光在无直射光时全透明;亮斑夜间黑色压暗。
+- `/public/sun-info` 返回每日 288 个五分钟时隙。`getSunScene` 输出光源、光束、配色、高度角、方位角、入射角和昼夜状态，供全局光影与投影器使用。
+- 窗面和暖居光束随太阳方位变化，无直射光时隐去，亮斑在夜间压暗。
 - 每 5 分钟更新一次时隙。
 - 拍立得堆按近 7 天照片筛选(展示 7 张随机),点击 `PhotoViewer` 播放全部近 7 天照片。
 
@@ -538,8 +509,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **侧栏迷你天气**:`.gc-user` 行右端 `.gc-mini-weather` 胶囊(`qi-*` 图标 16px + 温度 13px/600 等宽数字,`gap:3px`,`padding:3px 6px`,圆角 8px,hover 底 `--color-line`);有预警时尾部三角叹号(内联 SVG `components/WarnTriangle.vue`:圆角三角 + 镂空感叹号,`fill: currentColor`,尺寸 `1em`,取预警级别色;光尘侧栏 `.mini-weather` 同款同形),悬浮 tooltip 列全部预警;点击跳 `/weather` 并阻止冒泡到用户信息(避免误进设置)。昵称/家庭名容器 `flex:1` 收窄省略,天气胶囊 `flex:none`,230px 侧栏内不换行。
 - **顶栏品牌区文本截断(V10.43)**:顶栏左侧 `.gc-brand`(屋形 logo + 家庭名 `.gc-title` + 简介 `.gc-sub`)限宽 `min(520px, 46vw)`;名称与简介**单行省略**(`white-space:nowrap; overflow:hidden; text-overflow:ellipsis`),`.gc-brand` 与文本容器 `min-width:0`、logo `flex-shrink:0`——简介最长 200 字,不限宽会溢出挤压右侧工具栏。
 - **晨暮切换扫光(V9.62)**:暖居内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
-- **晨暮分段滑块(V9.63)**:晨/暮分段开关改「滑块 thumb」——`.gc-seg-thumb` 绝对定位盖在选中按钮下,`segMode` 本地 ref 跟随选中态;扫光结束后才更新滑块位置(`waitSweepEnd`),首次定位关过渡、ResizeObserver 跟随语言切换按钮宽度变化;选中文案 `--color-card`、thumb `--color-brand`、hover `--color-brand-hover`。
-- **天气背景待机浮现(V9.63;V11.75 静止时长改 1 分钟 + 顶栏不算背景板;V12.26 浮现中点击/滑动只收起图片、不穿透)**:指针停在「背景板」静止 ≥1 分钟(countdown 每次指针活动重置)后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1),指针一活动即恢复原状。**浮现期间 `pointer-events:auto` + `touch-action:none` 自己接管手势**:轻点走 `@click.stop.prevent` 只把图片收回去,划动超过 18px 也收起(浏览器此时不再补 click,万一尾随一个则由捕获阶段的 `swallowTrailingClick` 吃掉),绝不落到图片后面的卡片/按钮上——触屏平板没有「移动鼠标」这一步,穿透就是误触;触屏上轻点空白处同样起算静止,且最近一次触摸后 800ms 内的合成 `mousemove` 不参与复位(否则图片先被收起、紧跟的 `click` 就会打到下层)。**命中判定排除整条顶栏 `.gc-topbar`(含胞吐工具栏插槽 `.gc-pin`)**:返回键、晨暮开关、滚动后胞吐进顶栏的工具栏按钮上静止都不触发浮现,避免鼠标经过按钮时背景闪现。
+- **顶栏灯与晨暮**共用紧凑的控制区。日月圆片叠放，当前状态靠前。台灯贴在晨暮控件左侧，按实际亮度显示灯泡状态，点击切换，减少动态效果时保留静态指示。
+- **背景与待机**。暖居可选天气图、内置氛围和个人照片，预览下方调节浓度。闲置后进入 §40 的全端屏保。
 - **暖居首页组件化(V9.63;V9.66 组件默认展示优化)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 27 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 1/2/4/6/8/12、行高 1/2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v3`(V9.66 升版);拖动重排时**源卡实时移动到落点作唯一占位**(降透明度)且抑制浏览器拖拽快照,避免出现两张相同卡片;落位按**指针命中的卡片**判定(左/右半区决定前后,压源卡自身或卡片间隙时保持当前落点,越出网格边界收口到首尾),邻居推挤动画照常播放(落位测量取布局位置,不受动画中间态影响);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);**列宽 ≤2 走紧凑图标档**(1 列=纯图标、2 列=图标+最简名称,点击直达);侧栏模块编辑态可拖入首页。**触屏编辑(V11.35)**:卡片多一个 `⋮⋮` 排序手柄(Pointer Events,触屏拖它排序),缩放角 `touch-action:none`,触屏下缩放角 38px、`⋮⋮` 34px、删除 32px。V9.66 组件默认展示(照片卡牌堆/寻物户型图/收支比例条/色相锚点)见 §18d。
 
 ## 18d. 暖居首页组件默认展示规格(V9.66)
@@ -552,6 +523,14 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **色相锚点**:每卡 `--chip: var(--blob-N)`(N=1 陶土/2 暖沙/3 鼠尾草/4 暖米/5 暖木)内联注入,`.gc-card-h3::before`(3px×12px 标题竖条)+ `.gc-ic`(26px 图标芯片)取 `var(--chip)` 分色,让 6 张卡不再共用米色面+棕字。
 - **侧栏拖拽幽灵**:`.gc-drag-ghost` 胶囊形态(白卡+陶土虚线边+圆点+标题)随鼠标,进网格 `.is-card` 放大 1.6 + 渐隐;侧栏编辑态三态——待拖入 `widget-src`(虚线抓手 hover 右移 3px)、已拖入 `widget-added`(降透明 0.5 + 禁拖 + 「已在首页」角标)、不可拖入 `widget-none`(降透明 0.45 仍可点)。
 
+### 暖居纸面、窗边目录和桌沿交互
+
+- 暖居首页用同色水粉卡纸、压纹纤维纸和叠层纸分配组件表面，书布用于导航和晨暮切换座。常规业务页将纸纹用于工具栏、标题或图注，保留数字表格的实色行底与独立游戏的舞台材质。
+- 暖居首页的相册可选手动或自动轮播，家人动态与纪念日可横滑，收支可切到近半年趋势。编辑时用同尺寸占位预览邻卡让位，松手保存，Esc、失焦或取消手势恢复原布局。
+- 窗边以家庭照片、手记、按时序排列的近况和当天安排构成首页。「全部功能」在宽屏侧栏、窄屏页头打开，支持分类、别名搜索、固定与排序。返回键或 Esc 收起目录并回到原页面。
+- 「上次在…」展示本人最近 24 小时可继续的内容。桌面侧栏、窄屏浮卡、手机首页书签按可用空间展示。普通页面桌沿使用透明底旧画册水粉物件，物件避开交互区，倾斜不超过 ±30°。猫狗脚印每三分钟沿页面边缘经过，减少动态效果、屏保和沉浸播放时暂停。
+- 手机设置从目录进入分类，详情先回列表。外观与显示将窗下桌面收在暖居卡、画面布局收在首页内容，设置组间距 24px，相邻选项以淡虚线分隔。四款窗扇、双叶桌面图标按设备选择。
+
 ## 18c. 主题切换圆形色块(ThemeSwatch,V9.65)
 
 - **结构**:设置页「主题」行的 el-radio 替换为 `ThemeSwatch.vue`——每个主题一个圆(46px),底色在晨/暮两色间 6s 交叉渐变(`--sw-a`/`--sw-b` 取自 theme meta),下方主题名;hover 圆弹性放大 1.5 并展示主题特色动效,选中圆描边 `--color-brand` + 右下对勾。
@@ -559,7 +538,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **光尘圆动效 = 迷你丁达尔体积光**:hover 时「光晕 bloom + 单条羽毛光柱 + 浮尘」——光晕暖金 radial-gradient(screen);光柱 `linear-gradient(to bottom, 暖金 rgba(255,218,158)→rgba(255,188,108)→transparent)` + `filter:blur(2.5px)` + `mix-blend-mode:screen`,方向**自右上射向左下**(`rotate(31deg)`;负角度在屏幕坐标 y 向下里会把下端往右摆,与直觉相反);光柱缓慢呼吸明暗 + 轻微摆(模拟太阳方位角漂移 + 10s 微闪)。浮尘用 `var(--light-dust)`/`var(--light-dust-glow)`(主题同款)+ screen + 向下漂移淡出,每颗 `--dur/--delay` 错开(时长 5.5~8s、相位 0~3.2s,ease-in-out)。
 - **暖居圆动效**:呼吸暖光 `--glow-warm` radial + 「会呼吸的窗」(旋转窗框)+ 金色尘粒。
 - **暖居配色补充(V9.65)**:陶土粉(`--blob-1`)/鼠尾草绿(`--blob-3`)在暖居主体里原先极少(五色漂移色块被 `html.theme-warm .bg-blobs{display:none}` 关闭)——补充点:①studio 外壳叠极淡双色径向渐变底衬(右上陶土 + 左下鼠尾草绿,`rgba(...,.12)`);②天气窗左下角鼠尾草绿光斑(`rgba(var(--blob-3),.22)`,对角平衡右上陶土光斑);③快捷入口图标 `.gc-link-icon` 鼠尾草绿底 `rgba(var(--blob-3),.16)`、列表图标 `.gc-ic` 陶土粉底 `rgba(var(--blob-1),.14)`。
-- **晨暮分段开关同步(V9.65)**:顶栏 `.gc-seg` 滑块/高亮跟随 `themeStore.mode` 立即同步(去 `waitSweepEnd` 延迟)。
+- 暖居顶栏的日月圆片跟随当前模式即时更新。
 
 ## 18e. 表格(el-table)规范(V11.53)
 
@@ -575,11 +554,11 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **背景随滚动**:`.bg-blobs` 用 `position: fixed` 不随页面滚动;移除 `background-attachment: fixed`。
 - **关闭效果时跳过定时器**:`flickerTimer` 在所有开关关闭时 return,避免持续触发 sunScene 重写。
 - **v-if 优化**:blend 层(bright-spot/reflection/light-layer/dust-layer/lamp-light)opacity≤0.01 时 `display:none`。
-- **translateZ(0) 隔离**:bg-blobs、bright-spot、reflection-layer、light-layer、vignette、dust-layer、snow-layer、rain-layer、sidebar-nav、5 个面板滚动区。
+- **translateZ(0) 隔离**:bg-blobs、bright-spot、weather-shade、light-layer、vignette、dust-layer、snow-layer、rain-layer、sidebar-nav、5 个面板滚动区。
 - **contain:layout style**:app-sidebar、draggable-panel、music-player。
 - **rAF 写 Vue ref**:原 `useSunLight.js` 钟摆用 `requestAnimationFrame` 每帧写 ref,触发 `SunLightLayer.vue` 每帧重渲染 → 改 CSS `@keyframes lampSwing` 完全绕过响应式。
 - **常驻事件监听器**:原 `useDragResize.js` 每实例 `onMounted` 挂 `mousemove`/`mouseup` → 改 `onDragStart` 时挂、`onMouseUp` 时移除。
-- **mask 中心固定**:台灯 mask 不随钟摆变化,避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
+- **mask 中心固定**:台灯 mask 不随钟摆变化,避免每帧重栅格化 全屏光影层;只有台灯 div 本身做钟摆。
 - **mousemove 节流**:idle 检测 2s 节流。
 
 ## 20. 运维页·详细日志(Trace Logs,`/ops` 第 5 个 tab)
@@ -736,15 +715,15 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 51. **户型图尺子测量工具(V9.58)**:编辑态工具栏新增「尺子」按钮(内联 SVG 直尺,36px 工具图标同款,与标定/底图/裁剪/粘合并列,点击在 select↔ruler 间切换);按钮右下角小三角角标(`.fp-ruler-caret` 暖棕底白三角,**仅当有已存尺子时显示**),点击弹 el-popover(`.fp-ruler-list` 260px,挂 body 需全局样式)列出跨房子/楼层全部已存尺子——行=房子名(13px 单行省略)+楼层·米数(11px 次要色)+删除钮,点击行进对应房子+楼层并居中聚焦(`focusRuler`);画布内:点两点测距离(第一点蓝色预览虚线跟随鼠标,落第二点成测量线段),落点自动吸附房间边角/家具角点(阈值 12px 屏幕恒定);测量线段=蓝色虚线(`.fp-ruler-line` #4a8fc2 虚线)+两端圆点手柄(拖拽吸附)+中点米数标注(白描边);拖线段整线平移(两端各自吸附)/拖端点改位;单条删除=线段中点红叉(`.fp-ruler-del` 反缩放屏幕恒定)/底部居中「清除测量」按钮(`.fp-ruler-clear` 蓝底白字)一键清空;查看态尺子继续展示但不可交互(`.fp-ruler.is-inactive`)。
 
 52. **壁纸氛围屏**(`/wallpaper`,V9.87;V9.88 加 WE 参数桥、V9.89 加语言/令牌,独立全屏——`meta.standalone` 不套 ihomy 外壳,无侧栏/页脚/回顶/播放器;不引 Element Plus,全原生控件 + 主题 CSS 变量):
-   - **分层(z-index)**:兜底底色 `.wp-base`(0,`--color-bg`→`--color-bg-2` 160° 渐变,防关特效后留白)→ 光影层 `SunLightLayer`(自带,glass-bg 2/窗影 68/浮尘 76/体积光 78/台灯 100)→ 环境层 `.wp-ambient`(10,`pointer-events:none`)→ 照片层 `.wp-photos`(30)→ 角落控件 `.wp-ui`(40)→ 登录卡 `.wp-login`(90,遮罩 `pointer-events:none` 只让卡片吃点击)。
+   - **壁纸布局**使用站点光影层，角落保留时钟、天气与控制区。十一项组件独立增删，收支与积分在相册上方并排，菜谱、健康避开时钟与待办，盆栽靠下居中。矮屏缩小相册并调整卡片位置。
    - **环境层(左下)**:时间 `clamp(52px,8.5vw,118px)`/字重 250/`tabular-nums` 等宽数字 → 日期·星期(+ 家庭名,登录后)13.5px 字距 .08em 次要色 → 天气行(温度 26px + 天气 15px + 城市 13px 次要色,间距 10px,整块 padding `clamp(28px,4.5vw,72px)`)。
    - **照片层(居中)**:`.wp-stack` `min(46vw,640px)` + 4:3;4 张卡扇形摊开(每张步进 `--dx 30px/--dy 14px/--rot 4deg/--z 递减`,transform 拼 CSS 变量便于覆写),`transition: transform .8s cubic-bezier(.22,1,.36,1)`;整层 `opacity 0→1` `.9s ease` 由 `.revealed` 驱动;subtitles 字幕卡居中下方 28px `.wp-cap`(胶囊/白字/黑 38% 半透明/单行省略 `max-width:46vw`)。
    - **待机浮现(核心交互)**:鼠标静止 3s → 照片浮现 + 控件隐去 + 开始 6s 轮播;**页面加载/页内登录后即起算**(壁纸/副屏场景鼠标不动也要能看到照片);任意移动/触摸 → 照片立即收起、轮播暂停、控件浮现;控件再静止 2.2s 隐去;移动落在 `.wp-ui`/`.wp-login` 上只复位、不重新起算浮现。
    - **角落控件(右下;≤768px 改右上)**:`.wp-hint`(12px 次要色,`@media (hover:none)` 隐藏)→ 四组 `.wp-seg` 分段器(半透明卡片底 `rgba(var(--color-card-rgb),.74)` + 圆角 12px):主题(暖居/光尘)+ 晨暮(自动/晨/暮)+ **语言(中/EN,V9.89)** + **复制壁纸令牌(仅登录后显示,V9.89)**;`.wp-segbtn` `all:unset` + 内边距 6px 12px + 圆角 9px,选中 `.on` 品牌色底 + `--color-brand-text`;整块 opacity/translateY .5s 过渡,`pointer-events` 随显隐切换(隐藏时不吃点击)。
    - **登录卡(居中,未登录时唯一 UI)**:360px(窄屏 92vw)卡片 + 30/26/24 内边距 + 圆角 16 + `--shadow-hover`;标题 ihomy 22px + 说明 12.5px 次要色 + 邮箱/密码/验证码三个原生输入(10px 12px 内边距/圆角 10/聚焦品牌色描边)+ 验证码图 108×40 圆角 8 点击刷新(与输入同一行)+ 错误文案 12.5px `--color-accent` + 主按钮(品牌色/圆角 12/hover 深一档/提交中降透明度)。
    - **窄屏与触屏**:≤768px 控件改挂右上角(右下角会换行成 3 行、压住左下角日期/天气行)、隐藏鼠标提示文案;补 `@touchstart.passive` 唤出控件(触屏无 mousemove)。
-   - **主题**:直接复用全局 `themeStore`(与站点共享 `ihomy-theme`),晨暮切换沿用暖居扫光蒙版;页面无自建配色。
-   - **壁纸令牌入口(V9.89,两处)**:①壁纸页角落控件里的「复制壁纸令牌」按钮(登录后出现,与主题按钮同款 `.wp-segbtn`,复制成功文案切「已复制」2.5s,剪贴板不可用退回 `window.prompt` 让用户手动取);②**ihomy 设置页** 设置 → 个性化设置 → 「壁纸氛围屏」`.settings-card` = 区块标题 + 说明 `.share-tip`(12px 次要色)+ **整行只读令牌框**(`el-input` 只读,令牌完整可见——供剪贴板不可用时手动选中)+ `.form-footer` 右对齐两个按钮(主色「复制壁纸令牌」+ 幽灵「打开壁纸页」)+ 尾部 `.share-tip` 凭证提示。**两个按钮别塞进 `.share-row`**:EP 全局 `el-input` 宽度 100%,同行的输入框会撑满整行、把按钮顶到下一行且左对齐(实测 1280px 下输入框 758px + 按钮换行)。
+   - **壁纸主题**默认为暖居，独立保存到 `ihomy:wallpaper:theme:v1`。Wallpaper Engine 属性与 URL 可覆盖壁纸显示；离开时恢复站点主题。暖居用书布控件、水粉卡纸和有相角的相册页。
+   - **壁纸令牌入口(V9.89,两处)**:①壁纸页角落控件里的「复制壁纸令牌」按钮(登录后出现,与主题按钮同款 `.wp-segbtn`,复制成功文案切「已复制」2.5s,剪贴板不可用退回 `window.prompt` 让用户手动取);②**ihomy 设置页** 设置 → 个性化设置 → 「壁纸氛围屏」`.settings-card` = 区块标题 + 说明 `.share-tip`(12px 次要色)+ **整行只读令牌框**(`el-input` 只读,令牌完整可见——供剪贴板不可用时手动选中)+ `.form-footer` 右对齐两个按钮(主色「复制壁纸令牌」+ 幽灵「预览壁纸页」)+ 尾部 `.share-tip` 凭证提示。**两个按钮别塞进 `.share-row`**:EP 全局 `el-input` 宽度 100%,同行的输入框会撑满整行、把按钮顶到下一行且左对齐(实测 1280px 下输入框 758px + 按钮换行)。
    - **两种语言入口的分工**:WE 属性面板的「语言」下拉(加载时一次性投递,改完需重启预览)负责 WE 环境;页内 中/EN 按钮负责即时切换;两者都落 `applyLocale()`,写同一个 `ihomy-lang`(与站点共享偏好键)。
 
 53. **咔哒发布页**(`/kada`,V9.84 新增、V10.73 改为像素 CRT;`meta.standalone` 同壁纸页,不套 ihomy 外壳、不引 Element Plus,全原生控件 + 页内 CSS 变量):
@@ -900,7 +879,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 1. **老人模式**:`html.elder-mode` 下只提高 Element Plus 基准字号与文字对比度、加粗卡片边框,不改组件里写死的字号档位;首页换成 `ElderHome`(大字问候 + 日期天气 + 今日安排 + 六个大按钮),原仪表盘不渲染;深色另给一套高对比色。
 2. **儿童模式**:`html.child-mode` 隐藏聊天浮窗与命令面板;导航只留内容消费页(三端同口径);右下角常驻「家长」小入口(不是设置页——设置页被白名单挡住),输 4–8 位密码才退出;文案写明「这是本机使用限制,不是账号权限」。
 3. **平板双栏**:宽屏判定 = 窗口 ≥900px **且** 屏幕短边 ≥600dp;通用 `.wide-cols` / `.wide-col`(`align-items:start`、`min-width/height:0`、`max-height:var(--wide-col-max)`、`overscroll-behavior:contain`);列净高由 JS 实测写变量,窄屏保持原 DOM 分支不加 CSS `order`;列宽用 `clamp()` 按内容区伸缩,900px 下文件/图书馆左栏不能被压出横向滚动条。
-4. **看板(`/kiosk`)**:左侧大时钟 + 天气、右侧今日待办 + 未来几天;待办行可勾选(提醒/计划任务),其余只读;顶部天气预警条用预警自带色做左色条,类型 + 标题两行,无预警整条不渲染;长开页禁 `backdrop-filter`,防烧屏每 60s 位移 ±8px,退出用右下角隐形热区长按 3s。
+4. **只读待机**。手机、平板和桌面共用 §40 屏保。触摸或按键唤醒，回到原页面。
 5. **行手势与长按菜单**:滑动/长按只是加速通道,**每行都保留「更多」按钮**,菜单与滑动共用同一份 items;长按 480ms、位移 10px 取消、横滑 60% 或 36px 松手落位;禁止在 `pointerdown` 就 `setPointerCapture`;长按后补发的 click 按 320ms 时间窗只吞一次。
 6. **下拉刷新**:只在 `scrollY===0`、单指向下、`dy > 2|dx|` 时接管;全程 passive 不 `preventDefault`;指示器直接写 `style.transform`,不走响应式 ref;最少转 300ms。
 7. **命令面板**:`--z-palette: 215`(盖住页面弹窗,但低于 Popper/轻提示);`↑↓/Enter/Esc` 由面板独占并在 capture 阶段拦截;打开记 `activeElement`,关闭先还原焦点再执行「聚焦搜索」;独立页/沉浸页不渲染;触屏可打开(行高 ≥44px),`hasPointer` 只限制快捷键。
@@ -961,24 +940,26 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 7. **浮窗拖动与缩放**:浮窗自身 6px 判定为 dock(收纳)阈值,移动端底部 64px 为删除区;缩放手柄 `.chat-resize-zone` 四角 16×16、四边 6px、透明且默认不显形(悬停/拖动才可见);位置存 `ihomy:chat:panel:v1`,展开面板 360×520。
 8. **移动端半屏抽屉**:展开时给 `html` 加 `chat-sheet-open`,`--chat-sheet-h: 52vh`(支持 dvh 时 `52dvh`),页面底部补 `calc(var(--chat-sheet-h) + env(safe-area-inset-bottom) + 12px)` 内边距,最后一条消息不被抽屉遮住;面板 `max-width:min(360px, calc(100vw - 36px))`。
 
+9. **按住说话**。长按聊天浮球约 450ms 打开 AI 语音，松手后转写并发送。输入区的麦克风将转写文字保留在输入框，可编辑后再发送。
+
 ## 40. 移动端底栏与屏保
 
 1. **五个槽位**:`utils/mobileTabs.js` 固定 5 槽(4 个页面 + 中间拍照键),`useMobileTabs.js` 读偏好,编辑用 `MobileTabEditor.vue`;本机键 `ihomy:mobile:tabs:v1`、账号同步键 `mobile.tabs.v1`;取到的配置不足 5 槽时用默认项补位,不渲染空槽。
 2. **底栏尺寸**:bar 高 `calc(56px + env(safe-area-inset-bottom))`;普通项图标 22px、文字 11px/1.1 上下排列,选中项转主色并高亮图标;激活指示条 3px。
 3. **拍照键**:`.tab-item.is-capture` 不参与等分、只居中;`.capture-btn` 50×50、`margin-top:-34px` 上凸、圆形(brand→primary 160° 渐变)、3px `rgba(255,255,255,.92)` 白边(深色改卡片色)、阴影 `0 6px 16px brand/.42, 0 2px 6px black/.12`、`:active` 缩到 0.92;上传中用 `.capture-spinner`(20px)替图标并禁用重复点击。
-4. **屏保两模式**:`components/screensaver/ScreensaverOverlay.vue` 根 `.ss`;照片模式 `.ss-photo-mode`(`.ss-photo` + `.ss-photo-scrim` 压暗 + `.ss-clock/.ss-meta/.ss-weather/.ss-temp`),看板模式 `.ss-board`(头部 `.ss-board-head` + 卡片 `.ss-card` 与列表行 `.ss-row`);层级 `--z-immersive`。
-5. **点击不穿透**:覆盖层上任意点击/触摸只做唤醒,处理函数必须 `stopPropagation` 且**不 `preventDefault`**(保留滚动与手势);唤醒后立即卸载覆盖层,不留透明遮罩挡下面的点击。
-6. **空闲判定**:沿用 `BG_IDLE_MS`(默认 60s)与 `BUSY_SELECTORS` 口径——播放中、输入中、弹窗打开不触发;开关与模式存 `ihomy:screensaver:v1`。
+4. **全端屏保**在设置的 1–30 分钟空闲后覆盖整屏。背景可选纯黑、天气 AI 图或我的图片（内置氛围 / 上传照片）。时间与天气、今日待办、未来日程、纪念日、家庭照片五张卡片可分别开关，空卡自动隐藏。
+5. 上传照片把浓度映射到原图的 80%–100% 亮度，渐变仅压暗底部，文字配局部阴影。卡片按可用宽度排布并定时轻移。
+6. 点击、触摸或按键只唤醒当前页面。未登录、儿童模式、后台、通话、输入、播放、游戏和编辑等场景暂停触发。旧偏好由 `ihomy:screensaver:v1` 迁移。
 
 ## 41. 备份与迁移界面
 
-1. **运维页四段式**:`views/ops/tabs/OpsBackup.vue` = 概览 `.backup-summary`(4 张 `.backup-stat.card`:占用 / 磁盘可用 / 下次执行 / 最近成功)→ 动作行 `.filter-row.backup-actions`(立即备份基础数据 / 内容数据 / 全量 / 生成迁移包 + 刷新)→ 策略卡 `.card.backup-policy`(`.section-label` + `el-form label-width="150px"`)→ 任务表 + `.backup-pager`。
-2. **策略表单**:启用开关;cron 六段式输入 `.cron-input.mono`(占位 `0 30 2 * * *`),每日配 `.time-input`、每周配 `.dow-input`(只填星期);保留策略 `.retention-row` 用 `el-input-number` 并给死区间——基础日备 1–90 天、周备 0–52、月备 0–24;全量周备 1–52、月备 0–36;家庭包 1–365 天、保留 1–20 份。
-3. **规则提示**:表单下方 `.backup-rule` 实时把当前选择拼成一句人话(多久备一次、留几份),不弹窗、不写表名或内部键名。
-4. **任务表**:列固定为 类型/状态/触发/开始/耗时/大小/文件数/行数/说明;状态用 tag(成功/失败/进行中),只有成功行才出下载按钮(图标按钮 + tooltip);失败原因写进「说明」列,不弹全局报错;删除走 `ElMessageBox` 二次确认。
-5. **迁移包只导出**:站内不提供「一键恢复」——下载后按包内 `RESTORE.md` 在服务器导入;家庭侧 `BackupSettings.vue`(`?tab=backup`)必须显式写明这句。
-6. **限额不在界面猜**:后端门槛(磁盘可用 <1GB、备份总量 >20GB 拒绝新备份,单包 >4GB 拒绝下载)只在触发失败时以任务说明/错误提示呈现,界面不显示推算的剩余额度或进度预估。
-7. **家庭侧样式**:设置页分类「备份」= `.card.settings-card` + `.section-label` 竖线标题 + `.share-tip` 说明 + `el-alert type="info" .backup-rules` 规则条 + 生成按钮(生成中 `.backup-running` 并禁用)+ 任务列表 + 恢复提示 `.share-tip.backup-restore`。
+1. **概览与策略列表**展示空间、策略和执行概况。每条策略直接列出名称、模块、执行周期、保留期、最近执行与下次执行，可原位启停或从操作列编辑、执行和删除。
+2. **策略编辑**可勾选多个业务模块，选择每日、每周或每月及执行时刻。按需指定保留天数，周期、时刻与下次执行以可读文字呈现。
+3. **执行记录**可按策略、类型和状态筛选。任务行展示触发来源、状态和运行结果，成功产物可下载。
+
+4. **迁移包只导出**:站内不提供「一键恢复」——下载后按包内 `RESTORE.md` 在服务器导入;家庭侧 `BackupSettings.vue`(`?tab=backup`)必须显式写明这句。
+5. **限额不在界面猜**:后端门槛(磁盘可用 <1GB、备份总量 >20GB 拒绝新备份,单包 >4GB 拒绝下载)只在触发失败时以任务说明/错误提示呈现,界面不显示推算的剩余额度或进度预估。
+6. **家庭侧样式**:设置页分类「备份」= `.card.settings-card` + `.section-label` 竖线标题 + `.share-tip` 说明 + `el-alert type="info" .backup-rules` 规则条 + 生成按钮(生成中 `.backup-running` 并禁用)+ 任务列表 + 恢复提示 `.share-tip.backup-restore`。
 
 ## 42. 资源列表与长按多选
 
@@ -1021,13 +1002,17 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 9. **战绩分享图**:数据芯片(`.gh-chip`)可点击时加 `is-shareable` + `v-a11y-click`,点开 `components/games/GameScoreShare.vue` —— 版式与绘制在 `utils/games/scoreCard.js`(纯布局函数 + Canvas 2D,1080×1350 竖版:标题/日期/正方形棋盘/数据块/页脚),**颜色一律从主题变量读出后传入**(Canvas 读不到样式表),所以暖居/深色下生成的图和界面同一套配色;出口三件:保存图片 / 复制图片 / 系统分享(壳内走 Capacitor `shareBlob`)。**页面级弹窗放 `#overlay` 插槽**(即 `.gs-rail` 内),不要放进游戏区 —— `.gs-body` 是尺寸容器会把 `fixed` 定位困住;全屏时传 `:append-to-body="false"`(挂在 body 上的弹窗在全屏元素里看不见,这是 §27 的唯一例外)。
 10. **规则弹窗**:头部「规则」键开 `el-dialog`(标题「游戏名 · 规则」,页脚「知道了」),正文 `.gs-rules-body` 自己滚(`max-height: min(56vh, 460px)`,`max-height:560px` 降 44vh),**规则再长也既不挤占棋盘、也不把页脚顶出屏幕**。规则分层时给外壳传 `rulesPages`(页码标签数组),顶部出胶囊分页(`.gs-rules-tabs`,溢出横滑),`#rules` 插槽用 `page` 渲染当前页 —— 页面不要自己写 tab/步骤条。弹窗挂在 `.gs-rail` 内且 `:append-to-body="!isFullscreen"`(同分享弹窗,§27 例外);正文排版(`p/ul/ol/li/h4/strong`)在 `main.css`(插槽内容跨作用域)。**禁止再把规则写成页面里的常驻说明条或折叠面板**。
 
+### 棋盘与手牌控件
+
+连连看暂停时遮住整张棋盘，恢复按钮在遮罩内。数独宽屏用时条贴在棋盘上方，与棋盘上缘保持 8px，数字列与棋盘顶对齐。麻将绿毡上的托管按钮在各主题使用半透明白色，选中状态同步 `aria-pressed`。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
-2. 日出后太阳方位到达 90° 时光柱从左上方斜射(角度 -90°),亮斑从黑色变黄,阴影最深;正午光柱垂直(0°),亮斑透明,阴影最浅;日落前方位到达 270° 时光柱从右上方射(+90°),亮斑变橙红;太阳方位在 90°~270° 之外(窗角≤0)时无直射光,光柱不可见;夜间全黑,阴影最深待命在日落位置,凌晨 2 点跳变回日出角度(无人看,无感)。全天平滑过渡无扫光。
-3. 光柱在相册和面板之上(screen 变亮),灰尘粒子在光路中漂浮发光;左右框(上层阴影 z=49)盖住光柱顶部。
-4. 阴影重叠区域颜色不叠加变深(灰阶 darken 幂等)。
-5. 内容组件(相册/面板)在日间有轻微反光高光(soft-light,跟随光源位置)。
+2. 在济南春分、夏至、冬至的正午切换修正标准，检查 §6 的上下沿与季节比例。切到真实标准，检查窗台起点与地面影长随高度角平滑移动。
+3. 暖居在有直射日光时显示动态光柱与辉光，随方位和天气变化，夜间隐去。
+4. 正午盆底靠近上沿，枝叶向远端延伸。比较杯子和书签的落影，再将它们移到窗棂内，重叠区域保持同一深度。
+5. 调整阴影深度和天气时，窗棂、枝叶与桌沿物件随同一画面同步变化。
 6. 黑胶唱片播放器:有背景歌单且曲目>0 时显示在左下角(`left:240px bottom:24px z:55`),hover 放大唱片+展开歌名/进度条/控件;无歌单或无曲目时不渲染;切换家庭自动重载。
 7. 全局导航栏(AppSidebar)左侧固定,含家庭名/模块导航/系统下拉(设置+运维)/主题切换/台灯三态/语言/铃铛/用户头像;关灯时按钮伪元素径向发光圈脉冲动画。
 8. ≤960px 时左侧面板和纪念日隐藏,只保留相册 + 导航栏 + 紧凑天气 + 小唱片。

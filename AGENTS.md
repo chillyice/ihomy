@@ -102,7 +102,7 @@ cd backend;  .\mvnw.cmd -B clean package -DskipTests   # 只求编译
 cd frontend; npm run dev                      # 5173,代理 /api → 8080
 cd frontend; npm run lint; npx vitest run; npm run build
 ```
-- **基线**:后端 511 tests(纯逻辑不起 Spring);前端 lint 0 error/0 warning + vitest **1687 passed / 159 文件**(`pool: threads`,空载全量约 24s;2026-11-23 实测) + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **43 chunk / 1481.00KiB**(V14.4 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
+- **基线**:后端 531 tests / 70 suites;前端 lint 0 error/0 warning + vitest **1726 passed / 162 文件**（V14.64 实测） + `format:check`(历史遗留口径 踩坑速查 §1.13,**本次改动文件必须 `prettier --write` 后通过**);首屏初始 JS **43 chunk / 1481.00KiB**(V14.4 实测,按 `dist/assets/index-*.js` 静态 import 闭包求和);autotest `pytest -m api` 37 passed(仓库外 `..\autotest_framework`)。
 - **冒烟**:`GET /api/auth/captcha` 取 id → `POST /api/auth/login {email,password,captchaId,captchaCode:'qwer'}`,code=0 即有 token。**健康检查** `/api/public/health`(UP→200 / DEGRADED→503)、`/api/ops/health`(OPS,含依赖耗时)。
 - **闸门(CI 最先跑)**:`doc-drift-check.sh` + `gen-code-map.sh --check` + `doc-index.sh --check`;随后前后端构建、起库导 schema、登录冒烟。
 - 本机 JDK 21、Node 24 LTS(最低 22.12)、MySQL 8;没装 mvn 用 `C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`,`JAVA_HOME=C:\Program Files\Java\jdk-21`;clean 被锁改跑 `-B test`。
@@ -135,7 +135,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **记账本**:整本按成员档位(`family_book_permission`:NONE/READ/WRITE/MANAGE,**无行=WRITE**),OWNER 恒 MANAGE;**不走 `@RequirePermission`**,用 `BookPermissionService.requireRead/requireWrite`;账户 chip **只客户端过滤本月明细**(`accountRecords`,不新增请求)。**贷款** `account_id`=初始还款账户,换账户走 `ACCOUNT_CHANGE`(**不生成转账**),无初始账户按首次绑定(`foldInitialAccountChange`);到期期次调 `POST /loan/repay/sync`,后端按 `(loan_id,period)` 幂等补插;调息落在还款区间内**该期按天分段计息**;**月供唯一源 `utils/loan.js`**。需求 §4.5.5/§4.12.4。
 - **聊天室**:WS 协议 v2,消息六类(`common/ChatMsgType`,payload ≤4KB,渲染禁 v-html);连接由 `stores/chat.js` 全局单持有(退避重连 3→60s,登出清场);**同家庭或同亲友圈可私聊**(`sys_chat_dm_message`);浮窗键 `ihomy:chat:float:v1`;通话/对战信令 WS 定向,家庭隔离服务端校验;通话结束单点落 CALL 卡(Redis 幂等)。协议 踩坑速查 §11/§13。
 - **家庭封面**:一字段三档——门牌(暖居 44×44 / 光尘 30×30)、识别(列表 56×56、移动端 44px)、对外(分享落地 16:9);`PUT /family.coverImage`:缺省/null=不改、空串=清空落 NULL、新值=换图删旧(`/files/` 前缀把关);`?hid=` 只经 `parseShareQuery` 校验后传 `/public/home`。
-- **早安与移动端**:每日首屏 `MorningOverlay.vue`,场景/云层/天气照片口径在 `utils/morning.js`(纯函数+spec),设置页可预览;光向与光尘同源。底栏五槽位 + 拍照键;屏保键 `ihomy:screensaver:v1`,仅手机端、只读、点击只唤醒不穿透。细则 UI §38/§40。
+- **早安、移动端与屏保**：每日首屏 `MorningOverlay.vue`，场景取 `utils/morning.js`，底栏五槽位含拍照。全端只读屏保共用 `ihomy:screensaver:v1`，空闲 1–30 分钟触发，三种背景、五张卡片可选，点击或按键只唤醒。细则 UI §38/§40。
 
 ## 后端规范
 
@@ -155,7 +155,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 3. **样式与图标**:CSS 变量(`main.css`)+ `html.dark`;不声明 serif;需被类覆写的内联样式走变量(§3.4);图标 `el-icon`,Setting/Monitor 内联 SVG(`stroke-width:2px`)。
 4. **动画与毛玻璃**:GSAP 入场;`translateZ(0)` 隔离合成层;`contain: layout style`;避免 `background-attachment: fixed`;毛玻璃 `blur(24px) saturate(1.1)`,hover 用 `transform`,**长开/持续动画页别用**(§3.10);持续动画 CSS `@keyframes` > GSAP > rAF,**禁 rAF 每帧写 ref**。
 5. **可拖拽与手势**:`useDragResize`(位置尺寸持久化,监听按需挂载,**指针捕获只在真拖动时做** §3.35,手柄 Pointer Events + `touch-action:none` §3.61);移动横滑只识别意图不 `preventDefault`,起手在横滚容器/输入框/弹窗内不接管,切 Tab 记住 `scrollY`。
-6. **光影全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。
+6. **光影全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。窗格、树影、桌沿物件共用投影遮罩与深度。新增桌沿物件按 `docs/桌沿物件接入规范.md` 登记有效高度与入口。
 7. **i18n**:可见文本 `$t`,中英对齐;`en` 独立懒加载(`ensureLocale`);`{`/`}`/`@` 必须转义否则构建断整页;守门 `message-format.spec.js` + `hardcoded-cjk.spec.js`(保留项进 `ALLOW`)。
 8. **共享逻辑**:重复逻辑先抽 `utils/`(动态流 `feed.js`、枚举 `dictText`、金额 `money.js`、日期 `date.js`);computed 禁 `Math.random()`/`Date.now()`/副作用,一次性计算用 `ref` + `watch(immediate)`。
 9. **可点击非按钮与文案**:用 `v-a11y-click`;`<img>` 必须 `alt`;用户可见文案、`BizException`、`@Operation` 只讲用户能做什么,不写表字段/配置键/枚举码/节律。
