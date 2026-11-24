@@ -64,6 +64,48 @@ export function writeDisplayMode(state, storage = globalThis.localStorage) {
   }
 }
 
+// —— 按账号分开的记录 ——
+// 同一台设备上,儿童模式只该锁住使用它的那个成员(家长的账号不受影响),所以
+// 记录按账号 id 分开存;旧版那条不分账号的记录会在首次绑定时迁移给第一个登录的账号。
+const USER_KEY_PREFIX = 'ihomy:display-mode:u'
+const userKey = (userId) => `${USER_KEY_PREFIX}${userId ?? 'guest'}:v1`
+const isActivePin = (pin) => (pin && typeof pin === 'object' ? pin : null)
+
+/** 读某个账号在这台设备上的显示模式;没有记录时回落默认(不含密码,未开启即无密码) */
+export function readUserDisplayMode(userId, storage = globalThis.localStorage) {
+  const fallback = { mode: 'normal', pin: null }
+  try {
+    const raw = storage?.getItem(userKey(userId))
+    if (raw) {
+      const saved = JSON.parse(raw)
+      if (!saved || typeof saved !== 'object') return fallback
+      return { mode: isValidMode(saved.mode) ? saved.mode : 'normal', pin: isActivePin(saved.pin) }
+    }
+    // 旧版全局记录(不分账号)借给第一个绑定的账号,迁完即删,避免之后又借给别的账号
+    const legacy = readDisplayMode(storage)
+    if (legacy.mode !== 'normal' || legacy.pin) {
+      writeUserDisplayMode(userId, legacy, storage)
+      try {
+        storage?.removeItem(DISPLAY_MODE_KEY)
+      } catch (e) {
+        // 忽略
+      }
+    }
+    return legacy
+  } catch (e) {
+    return fallback
+  }
+}
+
+/** 写某个账号的显示模式(家长替孩子设置时也走这里) */
+export function writeUserDisplayMode(userId, state, storage = globalThis.localStorage) {
+  try {
+    storage?.setItem(userKey(userId), JSON.stringify({ mode: state?.mode || 'normal', pin: isActivePin(state?.pin) }))
+  } catch (e) {
+    // 忽略配额/禁用存储
+  }
+}
+
 const SALT_BYTES = 16
 const PIN_RE = /^\d{4,8}$/
 

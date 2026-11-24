@@ -1,6 +1,13 @@
 package com.ihomy.service.access;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
+import com.ihomy.entity.Diary;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,6 +20,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ContentAccessServiceTest {
 
     private final ContentAccessService service = new ContentAccessService();
+
+    @BeforeAll
+    static void initTableInfo() {
+        // 让 LambdaQueryWrapper 能解析 Diary 的列名(纯单测不起 Spring)
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Diary.class);
+    }
 
     private static final Long FAMILY_A = 10L;
     private static final Long FAMILY_B = 20L;
@@ -172,5 +185,63 @@ class ContentAccessServiceTest {
         assertThat(service.canShare(ContentKind.VAULT, FAMILY_A, MEMBER, "FAMILY", memberOfA(), "SELF_ONLY")).isFalse();
         // 跨家庭:不是自己的内容不能分享
         assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", memberOfB(), "SELF_ONLY")).isFalse();
+    }
+
+    // ---------- applyVisible:生成的 SQL 片段(回归:分享条件必须是 OR,不能退化成 AND) ----------
+
+    @Test
+    void applyVisible_memberWithShareKeepsAudienceAsOr() {
+        LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
+        service.applyVisible(qw, ContentKind.DIARY, memberOfA(),
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility, Diary::getId);
+        String sql = qw.getSqlSegment().replaceAll("\\s+", " ");
+        // 家庭维度内是「自己写的 + 家庭可见」与「分享给我家的」两档的并集
+        assertThat(sql).contains("(family_id = ");
+        assertThat(sql).contains("AND (author_id = ");
+        assertThat(sql).contains(") OR (visibility <> ");
+        assertThat(sql).doesNotContain(") AND (visibility <> ");
+        assertThat(sql).contains("id IN (SELECT content_id FROM content_audience");
+    }
+
+    @Test
+    void applyVisible_nonDiarySharedContentKeepsAudienceAsOr() {
+        LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
+        service.applyVisible(qw, ContentKind.PHOTO, memberOfA(),
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility, Diary::getId);
+        String sql = qw.getSqlSegment().replaceAll("\\s+", " ");
+        // 非日记不额外排除 PRIVATE(由可见档位自身表达),分享条件同样并集
+        assertThat(sql).contains(") OR (id IN (SELECT content_id FROM content_audience");
+        assertThat(sql).doesNotContain(") AND (id IN (SELECT content_id FROM content_audience");
+    }
+
+    @Test
+    void applyVisible_ownerStillSeesWholeFamilyAsOrWithShare() {
+        LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
+        service.applyVisible(qw, ContentKind.PHOTO, ownerOfA(),
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility, Diary::getId);
+        String sql = qw.getSqlSegment().replaceAll("\\s+", " ");
+        assertThat(sql).contains("(family_id = ");
+        assertThat(sql).contains(" OR id IN (SELECT content_id FROM content_audience");
+    }
+
+    @Test
+    void applyVisible_diaryOwnerDoesNotBypassPrivate() {
+        LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
+        service.applyVisible(qw, ContentKind.DIARY, ownerOfA(),
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility);
+        String sql = qw.getSqlSegment().replaceAll("\\s+", " ");
+        // 日记的家长分支与成员同口径:PRIVATE 只有作者本人可见
+        assertThat(sql).contains("author_id = ");
+        assertThat(sql).contains("visibility IN (");
+    }
+
+    @Test
+    void applyVisible_guestOnlySeesPublic() {
+        LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
+        service.applyVisible(qw, ContentKind.DIARY, guestOnA(),
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility, Diary::getId);
+        assertThat(qw.getSqlSegment()).startsWith("(visibility = ");
+        assertThat(qw.getSqlSegment()).doesNotContain("family_id");
+        assertThat(qw.getParamNameValuePairs()).containsValue(DictConst.VIS_PUBLIC);
     }
 }

@@ -1,72 +1,118 @@
-<!-- 显示模式设置:老人模式(大字/高对比/简化首页)与儿童模式(导航白名单 + 本机退出密码) -->
+<!-- 显示模式:默认 / 老人 / 未成年(儿童)。
+     只有选中未成年时才设退出密码;普通成员只能给自己设,家长可以选这台设备上要锁哪个成员。
+     记录按账号存在本机(utils/displayMode.js),儿童模式只限制使用它的那个成员。 -->
 <template>
   <div class="card settings-card">
     <div class="section-label">{{ $t('displayMode.title') }}</div>
     <p class="share-tip display-lead">{{ $t('displayMode.lead') }}</p>
 
+    <!-- 家长:选择要为谁设置;普通成员只给自己设置 -->
+    <el-form v-if="isOwner" label-position="top" class="settings-form">
+      <el-form-item :label="$t('displayMode.targetUser')">
+        <el-select v-model="targetId" class="target-select">
+          <el-option v-for="m in memberOptions" :key="m.id" :value="m.id" :label="m.name" />
+        </el-select>
+        <div class="share-tip">{{ $t('displayMode.targetHint') }}</div>
+      </el-form-item>
+    </el-form>
+
     <div class="mode-list">
-      <label v-for="opt in options" :key="opt.value" class="mode-row" :class="{ active: mode === opt.value }">
-        <el-radio :model-value="mode" :value="opt.value" @change="onPick(opt.value)">
+      <label v-for="opt in options" :key="opt.value" class="mode-row" :class="{ active: targetMode === opt.value }">
+        <el-radio :model-value="targetMode" :value="opt.value" @change="onPick(opt.value)">
           <span class="mode-name">{{ $t(opt.labelKey) }}</span>
         </el-radio>
         <span class="mode-desc">{{ $t(opt.descKey) }}</span>
       </label>
     </div>
 
-    <!-- 儿童模式退出密码:已开启时给「退出」;未开启时给「设置密码并开启」 -->
-    <div v-if="mode === 'child'" class="pin-box">
-      <div class="pin-title">{{ $t('displayMode.exitTitle') }}</div>
-      <div class="pin-tip">{{ $t('displayMode.exitTip') }}</div>
-      <div class="pin-row">
-        <el-input
-          v-model="exitPin"
-          type="password"
-          :maxlength="8"
-          inputmode="numeric"
-          show-password
-          :placeholder="$t('displayMode.pinPlaceholder')"
-          class="pin-input"
-        />
-        <el-button type="primary" :loading="busy" @click="onExitChild">{{ $t('displayMode.exitAction') }}</el-button>
-      </div>
-      <div class="pin-error" :class="{ show: errorText }">{{ errorText }}</div>
-    </div>
-
-    <div v-else class="pin-box">
-      <div class="pin-title">{{ $t('displayMode.pinTitle') }}</div>
-      <div class="pin-tip">{{ hasChildPin ? $t('displayMode.hasPin') : $t('displayMode.pinTip') }}</div>
-      <div class="pin-row">
-        <el-input
-          v-model="newPin"
-          type="password"
-          :maxlength="8"
-          inputmode="numeric"
-          show-password
-          :placeholder="$t('displayMode.pinPlaceholder')"
-          class="pin-input"
-        />
-        <el-button type="primary" :loading="busy" @click="onSavePin">{{ $t('displayMode.pinSave') }}</el-button>
-      </div>
-      <div class="pin-error" :class="{ show: pinMsg }">{{ pinMsg }}</div>
+    <!-- 未成年模式已开启:本人用密码退出;家长改别人时可直接关闭或重设密码 -->
+    <div v-if="targetMode === 'child'" class="pin-box">
+      <template v-if="targetIsSelf">
+        <div class="pin-title">{{ $t('displayMode.exitTitle') }}</div>
+        <div class="pin-tip">{{ $t('displayMode.exitTip') }}</div>
+        <div class="pin-row">
+          <el-input
+            v-model="exitPin"
+            type="password"
+            :maxlength="8"
+            inputmode="numeric"
+            show-password
+            :placeholder="$t('displayMode.pinPlaceholder')"
+            class="pin-input"
+            @keyup.enter="onExitChild"
+          />
+          <el-button type="primary" :loading="busy" @click="onExitChild">{{ $t('displayMode.exitAction') }}</el-button>
+        </div>
+        <div class="pin-error" :class="{ show: errorText }">{{ errorText }}</div>
+      </template>
+      <template v-else>
+        <div class="pin-title">{{ $t('displayMode.childOnFor', { name: targetName }) }}</div>
+        <div class="pin-row">
+          <el-button :loading="busy" @click="onDisableFor">{{ $t('displayMode.disableFor') }}</el-button>
+          <el-button type="primary" plain @click="openPinDialog">{{ $t('displayMode.resetPin') }}</el-button>
+        </div>
+      </template>
     </div>
 
     <div class="display-note">{{ $t('displayMode.note') }}</div>
+
+    <!-- 设置退出密码:点「未成年模式」时弹出;成人/儿童都只能给自己设,家长可选目标成员 -->
+    <el-dialog v-model="pinDialog" width="dialog-sm" :title="$t('displayMode.pinTitle')" append-to-body @closed="newPin = ''">
+      <p class="dlg-tip">{{ $t('displayMode.setPinFor', { name: targetName }) }}</p>
+      <el-input
+        v-model="newPin"
+        type="password"
+        :maxlength="8"
+        inputmode="numeric"
+        show-password
+        :placeholder="$t('displayMode.pinPlaceholder')"
+        @keyup.enter="onSavePin"
+      />
+      <div class="pin-error" :class="{ show: pinMsg }">{{ pinMsg }}</div>
+      <template #footer>
+        <el-button @click="pinDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="busy" @click="onSavePin">{{ $t('displayMode.pinSave') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { memberApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { isValidPin } from '@/utils/displayMode'
 
 const { t } = useI18n()
-const { mode, hasChildPin, setDisplayMode, enableChildMode, disableChildMode } = useDisplayMode()
+const userStore = useUserStore()
+const { mode, displayModeFor, setDisplayModeFor, enableChildMode, enableChildModeFor, disableChildMode } = useDisplayMode()
+
+const myId = computed(() => userStore.userInfo?.id ?? null)
+const isOwner = computed(() => userStore.isOwner)
+
+const members = ref([])
+const targetId = ref(myId.value)
+// 别的成员的模式存在本机,改动后用版本号催一次重算
+const version = ref(0)
+
+const targetIsSelf = computed(() => String(targetId.value) === String(myId.value))
+const targetName = computed(() => {
+  if (targetIsSelf.value) return userStore.userInfo?.nickname || userStore.userInfo?.username || t('displayMode.selfName')
+  return members.value.find((m) => String(m.id) === String(targetId.value))?.name || t('displayMode.selfName')
+})
+const memberOptions = computed(() => members.value)
+const targetMode = computed(() => {
+  version.value
+  return targetIsSelf.value ? mode.value : displayModeFor(targetId.value).mode
+})
 
 const exitPin = ref('')
 const newPin = ref('')
 const busy = ref(false)
+const pinDialog = ref(false)
 const errorText = ref('')
 const pinMsg = ref('')
 
@@ -76,16 +122,28 @@ const options = [
   { value: 'child', labelKey: 'displayMode.child', descKey: 'displayMode.childDesc' },
 ]
 
-const onPick = async (value) => {
-  errorText.value = ''
+const openPinDialog = () => {
+  newPin.value = ''
   pinMsg.value = ''
+  pinDialog.value = true
+}
+
+// 选未成年:先弹窗设密码;本人已有密码时直接保持开启
+const onPick = (value) => {
+  errorText.value = ''
   if (value === 'child') {
-    // 已设过密码就直接切(退出仍需密码);没设过则先让家长在下面设一个
-    if (hasChildPin.value) setDisplayMode('child')
-    else pinMsg.value = t('displayMode.setPinFirst')
+    if (targetMode.value === 'child') return
+    openPinDialog()
     return
   }
-  setDisplayMode(value)
+  if (targetMode.value === 'child' && targetIsSelf.value) {
+    // 退出必须验密码,直接在下方退出框输入
+    errorText.value = t('displayMode.exitTip')
+    return
+  }
+  setDisplayModeFor(targetId.value, value)
+  errorText.value = ''
+  version.value++
 }
 
 const onSavePin = async () => {
@@ -95,13 +153,14 @@ const onSavePin = async () => {
   }
   busy.value = true
   try {
-    // 在普通/老人模式下设置密码 = 立即进入儿童模式(已设过则重置密码)
-    const ok = await enableChildMode(newPin.value)
-    pinMsg.value = ok ? '' : t('displayMode.pinFailed')
-    if (ok) {
-      newPin.value = ''
-      ElMessage.success(t('displayMode.childStarted'))
+    const ok = targetIsSelf.value ? await enableChildMode(newPin.value) : await enableChildModeFor(targetId.value, newPin.value)
+    if (!ok) {
+      pinMsg.value = t('displayMode.pinFailed')
+      return
     }
+    pinDialog.value = false
+    version.value++
+    ElMessage.success(t('displayMode.childStarted'))
   } finally {
     busy.value = false
   }
@@ -119,6 +178,7 @@ const onExitChild = async () => {
       ElMessage.success(t('displayMode.exitDone'))
       exitPin.value = ''
       errorText.value = ''
+      version.value++
     } else {
       errorText.value = t('displayMode.wrongPin')
     }
@@ -126,11 +186,47 @@ const onExitChild = async () => {
     busy.value = false
   }
 }
+
+const onDisableFor = () => {
+  setDisplayModeFor(targetId.value, 'normal')
+  version.value++
+  ElMessage.success(t('displayMode.disableDone'))
+}
+
+onMounted(async () => {
+  if (targetId.value == null) targetId.value = myId.value
+  if (!isOwner.value) return
+  try {
+    const list = await memberApi.list()
+    members.value = (list || []).map((m) => ({
+      id: m.id,
+      name: m.nickname || m.username || String(m.id),
+    }))
+    if (!members.value.some((m) => String(m.id) === String(targetId.value))) targetId.value = myId.value
+  } catch (e) {
+    // 拉不到成员时只留自己,不影响本机设置
+    members.value = []
+  }
+})
+
+watch(myId, (id) => {
+  if (targetId.value == null) targetId.value = id
+})
+watch(isOwner, (owner) => {
+  if (!owner) {
+    targetId.value = myId.value
+    members.value = []
+  }
+})
 </script>
 
 <style scoped>
 .display-lead {
   margin: 0 0 12px;
+}
+.target-select {
+  width: 220px;
+  max-width: 100%;
 }
 .mode-list {
   display: flex;
@@ -168,7 +264,8 @@ const onExitChild = async () => {
   font-weight: 600;
   margin-bottom: 4px;
 }
-.pin-tip {
+.pin-tip,
+.dlg-tip {
   font-size: 13px;
   color: var(--color-text-secondary);
   line-height: 1.6;
@@ -201,5 +298,8 @@ const onExitChild = async () => {
   font-size: 13px;
   color: var(--color-text-secondary);
   line-height: 1.6;
+}
+.settings-form .el-form-item {
+  margin-bottom: 12px;
 }
 </style>

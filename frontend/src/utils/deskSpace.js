@@ -182,17 +182,52 @@ export function placeDeskItems(items, plan, lanes, obstacles, cards = []) {
   return result.length === 2 ? spreadDeskPair(result, plan, lanes, obstacles, cards) : result
 }
 
+// 一串爪印的步数与步距:8 步、横向 0.2 / 纵向 0.44 个物件尺寸(间距是旧版的两倍)。
+const PAW_STEPS = 8
+const PAW_STEP_X = 0.2
+const PAW_STEP_Y = 0.44
+
 export function placePawTrail(lanes, obstacles, random = Math.random) {
   const slot = { side: Math.floor(random() * 2), u: random(), v: random() }
-  const seat = findSpace(slot, lanes, obstacles, 86, 54)
-  if (!seat) return []
-  const direction = random() < 0.5 ? 1 : -1
-  return Array.from({ length: 4 }, (_, i) => ({
-    x: Math.round(seat.x + (i - 1.5) * seat.size * 0.1 * direction + (i % 2 ? 3 : -3)),
-    y: Math.round(seat.y + (1.5 - i) * seat.size * 0.22),
-    angle: direction * 19,
-    delay: i * 0.28,
-  }))
+  // 座位只按单只爪印的半径找,整串会比它长很多:两条桌沿各找一个座位,整串放不下就换下一条
+  const seats = []
+  for (const side of [slot.side, 1 - slot.side]) {
+    const seat = findSpace({ ...slot, side }, lanes, obstacles, 86, 54)
+    if (seat && !seats.some((s) => s.x === seat.x && s.y === seat.y)) seats.push(seat)
+  }
+  if (!seats.length) return []
+  // 每串都换一个弯曲方向与幅度:中段横向鼓出去、两端收回,走成一条弧线
+  const curve = (random() - 0.5) * 2 * seats[0].size * 0.16
+  const turning = random() < 0.5 ? 1 : -1
+  const vertical = random() < 0.5 ? 1 : -1
+  const middle = (PAW_STEPS - 1) / 2
+  const build = (seat, bend, side, up) =>
+    Array.from({ length: PAW_STEPS }, (_, i) => {
+      const k = i / middle
+      const drift = Math.sin((k * Math.PI) / 2) * bend
+      return {
+        x: Math.round(seat.x + (i % 2 ? 1 : -1) * seat.size * PAW_STEP_X * side + drift),
+        y: Math.round(seat.y + (middle - i) * seat.size * PAW_STEP_Y * up),
+        angle: side * 19 + Math.round((drift / seat.size) * 90),
+        delay: Math.round(i * 0.18 * 100) / 100,
+      }
+    })
+  // 弯着的放不下(窄边/桌沿被占)就退回直串;横向翻不进去再试纵向翻转
+  const attempts = [
+    [curve, turning, vertical],
+    [-curve, turning, vertical],
+    [curve, turning, -vertical],
+    [-curve, turning, -vertical],
+    [0, turning, vertical],
+    [0, turning, -vertical],
+  ]
+  for (const seat of seats) {
+    for (const [bend, side, up] of attempts) {
+      const trail = build(seat, bend, side, up)
+      if (pawTrailFits(trail, lanes, obstacles)) return trail
+    }
+  }
+  return []
 }
 
 export function pawTrailFits(trail, lanes, obstacles) {

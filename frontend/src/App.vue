@@ -129,9 +129,13 @@ const floatsStore = useFloatsStore()
 const desk = useWindowDeskStore()
 const route = useRoute()
 const router = useRouter()
-// 显示模式(老人/儿童):启动即把本机保存的模式贴回 html 根类
+// 显示模式(老人/儿童):按登录账号贴回这台设备上属于他的记录;登出/切号时跟着换
 const { isChild, isElder } = useDisplayMode()
-initDisplayMode()
+watch(
+  () => userStore.userInfo?.id,
+  (id) => initDisplayMode(id ?? null),
+  { immediate: true },
+)
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
 // 路由首次解析完成前 currentRoute 是 START_LOCATION(meta 为空),此时按「非独立页」渲染会先挂载整个

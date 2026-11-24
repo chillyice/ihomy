@@ -20,8 +20,7 @@
             <span class="ts-ray"></span>
             <span v-for="n in 5" :key="n" class="ts-dust" :class="`d${n}`"></span>
           </template>
-          <!-- 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒 -->
-          <img v-else-if="s.id === 'window'" class="ts-window-mark" :src="themeStore.windowMark" alt="" />
+          <!-- 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒(窗边主题已下线,不再出第三块色块) -->
           <template v-else>
             <span class="ts-glow"></span>
             <span class="ts-window"></span>

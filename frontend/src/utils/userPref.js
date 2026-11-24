@@ -2,8 +2,26 @@
 // 对齐规则:服务端有值就以服务端为准(换设备登录即恢复自己的排版);服务端没有而本机有,
 // 就把本机这份交上去(当前设备已有的布局成为账号布局);两处都没有就保持默认、不写库。
 // 冲突取「整份后写覆盖」:不做字段级合并,也不做实时推送。游客只写本机,一个请求都不发。
-import { userPrefApi } from '@/api'
-import { useUserStore } from '@/stores/user'
+// '@/api' 与 '@/stores/user' 都按需加载:它们会链到 router(createWebHistory 要 window),
+// 而本文件被屏保、早安等纯函数模块引用,顶层静态导入会让 node 环境的单测直接炸。
+let apiPromise = null
+let storePromise = null
+
+function loadApi() {
+  apiPromise ??= import('@/api').then((m) => m.userPrefApi)
+  apiPromise.catch(() => {
+    apiPromise = null
+  })
+  return apiPromise
+}
+
+function loadUserStore() {
+  storePromise ??= import('@/stores/user').then((m) => m.useUserStore)
+  storePromise.catch(() => {
+    storePromise = null
+  })
+  return storePromise
+}
 
 // 整理首页时拖拽/缩放会连发很多次,去抖后只发最后一次
 const SAVE_DEBOUNCE_MS = 400
@@ -30,8 +48,9 @@ export function decideSync(local, remote, unsynced = false) {
   return 'use-remote'
 }
 
-function isLoggedIn() {
+async function isLoggedIn() {
   try {
+    const useUserStore = await loadUserStore()
     return !!useUserStore().isLoggedIn
   } catch (e) {
     // 还没装 pinia(极端时序):按游客处理,只写本机
@@ -68,25 +87,30 @@ function markUnsynced(localKey, on, storage) {
 // 一次会话只拉一次(GET 失败不留缓存,下次进页面再试)
 async function loadRemote() {
   if (!remotePromise) {
-    remotePromise = userPrefApi.all().then(
-      (map) => {
-        remoteMap = map && typeof map === 'object' ? map : {}
-        return remoteMap
-      },
-      () => {
-        remoteMap = null
-        remotePromise = null
-        return null
-      },
-    )
+    remotePromise = loadApi()
+      .then((api) => api.all())
+      .then(
+        (map) => {
+          remoteMap = map && typeof map === 'object' ? map : {}
+          return remoteMap
+        },
+        () => {
+          remoteMap = null
+          remotePromise = null
+          return null
+        },
+      )
   }
   return remotePromise
 }
 
 async function push(localKey, serverKey, value, storage) {
   if (!value) return false
+  // 游客只写本机:登录态每会话都已在内存里,这里只多一次异步判断,不发请求
+  if (!(await isLoggedIn())) return false
   try {
-    await userPrefApi.save(serverKey, value)
+    const api = await loadApi()
+    await api.save(serverKey, value)
     uploaded.set(serverKey, value)
     if (remoteMap) remoteMap[serverKey] = value
     markUnsynced(localKey, false, storage)
@@ -104,7 +128,7 @@ async function push(localKey, serverKey, value, storage) {
  * 拉取失败返回 null,调用方应保留本机现状。
  */
 export async function readRemotePrefMap() {
-  if (!isLoggedIn()) return null
+  if (!(await isLoggedIn())) return null
   return loadRemote()
 }
 
@@ -113,7 +137,7 @@ export async function readRemotePrefMap() {
  * 返回「需要页面应用的值」(只有 use-remote 才有),其余情况返回 null 表示页面上的布局不用动。
  */
 export async function syncPref(localKey, serverKey, storage = globalThis.localStorage) {
-  if (!isLoggedIn()) return null
+  if (!(await isLoggedIn())) return null
   const map = await loadRemote()
   // 拉取失败时保持现状:别把「拿不到」当成「服务端没有」,否则会拿本机旧布局盖掉账号里的新版
   if (!map) return null
@@ -129,10 +153,9 @@ export async function syncPref(localKey, serverKey, storage = globalThis.localSt
   return null
 }
 
-/** 改了布局就调它:本机立刻落盘,远端去抖上传(内容与上次上传相同则跳过) */
+/** 改了布局就调它:本机立刻落盘,远端去抖上传(内容与上次上传相同则跳过;游客在 push 里被挡掉) */
 export function writePref(localKey, serverKey, value, storage = globalThis.localStorage) {
   writeLocal(localKey, value, storage)
-  if (!isLoggedIn()) return
   if (value === uploaded.get(serverKey)) return
   pending.set(serverKey, { localKey, value, storage })
   clearTimeout(timers.get(serverKey))

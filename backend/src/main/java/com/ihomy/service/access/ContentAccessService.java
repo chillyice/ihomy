@@ -75,7 +75,8 @@ public class ContentAccessService {
                     .and(i -> i.eq(authorCol, viewer.userId())
                             .or().in(visibilityCol, memberVisibilities()));
             if (audienceSql != null) {
-                w.or().and(a -> a.ne(kind == ContentKind.DIARY, visibilityCol, DictConst.VIS_PRIVATE)
+                // 必须用 or(consumer):or().and(...) 会退化成 AND,家庭内容一条都查不出来
+                w.or(a -> a.ne(kind == ContentKind.DIARY, visibilityCol, DictConst.VIS_PRIVATE)
                         .inSql(idCol, audienceSql));
             }
         });

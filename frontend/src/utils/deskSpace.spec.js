@@ -106,7 +106,7 @@ describe('window desk margins', () => {
 
   it('removes footprints when a floating panel covers the path or its margin disappears', () => {
     const trail = placePawTrail(large, [], () => 0.4)
-    expect(trail).toHaveLength(4)
+    expect(trail).toHaveLength(8)
     expect(pawTrailFits(trail, large, [])).toBe(true)
     const { x, y } = trail[0]
     const blocker = { left: x - 1, right: x + 1, top: y - 1, bottom: y + 1 }
@@ -114,11 +114,28 @@ describe('window desk margins', () => {
     expect(pawTrailFits(trail, [], [])).toBe(false)
   })
 
+  it('doubles the trail spacing and count, and bends the path in a random direction', () => {
+    const seq = (values) => {
+      let i = 0
+      return () => values[i++ % values.length]
+    }
+    // 座位随机值固定,只让弯曲幅度换两端:同一串的步距不变,只有弧线方向相反
+    const bentRight = placePawTrail(large, [], seq([0.4, 0.4, 0.4, 1, 0.6, 0.6]))
+    const bentLeft = placePawTrail(large, [], seq([0.4, 0.4, 0.4, 0, 0.6, 0.6]))
+    expect(bentRight).toHaveLength(8)
+    expect(bentLeft).toHaveLength(8)
+    // 纵向步距 0.44 个物件尺寸:8 步合计明显长于旧版 4 步的 0.22 间距
+    expect(Math.abs(bentRight[0].y - bentRight[7].y)).toBeGreaterThan(200)
+    // 中段偏离直线的幅度随弯曲方向改变
+    expect(Math.abs(bentRight[4].x - bentLeft[4].x)).toBeGreaterThan(10)
+    expect(bentRight[0].delay).toBeLessThan(bentRight[7].delay)
+  })
+
   it('can place a trail at a phone edge even with three desk objects on screen', () => {
     const lanes = deskLanes(375, 667, 0, null, 84)
     const objects = [50, 300, 550].map((top) => ({ left: 0, right: 84, top, bottom: top + 110 }))
     const trail = placePawTrail(lanes, objects, () => 0.4)
-    expect(trail).toHaveLength(4)
+    expect(trail).toHaveLength(8)
     expect(pawTrailFits(trail, lanes, objects)).toBe(true)
   })
 

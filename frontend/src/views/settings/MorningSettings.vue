@@ -14,7 +14,7 @@
         <div class="share-tip">{{ $t(themeStore.theme === 'window' ? 'windowDisplay.welcomeHint' : 'morning.enableHint') }}</div>
       </el-form-item>
 
-      <el-form-item>
+      <el-form-item v-if="prefs.enabled">
         <el-button @click="editorVisible = true">{{ $t('morning.editEntry') }}</el-button>
       </el-form-item>
     </el-form>

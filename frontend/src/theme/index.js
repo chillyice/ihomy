@@ -23,6 +23,7 @@ export const THEMES = {
     label: { zh: '光尘', en: 'Light & Dust' },
     meta: { dawn: '#EDE4D3', dusk: '#0F1A2E' },
   },
+  // 窗边主题已下线:只留条目给遗留样式(html.theme-window)与旧偏好识别,不再出现在主题选择里
   window: {
     id: 'window',
     label: { zh: '窗边', en: 'By the Window' },
@@ -31,6 +32,9 @@ export const THEMES = {
 }
 
 export const THEME_IDS = Object.keys(THEMES)
+
+// 可选主题(主题卡与壁纸页主题栏都只列这份);窗边已下线,旧偏好加载时回落到暖居
+export const SELECTABLE_THEME_IDS = ['warm', 'guangchen']
 
 export const DEFAULT_THEME = { theme: 'warm', mode: 'dawn', autoMode: true }
 
@@ -49,7 +53,7 @@ export function loadTheme() {
     const raw = localStorage.getItem(THEME_STORAGE_KEY)
     if (!raw) return { ...DEFAULT_THEME }
     const m = migrate(JSON.parse(raw))
-    if (!THEMES[m.theme]) m.theme = DEFAULT_THEME.theme
+    if (!SELECTABLE_THEME_IDS.includes(m.theme)) m.theme = DEFAULT_THEME.theme
     if (m.mode !== 'dawn' && m.mode !== 'dusk') m.mode = DEFAULT_THEME.mode
     return { ...DEFAULT_THEME, ...m }
   } catch {

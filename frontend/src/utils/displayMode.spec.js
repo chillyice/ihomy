@@ -5,8 +5,10 @@ import {
   isValidPin,
   makePinRecord,
   readDisplayMode,
+  readUserDisplayMode,
   verifyPinRecord,
   writeDisplayMode,
+  writeUserDisplayMode,
 } from './displayMode'
 
 function fakeStorage(initial = {}) {
@@ -80,5 +82,28 @@ describe('儿童模式密码', () => {
 
   it('没设过密码视为通过', async () => {
     expect(await verifyPinRecord('0000', null)).toBe(true)
+  })
+})
+
+describe('按账号分开的记录', () => {
+  it('各账号互不影响,没记录时是默认模式', () => {
+    const st = fakeStorage()
+    writeUserDisplayMode(7, { mode: 'child', pin: { salt: 's', hash: 'h' } }, st)
+    expect(readUserDisplayMode(7, st)).toEqual({ mode: 'child', pin: { salt: 's', hash: 'h' } })
+    expect(readUserDisplayMode(8, st)).toEqual({ mode: 'normal', pin: null })
+  })
+
+  it('迁移旧版不分账号的记录,只借给第一个绑定的账号', () => {
+    const st = fakeStorage({ [DISPLAY_MODE_KEY]: JSON.stringify({ mode: 'elder', pin: null }) })
+    expect(readUserDisplayMode(7, st).mode).toBe('elder')
+    expect(st.getItem(DISPLAY_MODE_KEY)).toBeNull()
+    // 第二个账号不会继承这份记录
+    expect(readUserDisplayMode(8, st)).toEqual({ mode: 'normal', pin: null })
+  })
+
+  it('坏 JSON 不抛错', () => {
+    const st = fakeStorage()
+    st.setItem('ihomy:display-mode:u9:v1', '{oops')
+    expect(readUserDisplayMode(9, st)).toEqual({ mode: 'normal', pin: null })
   })
 })

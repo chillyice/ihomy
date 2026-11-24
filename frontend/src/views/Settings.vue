@@ -38,15 +38,17 @@
             <div id="settings-daily"><DailySettings /></div>
             <div v-if="userStore.hasPerm('family:manage')" id="settings-weather"><WeatherSettings /></div>
           </template>
-          <!-- 外观与显示:光照/主题 + 暖居背景(仅暖居桌面外壳)+ 显示模式 + 每日早安 + 屏保(仅手机端) -->
+          <!-- 外观与显示:主题(含主题专属设置)→ 光影 → 每日早安 → 屏幕保护 → 显示模式 → Wallpaper Engine -->
           <template v-else-if="panel.id === 'appearance'">
-            <div id="settings-light"><LightSettings /></div>
+            <div id="settings-theme"><ThemeSettings /></div>
             <!-- 背景作用于桌面暖居外壳(WarmLayout),手机端走 MobileLayout 看不到效果,故不在手机设置里露出 -->
             <div v-if="themeStore.theme === 'warm' && !isMobile" id="settings-warmbg"><WarmBackgroundSettings /></div>
             <WindowDeskSettings v-if="activeId === 'appearance'" :show-objects="isTablet || (isWide && !isMobile)" />
-            <div id="settings-display"><ModeSettings /></div>
+            <div id="settings-light"><LightSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
             <div id="settings-screensaver"><ScreensaverSettings /></div>
+            <div id="settings-display"><ModeSettings /></div>
+            <div id="settings-wallpaper"><WallpaperSettings /></div>
           </template>
         </div>
       </div>
@@ -73,6 +75,8 @@ import DailySettings from './settings/DailySettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
+import ThemeSettings from './settings/ThemeSettings.vue'
+import WallpaperSettings from './settings/WallpaperSettings.vue'
 import WarmBackgroundSettings from './settings/WarmBackgroundSettings.vue'
 import WindowDeskSettings from './settings/WindowDeskSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
@@ -115,7 +119,7 @@ const GROUPS = [
 ]
 
 // 旧 ?tab= 别名:合并后落地到新大类,旧链接(放映厅/相册/日程等页面跳转)不失效
-const TAB_ALIAS = { daily: 'content', weather: 'content', light: 'appearance', display: 'appearance' }
+const TAB_ALIAS = { daily: 'content', weather: 'content', theme: 'appearance', light: 'appearance', display: 'appearance' }
 
 const visiblePanels = computed(() => PANELS.filter((p) => (!p.perm || userStore.hasPerm(p.perm)) && (!p.nativeOnly || isNativeApp())))
 
@@ -139,7 +143,13 @@ const currentPanel = computed(() => visiblePanels.value.find((p) => p.id === act
 const mountedPanels = computed(() => visiblePanels.value.filter((p) => p.id === activeId.value || (!isMobile.value && p.id !== 'storage')))
 
 // 合并后旧链接仍指向某一小块:进页直接滚到那张卡(如老人模式的「设置」→ ?tab=display)
-const TAB_ANCHOR = { daily: '#settings-daily', weather: '#settings-weather', light: '#settings-light', display: '#settings-display' }
+const TAB_ANCHOR = {
+  daily: '#settings-daily',
+  weather: '#settings-weather',
+  theme: '#settings-theme',
+  light: '#settings-light',
+  display: '#settings-display',
+}
 
 // 进/出大类都从顶部开始看;带旧锚点参数时滚到对应卡片
 watch(

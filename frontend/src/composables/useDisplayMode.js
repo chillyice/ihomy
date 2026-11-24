@@ -1,11 +1,32 @@
 // 显示模式的响应式状态(模块级单例):App 外壳、首页、导航、路由守卫共用同一份。
 // 根元素只挂两个类:html.elder-mode(大字/高对比)与 html.child-mode(导航白名单)。
+// 记录按账号分开存在本机:儿童模式只锁使用它的那个成员,家长登录后不受影响。
 import { computed, ref } from 'vue'
-import { isValidPin, makePinRecord, readDisplayMode, verifyPinRecord, writeDisplayMode, DISPLAY_MODES } from '@/utils/displayMode'
+import {
+  DISPLAY_MODES,
+  isValidPin,
+  makePinRecord,
+  readDisplayMode,
+  readUserDisplayMode,
+  verifyPinRecord,
+  writeDisplayMode,
+  writeUserDisplayMode,
+} from '@/utils/displayMode'
 
+// 启动时先按旧版(不分账号)记录显示,绑定账号后再换成该账号自己的记录
 const initial = readDisplayMode()
 const mode = ref(initial.mode)
 const pin = ref(initial.pin)
+// 当前内存状态属于哪个账号;null = 未登录
+let boundUser = null
+
+const sameUser = (userId) => userId != null && String(userId) === String(boundUser)
+
+function persistCurrent() {
+  const record = { mode: mode.value, pin: pin.value }
+  if (boundUser == null) writeDisplayMode(record)
+  else writeUserDisplayMode(boundUser, record)
+}
 
 function applyRootClass(next) {
   if (typeof document === 'undefined') return
@@ -14,16 +35,20 @@ function applyRootClass(next) {
   root.classList.toggle('child-mode', next === 'child')
 }
 
-/** 启动时调一次:把本机保存的模式贴回 html(刷新后不闪回默认字号) */
-export function initDisplayMode() {
+/** 绑定登录账号并贴回该账号在这台设备上的模式;登录/登出/切账号时调 */
+export function initDisplayMode(userId = null) {
+  boundUser = userId ?? null
+  const record = boundUser == null ? readDisplayMode() : readUserDisplayMode(boundUser)
+  mode.value = record.mode
+  pin.value = record.pin
   applyRootClass(mode.value)
 }
 
-/** 直接切模式(老人/默认);儿童模式请走 enableChildMode 以便设密码 */
+/** 直接切模式(默认/老人);儿童模式请走 enableChildMode 以便设密码 */
 export function setDisplayMode(next) {
   if (!DISPLAY_MODES.includes(next)) return
   mode.value = next
-  writeDisplayMode({ mode: next, pin: pin.value })
+  persistCurrent()
   applyRootClass(next)
 }
 
@@ -47,7 +72,42 @@ export async function changeChildPin(oldPin, newPin) {
   if (pin.value && !(await verifyPinRecord(oldPin, pin.value))) return false
   if (!isValidPin(newPin)) return false
   pin.value = await makePinRecord(newPin)
-  writeDisplayMode({ mode: mode.value, pin: pin.value })
+  persistCurrent()
+  return true
+}
+
+// —— 家长替其他成员设置(只动本机记录,不上传服务端) ——
+
+/** 查某个账号在这台设备上的显示模式(设置页选择目标成员时用) */
+export function displayModeFor(userId) {
+  if (sameUser(userId)) return { mode: mode.value, pin: pin.value }
+  if (userId == null) return { mode: 'normal', pin: null }
+  return readUserDisplayMode(userId)
+}
+
+/** 把某个账号改成默认/老人模式;目标是当前账号时立即生效 */
+export function setDisplayModeFor(userId, next) {
+  if (!DISPLAY_MODES.includes(next) || next === 'child') return false
+  if (sameUser(userId)) {
+    setDisplayMode(next)
+    return true
+  }
+  if (userId == null) return false
+  const record = readUserDisplayMode(userId)
+  writeUserDisplayMode(userId, { mode: next, pin: record.pin })
+  return true
+}
+
+/** 给某个账号开启未成年模式并设退出密码;目标是当前账号时立即生效 */
+export async function enableChildModeFor(userId, pinCode) {
+  if (!isValidPin(pinCode) || userId == null) return false
+  const record = await makePinRecord(pinCode)
+  if (sameUser(userId)) {
+    pin.value = record
+    setDisplayMode('child')
+    return true
+  }
+  writeUserDisplayMode(userId, { mode: 'child', pin: record })
   return true
 }
 
@@ -66,5 +126,8 @@ export function useDisplayMode() {
     enableChildMode,
     disableChildMode,
     changeChildPin,
+    displayModeFor,
+    setDisplayModeFor,
+    enableChildModeFor,
   }
 }

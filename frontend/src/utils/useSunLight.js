@@ -46,35 +46,73 @@ export function useSunLight() {
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
   let _suspended = null
-  const lampMode = ref(_saved.lampMode ?? 'auto')
+  // 光影总开关:关闭时下方每项按「关」呈现,但各自的偏好仍留在存储里,重新打开即恢复
+  const effectsEnabled = ref(_saved.effectsEnabled ?? true)
+  const _lampMode = ref(_saved.lampMode ?? 'auto')
   const lampTemp = ref(_saved.lampTemp ?? 30)
   const lampBrightness = ref(_saved.lampBrightness ?? 50)
-  const shadowEnabled = ref(_saved.shadowEnabled ?? true)
+  const _shadowEnabled = ref(_saved.shadowEnabled ?? true)
   // 阴影深度 0~100，默认 70。
   const projectionStandard = ref(_saved.projectionStandard === 'real' ? 'real' : 'corrected')
   const shadowDepth = ref(_saved.shadowDepth ?? 70)
-  const weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
-  const blobsEnabled = ref(_saved.blobsEnabled ?? true)
-  const glassEnabled = ref(_saved.glassEnabled ?? true)
-  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, shadowDepth, projectionStandard, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
-    // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
-    // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
-    if (_suspended) return
-    localStorage.setItem(
-      'ihomy:effects',
-      JSON.stringify({
-        lampMode: lampMode.value,
-        lampTemp: lampTemp.value,
-        lampBrightness: lampBrightness.value,
-        shadowEnabled: shadowEnabled.value,
-        projectionStandard: projectionStandard.value,
-        shadowDepth: shadowDepth.value,
-        weatherEffectEnabled: weatherEffectEnabled.value,
-        blobsEnabled: blobsEnabled.value,
-        glassEnabled: glassEnabled.value,
-      }),
-    )
+  const _weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
+  const _blobsEnabled = ref(_saved.blobsEnabled ?? true)
+  const _glassEnabled = ref(_saved.glassEnabled ?? true)
+  // 对外的开关都经总开关过滤:组件与样式只看得到最终生效值,写回仍落到各自偏好
+  const lampMode = computed({
+    get: () => (effectsEnabled.value ? _lampMode.value : 'off'),
+    set: (v) => (_lampMode.value = v),
   })
+  const shadowEnabled = computed({
+    get: () => effectsEnabled.value && _shadowEnabled.value,
+    set: (v) => (_shadowEnabled.value = v),
+  })
+  const weatherEffectEnabled = computed({
+    get: () => effectsEnabled.value && _weatherEffectEnabled.value,
+    set: (v) => (_weatherEffectEnabled.value = v),
+  })
+  const blobsEnabled = computed({
+    get: () => effectsEnabled.value && _blobsEnabled.value,
+    set: (v) => (_blobsEnabled.value = v),
+  })
+  const glassEnabled = computed({
+    get: () => effectsEnabled.value && _glassEnabled.value,
+    set: (v) => (_glassEnabled.value = v),
+  })
+  watch(
+    [
+      effectsEnabled,
+      _lampMode,
+      lampTemp,
+      lampBrightness,
+      _shadowEnabled,
+      shadowDepth,
+      projectionStandard,
+      _weatherEffectEnabled,
+      _blobsEnabled,
+      _glassEnabled,
+    ],
+    () => {
+      // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
+      // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
+      if (_suspended) return
+      localStorage.setItem(
+        'ihomy:effects',
+        JSON.stringify({
+          effectsEnabled: effectsEnabled.value,
+          lampMode: _lampMode.value,
+          lampTemp: lampTemp.value,
+          lampBrightness: lampBrightness.value,
+          shadowEnabled: _shadowEnabled.value,
+          projectionStandard: projectionStandard.value,
+          shadowDepth: shadowDepth.value,
+          weatherEffectEnabled: _weatherEffectEnabled.value,
+          blobsEnabled: _blobsEnabled.value,
+          glassEnabled: _glassEnabled.value,
+        }),
+      )
+    },
+  )
   // 总开关:所有特效都关闭时为 false,用于门控定时器/API 调用/组件挂载
   const anyEffectEnabled = computed(
     () => shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off',
@@ -589,6 +627,7 @@ export function useSunLight() {
     weatherDetail,
     loadWeather,
     loadSunInfoForDate,
+    effectsEnabled,
     lampMode,
     lampTemp,
     lampBrightness,
