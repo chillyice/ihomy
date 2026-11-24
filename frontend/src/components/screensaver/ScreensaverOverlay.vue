@@ -27,7 +27,7 @@
         aria-hidden="true"
         :style="{ backgroundImage: bg.image, backgroundSize: bg.size, opacity: bg.opacity }"
       ></div>
-      <div v-if="bg.kind === 'image' && hasContent" class="ss-scrim" aria-hidden="true"></div>
+      <div v-if="bg.kind === 'image' && hasContent" class="ss-scrim" :class="{ 'ss-scrim-photo': bg.photo }" aria-hidden="true"></div>
 
       <div class="ss-stage" :style="stageStyle">
         <header v-if="cards.clock" class="ss-head">
@@ -500,6 +500,11 @@ onBeforeUnmount(() => {
   left: 0;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.16) 46%, rgba(0, 0, 0, 0.44) 100%);
 }
+/* 自己的照片是屏保主角:只压底部一条给唤醒提示,上方原图不动(卡片自带深色底、文字靠阴影立住),
+   别用整屏压暗把照片糊掉 */
+.ss-scrim-photo {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.52) 0%, rgba(0, 0, 0, 0.06) 30%, rgba(0, 0, 0, 0) 52%);
+}
 
 .ss-stage {
   position: absolute;
@@ -516,6 +521,10 @@ onBeforeUnmount(() => {
 
 .ss-head {
   flex: 0 0 auto;
+  /* 照片背景不整屏压暗,白字靠自身阴影立住 */
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.45);
 }
 .ss-clock {
   font-family: inherit;
@@ -682,6 +691,7 @@ onBeforeUnmount(() => {
   opacity: 0.5;
   pointer-events: none;
   color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
 
 /* 手机竖屏:卡片单列、时钟略小,避免和卡片挤在一屏 */

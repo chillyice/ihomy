@@ -144,12 +144,18 @@ export function activeStandbyTask(doc) {
 
 const urlCss = (url) => `url("${String(url).replace(/"/g, '%22')}")`
 
+// 自己上传的照片在屏保里是「被看的东西」:浓度只做轻微压暗,最暗也留 80% 亮度。
+// 直接按浓度乘纯黑底(60% 浓度 = 60% 亮度)再叠压暗层,照片会糊成一片深灰,
+// 跟设置页那张原图缩略图完全对不上。内置氛围是浅色渐变,必须按原浓度压暗才能衬白字,所以只抬上传图。
+const PHOTO_MIN_BRIGHTNESS = 0.8
+
 /**
  * 算出屏保背景层(纯函数):
  * - 纯黑:什么都不画,只留黑底(防烧屏)
  * - 天气图:有当日天气图就满屏铺(浓度 1),没有就按纯黑
  * - 我的图片:内置氛围或上传照片,浓度取用户设定;上传图在未登录时不可读(/files/ 需登录),回落内置氛围
- * 返回 {kind:'black'} 或 {kind:'image', image, size, opacity}
+ * 返回 {kind:'black'} 或 {kind:'image', image, size, opacity, photo?}
+ * photo=true 表示铺的是自己上传的照片:组件据此换用轻得多的压暗层
  */
 export function screensaverBgLayer(pref, { weatherUrl = '', isLoggedIn = false } = {}) {
   const p = pref || DEFAULT_PREFS
@@ -158,6 +164,12 @@ export function screensaverBgLayer(pref, { weatherUrl = '', isLoggedIn = false }
     return weatherUrl ? { kind: 'image', image: urlCss(weatherUrl), size: 'cover', opacity: 1 } : { kind: 'black' }
   }
   const layer = warmBgLayer({ mode: 'mine', ...p.image }, { isLoggedIn })
+  const photo = !!layer && p.image.pick === 'upload' && !!p.image.url && isLoggedIn
+  if (photo) {
+    // 浓度仍在 80%→100% 之间起效(越高越亮),只是不再把照片压到深灰
+    const opacity = PHOTO_MIN_BRIGHTNESS + (1 - PHOTO_MIN_BRIGHTNESS) * (p.image.opacity / 100)
+    return { kind: 'image', ...layer, opacity, photo: true }
+  }
   if (layer) return { kind: 'image', ...layer }
   // 上传图未登录不可读时 warmBgLayer 会返回 null:退回用户选的内置氛围,别留白
   const preset = presetById(p.image.preset)

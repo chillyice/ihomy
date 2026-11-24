@@ -148,9 +148,26 @@ describe('screensaverBgLayer', () => {
 
   it('上传图登录可读,未登录回落到内置氛围', () => {
     const pref = { ...DEFAULT_PREFS, bg: BG.IMAGE, image: { pick: 'upload', preset: 'dusk', url: '/files/a.jpg', opacity: 80 } }
-    expect(screensaverBgLayer(pref, { isLoggedIn: true }).image).toBe('url("/files/a.jpg")')
+    const photo = screensaverBgLayer(pref, { isLoggedIn: true })
+    expect(photo.image).toBe('url("/files/a.jpg")')
+    expect(photo.photo).toBe(true)
     const guest = screensaverBgLayer(pref, { isLoggedIn: false })
     expect(guest.image).toBe(BG_PRESETS.find((p) => p.id === 'dusk').css)
+    // 回落的内置氛围不是照片,不能走轻压暗层
+    expect(guest.photo).toBeUndefined()
+  })
+
+  it('上传照片浓度只做轻微压暗,最暗也留 80% 亮度(不能被压成深灰)', () => {
+    const at = (opacity) => {
+      const pref = { ...DEFAULT_PREFS, bg: BG.IMAGE, image: { pick: 'upload', preset: 'amber', url: '/files/a.jpg', opacity } }
+      return screensaverBgLayer(pref, { isLoggedIn: true }).opacity
+    }
+    expect(at(20)).toBeCloseTo(0.84, 3)
+    expect(at(60)).toBeCloseTo(0.92, 3)
+    expect(at(100)).toBeCloseTo(1, 3)
+    // 浓度越高越亮(与暖居「浓度」语义同向)
+    expect(at(20) < at(60)).toBe(true)
+    expect(at(60) < at(100)).toBe(true)
   })
 })
 
