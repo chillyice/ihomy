@@ -1,3 +1,5 @@
+import { drawWindowFoliage } from './windowFoliage'
+
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
@@ -35,7 +37,10 @@ function resize(canvas, width, height) {
 
 // occluders accepts filled SVG path strings or Path2D objects in window-plane
 // coordinates. Overlapping silhouettes block the same light only once.
-export function drawWindowProjection(canvas, { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, occluders = [] }) {
+export function drawWindowProjection(
+  canvas,
+  { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, foliageTime = 0, occluders = [] },
+) {
   const scale = Math.min(0.5, 512 / Math.max(1, width, height))
   const w = Math.max(1, Math.round(width * scale))
   const h = Math.max(1, Math.round(height * scale))
@@ -76,6 +81,7 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   const transomHeight = 0.0825
   mask.fillRect(0.5 - mullionWidth / 2, 0, mullionWidth, 1)
   mask.fillRect(0, 0.483 - transomHeight / 2, 1, transomHeight)
+  drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()
 
@@ -109,4 +115,5 @@ export function drawWindowProjection(canvas, { width, height, scene, weather = '
   ctx.globalCompositeOperation = 'lighter'
   ctx.drawImage(scratch, 0, 0)
   ctx.restore()
+  return true
 }

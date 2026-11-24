@@ -16,6 +16,9 @@ const props = defineProps({
 const surface = ref(null)
 let observer
 let frame = 0
+let breezeTimer
+let reducedMotion
+let foliageTime = 0
 let displayed
 let start
 let target
@@ -24,7 +27,8 @@ let startedAt
 // Coalesce a resize, time step and slider change into one paint. Cloud cover
 // and the lamp mask are composited by CSS and never invalidate the aperture.
 function schedulePaint() {
-  if (frame) return
+  clearTimeout(breezeTimer)
+  if (document.hidden || frame) return
   frame = requestAnimationFrame((now) => {
     frame = 0
     const canvas = surface.value
@@ -45,23 +49,33 @@ function schedulePaint() {
       altitude: start.altitude + (target.altitude - start.altitude) * blend,
       azimuth: start.azimuth + (target.azimuth - start.azimuth) * blend,
     }
-    drawWindowProjection(canvas, {
+    if (!reducedMotion.matches) foliageTime = now / 1000
+    const painted = drawWindowProjection(canvas, {
       ...props,
+      foliageTime,
       realWeight: displayed.realWeight,
       scene: { ...scene, ...displayed },
       width: canvas.clientWidth,
       height: canvas.clientHeight,
     })
     if (t < 1) schedulePaint()
+    // Slow movement only needs about twelve samples per second on a stationary window.
+    else if (painted && !reducedMotion.matches) breezeTimer = setTimeout(schedulePaint, 80)
   })
 }
 
 onMounted(() => {
+  reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reducedMotion.addEventListener('change', schedulePaint)
+  document.addEventListener('visibilitychange', schedulePaint)
   observer = new ResizeObserver(schedulePaint)
   observer.observe(surface.value)
 })
 watch(() => [props.standard, props.scene, props.weather, props.shadowAlpha, ...props.occluders], schedulePaint, { flush: 'post' })
 onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', schedulePaint)
+  reducedMotion?.removeEventListener('change', schedulePaint)
+  clearTimeout(breezeTimer)
   observer?.disconnect()
   cancelAnimationFrame(frame)
 })
