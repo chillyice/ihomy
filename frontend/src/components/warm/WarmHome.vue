@@ -31,13 +31,14 @@
       <div v-if="editMode" class="gc-edit-hint">{{ $t('warm.editHint') }}</div>
     </Transition>
 
-    <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop" @dragend="onDragEnd">
+    <div class="gc-grid" ref="gridEl">
       <div
         v-a11y-click
         v-for="w in displayWidgets"
         :key="w.id"
         class="gc-card"
         :data-wid="w.id"
+        :inert="w.kind === 'preview'"
         :class="[
           `gc-c${w.span}`,
           `gc-r${w.row}`,
@@ -55,17 +56,15 @@
             'gc-daily-card': baseOf(w) === 'daily',
           },
         ]"
-        :style="cardStyle(w)"
-        :draggable="editMode && w.kind !== 'preview'"
-        @dragstart="onDragStart($event, w)"
-        @dragover.prevent
-        @dragend="onDragEnd"
+        :style="[cardStyle(w), reorderStyle(w)]"
+        @pointerdown="onReorderStart($event, w)"
+        @dragstart="editMode && $event.preventDefault()"
         @click="onCardClick(w)"
       >
         <!-- 编辑手柄 -->
         <template v-if="editMode && w.kind !== 'preview'">
           <button class="gc-del" :title="$t('warm.removeWidget')" @click.stop="removeWidget(w)">✕</button>
-          <div class="gc-grip" :title="$t('warm.dragSort')" @pointerdown.stop.prevent="onGripPointerDown($event, w)">⋮⋮</div>
+          <div class="gc-grip" :title="$t('warm.dragSort')">⋮⋮</div>
           <div class="gc-resize" :title="$t('warm.resizeWidget')" @pointerdown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
           <!-- 样式切换:同一功能注册了多种样式才出现(原位换样式,尺寸保留) -->
           <template v-if="styleOptions(w).length">
@@ -89,7 +88,10 @@
         </template>
 
         <!-- 紧凑图标档:1 列纯图标(一行一列),2 列图标 + 最简名称(一行两列) -->
-        <div v-if="compact(w)" class="gc-tile">
+        <div v-if="w.id === '__slot__'" class="gc-preview-body" aria-hidden="true">
+          <span v-if="!compact(w)" class="gc-preview-hint">{{ $t('warm.dropHere') }}</span>
+        </div>
+        <div v-else-if="compact(w)" class="gc-tile">
           <span class="gc-tile-icon">{{ w.icon }}</span>
           <span v-if="w.span >= 2" class="gc-tile-label">{{ w.label }}</span>
         </div>
@@ -366,7 +368,7 @@
           </div>
         </template>
 
-        <!-- 拖入预览占位(4 列 × 2 行,作为真实网格项参与推挤) -->
+        <!-- 侧栏拖入占位，尺寸取自该组件的默认布局 -->
         <template v-else-if="w.kind === 'preview'">
           <div class="gc-preview-body">
             <span class="gc-preview-icon">{{ w.icon }}</span>
@@ -401,6 +403,7 @@ import { useUserStore } from '@/stores/user'
 import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
+import { useWarmCardReorder } from '@/composables/useWarmCardReorder'
 import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '@/api'
@@ -604,15 +607,17 @@ const captureRects = () => {
   })
   return m
 }
-// 回弹缓动:末段轻微越过目标再回正(overshoot)
-const FLIP_EASE = 'cubic-bezier(.34, 1.56, .64, 1)'
+// 连续换位时，下一段动画从屏幕上正在显示的位置接续。
+const FLIP_EASE = 'cubic-bezier(.2,.8,.2,1)'
 const flipLayout = (prev) => {
   const grid = gridEl.value
   if (!grid || !prev.size) return
   const moves = []
-  grid.querySelectorAll('.gc-card').forEach((c) => {
+  const cards = grid.querySelectorAll('.gc-card')
+  cards.forEach((card) => flipAnims.get(card)?.cancel())
+  cards.forEach((c) => {
     const id = c.dataset.wid
-    if (!id) return
+    if (!id || id === reorderPreview.value?.id || id === '__slot__') return
     const first = prev.get(id)
     if (!first) return
     const last = c.getBoundingClientRect()
@@ -625,7 +630,6 @@ const flipLayout = (prev) => {
   })
   if (!moves.length) return
   moves.forEach(({ el, dx, dy, dw, dh }) => {
-    flipAnims.get(el)?.cancel()
     flipAnims.set(
       el,
       el.animate(
@@ -633,7 +637,7 @@ const flipLayout = (prev) => {
           { transform: `translate(${dx}px, ${dy}px) scale(${dw}, ${dh})`, transformOrigin: 'top left' },
           { transform: 'translate(0, 0) scale(1, 1)', transformOrigin: 'top left' },
         ],
-        { duration: 300, easing: FLIP_EASE },
+        { duration: 220, easing: FLIP_EASE },
       ),
     )
   })
@@ -680,11 +684,12 @@ const editMode = computed(() => appStore.homeEditMode)
 const canEdit = computed(() => userStore.isOwner)
 const startEdit = () => appStore.toggleHomeEditMode()
 const finishEdit = () => appStore.toggleHomeEditMode()
-// 编辑期间的增删/拖拽/缩放/恢复默认都只改内存,退出编辑(点「完成」或经侧栏再次点编辑)时才落库
+// 排序和侧栏拖入在松手时保存，其余编辑在退出时保存。
 watch(editMode, (on) => {
   if (on) {
     entranceMedia?.revert()
   } else {
+    cancelReorder()
     styleMenuId.value = null
     saveLayout()
   }
@@ -720,9 +725,7 @@ const onCardClick = (w) => {
   if (dest) router.push(dest)
 }
 
-// ========== 拖拽排序 + 调整大小(原生 HTML5 DnD 排序 + 右下角手柄拖拽改列宽) ==========
-const dragId = ref(null)
-const reorderPreview = ref(null) // { id, index, label, icon, span, row } —— 重排时在目标下标插入同尺寸占位
+// ========== 卡片排序与尺寸吸附 ==========
 const resizing = ref(false)
 const resizeState = ref(null)
 const ROW_H = 80
@@ -732,67 +735,40 @@ const GAP = 16
 const ALLOWED_SPANS = [1, 2, 4, 6, 8, 12]
 const ALLOWED_ROWS = [1, 2, 3, 4, 6]
 
-const onDragStart = (e, w) => {
-  if (resizing.value) {
-    e.preventDefault()
-    return
-  } // 调整大小时取消卡片原生拖拽
-  dropPreview.value = null
-  // 起初下标即原位(移除源卡后插回原位),指针压在自己身上时保持不变,避免第一帧就跳位
-  reorderPreview.value = {
-    id: w.id,
-    index: Math.max(
-      0,
-      widgets.value.findIndex((x) => x.id === w.id),
-    ),
-  }
-  dragId.value = w.id
-  e.dataTransfer.effectAllowed = 'move'
-  // 用透明画布替换浏览器默认的拖拽快照:否则光标下会再跟一张卡片,与网格里的占位叠成「两个相同组件」
-  const blank = document.createElement('canvas')
-  blank.width = 1
-  blank.height = 1
-  e.dataTransfer.setDragImage(blank, 0, 0)
-}
-
-// ========== 侧栏拖入预览(4 列 × 2 行幽灵占位,作为真实网格项参与推挤) ==========
+// ========== 侧栏拖入预览(按目标组件的默认尺寸占位) ==========
 const { code: dragCode, label: dragLabel, onMove, onDrop: onWidgetDrop, setOverGrid } = useWarmWidgetDrag()
 const dropPreview = ref(null) // { code, label, icon, index }
 // 需登录态的组件:数据全来自需要登录的接口(记账/寻物/悬赏/提醒),未登录访客拉不到,
 // 渲染出来只会是「本月还没有记账」「去登记户型图与物品」这类空态,反而显得演示内容残缺,故对游客隐藏。
 // 愿望单不在此列——它已对游客开放(见 onMounted 的 wishApi.list 与后端 /wish/list 游客分支)。
-// 口径与光尘首页 Home.vue 的 visibleWidgets 游客守卫一致。游客不可编辑(canEdit=isOwner),
-// 隐藏只影响渲染,不会让编辑态的下标错位。
+// 先把落点应用到完整布局，再过滤当前成员不可见的卡片。
 const GUEST_HIDDEN_WIDGETS = ['finance', 'item', 'task', 'reminder']
 const displayWidgets = computed(() => {
-  const hideForGuest = !userStore.isLoggedIn
-  // 账本不可读(家长设为 NONE)的成员连收支卡一起隐藏,与光尘首页口径一致
-  const hideFinance = hideForGuest || !userStore.canReadBook
-  const list = hideFinance
-    ? widgets.value.filter((w) => baseOf(w) !== 'finance' && !(hideForGuest && GUEST_HIDDEN_WIDGETS.includes(baseOf(w))))
-    : [...widgets.value]
   const rp = reorderPreview.value
   const dp = dropPreview.value
+  const list = [...widgets.value]
   if (rp) {
-    // 卡片重排:实时移动——把源卡片(降透明度)直接挪到落点,只保留这一个占位,不再额外插入幽灵卡。
-    // rp.index 是「移除源卡后」的下标,故先移出源卡再按该下标插回
+    // 真卡悬浮在网格上方，原组件保持挂载。同尺寸占位独立参与 CSS Grid 排版。
     const from = list.findIndex((w) => w.id === rp.id)
     if (from >= 0) {
-      const [src] = list.splice(from, 1)
-      list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, src)
+      const [source] = list.splice(from, 1)
+      list.splice(rp.index, 0, { id: '__slot__', kind: 'preview', span: source.span, row: source.row })
+      list.push(source)
     }
   } else if (dp) {
-    list.splice(Math.max(0, Math.min(dp.index, list.length)), 0, {
+    const id = MODULE_DEFAULT_WIDGET[dp.code] || `link:${dp.code}`
+    list.splice(dp.index, 0, {
       id: '__preview__',
       kind: 'preview',
       label: dp.label,
       icon: dp.icon,
-      span: 4,
-      row: 2,
+      span: defaultSpan(id),
+      row: defaultRow(id),
       hint: t('warm.dropHere'),
     })
   }
-  return list
+  const guest = !userStore.isLoggedIn
+  return list.filter((w) => (userStore.canReadBook || baseOf(w) !== 'finance') && !(guest && GUEST_HIDDEN_WIDGETS.includes(baseOf(w))))
 })
 const previewMeta = (code) => {
   const def = widgetById(MODULE_DEFAULT_WIDGET[code])
@@ -800,21 +776,20 @@ const previewMeta = (code) => {
   const meta = MODULE_META[code]
   return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
-// 由鼠标坐标推导插入下标:取指针真正命中的卡片(间隙/源卡自身保持当前下标,见 utils/dragInsert.js)
+// 从网格测量卡片与占位的最终位置，交给 pickInsertIndex 判断落点。
 // 卡片矩形用 offsetLeft/offsetTop 换算(布局位置),不能用 getBoundingClientRect——
 // 邻居推挤的 FLIP 动画在跑,rect 会带 transform 的中间态,下标会连着算错、预览来回跳
 const insertionIndexAt = (x, y, current, sourceId) => {
   const grid = gridEl.value
   if (!grid) return current ?? 0
   const g = grid.getBoundingClientRect()
-  const originX = g.left - grid.offsetLeft
-  const originY = g.top - grid.offsetTop
   const boxes = Array.from(grid.querySelectorAll('.gc-card'))
-    .filter((c) => c.dataset.wid)
+    .filter((c) => c.dataset.wid && !c.classList.contains('gc-card-dragging'))
     .map((c) => {
-      const left = originX + c.offsetLeft
-      const top = originY + c.offsetTop
-      return { id: c.dataset.wid, left, top, right: left + c.offsetWidth, bottom: top + c.offsetHeight }
+      const left = g.left + c.offsetLeft
+      const top = g.top + c.offsetTop
+      const id = c.dataset.wid === '__slot__' ? sourceId : c.dataset.wid
+      return { id, left, top, right: left + c.offsetWidth, bottom: top + c.offsetHeight }
     })
   return pickInsertIndex(
     boxes,
@@ -823,7 +798,7 @@ const insertionIndexAt = (x, y, current, sourceId) => {
     y,
     current,
     sourceId,
-    { top: g.top, bottom: g.bottom },
+    g,
   )
 }
 const insertWidgetAt = (code, idx) => {
@@ -842,6 +817,7 @@ const insertWidgetAt = (code, idx) => {
   const list = [...layout.value]
   list.splice(Math.max(0, Math.min(idx, list.length)), 0, { id, span: defaultSpan(id), row: defaultRow(id) })
   applyLayout(list)
+  saveLayout()
   ElMessage.success(t('warm.addedToast', { label: resolved.label }))
 }
 // 拖拽移动(鼠标事件驱动,同步更新):进入网格 → 幽灵变形为卡片 + 占位推挤;离开 → 还原
@@ -878,101 +854,53 @@ onWidgetDrop((c) => {
   if (dropPreview.value) insertWidgetAt(c, dropPreview.value.index)
 })
 
-// 卡片重排:拖拽中实时把源卡移到目标下标(展示为唯一占位),复用 insertionIndexAt + FLIP 推挤
-const onReorderDragOver = (e) => {
-  e.preventDefault()
-  if (!dragId.value) return
-  e.dataTransfer.dropEffect = 'move'
-  const idx = insertionIndexAt(e.clientX, e.clientY, reorderPreview.value?.index, dragId.value)
-  const cur = reorderPreview.value
-  if (!cur || cur.index !== idx) {
+watch(dragCode, (code) => {
+  if (!code && dropPreview.value) {
     const prev = captureRects()
-    reorderPreview.value = { id: dragId.value, index: idx }
+    dropPreview.value = null
     nextTick(() => flipLayout(prev))
   }
-}
-const onReorderDrop = (e) => {
-  e.preventDefault()
-  const from = dragId.value
-  if (!from) return
-  const k = reorderPreview.value?.index
-  dragId.value = null
-  reorderPreview.value = null
-  if (k == null) return
-  const dragged = layout.value.find((x) => x.id === from)
-  if (!dragged) return
-  const others = layout.value.filter((x) => x.id !== from)
-  others.splice(Math.max(0, Math.min(k, others.length)), 0, dragged)
-  applyLayout(others)
-}
-const onDragEnd = () => {
-  dragId.value = null
-  reorderPreview.value = null
-}
+})
 
-// 触屏排序:原生 HTML5 DnD 在手机上不触发,编辑态改从「⋮⋮ 手柄」按住拖动;
-// 复用鼠标拖拽的实时占位 / FLIP 推挤,松手才落一次布局。
-let gripDrag = null
-
-const onGripPointerDown = (e, w) => {
-  if (!editMode.value || (e.pointerType === 'mouse' && e.button !== 0)) return
-  gripDrag = { id: w.id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, active: false }
-  window.addEventListener('pointermove', onGripPointerMove)
-  window.addEventListener('pointerup', onGripPointerUp)
-  window.addEventListener('pointercancel', onGripPointerUp)
+const {
+  preview: reorderPreview,
+  start: startReorder,
+  cancel: cancelReorder,
+} = useWarmCardReorder({
+  gridEl,
+  indexOf: (id) => layout.value.findIndex((w) => w.id === id),
+  indexAt: insertionIndexAt,
+  captureRects,
+  flipLayout,
+  commit: (id, index) => {
+    const next = [...layout.value]
+    const from = next.findIndex((w) => w.id === id)
+    if (from < 0) return
+    const [source] = next.splice(from, 1)
+    next.splice(index, 0, source)
+    layout.value = next
+    saveLayout()
+  },
+})
+const reorderStyle = (w) => {
+  const rp = reorderPreview.value
+  if (!rp) return
+  // 暖居纸面样式会把真卡设为相对定位，提起时连同实测尺寸一起覆盖。
+  if (w.id === rp.id) return { position: 'absolute', width: `${rp.width}px`, height: `${rp.height}px` }
+  if (w.id === '__slot__') return { height: `${rp.height}px` }
 }
-
-const onGripPointerMove = (e) => {
-  if (!gripDrag || e.pointerId !== gripDrag.pointerId) return
-  if (!gripDrag.active) {
-    // 先走 8px 阈值,避免把「点一下手柄」误判成拖拽
-    if (Math.hypot(e.clientX - gripDrag.startX, e.clientY - gripDrag.startY) < 8) return
-    gripDrag.active = true
-    dragId.value = gripDrag.id
-    reorderPreview.value = {
-      id: gripDrag.id,
-      index: Math.max(
-        0,
-        layout.value.findIndex((x) => x.id === gripDrag.id),
-      ),
-    }
-  }
-  const idx = insertionIndexAt(e.clientX, e.clientY, reorderPreview.value?.index, gripDrag.id)
-  if (reorderPreview.value?.index !== idx) {
-    const prev = captureRects()
-    reorderPreview.value = { id: gripDrag.id, index: idx }
-    nextTick(() => flipLayout(prev))
-  }
-}
-
-const detachGripDrag = () => {
-  window.removeEventListener('pointermove', onGripPointerMove)
-  window.removeEventListener('pointerup', onGripPointerUp)
-  window.removeEventListener('pointercancel', onGripPointerUp)
-}
-
-const onGripPointerUp = (e) => {
-  if (!gripDrag || (e.pointerId !== undefined && e.pointerId !== gripDrag.pointerId)) return
-  const { id, active } = gripDrag
-  gripDrag = null
-  detachGripDrag()
-  if (!active) return
-  const k = reorderPreview.value?.index
-  dragId.value = null
-  reorderPreview.value = null
-  if (k == null) return
-  const dragged = layout.value.find((x) => x.id === id)
-  if (!dragged) return
-  const others = layout.value.filter((x) => x.id !== id)
-  others.splice(Math.max(0, Math.min(k, others.length)), 0, dragged)
-  applyLayout(others)
+const onReorderStart = (e, w) => {
+  if (!editMode.value || resizing.value || dragCode.value || w.kind === 'preview') return
+  if (e.target.closest('button, input, select, textarea, a, .gc-resize, .gc-style-menu')) return
+  if (e.pointerType === 'touch' && !e.target.closest('.gc-grip')) return
+  startReorder(e, w.id)
 }
 
 // 调整大小:按下右下角手柄拖拽,把卡片列宽吸附 4/6/8/12、行高吸附 2/3/4/6;
 // 拖动中实时改 span/row,邻居经 CSS 栅格自动重排(实时预览),松手才 saveLayout 提交,拖回原位等于还原
 // 缩放同样改用 Pointer Events:触屏/触控笔与鼠标共用,手柄加 touch-action:none 防止被页面滚动抢走
 const onResizeStart = (e, w) => {
-  if (e.pointerType === 'mouse' && e.button !== 0) return
+  if (e.button !== 0 || e.isPrimary === false || reorderPreview.value || resizing.value) return
   const card = e.currentTarget.closest('.gc-card')
   if (!card) return
   const grid = card.parentElement
@@ -1040,7 +968,6 @@ const onResizeUp = (e) => {
   // 松手仅结束拖拽,不落库;退出编辑(点「完成」或再次点编辑)时统一提交
 }
 onBeforeUnmount(() => {
-  detachGripDrag()
   window.removeEventListener('pointermove', onResizeMove)
   window.removeEventListener('pointerup', onResizeUp)
   window.removeEventListener('pointercancel', onResizeUp)
@@ -1475,10 +1402,19 @@ html.theme-warm.dark .gc-home {
 }
 
 .gc-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   grid-auto-rows: 80px;
   gap: 16px;
+}
+.gc-grid:has(.gc-card-dragging) {
+  overflow: clip;
+  overflow-anchor: none;
+  cursor: grabbing;
+}
+.gc-editing .gc-grid:empty {
+  min-height: 120px;
 }
 .gc-c12 {
   grid-column: span 12;
@@ -1671,11 +1607,21 @@ html.theme-warm.dark .gc-home {
 .gc-card-link {
   cursor: pointer;
 }
-/* 卡片重排中「被拿起」的源卡片:实时移动到落点并降透明度,作为唯一占位(不再另插幽灵卡) */
-.gc-card-dragging {
-  opacity: 0.4;
+.gc-card-edit {
+  cursor: grab;
+  user-select: none;
 }
-/* 拖入预览占位(4 列 × 2 行幽灵卡片,作为真实网格项参与推挤) */
+.gc-card.gc-card-dragging {
+  inset: 0 auto auto 0;
+  grid-area: auto;
+  box-sizing: border-box;
+  z-index: var(--z-content);
+  pointer-events: none;
+  cursor: grabbing;
+  box-shadow: var(--shadow-hover);
+  will-change: translate;
+}
+/* 占位参与网格排版，邻居按放置后的尺寸让位。 */
 .gc-card-preview {
   border-style: dashed;
   border-color: var(--color-accent, var(--color-brand));

@@ -1,24 +1,33 @@
-// 网格拖拽落位:boxes 是当前渲染出来的卡片矩形(按视觉顺序),others 是「移除被拖拽项后」的序列。
-// 规则:只认指针真正压在的那张卡片,按左右半区决定插到它前/后;压在源卡自身、卡片间隙或网格内时
-// 保持当前下标(间隙里"最近卡片"只在还没有占位时兜底),指针越过网格上下边界则收口到首/尾。
-// 不能按「逐张 y < 卡片中心就返回」推导——同行卡片高度不一时右侧卡上方会被误判到最前,落位会漂。
+function distanceToBox(box, x, y) {
+  const dx = Math.max(box.left - x, 0, x - box.right)
+  const dy = Math.max(box.top - y, 0, y - box.bottom)
+  return dx * dx + dy * dy
+}
+
+// boxes 使用布局坐标(忽略让位动效的 transform)。others 是移除源卡后的完整布局,含当前隐藏项。
 export function pickInsertIndex(boxes, others, x, y, current, sourceId, gridRect) {
-  if (!boxes.length) return 0
-  const inside = (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
-  const dist2 = (r) => {
-    const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
-    const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
-    return dx * dx + dy * dy
+  if (!boxes.length || y < gridRect?.top) return 0
+  if (y > gridRect?.bottom) return others.length
+
+  // 空隙也能投放。按矩形边缘而非中心选最近的卡片,避免大卡片在靠边时误选邻居。
+  let target = null
+  let minDistance = Infinity
+  for (const box of boxes) {
+    const distance = distanceToBox(box, x, y)
+    if (distance < minDistance || (distance === minDistance && box.id === sourceId)) {
+      minDistance = distance
+      target = box
+    }
   }
-  const hit = boxes.find((b) => inside(b))
-  if (hit && hit.id === sourceId) return current ?? others.length
-  if (!hit) {
-    if (gridRect && y > gridRect.bottom) return others.length
-    if (gridRect && y < gridRect.top) return 0
-    if (current != null) return current
-  }
-  const target = hit || boxes.reduce((a, b) => (dist2(b) < dist2(a) ? b : a))
-  const idx = others.findIndex((e) => e.id === target.id)
-  if (idx < 0) return current ?? others.length
-  return x < target.left + (target.right - target.left) / 2 ? idx : idx + 1
+  if (target.id === sourceId) return current ?? others.length
+  const index = others.findIndex((entry) => entry.id === target.id)
+  if (index < 0) return current ?? others.length
+
+  // 上下行之间取上下边,同行取左右边。独占整行的卡片(含手机单列)始终按高度判断。
+  const spansRow = gridRect && target.left <= gridRect.left + 1 && target.right >= gridRect.right - 1
+  const vertical = spansRow || y < target.top || y > target.bottom
+  const offset = vertical ? y - (target.top + target.bottom) / 2 : x - (target.left + target.right) / 2
+  // 保留中线两侧的几像素,触控及鼠标轻微颤动不会反复触发让位。
+  if (Math.abs(offset) <= 4 && (current === index || current === index + 1)) return current
+  return offset < 0 ? index : index + 1
 }

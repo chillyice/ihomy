@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { getCurrentScope, onScopeDispose, ref } from 'vue'
 
 // 侧栏模块拖入首页的共享拖拽状态(模块级单例;WarmLayout 启动拖拽 → WarmHome 消费)。
 // 原生 HTML5 DnD 的拖拽图是静态截图、无法在拖拽中变形,故改用 Pointer Events + 自定义浮层幽灵:
@@ -15,16 +15,13 @@ let dropCb = null
 let activePointerId = null
 
 function onPointerMove(e) {
-  if (activePointerId !== null && e.pointerId !== activePointerId) return
+  if (e.pointerId !== activePointerId) return
   x.value = e.clientX
   y.value = e.clientY
   if (moveCb) moveCb(e.clientX, e.clientY)
 }
 
-function onPointerUp(e) {
-  if (activePointerId !== null && e.pointerId !== undefined && e.pointerId !== activePointerId) return
-  const c = code.value
-  const wasOverGrid = overGrid.value
+function finishDrag() {
   dragging.value = false
   code.value = null
   label.value = ''
@@ -32,13 +29,32 @@ function onPointerUp(e) {
   activePointerId = null
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
-  window.removeEventListener('pointercancel', onPointerUp)
-  if (wasOverGrid && dropCb) dropCb(c)
+  window.removeEventListener('pointercancel', onPointerCancel)
+  window.removeEventListener('blur', finishDrag)
+  window.removeEventListener('keydown', onKeyDown)
+}
+
+function onPointerUp(e) {
+  if (e.pointerId !== activePointerId) return
+  try {
+    if (e.clientX !== x.value || e.clientY !== y.value) onPointerMove(e)
+    if (overGrid.value) dropCb?.(code.value)
+  } finally {
+    finishDrag()
+  }
+}
+
+function onPointerCancel(e) {
+  if (e.pointerId === activePointerId) finishDrag()
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape') finishDrag()
 }
 
 export function useWarmWidgetDrag() {
   const startDrag = (_code, _label, e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
+    if (dragging.value || e.isPrimary === false || e.button !== 0) return
     code.value = _code
     label.value = _label
     x.value = e.clientX
@@ -49,13 +65,30 @@ export function useWarmWidgetDrag() {
     e.preventDefault()
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointercancel', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    window.addEventListener('blur', finishDrag)
+    window.addEventListener('keydown', onKeyDown)
   }
+  let localDrop = null
+  let localMove = null
   const onDrop = (cb) => {
-    dropCb = cb
+    dropCb = localDrop = cb
+    return () => {
+      if (dropCb === cb) dropCb = null
+    }
   }
   const onMove = (cb) => {
-    moveCb = cb
+    moveCb = localMove = cb
+    return () => {
+      if (moveCb === cb) moveCb = null
+    }
+  }
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (moveCb === localMove) moveCb = null
+      if (dropCb === localDrop) dropCb = null
+      if (dragging.value) finishDrag()
+    })
   }
   const setOverGrid = (v) => {
     overGrid.value = v

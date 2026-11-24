@@ -3,13 +3,13 @@ import { pickInsertIndex } from './dragInsert'
 
 const box = (id, left, top, right, bottom) => ({ id, left, top, right, bottom })
 const others = (...ids) => ids.map((id) => ({ id }))
-const GRID = { top: 0, bottom: 500 }
+const GRID = { top: 0, bottom: 500, left: 0, right: 800 }
 
 describe('pickInsertIndex', () => {
   // 同行左右并排、高度不一(旧算法会把右侧卡上方误判到最前)
   const A = box('a', 0, 0, 400, 100)
   const B = box('b', 412, 0, 800, 300)
-  const C = box('c', 0, 112, 800, 300)
+  const C = box('c', 0, 312, 800, 412)
 
   it('落在卡片左/右半区决定插到它前/后', () => {
     expect(pickInsertIndex([A, B, C], others('a', 'b', 'c'), 700, 20, 2, 'c', GRID)).toBe(2)
@@ -21,8 +21,21 @@ describe('pickInsertIndex', () => {
     expect(pickInsertIndex([A, B, C], others('a', 'b', 'c'), 600, 150, 2, 'b', GRID)).toBe(2)
   })
 
-  it('落在卡片间隙时保持当前下标', () => {
-    expect(pickInsertIndex([A, B, C], others('a', 'b', 'c'), 406, 20, 0, 'c', GRID)).toBe(0)
+  it('同行间隙指向相邻卡片之间,空白行距按上下边落位', () => {
+    expect(pickInsertIndex([A, B, C], others('a', 'b'), 406, 20, 0, 'c', GRID)).toBe(1)
+    expect(pickInsertIndex([A, B, C], others('a', 'c'), 22, 309, 0, 'b', GRID)).toBe(1)
+  })
+
+  it('满行组件和手机单列使用纵向中线,保持完整布局中的隐藏项', () => {
+    const list = others('a', 'hidden', 'c')
+    expect(pickInsertIndex([A, B, C], list, 780, 315, 0, 'b', GRID)).toBe(2)
+    expect(pickInsertIndex([A, B, C], list, 10, 410, 0, 'b', GRID)).toBe(3)
+    expect(pickInsertIndex([A, B, C], list, 10, 364, 2, 'b', GRID)).toBe(2)
+  })
+
+  it('首次拖入遇到空网格,或指针靠近自己的占位时保持稳定', () => {
+    expect(pickInsertIndex([], [], 40, 40, null, '__preview__', GRID)).toBe(0)
+    expect(pickInsertIndex([A, B, C], others('a', 'b'), 20, 311, 1, 'c', GRID)).toBe(1)
   })
 
   it('越出网格上下边界收口到首/尾', () => {
