@@ -192,9 +192,10 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
 
-  async function startVoice(t, owner) {
+  /** options.autoSend:长按浮球说完即发(松手转写成功后直接发送);options.pageContext 随消息带上当前页 */
+  async function startVoice(t, owner, options = {}) {
     if (!eligible.value || !active.value || take || sending.value) return
-    const recording = { recorder: useVoiceRecorder(), started: false, timer: null, owner }
+    const recording = { recorder: useVoiceRecorder(), started: false, timer: null, owner, options }
     take = recording
     voice.value = 'starting'
     error.value = ''
@@ -225,7 +226,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
 
-  async function finishVoice(t, owner) {
+  async function finishVoice(t, owner, options) {
     const recording = take
     if (owner && recording?.owner !== owner) return
     if (!recording || voice.value === 'transcribing') return
@@ -233,22 +234,28 @@ export const useAssistantStore = defineStore('assistant', () => {
       discardVoice()
       return
     }
+    const opts = options || recording.options || {}
     clearTimeout(recording.timer)
     recording.started = false
     voice.value = 'transcribing'
+    let said = ''
     try {
       const blob = await recording.recorder.stop()
       if (take !== recording) return
       if (blob.size <= 44) throw new Error()
       const result = await assistantApi.transcribe(new File([blob], 'voice.wav', { type: blob.type }))
       if (take !== recording) return
-      if (result.text?.trim()) draft.value = [draft.value.trim(), result.text.trim()].filter(Boolean).join(' ')
-      else error.value = t('chat.assistant.noSpeech')
+      if (result.text?.trim()) {
+        said = result.text.trim()
+        draft.value = [draft.value.trim(), said].filter(Boolean).join(' ')
+      } else error.value = t('chat.assistant.noSpeech')
     } catch {
       if (take === recording) error.value = t('chat.assistant.noSpeech')
     } finally {
       if (take === recording) discardVoice()
     }
+    // 长按浮球:松手转写成功即发,不必再点一次发送;输入区麦克风仍只填输入框,可先编辑
+    if (said && opts.autoSend) await send(opts.pageContext)
   }
 
   return {

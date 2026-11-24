@@ -21,7 +21,7 @@ export default {
   noAsr: 'Voice recognition has not been configured for this family. You can still type.',
   micFailed: 'Cannot access your microphone. Check its permissions or type your message.',
   noSpeech: 'Could not transcribe that recording. Try again or type your message.',
-  holdHint: 'Tap to open chat. Hold to speak to your assistant.',
+  holdHint: 'Tap to open chat. Hold to speak to your assistant, and it sends when you let go.',
   voice: { idle: 'Voice input', starting: 'Opening microphone…', recording: 'Recording, tap to finish', transcribing: 'Transcribing…' },
   states: { PENDING: 'Pending', DONE: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled' },
   suggestions: {

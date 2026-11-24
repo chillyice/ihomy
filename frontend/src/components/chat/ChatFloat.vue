@@ -472,7 +472,11 @@ const onBallDown = (e) => {
       chatStore.openAssistant()
       expand()
       haptic('tap')
-      assistant.startVoice(t, floatVoiceOwner)
+      // 说完松手即发:不必再回输入框点发送
+      assistant.startVoice(t, floatVoiceOwner, {
+        autoSend: true,
+        pageContext: { path: route.path.slice(0, 200), name: String(route.name || '').slice(0, 80) },
+      })
     },
     release: () => assistant.finishVoice(t, floatVoiceOwner),
     cancel: () => assistant.discardVoice(floatVoiceOwner),

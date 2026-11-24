@@ -21,7 +21,7 @@ export default {
   noAsr: '家庭尚未配置语音识别，可以继续打字。',
   micFailed: '无法使用麦克风，请检查话筒权限或继续打字。',
   noSpeech: '没能识别这段语音，请重试或继续打字。',
-  holdHint: '点按打开聊天，长按向助手说话',
+  holdHint: '点按打开聊天，长按对助手说话，松手即发送',
   voice: { idle: '语音输入', starting: '正在打开麦克风…', recording: '正在录音，点按结束', transcribing: '正在转写…' },
   states: { PENDING: '待确认', DONE: '已完成', FAILED: '未完成', CANCELLED: '已取消' },
   suggestions: {

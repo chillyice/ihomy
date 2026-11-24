@@ -493,7 +493,7 @@ actions: openAssistant() / closeAssistant() / loadAssistant() / sendAssistant(te
 | 触发 | 按住 **450ms**（对齐 `usePickSelect`）+ 位移 ≤10px；鼠标/触屏同一套 Pointer Events |
 | 拖动冲突 | `ball.dragging` 为真、或删除锚点 `dockActive` 为真 → 立即取消长按计时 |
 | 触发后 | 轻震动（`navigator.vibrate?.(10)`）→ `expand()` + `openAssistant()` → 开始录音；`ignoreBallClick=true` 吞掉松手后的 click |
-| 松手 | 停止录音 → `aiApi.transcribe(blob)` → 文本填入输入框（**不自动发送**），期间输入框显示「识别中…」 |
+| 松手 | 停止录音 → `aiApi.transcribe(blob)` → **转写成功即自动发送**（带当前页 `pageContext`），面板此时已打开、直接看回复；输入区麦克风仍只填输入框可编辑，期间显示「识别中…」 |
 | 上限 | 录音最长 60s 自动停；转写失败保留面板，提示「没听清，再说一次」 |
 | 不可用 | 无 `mediaDevices` / 未配 ASR：提示 + 聚焦输入框，不静默失败 |
 | 无障碍 | 长按不可发现/不可键盘 → 输入区常驻麦克风按钮（同样流程），文案进 i18n |
@@ -636,7 +636,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 12. 待拍板（开工前需确认，不阻塞 P0）
 
-1. **语音转写后是否自动发送**：建议填输入框不自动发；是否需要「松手即发送」开关？
+1. ~~**语音转写后是否自动发送**~~ → **已拍板（2026-11-24）**：长按浮球说完松手即自动发送并停在助手面板看回复；输入区麦克风仍填输入框可编辑，不做开关。
 2. **多会话**：P1 单会话够用，还是首版就要历史会话列表？
 
 ---
