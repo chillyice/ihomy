@@ -17,7 +17,8 @@
           height: size + 'px',
           '--desk-size': size + 'px',
           '--desk-angle': angle + 'deg',
-          '--desk-ink': cropWidth ? paintInset(item, angle) : undefined,
+          '--desk-ink': cropWidth ? paintHalfExtent(item, angle, 'width') + '%' : undefined,
+          '--desk-cast': litShadows.get(item.key),
         }"
       >
         <span class="desk-crop" aria-hidden="true">
@@ -42,10 +43,12 @@
 </template>
 
 <script setup>
-import { computed, shallowRef } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeskObjects } from '@/composables/useDeskObjects'
 import { useDeskSpace } from '@/composables/useDeskSpace'
+import { apertureCoverage, castShadow, projectionQuad } from '@/utils/deskLight'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
   destinations: { type: Object, default: () => ({}) },
@@ -70,30 +73,73 @@ const { candidates } = useDeskObjects(true, () => props.destinations, arrangemen
 const drawable = computed(() => candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))))
 const { placements, modalOpen } = useDeskSpace(drawable, arrangement)
 
-// 原画有透明留白。按正放和倾斜 30° 时颜料的水平半宽（画布百分比）取景，
-// 让朝向正文的一边保留物件本身的轮廓。叶片和杯子按实际选中的插画区分。
-const paintHalfWidths = {
-  bookmark: [12, 30],
-  coffee: [41, 41],
-  tea: [37, 37],
-  envelope: [40, 46],
-  fruit: [34, 36],
-  'fruit-peach': [36, 41],
-  'fruit-pear': [32, 33],
-  journal: [27, 43],
-  'leaf-autumn': [42, 44],
-  'leaf-spring': [23, 31],
-  'leaf-summer': [37, 39],
-  'leaf-winter': [28, 35],
-  note: [37, 51],
-  phone: [21, 35],
-  photo: [42, 61],
-  recipe: [38, 46],
-  record: [36, 51],
+const sunLight = inject(SUN_LIGHT_KEY, null)
+const viewport = ref({ width: window.innerWidth || 0, height: window.innerHeight || 0 })
+const syncViewport = () => {
+  viewport.value = { width: window.innerWidth || 0, height: window.innerHeight || 0 }
 }
-function paintInset(item, angle) {
-  const [upright, tilted] = paintHalfWidths[item.art ?? item.kind] ?? [40, 50]
-  return upright + (tilted - upright) * Math.min(1, Math.abs(angle) / 30) + '%'
+onMounted(() => window.addEventListener('resize', syncViewport))
+onBeforeUnmount(() => window.removeEventListener('resize', syncViewport))
+
+const litShadows = computed(() => {
+  const shadows = new Map()
+  const scene = sunLight?.sunScene?.value
+  const strength = (sunLight?.lightLayerOpacity?.value ?? 0) * (sunLight?.shadowAlpha?.value ?? 0)
+  if (!scene?.hasDirectLight || strength <= 0 || !placements.value.length) return shadows
+  const realWeight = sunLight.projectionStandard.value === 'real' ? 1 : 0
+  const quad = projectionQuad(viewport.value.width, viewport.value.height, scene, realWeight)
+  for (const seat of placements.value) {
+    const coverage = apertureCoverage(quad, visiblePaintRect(seat))
+    if (coverage <= 0) continue
+    const shadow = castShadow(scene, seat.size, strength * coverage, seat.item.kind)
+    if (shadow) {
+      shadows.set(
+        seat.item.key,
+        `drop-shadow(${shadow.x.toFixed(1)}px ${shadow.y.toFixed(1)}px ${shadow.blur.toFixed(1)}px ${shadow.color})`,
+      )
+    }
+  }
+  return shadows
+})
+
+// Visible ink extents as percentages of the square sprite: half width at 0°/30°, then half height at 0°/30°.
+const paintHalfExtents = {
+  bookmark: [12, 30, 45, 42],
+  coffee: [41, 41, 42, 42],
+  tea: [37, 37, 37, 37],
+  envelope: [40, 46, 24, 40],
+  fruit: [34, 36, 34, 34],
+  'fruit-peach': [36, 41, 36, 39],
+  'fruit-pear': [32, 33, 33, 34],
+  journal: [27, 43, 43, 48],
+  'leaf-autumn': [42, 44, 42, 41],
+  'leaf-spring': [23, 31, 42, 37],
+  'leaf-summer': [37, 39, 41, 38],
+  'leaf-winter': [28, 35, 39, 41],
+  note: [37, 51, 39, 52],
+  phone: [21, 35, 41, 43],
+  photo: [42, 61, 46.5, 61],
+  recipe: [38, 46, 33, 43],
+  record: [36, 51, 43, 54],
+}
+function paintHalfExtent(item, angle, dimension) {
+  const extents = paintHalfExtents[item.art ?? item.kind] ?? [40, 50, 40, 50]
+  const i = dimension === 'width' ? 0 : 2
+  return extents[i] + (extents[i + 1] - extents[i]) * Math.min(1, Math.abs(angle) / 30)
+}
+
+function visiblePaintRect({ item, size, angle, x, y, cropWidth, edge }) {
+  const halfWidth = (size * paintHalfExtent(item, angle, 'width')) / 100
+  const halfHeight = (size * paintHalfExtent(item, angle, 'height')) / 100
+  let left = x - halfWidth
+  let right = x + halfWidth
+  if (cropWidth) {
+    // The ink is flush with the inner edge of the crop, as positioned by --desk-ink.
+    const width = Math.min(2 * halfWidth, cropWidth)
+    left = edge === 'left' ? x + cropWidth / 2 - width : x - cropWidth / 2
+    right = left + width
+  }
+  return { left, right, top: y - halfHeight, bottom: y + halfHeight }
 }
 
 function paperStyle(item) {
@@ -115,6 +161,7 @@ function paperStyle(item) {
   pointer-events: none;
   contain: layout style;
   --desk-shadow: rgba(57, 42, 24, 0.19);
+  --desk-cast: none;
 }
 html.dark .window-desk {
   --desk-shadow: rgba(8, 6, 4, 0.34);
@@ -144,6 +191,9 @@ html.dark .window-desk {
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
   pointer-events: none;
+  /* Cast the clipped silhouette in screen coordinates, after the sprite has been rotated. */
+  filter: var(--desk-cast);
+  transition: filter 600ms ease;
 }
 .edge-crop .desk-crop {
   overflow: clip;
@@ -296,6 +346,7 @@ html.dark .desk-illustration {
     display: none;
   }
   .desk-illustration,
+  .desk-crop,
   .desk-hint {
     transition: none;
   }

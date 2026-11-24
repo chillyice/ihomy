@@ -1,5 +1,17 @@
 import { drawWindowFoliage } from './windowFoliage'
 
+// Clear glass in normalized window coordinates, shared with the desktop objects'
+// lighting calculation so a mullion casts shade in both places.
+const halfMullion = 0.072 / 2
+const halfTransom = 0.0825 / 2
+export const WINDOW_PANES = [
+  [0.012, 0.5 - halfMullion],
+  [0.5 + halfMullion, 1 - 0.012],
+].flatMap(([left, right]) => [
+  { left, right, top: 0, bottom: 0.483 - halfTransom },
+  { left, right, top: 0.483 + halfTransom, bottom: 1 },
+])
+
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
   const bearing = (180 - azimuth) * radians
@@ -73,14 +85,8 @@ export function drawWindowProjection(
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  // Inset the opening to leave a solid perimeter around the glass.
-  const frameX = 0.012
-  mask.fillRect(frameX, 0, 1 - 2 * frameX, 1)
+  for (const { left, right, top, bottom } of WINDOW_PANES) mask.fillRect(left, top, right - left, bottom - top)
   mask.globalCompositeOperation = 'destination-out'
-  const mullionWidth = 0.072
-  const transomHeight = 0.0825
-  mask.fillRect(0.5 - mullionWidth / 2, 0, mullionWidth, 1)
-  mask.fillRect(0, 0.483 - transomHeight / 2, 1, transomHeight)
   drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()
