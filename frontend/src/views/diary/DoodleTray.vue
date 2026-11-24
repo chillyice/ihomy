@@ -9,6 +9,7 @@
         type="button"
         class="tray-toggle"
         :class="{ up: !collapsed }"
+        :aria-expanded="!collapsed"
         :title="collapsed ? $t('common.expand') : $t('common.collapse')"
         @click="toggle"
       >
@@ -35,6 +36,7 @@
           type="button"
           class="pen-item"
           :class="{ active: brush === b.id }"
+          :aria-pressed="brush === b.id"
           :title="$t(b.labelKey)"
           @click="pickBrush(b)"
         >
@@ -448,32 +450,84 @@ html.dark .swatch {
   margin-top: 12px;
 }
 
-@media (max-width: 768px) {
-  .doodle-area {
-    width: 100%;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    top: auto;
-    border-radius: 14px 14px 0 0;
-    z-index: var(--z-action);
-    max-height: 48vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-  }
+.doodle-area.mobile {
+  box-sizing: border-box;
+  width: 100%;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  border-radius: 14px 14px 0 0;
+  z-index: var(--z-action);
+  max-height: 48vh;
+  max-height: 48dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
   /* 标题栏固定抽屉顶部,工具内容在 body 内部滚动(收起把手始终可见) */
-  .mobile .tray-body {
+  .tray-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 20px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding-bottom: 4px;
+    overflow-x: clip;
+    padding: 4px;
+    overscroll-behavior: contain;
+  }
+  .pen-grid,
+  .palette-row,
+  .tray-actions,
+  .tray-hint {
+    grid-column: 1 / -1;
+  }
+  .pen-grid {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    gap: 4px;
+  }
+  .pen-item {
+    flex-direction: row;
+    justify-content: center;
+    min-height: 44px;
+    padding: 2px;
+  }
+  .pen-name {
+    overflow-wrap: anywhere;
   }
   .pen-svg {
-    width: 22px;
-    height: 44px;
+    flex: none;
+    width: 15px;
+    height: 30px;
+  }
+  .tray-row,
+  .tray-actions,
+  .tray-hint {
+    margin-top: 0;
+  }
+  .tray-row:not(.palette-row) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding-inline: 18px;
+  }
+  .tray-row .el-slider {
+    flex: none;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+  }
+  .swatch.custom input {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .palette {
+    grid-template-columns: repeat(auto-fit, minmax(24px, 1fr));
+    min-width: 0;
   }
 }
 </style>
