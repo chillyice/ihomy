@@ -216,6 +216,13 @@ const routes = [
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
   { path: '/games/pool', name: 'Pool', component: () => import('@/views/games/Pool.vue'), meta: { requiresAuth: true } },
   {
+    path: '/games/chinese-checkers',
+    name: 'ChineseCheckers',
+    component: () => import('@/views/games/ChineseCheckers.vue'),
+    meta: { requiresAuth: true },
+  },
+  { path: '/games/gomoku', name: 'Gomoku', component: () => import('@/views/games/Gomoku.vue'), meta: { requiresAuth: true } },
+  {
     path: '/games/eight-ball',
     name: 'EightBall',
     component: () => import('@/views/games/EightBall.vue'),

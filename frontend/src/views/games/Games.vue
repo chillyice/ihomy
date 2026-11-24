@@ -389,6 +389,20 @@ const builtinGames = [
     category: 'ARCADE',
   },
   {
+    key: 'chinese-checkers',
+    titleKey: 'games.chineseCheckers.title',
+    descKey: 'games.chineseCheckers.desc',
+    path: '/games/chinese-checkers',
+    category: 'BOARD',
+  },
+  {
+    key: 'gomoku',
+    titleKey: 'games.gomoku.title',
+    descKey: 'games.gomoku.desc',
+    path: '/games/gomoku',
+    category: 'BOARD',
+  },
+  {
     key: 'pool',
     titleKey: 'games.pool.title',
     descKey: 'games.pool.desc',
