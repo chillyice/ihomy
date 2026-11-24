@@ -4,10 +4,11 @@
      交互(V9.93 起):天气 AI 生图为常驻底图(与暖居外壳同源 useWeatherBg);照片轮播/纪念日/待办
           三个小组件常驻显示,整卡可拖拽,位置固化进 localStorage(浏览器与 WE 环境各自记忆);
           角落控件仍保留「移动浮现、静止 2.2s 淡出」(待机浮现照片的旧逻辑已移除)。
-     组件可增删(本轮):组件库 WIDGET_DEFS 列出可用小组件(照片/纪念日/待办 + 动态流/家庭计划/提醒),
-          在角落控件的「组件」面板里点一下即添加/移除,启用态落 localStorage ihomy:wallpaper:widgets:v1
-          (默认开照片/纪念日/待办,与旧版视觉一致;新组件默认关)。新增组件的落点:注册表加一条 +
-          模板加 isOn('id') 分支 + 样式补默认坐标;未启用的组件不取数(壁纸请求数不随组件库膨胀)。
+     组件可增删:组件库 WIDGET_DEFS 列出可用小组件(照片/纪念日/待办 + 动态流/家庭计划/提醒 +
+          本月收支/积分/今日菜谱/健康/家庭盆栽),在角落控件的「组件」面板里点一下即添加/移除,
+          启用态落 localStorage ihomy:wallpaper:widgets:v1(默认开照片/纪念日/待办,与旧版视觉一致;
+          新组件默认关)。新增组件的落点:注册表加一条 + 模板加 isOn('id') 分支 + 样式补默认坐标;
+          未启用的组件不取数(壁纸请求数不随组件库膨胀),账本按成员档位(NONE 不取数)。
           原角落控件里的「复制壁纸令牌」按钮已移除,令牌入口只留设置页一处。
      主题:独立产品页自带配色——主题偏好存本页自己的键(缺省暖居),不跟站点 ihomy-theme 走;
           「自动」由太阳高度角驱动(useSunLight 内 applyAuto)。
@@ -161,6 +162,110 @@
       </div>
     </div>
 
+    <!-- 本月收支(账本可读的成员才显示;数字卡只有三列,不做趋势图) -->
+    <div
+      v-if="isOn('book') && bookSummary?.count"
+      class="wp-widget wpw-book"
+      :class="{ placed: widgetPos.book, dragging: dragId === 'book' }"
+      :style="widgetStyle('book')"
+      @pointerdown="onWidgetDown('book', $event)"
+    >
+      <div class="wpw-title">{{ $t('wallpaper.wBook') }}</div>
+      <div class="wpw-nums">
+        <div class="wpw-num">
+          <div class="wpw-num-v income">+{{ moneyText(bookSummary.income) }}</div>
+          <div class="wpw-num-k">{{ $t('wallpaper.bookIncome') }}</div>
+        </div>
+        <div class="wpw-num">
+          <div class="wpw-num-v expense">−{{ moneyText(bookSummary.expense) }}</div>
+          <div class="wpw-num-k">{{ $t('wallpaper.bookExpense') }}</div>
+        </div>
+        <div class="wpw-num">
+          <div class="wpw-num-v">{{ moneyText(bookSummary.balance) }}</div>
+          <div class="wpw-num-k">{{ $t('wallpaper.bookBalance') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 积分(只读:余额 + 连续天数 + 今日签到状态;签到动作回积分页做) -->
+    <div
+      v-if="isOn('points') && pointsStats"
+      class="wp-widget wpw-points"
+      :class="{ placed: widgetPos.points, dragging: dragId === 'points' }"
+      :style="widgetStyle('points')"
+      @pointerdown="onWidgetDown('points', $event)"
+    >
+      <div class="wpw-title">{{ $t('wallpaper.wPoints') }}</div>
+      <div class="wpw-points-row">
+        <span class="wpw-big">{{ pointsStats.balance ?? 0 }}</span>
+        <span v-if="pointsStats.streak" class="wpw-points-sub">{{ $t('wallpaper.pointsStreak', { n: pointsStats.streak }) }}</span>
+      </div>
+      <div class="wpw-sub">
+        {{ pointsStats.checkedToday ? $t('wallpaper.pointsChecked') : $t('wallpaper.pointsCheckin', { n: pointsStats.todayPoints ?? 5 }) }}
+      </div>
+    </div>
+
+    <!-- 今日菜谱(只读:后端今日推荐,最多三条) -->
+    <div
+      v-if="isOn('kitchen') && recipes.length"
+      class="wp-widget wpw-kitchen"
+      :class="{ placed: widgetPos.kitchen, dragging: dragId === 'kitchen' }"
+      :style="widgetStyle('kitchen')"
+      @pointerdown="onWidgetDown('kitchen', $event)"
+    >
+      <div class="wpw-title">{{ $t('wallpaper.wKitchen') }}</div>
+      <div class="wpw-body">
+        <div v-for="r in recipes" :key="r.id" class="wpw-row">
+          <div class="wpw-name">{{ r.name }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 健康摘要(只读,永远是本人数据:昨晚睡眠 + 今日步数;与首页健康卡同源同口径) -->
+    <div
+      v-if="isOn('health') && healthSummary?.hasData"
+      class="wp-widget wpw-health"
+      :class="{ placed: widgetPos.health, dragging: dragId === 'health' }"
+      :style="widgetStyle('health')"
+      @pointerdown="onWidgetDown('health', $event)"
+    >
+      <div class="wpw-title">{{ $t('wallpaper.wHealth') }}</div>
+      <div class="wpw-body">
+        <div class="wpw-row">
+          <div class="wpw-name">{{ $t('wallpaper.healthSleep') }}</div>
+          <div class="wpw-v">{{ healthSleepRow ? sleepText($t, healthSleepRow.sleepMin) : '—' }}</div>
+        </div>
+        <div class="wpw-row">
+          <div class="wpw-name">{{ $t('wallpaper.healthSteps') }}</div>
+          <div class="wpw-v">{{ healthStepsText }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 家庭盆栽(只读:全家共养的那一棵,长得怎么样一眼看见;浇水晒太阳回盆栽页) -->
+    <div
+      v-if="isOn('plant') && plantState?.planted"
+      class="wp-widget wpw-plant"
+      :class="{ placed: widgetPos.plant, dragging: dragId === 'plant' }"
+      :style="widgetStyle('plant')"
+      @pointerdown="onWidgetDown('plant', $event)"
+    >
+      <div class="wpw-title">{{ $t('wallpaper.wPlant') }}</div>
+      <div class="wpw-plant-body">
+        <PlantSprite class="wpw-plant-art" :species="plantState.species" :stage="plantState.stage" :wilted="plantState.wilted" />
+        <div class="wpw-plant-info">
+          <div class="wpw-name">{{ $t('plant.species.' + plantState.species) }} · {{ $t('plant.stageName.' + plantState.stage) }}</div>
+          <div class="wpw-plant-bar">
+            <div class="wpw-plant-fill" :style="{ width: `${clampNutrient(plantState.nutrient)}%` }" />
+          </div>
+          <div class="wpw-sub">{{ $t('wallpaper.plantNutrient', { n: plantState.nutrient ?? 0 }) }}</div>
+          <div v-if="plantState.wilted" class="wpw-plant-flag">{{ $t('wallpaper.plantWilted') }}</div>
+          <div v-else-if="plantState.harvestable" class="wpw-plant-flag">{{ $t('wallpaper.plantMatured') }}</div>
+          <div v-else-if="plantState.thirsty" class="wpw-plant-flag">{{ $t('wallpaper.plantThirsty') }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 角落控件:鼠标移动浮现、静止隐去(壁纸不留常驻界面) -->
     <div class="wp-ui" :class="{ visible: uiVisible }">
       <div class="wp-seg">
@@ -252,6 +357,7 @@
 
 <script setup>
 import IhomyWordmark from '@/components/IhomyWordmark.vue'
+import PlantSprite from '@/views/plant/PlantSprite.vue'
 import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -261,7 +367,9 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore, setThemePersist } from '@/stores/theme'
 import { DEFAULT_THEME, THEMES, loadTheme } from '@/theme'
 import { useWeatherBg } from '@/composables/useWeatherBg'
-import { authApi, publicApi, taskApi, planApi, reminderApi } from '@/api'
+import { authApi, publicApi, taskApi, planApi, reminderApi, bookApi, pointsApi, plantApi, healthApi, kitchenApi } from '@/api'
+import { formatYuan } from '@/utils/money'
+import { formatMetric, sleepText } from '@/utils/healthMetrics'
 import { applyLocale } from '@/i18n'
 
 const { locale, t } = useI18n()
@@ -366,6 +474,11 @@ const WIDGET_DEFS = [
   { id: 'feed', label: 'wallpaper.wFeed' },
   { id: 'plan', label: 'wallpaper.wPlan' },
   { id: 'reminder', label: 'wallpaper.wReminder' },
+  { id: 'book', label: 'wallpaper.wBook' },
+  { id: 'points', label: 'wallpaper.wPoints' },
+  { id: 'kitchen', label: 'wallpaper.wKitchen' },
+  { id: 'health', label: 'wallpaper.wHealth' },
+  { id: 'plant', label: 'wallpaper.wPlant' },
 ]
 // 默认开照片/纪念日/待办(与 V9.93 的常驻组件一致,升级后视觉不变);新增组件默认关,由用户自己添加
 const DEFAULT_WIDGETS = ['photos', 'anni', 'task']
@@ -409,6 +522,11 @@ const toggleWidget = (id) => {
 const feedItems = ref([])
 const plans = ref([])
 const reminders = ref([])
+const bookSummary = ref(null)
+const pointsStats = ref(null)
+const recipes = ref([])
+const healthSummary = ref(null)
+const plantState = ref(null)
 const WIDGET_ROWS = 4
 const loadWidgetData = async (only) => {
   if (!userStore.isLoggedIn) return
@@ -443,7 +561,66 @@ const loadWidgetData = async (only) => {
       /* 静默 */
     }
   }
+  // 账本:档位 NONE 的成员看不了账目,连摘要也不取(与首页收支卡同口径)
+  if ((!only || only === 'book') && isOn('book') && userStore.canReadBook) {
+    try {
+      bookSummary.value = await bookApi.summary()
+    } catch (e) {
+      /* 静默 */
+    }
+  }
+  if ((!only || only === 'points') && isOn('points')) {
+    try {
+      pointsStats.value = await pointsApi.stats()
+    } catch (e) {
+      /* 静默 */
+    }
+  }
+  // 今日菜谱:后端按家庭已有菜谱挑今日推荐(与首页菜谱卡同源)
+  if ((!only || only === 'kitchen') && isOn('kitchen')) {
+    try {
+      const data = await kitchenApi.menu()
+      recipes.value = (Array.isArray(data?.todayRecommend) ? data.todayRecommend : []).slice(0, 3)
+    } catch (e) {
+      /* 静默 */
+    }
+  }
+  // 健康摘要只回本人(他人数据是 404),游客态由登录判断挡在前面
+  if ((!only || only === 'health') && isOn('health')) {
+    try {
+      healthSummary.value = await healthApi.summary(7)
+    } catch (e) {
+      /* 静默 */
+    }
+  }
+  if ((!only || only === 'plant') && isOn('plant')) {
+    try {
+      plantState.value = await plantApi.state()
+    } catch (e) {
+      /* 静默 */
+    }
+  }
 }
+
+// 账本金额:整数省掉小数位(壁纸上的数字卡求紧凑,零头才显示两位小数)
+const moneyText = (v) => formatYuan(v, Number(v) % 1 ? 2 : 0)
+// 健康:今日行取最后一条;睡眠按「入睡日」落库,卡上取最近一条有睡眠的记录(与首页健康卡同口径)
+const healthToday = computed(() => {
+  const items = healthSummary.value?.items
+  return Array.isArray(items) && items.length ? items[items.length - 1] : null
+})
+const healthSleepRow = computed(() => {
+  const items = healthSummary.value?.items
+  if (!Array.isArray(items)) return null
+  for (let i = items.length - 1; i >= 0; i--) if (items[i].sleepMin != null) return items[i]
+  return null
+})
+const healthStepsText = computed(() => {
+  const v = healthToday.value?.steps
+  return v != null ? `${formatMetric('STEPS', v)} ${t('wallpaper.stepsUnit')}` : '—'
+})
+// 养分条宽度兜底:后端已给 0–100,脏数据也不让进度条溢出卡片
+const clampNutrient = (v) => Math.min(100, Math.max(0, Number(v) || 0))
 
 // 动态流一行:一行文本 + 类型标签(与移动端首页动态流同口径,文案走 i18n)
 const FEED_TYPES = ['blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
@@ -979,6 +1156,129 @@ onBeforeUnmount(() => {
   width: 288px;
   padding: 12px 16px 10px;
 }
+/* 第二轮组件默认位:顶部中间并排两条数字带(照片堆上方)、左列计划之下、右列提醒与待办之间、底部中间。
+   与上一批同一套思路——只是初始位置,拖一次即固化为 px。
+   收支在中心线左侧、积分在右侧(不是上下叠:两条都压在照片堆顶上会互相挤) */
+.wpw-book {
+  top: clamp(20px, 3vh, 34px);
+  left: 50%;
+  transform: translateX(calc(-100% - 6px));
+  width: 306px;
+  padding: 12px 16px 10px;
+}
+.wpw-points {
+  top: clamp(20px, 3vh, 34px);
+  left: 50%;
+  transform: translateX(6px);
+  width: 306px;
+  padding: 12px 16px 12px;
+}
+.wpw-kitchen {
+  top: clamp(590px, 56vh, 660px);
+  left: clamp(24px, 4vw, 64px);
+  width: 288px;
+  padding: 12px 16px 10px;
+}
+.wpw-health {
+  top: clamp(468px, 45vh, 520px);
+  right: clamp(24px, 4vw, 64px);
+  width: 264px;
+  padding: 12px 16px 10px;
+}
+.wpw-plant {
+  bottom: clamp(28px, 4vh, 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 306px;
+  padding: 12px 16px 12px;
+}
+/* 收支三列(收/支/结余):数字主、标签小,整数不带小数位 */
+.wpw-nums {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wpw-num {
+  min-width: 0;
+}
+.wpw-num-v {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wpw-num-v.income {
+  color: var(--color-brand);
+}
+.wpw-num-v.expense {
+  color: var(--color-accent);
+}
+.wpw-num-k {
+  margin-top: 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--color-text-secondary);
+}
+/* 积分:一个大数字 + 连续天数 */
+.wpw-points-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.wpw-big {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.wpw-points-sub {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+/* 健康两行:数字右对齐 */
+.wpw-v {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* 盆栽:左边一小株,右边品种/阶段 + 养分条 + 状态提示 */
+.wpw-plant-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wpw-plant-art {
+  width: 44px;
+  height: 58px;
+  flex-shrink: 0;
+}
+.wpw-plant-info {
+  min-width: 0;
+  flex: 1;
+}
+.wpw-plant-bar {
+  height: 5px;
+  margin: 7px 0 4px;
+  border-radius: 3px;
+  background: var(--color-line);
+  overflow: hidden;
+}
+.wpw-plant-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(var(--blob-1), 0.9);
+  transition: width 0.6s ease;
+}
+.wpw-plant-flag {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
 .wpw-title {
   font-size: 11.5px;
   font-weight: 650;
@@ -1049,6 +1349,19 @@ onBeforeUnmount(() => {
   position: relative;
   width: min(46vw, 640px);
   aspect-ratio: 4 / 3;
+}
+/* 屏幕不够高时相册收一档:顶部两条数字带与左下时钟都要留位置(1080p 及以上不受影响)。
+   右列的健康卡与左侧的菜谱卡也跟着收:矮屏里它们各自的原位会压住右下默认开着的待办、压住钟面 */
+@media (max-height: 840px) {
+  .wp-stack {
+    width: min(34vw, 460px);
+  }
+  .wpw-health {
+    top: clamp(398px, 56vh, 470px);
+  }
+  .wpw-kitchen {
+    left: clamp(340px, 30vw, 440px);
+  }
 }
 .wp-pcard {
   position: absolute;
@@ -1148,6 +1461,9 @@ onBeforeUnmount(() => {
   bottom: calc(100% + 10px);
   width: max-content;
   min-width: 140px;
+  /* 组件多了以后面板会比屏幕还高:限高 + 内部滚动(壁纸页不引 EP,这里用原生滚动) */
+  max-height: min(62vh, 460px);
+  overflow-y: auto;
   box-sizing: border-box;
   padding: 8px;
   border-radius: 12px;
@@ -1328,13 +1644,18 @@ html.theme-warm .wp-widget.dragging {
 }
 /* 按内容丰富度分纸:列表类用压过的叠层纸,条目类用带压痕的纤维纸(与首页分配一致) */
 html.theme-warm .wpw-feed,
-html.theme-warm .wpw-plan {
+html.theme-warm .wpw-plan,
+html.theme-warm .wpw-kitchen {
   --card-art: url('@/assets/materials/painted-card-pressed.webp?no-inline');
   --card-cut: 106 54 46 132 fill / 24px 12px 12px 31px;
 }
 html.theme-warm .wpw-anni,
 html.theme-warm .wpw-task,
-html.theme-warm .wpw-reminder {
+html.theme-warm .wpw-reminder,
+html.theme-warm .wpw-book,
+html.theme-warm .wpw-points,
+html.theme-warm .wpw-health,
+html.theme-warm .wpw-plant {
   --card-art: url('@/assets/materials/painted-card-laid.webp?no-inline');
   --card-cut: 38 38 60 59 fill / 10px 10px 15px 15px;
 }
@@ -1349,6 +1670,21 @@ html.theme-warm .wpw-plan {
 }
 html.theme-warm .wpw-feed {
   --chip: var(--blob-3);
+}
+html.theme-warm .wpw-book {
+  --chip: var(--blob-4);
+}
+html.theme-warm .wpw-points {
+  --chip: var(--blob-2);
+}
+html.theme-warm .wpw-kitchen {
+  --chip: var(--blob-3);
+}
+html.theme-warm .wpw-health {
+  --chip: var(--blob-1);
+}
+html.theme-warm .wpw-plant {
+  --chip: var(--blob-5);
 }
 html.theme-warm .wpw-title {
   display: flex;
