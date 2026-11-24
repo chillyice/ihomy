@@ -25,6 +25,15 @@ export const ROOM_RESULT = {
  * path 为游戏页路由(纸牌是二级路由,房间页按此直达牌桌)。
  */
 export const ROOM_GAMES = {
+  game_eight_ball: {
+    code: 'game_eight_ball',
+    nameKey: 'games.eightBall.title',
+    path: '/games/eight-ball',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.FIRST,
+    maxSeats: 2,
+    ai: false,
+  },
   game_petlink: {
     code: 'game_petlink',
     nameKey: 'games.petlink.title',

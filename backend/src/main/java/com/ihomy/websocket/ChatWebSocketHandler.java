@@ -198,6 +198,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
             String roomEvent = str(data.get("event"));
+            // Room lifecycle notices originate from the server after an authorized HTTP mutation.
+            if ("room".equals(roomEvent) || "kicked".equals(roomEvent)) {
+                replyError(session, "BAD_SIGNAL");
+                return;
+            }
             if ("chat".equals(roomEvent) || "chat:sync".equals(roomEvent)) {
                 onRoomChat(session, familyId, roomId, userId, roomEvent, data);
                 return;

@@ -209,7 +209,7 @@ public class GameRoomController {
                                               @RequestBody @jakarta.validation.Valid GameRoomFinishDTO dto) {
         LoginUser user = current();
         Map<String, Object> room = roomService.finish(user.getUserId(), user.getFamilyId(), id,
-                dto.getScore() == null ? 0 : dto.getScore());
+                dto.getScore() == null ? 0 : dto.getScore(), dto.getWinnerId(), dto.getRoundToken());
         broadcast(id, room);
         postResultCard(user, room);
         return Result.success(room);

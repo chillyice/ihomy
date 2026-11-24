@@ -14,6 +14,7 @@ export const CARD_OBJ_TYPES = ['ALBUM', 'PHOTO', 'VIDEO', 'BLOG', 'DIARY', 'BOOK
 
 /** H5 小游戏全集:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
 export const H5_GAMES = [
+  { code: 'game_eight_ball', nameKey: 'games.eightBall.title', route: '/games/eight-ball' },
   { code: 'game_2048', nameKey: 'games.g2048.title', route: '/games/2048' },
   { code: 'game_sudoku', nameKey: 'games.sudoku.title', route: '/games/sudoku' },
   { code: 'game_minesweeper', nameKey: 'games.minesweeper.title', route: '/games/minesweeper' },

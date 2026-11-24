@@ -1,4 +1,4 @@
-import { BALL_RADIUS, POCKET_RADIUS, POCKETS, TABLE_HEIGHT, TABLE_WIDTH } from '@/utils/games/pool'
+import { BALL_RADIUS, CUSHIONS, POCKETS, TABLE_HEIGHT, TABLE_WIDTH, tracePoolBoundary } from '@/utils/games/pool'
 
 // Canvas coordinates use the engine's playing surface. The extra margin holds the rails.
 const PAD = 32
@@ -45,6 +45,91 @@ export function tablePoint(canvas, event) {
   return { x: fx * (W + 2 * PAD) - PAD, y: fy * (H + 2 * PAD) - PAD }
 }
 
+// Work across the throat and out toward the back of the pocket. The same cut
+// rotates into each corner; the two middle pockets have a shorter, narrower well.
+function drawPocket(ctx, { x, mouth, throat, outward }) {
+  const [a, b] = throat
+  const width = Math.hypot(b.x - a.x, b.y - a.y)
+  const half = width / 2
+  const centerX = (a.x + b.x) / 2
+  const centerY = (a.y + b.y) / 2
+  const depth = x === W / 2 ? 12.5 : 20
+  const shelf = ctx.createLinearGradient((mouth[0].x + mouth[1].x) / 2, (mouth[0].y + mouth[1].y) / 2, centerX, centerY)
+  shelf.addColorStop(0, '#286861')
+  shelf.addColorStop(0.65, '#20584f')
+  shelf.addColorStop(1, '#153e38')
+  polygon(
+    ctx,
+    [mouth[0], a, b, mouth[1]].map((p) => [p.x, p.y]),
+    shelf,
+  )
+
+  ctx.save()
+  ctx.transform((b.x - a.x) / width, (b.y - a.y) / width, outward.x, outward.y, centerX, centerY)
+  // An open leather liner follows only the back of the cutout. The front is
+  // unobstructed cloth between the two physical cushion noses.
+  const liner = ctx.createLinearGradient(0, -1, 0, depth + 5)
+  liner.addColorStop(0, '#805d3c')
+  liner.addColorStop(0.55, '#b99564')
+  liner.addColorStop(1, '#7b563d')
+  ctx.beginPath()
+  ctx.moveTo(-half - 4, 0)
+  ctx.bezierCurveTo(-half - 5, depth + 2, -half * 0.62, depth + 5, 0, depth + 5)
+  ctx.bezierCurveTo(half * 0.62, depth + 5, half + 5, depth + 2, half + 4, 0)
+  ctx.closePath()
+  ctx.fillStyle = liner
+  ctx.fill()
+
+  const well = ctx.createLinearGradient(0, -0.5, 0, depth + 1)
+  well.addColorStop(0, '#303831')
+  well.addColorStop(0.24, '#172522')
+  well.addColorStop(0.65, '#0b1718')
+  well.addColorStop(1, '#122021')
+  ctx.beginPath()
+  ctx.moveTo(-half, 0)
+  ctx.quadraticCurveTo(0, -1.8, half, 0)
+  ctx.bezierCurveTo(half, depth * 0.84, half * 0.67, depth + 0.7, 0, depth + 0.7)
+  ctx.bezierCurveTo(-half * 0.67, depth + 0.7, -half, depth * 0.84, -half, 0)
+  ctx.fillStyle = well
+  ctx.fill()
+  ctx.restore()
+}
+
+function drawCushion(ctx, [backA, noseA, noseB, backB]) {
+  const midX = (noseA.x + noseB.x) / 2
+  const midY = (noseA.y + noseB.y) / 2
+  const horizontal = noseA.y === noseB.y
+  const backX = horizontal ? midX : (backA.x + backB.x) / 2
+  const backY = horizontal ? (backA.y + backB.y) / 2 : midY
+  const bevel = ctx.createLinearGradient(backX, backY, midX, midY)
+  bevel.addColorStop(0, '#194f48')
+  bevel.addColorStop(0.28, '#347b6e')
+  bevel.addColorStop(0.79, '#347c70')
+  bevel.addColorStop(1, '#215d53')
+  polygon(
+    ctx,
+    [backA, noseA, noseB, backB].map((p) => [p.x, p.y]),
+    bevel,
+  )
+  // A continuous narrow edge picks out the pointed noses and both jaw faces.
+  ctx.beginPath()
+  ctx.moveTo(backA.x, backA.y)
+  ctx.lineTo(noseA.x, noseA.y)
+  ctx.lineTo(noseB.x, noseB.y)
+  ctx.lineTo(backB.x, backB.y)
+  ctx.lineWidth = 1.65
+  ctx.strokeStyle = '#184b43'
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(backA.x, backA.y)
+  ctx.lineTo(noseA.x, noseA.y)
+  ctx.moveTo(noseB.x, noseB.y)
+  ctx.lineTo(backB.x, backB.y)
+  ctx.strokeStyle = '#7aa697'
+  ctx.lineWidth = 1.35
+  ctx.stroke()
+}
+
 export function drawTable(ctx) {
   const wood = ctx.createLinearGradient(0, -PAD, 0, H + PAD)
   wood.addColorStop(0, '#805338')
@@ -78,48 +163,15 @@ export function drawTable(ctx) {
   ctx.stroke()
   disk(ctx, (3 * W) / 4, H / 2, 1.8, 'rgba(245,242,212,.5)')
 
-  // Bevels stop at each pocket mouth so the visible nose matches the rebound line.
+  for (const pocket of POCKETS) drawPocket(ctx, pocket)
+  for (const cushion of CUSHIONS) drawCushion(ctx, cushion)
+
   for (const flip of [false, true]) {
     ctx.save()
     if (flip) {
       ctx.translate(W, H)
       ctx.rotate(Math.PI)
     }
-    for (const [a, b] of [
-      [17, W / 2 - 17],
-      [W / 2 + 17, W - 17],
-    ]) {
-      polygon(
-        ctx,
-        [
-          [a - 8, -14],
-          [b + 8, -14],
-          [b, 0],
-          [a, 0],
-        ],
-        flip ? '#195954' : '#2c756b',
-      )
-      polygon(
-        ctx,
-        [
-          [a, -2],
-          [b, -2],
-          [b, 0],
-          [a, 0],
-        ],
-        flip ? '#4a8d7f' : '#194f49',
-      )
-    }
-    polygon(
-      ctx,
-      [
-        [-14, 9],
-        [0, 17],
-        [0, H - 17],
-        [-14, H - 9],
-      ],
-      flip ? '#317b70' : '#22655b',
-    )
     for (let i = 1; i < 8; i++) {
       if (i === 4) continue
       const x = (W * i) / 8
@@ -148,19 +200,6 @@ export function drawTable(ctx) {
       )
     }
     ctx.restore()
-  }
-  for (const p of POCKETS) {
-    const brass = ctx.createLinearGradient(p.x, p.y - 23, p.x + 8, p.y + 23)
-    brass.addColorStop(0, '#e1c790')
-    brass.addColorStop(0.48, '#977b4c')
-    brass.addColorStop(1, '#785c3c')
-    disk(ctx, p.x, p.y, POCKET_RADIUS + 4, brass)
-    disk(ctx, p.x, p.y, POCKET_RADIUS + 1.7, '#573f2e')
-    const well = ctx.createRadialGradient(p.x, p.y - 4, 2, p.x, p.y, POCKET_RADIUS)
-    well.addColorStop(0, '#11191a')
-    well.addColorStop(0.75, '#172021')
-    well.addColorStop(1, '#333638')
-    disk(ctx, p.x, p.y, POCKET_RADIUS, well)
   }
 }
 
@@ -197,9 +236,8 @@ function drawBall(ctx, ball, upright) {
 function drawAim(ctx, cue, balls, angle, power) {
   const dx = Math.cos(angle)
   const dy = Math.sin(angle)
-  const wallX = Math.abs(dx) < 1e-8 ? Infinity : ((dx > 0 ? W - R : R) - cue.x) / dx
-  const wallY = Math.abs(dy) < 1e-8 ? Infinity : ((dy > 0 ? H - R : R) - cue.y) / dy
-  let distance = Math.min(wallX, wallY)
+  const boundary = tracePoolBoundary(cue.x, cue.y, dx, dy)
+  let distance = boundary?.distance ?? 0
   let target
   for (const ball of balls) {
     if (!ball.id || ball.pocketed) continue
@@ -230,6 +268,8 @@ function drawAim(ctx, cue, balls, angle, power) {
       ctx.beginPath()
       ctx.arc(distance, 0, R, 0, TURN)
       ctx.stroke()
+    } else if (boundary?.type === 'pocket') {
+      disk(ctx, distance, 0, 2.4, '#efe2b6')
     }
   }
   ctx.translate(-R - 4 - power * 0.12, 0)
@@ -260,9 +300,9 @@ function drawAim(ctx, cue, balls, angle, power) {
   ctx.restore()
 }
 
-export function drawPlay(ctx, game, angle, power) {
+export function drawPlay(ctx, game, angle, power, showAim = true, placement = null) {
   ctx.clearRect(-PAD, -PAD, W + 2 * PAD, H + 2 * PAD)
-  if (game.phase === 'ready') {
+  if (game.phase === 'ready' && showAim) {
     ctx.save()
     ctx.beginPath()
     ctx.roundRect(-PAD + 1, -PAD + 1, W + 2 * PAD - 2, H + 2 * PAD - 2, 24)
@@ -273,5 +313,15 @@ export function drawPlay(ctx, game, angle, power) {
   const upright = ctx.canvas.height > ctx.canvas.width
   for (const ball of game.balls) {
     if (!ball.pocketed) drawBall(ctx, ball, upright)
+  }
+  if (placement) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(placement.x, placement.y, R + 3, 0, TURN)
+    ctx.strokeStyle = placement.valid === false ? '#ffae99' : '#f5e6b8'
+    ctx.lineWidth = 2
+    ctx.setLineDash([4, 3])
+    ctx.stroke()
+    ctx.restore()
   }
 }

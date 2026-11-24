@@ -390,7 +390,12 @@ const canOfferSwapTo = (m) =>
   !!room.value && canSelfSwitch.value && myIsSpectator.value && !pendingSwap.value && m.role === ROOM_ROLE.PLAYER && m.userId !== myId.value
 /** 对局中让位:我是参战玩家且有观战者在场 */
 const canYield = computed(
-  () => !!room.value && room.value.status === ROOM_STATUS.PLAYING && !myIsSpectator.value && seatView.value.spectators.length > 0,
+  () =>
+    !!room.value &&
+    room.value.status === ROOM_STATUS.PLAYING &&
+    !myIsSpectator.value &&
+    !(room.value.gameCode === 'game_eight_ball' && isHost.value) &&
+    seatView.value.spectators.length > 0,
 )
 
 /** 房主请人离开:对局中不开放(先「结束本局」),避免牌桌席位与成员名单对不上 */

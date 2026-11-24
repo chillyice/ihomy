@@ -6,4 +6,7 @@ import lombok.Data;
 @Data
 public class GameRoomFinishDTO {
     private Long score;
+    /** 八球由房主上报实际胜者，轮次标识按字符串传输以保留完整精度。 */
+    private Long winnerId;
+    private String roundToken;
 }

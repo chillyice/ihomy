@@ -453,7 +453,7 @@ export const roomApi = {
   board: (id) => request.get(`/game/room/${id}/board`),
   start: (id) => request.post(`/game/room/${id}/start`),
   again: (id) => request.post(`/game/room/${id}/again`),
-  finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
+  finish: (id, score, outcome = {}) => request.post(`/game/room/${id}/finish`, { score, ...outcome }),
   end: (id) => request.post(`/game/room/${id}/end`),
   leave: (id) => request.post(`/game/room/${id}/leave`),
   // 房主请成员离开(不能踢自己;对局中走「结束本局」,大厅/局终才可踢)

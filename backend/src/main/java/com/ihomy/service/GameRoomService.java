@@ -119,6 +119,9 @@ public class GameRoomService {
                 .set(GameRoom::getGameCode, gameCode)
                 .set(GameRoom::getMode, finalMode)
                 .set(GameRoom::getSeed, Math.abs(RandomUtil.randomLong())));
+        if (GameConst.GAME_EIGHT_BALL.equals(gameCode)) {
+            restoreDuelHost(room);
+        }
         assignSeats(id, spec);
         clearSwap(id);
         return get(familyId, id);
@@ -138,6 +141,22 @@ public class GameRoomService {
                     .set(GameRoomMember::getRole, role)
                     .set(GameRoomMember::getReady, 0));
         }
+    }
+
+    /** 房主可能在上一款游戏中让了座，或在上一局结束时已经离开。 */
+    private boolean restoreDuelHost(GameRoom room) {
+        GameRoomMember host = memberOf(room.getId(), room.getHostId());
+        if (host == null) {
+            addMember(room, room.getHostId(), GameConst.ROOM_ROLE_HOST);
+        } else if (!GameConst.ROOM_ROLE_HOST.equals(host.getRole())) {
+            memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
+                    .eq(GameRoomMember::getId, host.getId())
+                    .set(GameRoomMember::getRole, GameConst.ROOM_ROLE_HOST)
+                    .set(GameRoomMember::getReady, 1));
+        } else {
+            return false;
+        }
+        return true;
     }
 
     /** 家庭房间列表(最近在前,≤20 条) */
@@ -312,6 +331,9 @@ public class GameRoomService {
             if (!GameConst.ROOM_PLAYING.equals(room.getStatus())) {
                 throw new BizException(ResultCode.BAD_REQUEST, "对局中才能让位,等待中直接切换席位");
             }
+            if (GameConst.GAME_EIGHT_BALL.equals(room.getGameCode()) && Objects.equals(room.getHostId(), userId)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "房主需留在球桌上主持对局");
+            }
             GameRoomMember me = requireMember(id, userId);
             if (GameConst.ROOM_ROLE_SPECTATOR.equals(me.getRole())) {
                 throw new BizException(ResultCode.BAD_REQUEST, "你在观战中,不需要让位");
@@ -426,12 +448,23 @@ public class GameRoomService {
      * PK 高分制:所有人上报完才结算,房主可提前结束;
      * COOP:仅房主上报完成,房间结束,不判胜负。
      */
-    public Map<String, Object> finish(Long userId, Long familyId, Long id, long score) {
+    public Map<String, Object> finish(Long userId, Long familyId, Long id, long score, Long winnerId, String roundToken) {
         GameRoom room = require(familyId, id);
         if (!GameConst.ROOM_PLAYING.equals(room.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "对局还没有开始");
         }
         GameRoomMember member = requireMember(id, userId);
+        if (GameConst.GAME_EIGHT_BALL.equals(room.getGameCode())) {
+            if (!Objects.equals(room.getHostId(), userId) || !String.valueOf(room.getSeed()).equals(roundToken)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "请由本局房主确认胜负");
+            }
+            if (winnerId == null || members(id).stream().noneMatch(m -> winnerId.equals(m.getUserId())
+                    && !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))) {
+                throw new BizException(ResultCode.BAD_REQUEST, "请选择本局的参战玩家");
+            }
+            settle(finishFirst(room, winnerId));
+            return get(familyId, id);
+        }
         if (GameConst.ROOM_ROLE_SPECTATOR.equals(member.getRole())) {
             return get(familyId, id);
         }
@@ -511,6 +544,9 @@ public class GameRoomService {
         if (updated == 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "这局还没结束");
         }
+        if (GameConst.GAME_EIGHT_BALL.equals(room.getGameCode()) && restoreDuelHost(room)) {
+            assignSeats(id, GameConst.ROOM_GAMES.get(room.getGameCode()));
+        }
         for (GameRoomMember m : members(id)) {
             memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
                     .eq(GameRoomMember::getId, m.getId())
@@ -550,7 +586,9 @@ public class GameRoomService {
             }
         } else if (GameConst.ROOM_PLAYING.equals(room.getStatus())) {
             memberMapper.hardDelete(member.getId());
-            if (isHost) {
+            boolean duelPlayerLeft = GameConst.GAME_EIGHT_BALL.equals(room.getGameCode())
+                    && !GameConst.ROOM_ROLE_SPECTATOR.equals(member.getRole());
+            if (isHost || duelPlayerLeft) {
                 GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
                 String result = spec == null ? GameConst.ROOM_RESULT_SCORE : spec.result();
                 settle(GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null));
@@ -574,6 +612,10 @@ public class GameRoomService {
         GameRoomMember target = memberOf(id, targetUserId);
         if (target == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个人已经不在房间里了");
+        }
+        if (GameConst.GAME_EIGHT_BALL.equals(room.getGameCode()) && GameConst.ROOM_PLAYING.equals(room.getStatus())
+                && !GameConst.ROOM_ROLE_SPECTATOR.equals(target.getRole())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请先结束本局，再移除参战玩家");
         }
         Map<String, Long> swap = readSwap(id);
         if (swap != null && (targetUserId.equals(swap.get("from")) || targetUserId.equals(swap.get("target")))) {
@@ -605,6 +647,7 @@ public class GameRoomService {
     private GameRoom finishFirst(GameRoom room, Long winnerId) {
         int updated = roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
                 .eq(GameRoom::getId, room.getId())
+                .eq(GameRoom::getSeed, room.getSeed())
                 .eq(GameRoom::getStatus, GameConst.ROOM_PLAYING)
                 .set(GameRoom::getStatus, GameConst.ROOM_FINISHED)
                 .set(GameRoom::getWinnerId, winnerId)
@@ -858,6 +901,9 @@ public class GameRoomService {
             v.put("gameName", GameConst.ROOM_GAME_NAMES.getOrDefault(room.getGameCode(), room.getGameCode()));
             v.put("mode", room.getMode());
             v.put("seed", room.getSeed());
+            if (GameConst.GAME_EIGHT_BALL.equals(room.getGameCode())) {
+                v.put("roundToken", String.valueOf(room.getSeed()));
+            }
             v.put("status", room.getStatus());
             v.put("hostId", room.getHostId());
             v.put("hostName", names.getOrDefault(room.getHostId(), "成员"));

@@ -1,16 +1,18 @@
 <template>
   <GameShell
-    :title="$t('games.pool.title')"
-    :new-game="true"
+    :title="$t(prefix + 'title')"
+    :new-game="!online"
     :new-game-confirm="shots > 0 && phase !== 'won'"
+    :room-mode="online"
+    :default-wide="online"
     @new-game="newGame"
-    @back="router.push('/games')"
+    @back="goBack"
   >
     <template #rules>
-      <p>{{ $t('games.pool.rules') }}</p>
-      <p>{{ $t('games.pool.controls') }}</p>
+      <p>{{ $t(prefix + 'rules') }}</p>
+      <p>{{ $t(prefix + 'controls') }}</p>
     </template>
-    <template #settings>
+    <template v-if="!room?.watching" #settings>
       <label class="pool-power">
         <span>{{ $t('games.pool.power') }}</span>
         <input
@@ -21,16 +23,22 @@
           step="1"
           :aria-label="$t('games.pool.power')"
           :aria-valuetext="power + '%'"
-          :disabled="phase !== 'ready'"
+          :disabled="!canAct"
           @input="redraw"
         />
         <b>{{ power }}%</b>
       </label>
     </template>
-    <template #actions>
-      <el-button type="primary" :disabled="phase !== 'ready'" @click="shoot">{{ $t('games.pool.shoot') }}</el-button>
+    <template v-if="!room?.watching" #actions>
+      <el-button v-if="eightBall && !online" :loading="openingRoom" @click="$emit('onlinePlay')">{{
+        $t('games.eightBall.onlinePlay')
+      }}</el-button>
+      <el-button v-if="canAct && game.ballInHand" :aria-pressed="placing" @click="togglePlace">
+        {{ $t(placing ? 'games.eightBall.shootMode' : 'games.eightBall.placeMode') }}
+      </el-button>
+      <el-button type="primary" :disabled="!canAct || placing" @click="shoot">{{ $t('games.pool.shoot') }}</el-button>
     </template>
-    <template #stats>
+    <template v-if="!eightBall" #stats>
       <span class="gh-chip"
         ><span>{{ $t('games.pool.shots') }}</span
         ><b>{{ shots }}</b></span
@@ -44,18 +52,32 @@
         ><b>{{ best || '—' }}</b></span
       >
     </template>
+    <template v-else #stats>
+      <span
+        v-for="(label, seat) in names"
+        :key="seat"
+        class="gh-chip pool-seat"
+        :class="{ 'is-current': game.player === seat && phase !== 'won' }"
+      >
+        <span>{{ label }}</span>
+        <b :title="$t('games.eightBall.remaining')"
+          ><i :class="game.groups[seat]" aria-hidden="true"></i>{{ $t('games.eightBall.' + (game.groups[seat] || 'open'))
+          }}<template v-if="game.groups[seat]"> · {{ remaining[seat] }}</template></b
+        >
+      </span>
+    </template>
 
-    <div class="pool-stage">
+    <div class="pool-stage" :class="{ 'is-match': eightBall }">
       <div ref="table" class="pool-table">
         <canvas ref="cloth" class="pool-cloth" aria-hidden="true"></canvas>
         <canvas
           ref="surface"
           class="pool-surface"
-          :class="{ 'can-aim': phase === 'ready' }"
+          :class="{ 'can-aim': canAct }"
           role="application"
           tabindex="0"
           :aria-label="$t('games.pool.aimLabel')"
-          :aria-description="$t('games.pool.controls')"
+          :aria-description="$t(prefix + 'controls')"
           @pointerdown="beginAim"
           @pointermove="moveAim"
           @pointerup="endAim"
@@ -64,41 +86,67 @@
           @keydown="onKey"
           @contextmenu.prevent
         ></canvas>
-        <div v-if="phase === 'won'" class="pool-result game-overlay">
+        <div v-if="phase === 'won' || roomEnded" class="pool-result game-overlay">
           <div class="game-overlay-card">
-            <strong class="game-overlay-title">{{ $t('games.pool.won') }}</strong>
-            <div class="game-overlay-meta">{{ $t('games.pool.shots') }} · {{ shots }}</div>
-            <el-button type="primary" round @click="newGame">{{ $t('games.newGame') }}</el-button>
+            <strong class="game-overlay-title">{{ resultTitle }}</strong>
+            <div v-if="!eightBall" class="game-overlay-meta">{{ $t('games.pool.shots') }} · {{ shots }}</div>
+            <div v-else-if="game.winner != null" class="game-overlay-meta">{{ $t(prefix + game.lastResult) }}</div>
+            <el-button v-if="online" type="primary" round @click="goBack">{{ $t('games.room.backRoom') }}</el-button>
+            <el-button v-else type="primary" round @click="newGame">{{ $t('games.newGame') }}</el-button>
           </div>
         </div>
       </div>
-      <div class="pool-status" role="status" aria-live="polite">{{ $t('games.pool.' + status) }}</div>
+      <div class="pool-status" role="status" aria-live="polite">
+        <strong v-if="eightBall && (!room || room.ready) && !roomEnded && phase !== 'won'"
+          >{{ $t('games.eightBall.turn', { player: names[game.player] }) }} ·
+        </strong>
+        {{ caption }}
+      </div>
     </div>
   </GameShell>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import GameShell from '@/components/games/GameShell.vue'
+import { useEightBallRoom } from '@/composables/useEightBallRoom'
 import { createPoolGame, restorePoolGame, shootPool, stepPool } from '@/utils/games/pool'
+import {
+  createEightBallGame,
+  restoreEightBallGame,
+  shootEightBall,
+  stepEightBall,
+  canPlaceEightBallCue,
+  placeEightBallCue,
+} from '@/utils/games/eightBall'
 import { drawPlay, drawTable, prepareCanvas, tablePoint } from './poolCanvas'
 
-const STATE_KEY = 'ihomy:games:pool:state:v1'
+const props = defineProps({ eightBall: Boolean, openingRoom: Boolean })
+defineEmits(['onlinePlay'])
+const { t } = useI18n()
+const route = useRoute()
+const online = props.eightBall && Number(route.query.room) > 0
+const prefix = props.eightBall ? 'games.eightBall.' : 'games.pool.'
+const createGame = props.eightBall ? createEightBallGame : createPoolGame
+const restoreGame = props.eightBall ? restoreEightBallGame : restorePoolGame
+const shootBall = props.eightBall ? shootEightBall : shootPool
+const stepBall = props.eightBall ? stepEightBall : stepPool
+const STATE_KEY = props.eightBall ? 'ihomy:games:eight-ball:state:v1' : 'ihomy:games:pool:state:v1'
 const BEST_KEY = 'ihomy:games:pool:best:v1'
 const router = useRouter()
 const table = ref(null)
 const cloth = ref(null)
 const surface = ref(null)
 const power = ref(80)
-const phase = ref('ready')
 const status = ref('ready')
-const shots = ref(0)
-const cleared = ref(0)
 const best = ref(0)
+const placing = ref(false)
+const invalidPlace = ref(false)
 
 // Keep moving balls outside Vue's render loop. The UI only observes scoring and turn changes.
-let game = createPoolGame()
+const game = shallowRef(createGame())
 let angle = 0
 let drawing = null
 let resizeObserver = null
@@ -106,17 +154,51 @@ let frame = 0
 let lastTime = 0
 let aimPointer = null
 let penaltiesAtShot = 0
+let candidate = null
 
-function syncStats() {
-  phase.value = game.phase
-  shots.value = game.shots + game.penalties
-  cleared.value = game.balls.filter((ball) => ball.id && ball.pocketed).length
+const room = online ? useEightBallRoom({ getGame: () => game.value, applyState, applyShot, applyPlacement }) : null
+const phase = computed(() => game.value.phase)
+const shots = computed(() => game.value.shots + (props.eightBall ? 0 : game.value.penalties))
+const cleared = computed(() => game.value.balls.filter((ball) => ball.id && ball.pocketed).length)
+const names = computed(() => [0, 1].map((seat) => room?.names[seat] || t('games.eightBall.player' + (seat + 1))))
+const remaining = computed(() =>
+  game.value.groups.map(
+    (group) => game.value.balls.filter((b) => !b.pocketed && (group === 'solid' ? b.id > 0 && b.id < 8 : b.id > 8)).length,
+  ),
+)
+const roomEnded = computed(() => !!(room?.play.ended || room?.play.gone))
+const canAct = computed(() => phase.value === 'ready' && (!room || (room.ready && room.canAct && !roomEnded.value)))
+const resultTitle = computed(() => {
+  if (!props.eightBall) return t('games.pool.won')
+  const winnerId = room?.play.room?.winnerId
+  if (winnerId != null) {
+    const member = room.play.members.find((m) => String(m.userId) === String(winnerId))
+    if (member?.name) return t('games.eightBall.winner', { player: member.name })
+  }
+  if (game.value.winner != null) return t('games.eightBall.winner', { player: names.value[game.value.winner] })
+  return t('games.room.status.finished')
+})
+const caption = computed(() => {
+  if (!props.eightBall) return t('games.pool.' + status.value)
+  if (roomEnded.value || phase.value === 'won') return resultTitle.value
+  if (room && !room.ready) return t(prefix + 'waiting')
+  let key = game.value.lastResult || 'breakShot'
+  if (phase.value === 'rolling') return t('games.pool.rolling')
+  if (invalidPlace.value) key = 'placementInvalid'
+  if (room?.watching) return t(prefix + 'watching') + ' · ' + t(prefix + key)
+  return t(prefix + key)
+})
+
+function goBack() {
+  if (room) room.back()
+  else router.push('/games')
 }
 
 function saveTable() {
+  if (online) return
   try {
-    localStorage.setItem(STATE_KEY, JSON.stringify(game))
-    if (game.phase === 'won') {
+    localStorage.setItem(STATE_KEY, JSON.stringify(game.value))
+    if (!props.eightBall && phase.value === 'won') {
       const previous = readBest()
       if (previous > 0) best.value = Math.min(previous, best.value)
       localStorage.setItem(BEST_KEY, String(best.value))
@@ -132,20 +214,28 @@ function readBest() {
 }
 
 function restoreTable() {
+  if (online) return
   try {
-    best.value = readBest()
-    const saved = restorePoolGame(JSON.parse(localStorage.getItem(STATE_KEY)))
-    if (saved) game = saved
+    if (!props.eightBall) best.value = readBest()
+    const saved = restoreGame(JSON.parse(localStorage.getItem(STATE_KEY)))
+    if (saved) applyState(saved)
   } catch {
     // An unreadable snapshot starts a fresh table.
   }
-  syncStats()
-  if (game.phase === 'won') best.value = best.value ? Math.min(best.value, shots.value) : shots.value
-  status.value = game.phase
+  if (!props.eightBall && phase.value === 'won') best.value = best.value ? Math.min(best.value, shots.value) : shots.value
+  status.value = phase.value
 }
 
 function redraw() {
-  if (drawing) drawPlay(drawing, game, angle, power.value)
+  if (drawing)
+    drawPlay(
+      drawing,
+      game.value,
+      angle,
+      power.value,
+      canAct.value && !placing.value,
+      canAct.value && placing.value ? candidate || game.value.balls[0] : null,
+    )
 }
 
 function resizeTable() {
@@ -157,75 +247,161 @@ function resizeTable() {
 }
 
 function newGame() {
+  if (online) return
+  applyState(createGame())
+  saveTable()
+}
+
+function applyState(next) {
   cancelAnimationFrame(frame)
   frame = 0
   aimPointer = null
-  game = createPoolGame()
-  angle = 0
-  syncStats()
+  if (!next.ballInHand) placing.value = false
+  else if (!game.value.ballInHand || next.shots !== game.value.shots) placing.value = true
+  if (!next.shots) angle = 0
+  candidate = null
+  invalidPlace.value = false
+  game.value = next
   status.value = 'ready'
-  saveTable()
   redraw()
 }
 
 function animate(now) {
   const dt = Math.min(0.06, Math.max(0, (now - lastTime) / 1000))
   lastTime = now
-  stepPool(game, dt)
+  stepBall(game.value, dt)
   redraw()
-  if (game.phase === 'rolling') {
+  if (game.value.phase === 'rolling') {
     frame = requestAnimationFrame(animate)
     return
   }
   frame = 0
-  syncStats()
-  if (game.phase === 'won') {
+  placing.value = !!game.value.ballInHand
+  triggerRef(game)
+  if (!props.eightBall && phase.value === 'won') {
     best.value = best.value ? Math.min(best.value, shots.value) : shots.value
     status.value = 'won'
   } else {
-    status.value = game.penalties > penaltiesAtShot ? 'scratch' : 'ready'
+    status.value = game.value.penalties > penaltiesAtShot ? 'scratch' : 'ready'
   }
-  saveTable()
+  if (room) room.settled()
+  else saveTable()
+  redraw()
 }
 
 function shoot() {
-  if (!shootPool(game, angle, power.value / 100)) return
+  if (!canAct.value || placing.value) return
+  if (room) room.shoot(angle, power.value / 100)
+  else applyShot(angle, power.value / 100)
+}
+
+function applyShot(direction, force) {
+  if (!shootBall(game.value, direction, force)) return false
+  angle = direction
   aimPointer = null
-  penaltiesAtShot = game.penalties
-  syncStats()
+  candidate = null
+  placing.value = false
+  invalidPlace.value = false
+  penaltiesAtShot = game.value.penalties
+  triggerRef(game)
   status.value = 'rolling'
   lastTime = performance.now()
   redraw()
   frame = requestAnimationFrame(animate)
+  return true
 }
 
 function aimAt(event) {
   const point = tablePoint(surface.value, event)
-  const cue = game.balls[0]
+  if (placing.value) {
+    previewPlace(point)
+    return
+  }
+  const cue = game.value.balls[0]
   if (Math.hypot(point.x - cue.x, point.y - cue.y) < 2) return
   angle = Math.atan2(point.y - cue.y, point.x - cue.x)
   redraw()
 }
 
+function togglePlace() {
+  placing.value = !placing.value
+  candidate = null
+  invalidPlace.value = false
+  redraw()
+}
+
+function previewPlace(point) {
+  candidate = { ...point, valid: canPlaceEightBallCue(game.value, point.x, point.y) }
+  invalidPlace.value = !candidate.valid
+  redraw()
+}
+
+function confirmPlace() {
+  if (!candidate?.valid || !canAct.value) return
+  const { x, y } = candidate
+  const placed = room ? room.place(x, y) : applyPlacement(x, y)
+  if (placed) {
+    placing.value = false
+    candidate = null
+    redraw()
+  }
+}
+
+function applyPlacement(x, y) {
+  if (!placeEightBallCue(game.value, x, y)) return false
+  triggerRef(game)
+  saveTable()
+  redraw()
+  return true
+}
+
 function beginAim(event) {
-  if (game.phase !== 'ready' || !event.isPrimary || event.button !== 0) return
+  if (!canAct.value || !event.isPrimary || event.button !== 0) return
   surface.value.focus({ preventScroll: true })
   aimPointer = event.pointerId
   aimAt(event)
 }
 
 function moveAim(event) {
-  if (event.pointerId !== aimPointer || !event.buttons || game.phase !== 'ready') return
+  if (!canAct.value || event.pointerId !== aimPointer || !event.buttons) return
   if (!surface.value.hasPointerCapture(event.pointerId)) surface.value.setPointerCapture(event.pointerId)
   aimAt(event)
 }
 
 function endAim(event) {
-  if (event.pointerId === aimPointer) aimPointer = null
+  if (event.pointerId !== aimPointer) return
+  if (placing.value && event.type === 'pointerup' && canAct.value) {
+    aimAt(event)
+    confirmPlace()
+  }
+  aimPointer = null
 }
 
 function onKey(event) {
-  if (game.phase !== 'ready') return
+  if (!canAct.value) return
+  if (placing.value) {
+    const delta = event.shiftKey ? 1 : 7
+    const upright = surface.value.height > surface.value.width
+    const offsets = {
+      ArrowLeft: upright ? [0, -delta] : [-delta, 0],
+      ArrowRight: upright ? [0, delta] : [delta, 0],
+      ArrowUp: upright ? [delta, 0] : [0, -delta],
+      ArrowDown: upright ? [-delta, 0] : [0, delta],
+    }
+    if (offsets[event.key]) {
+      event.preventDefault()
+      const { x, y } = candidate || game.value.balls[0]
+      const [dx, dy] = offsets[event.key]
+      previewPlace({ x: x + dx, y: y + dy })
+    } else if (event.code === 'Space' || event.key === 'Enter') {
+      event.preventDefault()
+      if (!event.repeat) {
+        if (!candidate) previewPlace(game.value.balls[0])
+        confirmPlace()
+      }
+    }
+    return
+  }
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault()
     const increment = ((event.shiftKey ? 0.25 : 1) * Math.PI) / 180
@@ -237,6 +413,7 @@ function onKey(event) {
   }
 }
 
+watch(canAct, redraw)
 onMounted(() => {
   restoreTable()
   resizeObserver = new ResizeObserver(resizeTable)
@@ -270,11 +447,43 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 .pool-stage {
+  --caption-space: 27px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  width: min(100cqw, calc((100cqh - 27px) * 864 / 464));
+  width: min(100cqw, calc((100cqh - var(--caption-space)) * 864 / 464));
+}
+.pool-stage.is-match {
+  --caption-space: 48px;
+}
+.pool-seat {
+  min-width: 0;
+}
+.pool-seat > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pool-seat b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.pool-seat.is-current > span {
+  font-weight: 700;
+  color: var(--el-color-primary);
+}
+.pool-seat b i:is(.solid, .stripe) {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #6b5431;
+  border-radius: 50%;
+  background: #d7a148;
+}
+.pool-seat b i.stripe {
+  background: linear-gradient(0deg, #fff5d5 25%, #397d9f 25% 75%, #fff5d5 75%);
 }
 .pool-table {
   position: relative;
@@ -305,6 +514,11 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 20px;
   color: var(--el-text-color-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.pool-status strong {
+  color: var(--el-text-color-regular);
 }
 .pool-result {
   position: absolute;
@@ -334,7 +548,7 @@ onBeforeUnmount(() => {
 }
 @container (max-aspect-ratio: 1/1) {
   .pool-stage {
-    width: min(100cqw, calc((100cqh - 27px) * 464 / 864));
+    width: min(100cqw, calc((100cqh - var(--caption-space)) * 464 / 864));
   }
   .pool-table {
     aspect-ratio: 464 / 864;

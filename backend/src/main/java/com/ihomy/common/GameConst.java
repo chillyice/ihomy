@@ -31,8 +31,11 @@ public final class GameConst {
     /** 数独/2048 等 H5 小游戏的每日奖励次数上限,口径与连连看一致 */
     public static final int H5_GAME_DAILY_LIMIT = 5;
 
+    public static final String GAME_EIGHT_BALL = "game_eight_ball";
+
     /** H5 小游戏 code 全集(与 PointsRuleConst 的 game_* 一致):聊天游戏邀请卡校验用 */
     public static final java.util.Set<String> H5_GAME_CODES = java.util.Set.of(
+            GAME_EIGHT_BALL,
             PointsRuleConst.GAME_PETLINK, PointsRuleConst.GAME_SUDOKU, PointsRuleConst.GAME_2048,
             PointsRuleConst.GAME_MINESWEEPER, PointsRuleConst.GAME_SOLITAIRE, PointsRuleConst.GAME_SPIDER,
             PointsRuleConst.GAME_FREECELL, PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE,
@@ -107,6 +110,8 @@ public final class GameConst {
      * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
     public static final java.util.Map<String, RoomGame> ROOM_GAMES = java.util.Map.ofEntries(
+            java.util.Map.entry(GAME_EIGHT_BALL, new RoomGame(GAME_EIGHT_BALL,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 2, false)),
             java.util.Map.entry(PointsRuleConst.GAME_PETLINK, new RoomGame(PointsRuleConst.GAME_PETLINK,
                     java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6, false)),
             java.util.Map.entry(PointsRuleConst.GAME_MINESWEEPER, new RoomGame(PointsRuleConst.GAME_MINESWEEPER,
@@ -140,6 +145,7 @@ public final class GameConst {
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
     public static final java.util.Map<String, String> ROOM_GAME_NAMES = java.util.Map.ofEntries(
+            java.util.Map.entry(GAME_EIGHT_BALL, "八球对战"),
             java.util.Map.entry(PointsRuleConst.GAME_PETLINK, "宠物连连看"),
             java.util.Map.entry(PointsRuleConst.GAME_MINESWEEPER, "扫雷"),
             java.util.Map.entry(PointsRuleConst.GAME_SUDOKU, "数独"),

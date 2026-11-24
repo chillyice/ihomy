@@ -396,6 +396,13 @@ const builtinGames = [
     category: 'CASUAL',
   },
   {
+    key: 'eight_ball',
+    titleKey: 'games.eightBall.title',
+    descKey: 'games.eightBall.desc',
+    path: '/games/eight-ball',
+    category: 'CASUAL',
+  },
+  {
     key: 'mahjong',
     titleKey: 'games.mahjong.title',
     descKey: 'games.mahjong.desc',

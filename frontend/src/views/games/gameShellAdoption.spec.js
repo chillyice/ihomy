@@ -66,11 +66,17 @@ const pagePath = (name) => {
 
 describe('统一游戏外壳守门', () => {
   it('每个游戏页都必须在迁移名单里挂号', () => {
-    const known = new Set([...MIGRATED, ...PENDING, ...EXEMPT, ...CARD_BOARD])
+    const known = new Set([...MIGRATED, ...PENDING, ...EXEMPT, ...CARD_BOARD, 'EightBall.vue'])
     const unknown = [...vueFiles(GAME_DIR), ...vueFiles(CARDS_DIR), ...vueFiles(EMBEDDED_DIR)].filter(
       (name) => !known.has(name) && !(name === 'CardDragGhost.vue'),
     )
     expect(unknown, `新游戏页请决定是否用 GameShell 并登记到本文件:\n${unknown.join('\n')}`).toEqual([])
+  })
+
+  it('八球路由复用桌球舞台', () => {
+    const src = read(pagePath('EightBall.vue'))
+    expect(src).toContain("import Pool from './Pool.vue'")
+    expect(src).toMatch(/<Pool\b[^>]*\beight-ball\b/)
   })
 
   it('已迁移页不再自己拼头部,也不用魔法数算高度', () => {
