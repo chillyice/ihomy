@@ -7,6 +7,7 @@ import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.AlbumDTO;
 import com.ihomy.dto.PhotoBackupResult;
+import com.ihomy.dto.PhotoDTO;
 import com.ihomy.entity.Album;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.Photo;
@@ -419,10 +420,20 @@ public class AlbumService {
     }
 
     /** 修改照片备注:仅上传者或家长 */
-    public void updatePhoto(Long photoId, SysUser user, boolean isOwner, String description) {
-        Photo p = requirePhoto(photoId, user, isOwner);
-        p.setDescription(description);
-        photoMapper.updateById(p);
+    /** 更新照片标题/描述:只写传进来的字段(空串=清空),未传的保持原值 */
+    public void updatePhoto(Long photoId, SysUser user, boolean isOwner, PhotoDTO dto) {
+        requirePhoto(photoId, user, isOwner);
+        LambdaUpdateWrapper<Photo> uw = new LambdaUpdateWrapper<Photo>().eq(Photo::getId, photoId);
+        boolean touched = false;
+        if (dto.getTitle() != null) {
+            uw.set(Photo::getTitle, trimToNull(dto.getTitle()));
+            touched = true;
+        }
+        if (dto.getDescription() != null) {
+            uw.set(Photo::getDescription, trimToNull(dto.getDescription()));
+            touched = true;
+        }
+        if (touched) photoMapper.update(null, uw);
     }
 
     /** 删除照片:仅上传者或家长;改为逻辑删入回收站,文件保留至彻底删除 */
@@ -580,8 +591,8 @@ public class AlbumService {
         return a;
     }
 
-    /** 校验照片归属:存在、属于当前家庭且是上传者(或家长) */
-    private Photo requirePhoto(Long id, SysUser user, boolean isOwner) {
+    /** 校验照片归属:存在、属于当前家庭且是上传者(或家长);AI 看图等照片写操作共用这一守门 */
+    public Photo requirePhoto(Long id, SysUser user, boolean isOwner) {
         Photo p = photoMapper.selectById(id);
         if (p == null) throw new BizException(ResultCode.NOT_FOUND);
         if (user == null) throw new BizException(ResultCode.FORBIDDEN);
@@ -591,5 +602,12 @@ public class AlbumService {
         boolean author = p.getAuthorId() != null && p.getAuthorId().equals(user.getId());
         if (!isOwner && !author) throw new BizException(ResultCode.FORBIDDEN);
         return p;
+    }
+
+    /** 去首尾空白,空串归 null(清空照片标题/描述用) */
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 }

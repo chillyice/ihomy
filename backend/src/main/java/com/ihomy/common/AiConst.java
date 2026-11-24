@@ -45,6 +45,8 @@ public final class AiConst {
     public static final String FEATURE_ASR = "ASR";
     /** 开源组件升级评估(台账 /ops/oss 升级前 AI 辅助决策) */
     public static final String FEATURE_OSS_UPGRADE_EVAL = "OSS_UPGRADE_EVAL";
+    /** 照片看图:生成标题与描述(需绑定支持图片输入的多模态 LLM) */
+    public static final String FEATURE_PHOTO_CAPTION = "PHOTO_CAPTION";
 
     /** 功能 → 允许绑定的模型类型集合(绑定校验用;找物/放物本地或 LLM 二选一) */
     public static final Map<String, Set<String>> FEATURE_ALLOWED_TYPES = Map.of(
@@ -55,12 +57,13 @@ public final class AiConst {
             FEATURE_IMAGE, Set.of(TYPE_IMAGE),
             FEATURE_WEATHER_IMAGE, Set.of(TYPE_IMAGE),
             FEATURE_ASR, Set.of(TYPE_ASR),
-            FEATURE_OSS_UPGRADE_EVAL, Set.of(TYPE_LLM));
+            FEATURE_OSS_UPGRADE_EVAL, Set.of(TYPE_LLM),
+            FEATURE_PHOTO_CAPTION, Set.of(TYPE_LLM));
 
     /** 功能展示顺序(设置页绑定区按此顺序渲染) */
     public static final List<String> FEATURES = List.of(
             FEATURE_ITEM_FIND, FEATURE_ITEM_PUT, FEATURE_CHAT, FEATURE_IMAGE, FEATURE_WEATHER_IMAGE, FEATURE_ASR,
-            FEATURE_OSS_UPGRADE_EVAL, FEATURE_ASSISTANT);
+            FEATURE_PHOTO_CAPTION, FEATURE_OSS_UPGRADE_EVAL, FEATURE_ASSISTANT);
 
     public static boolean isValidFeature(String code) {
         return FEATURE_ALLOWED_TYPES.containsKey(code);

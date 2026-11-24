@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.HttpUrlUtil;
 import com.ihomy.common.LivePhotoUtil;
 import com.ihomy.common.Result;
@@ -13,10 +14,14 @@ import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AlbumService;
 import com.ihomy.service.FileService;
+import com.ihomy.service.PhotoAiRunner;
+import com.ihomy.service.PhotoAiService;
 import com.ihomy.service.PointsService;
 import com.ihomy.controller.PublicController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -52,6 +57,8 @@ public class PhotoController {
     private final AlbumService albumService;
     private final FileService fileService;
     private final PointsService pointsService;
+    private final PhotoAiService photoAiService;
+    private final PhotoAiRunner photoAiRunner;
     private final SecurityHelper securityHelper;
     private final PublicController publicController;
 
@@ -92,6 +99,8 @@ public class PhotoController {
         if (!photos.isEmpty()) {
             pointsService.rewardPhotoUpload(user.getId(), fid, photos.size());
             publicController.invalidateHomeCache(fid);
+            // 家庭开启了「照片 AI 标题描述」时异步补内容:不阻塞上传,失败不影响结果
+            photoAiRunner.autoCaption(fid, photos.stream().map(Photo::getId).toList());
         }
         return Result.success(photos);
     }
@@ -115,11 +124,11 @@ public class PhotoController {
         return Result.success(result);
     }
 
-    @Operation(summary = "更新照片备注")
-    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "编辑照片备注")
+    @Operation(summary = "更新照片标题与备注")
+    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "编辑照片标题备注")
     @PutMapping("/photo/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody PhotoDTO dto) {
-        albumService.updatePhoto(id, securityHelper.currentUser(), securityHelper.isOwner(), dto.getDescription());
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody PhotoDTO dto) {
+        albumService.updatePhoto(id, securityHelper.currentUser(), securityHelper.isOwner(), dto);
         return Result.success();
     }
 
@@ -152,6 +161,74 @@ public class PhotoController {
         List<Long> photoIds = idNums.stream().map(Number::longValue).toList();
         int moved = albumService.batchMovePhotos(photoIds, albumNum.longValue(), user, securityHelper.isOwner());
         return Result.success(moved);
+    }
+
+    // ========== AI 看图:生成标题与描述 ==========
+
+    public record AiCaptionSetting(@NotNull Boolean enabled) {}
+
+    /** 家庭开关与模型绑定状态:available=false 时前端不显示 AI 入口 */
+    @Operation(summary = "照片 AI 标题描述配置状态")
+    @GetMapping("/photo/ai-caption")
+    public Result<Map<String, Object>> aiCaptionStatus() {
+        return Result.success(photoAiService.status(securityHelper.current().getFamilyId()));
+    }
+
+    /** 整体开启/关闭(家长):开启后新上传照片自动生成;手动单张/批量不受开关限制 */
+    @Operation(summary = "设置照片 AI 标题描述总开关")
+    @PutMapping("/photo/ai-caption/settings")
+    @RequirePermission("family:manage")
+    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "设置照片 AI 标题描述开关")
+    public Result<Void> setAiCaption(@Valid @RequestBody AiCaptionSetting body) {
+        photoAiService.setEnabled(securityHelper.current().getFamilyId(), body.enabled());
+        return Result.success();
+    }
+
+    /** 手动生成单张照片标题描述:preview=true 只返回结果不落库(编辑弹窗先预览) */
+    @Operation(summary = "AI 生成单张照片标题描述")
+    @PostMapping("/photo/{id}/ai-caption")
+    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "AI 生成照片标题描述", saveArgs = false)
+    public Result<?> aiCaption(@PathVariable Long id,
+                               @RequestParam(value = "preview", required = false, defaultValue = "false") boolean preview) {
+        SysUser user = securityHelper.currentUser();
+        boolean isOwner = securityHelper.isOwner();
+        if (preview) return Result.success(photoAiService.preview(id, user, isOwner));
+        Photo photo = photoAiService.caption(id, user, isOwner);
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", photo.getId());
+        m.put("title", photo.getTitle());
+        m.put("description", photo.getDescription());
+        return Result.success(m);
+    }
+
+    /** 批量生成(多选用):逐张守门,无权限或生成失败的只计入 failed,不回滚已成功的 */
+    @Operation(summary = "AI 批量生成照片标题描述")
+    @PostMapping("/photo/batch/ai-caption")
+    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "AI 批量生成照片标题描述", saveArgs = false)
+    public Result<Map<String, Object>> aiCaptionBatch(@RequestBody Map<String, Object> body) {
+        SysUser user = securityHelper.currentUser();
+        @SuppressWarnings("unchecked")
+        List<Number> idNums = (List<Number>) body.get("photoIds");
+        if (idNums == null || idNums.isEmpty()) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST);
+        }
+        // 逐张调用模型,单次上限 20 张,避免一次请求占用太久
+        if (idNums.size() > 20) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "一次最多生成 20 张");
+        }
+        List<Long> photoIds = idNums.stream().map(Number::longValue).distinct().toList();
+        boolean isOwner = securityHelper.isOwner();
+        int ok = 0;
+        int failed = 0;
+        for (Long photoId : photoIds) {
+            try {
+                photoAiService.caption(photoId, user, isOwner);
+                ok++;
+            } catch (RuntimeException e) {
+                failed++;
+            }
+        }
+        return Result.success(Map.of("updated", ok, "failed", failed));
     }
 
     @Operation(summary = "保存网络/Base64 图片到相册(AI 生图落库)")

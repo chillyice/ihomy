@@ -16,6 +16,20 @@
       />
     </div>
 
+    <!-- 照片 AI 标题描述:默认关闭;开启后新上传的照片自动生成,单张仍可在相册里手动生成 -->
+    <div class="ai-feature-row assistant-setting">
+      <label id="photo-caption-enabled-label" for="photo-caption-enabled">{{ $t('settings.ai.photoCaptionSwitch') }}</label>
+      <el-switch
+        id="photo-caption-enabled"
+        aria-labelledby="photo-caption-enabled-label"
+        :model-value="photoCaptionEnabled === true"
+        :disabled="photoCaptionEnabled === null || photoCaptionSaving"
+        :loading="photoCaptionSaving"
+        @change="setPhotoCaptionEnabled"
+      />
+    </div>
+    <div class="share-tip">{{ $t('settings.ai.photoCaptionHint') }}</div>
+
     <div class="ai-sub-label">{{ $t('settings.ai.models') }}</div>
     <div class="ai-toolbar">
       <el-button type="primary" plain @click="openAiModel()">{{ $t('settings.ai.addModel') }}</el-button>
@@ -155,7 +169,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { aiApi, assistantApi } from '@/api'
+import { aiApi, assistantApi, photoApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, CircleClose, Edit, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -185,6 +199,21 @@ const aiSaving = ref(false)
 const aiLoading = ref(false)
 const assistantEnabled = ref(null)
 const assistantSaving = ref(false)
+const photoCaptionEnabled = ref(null)
+const photoCaptionSaving = ref(false)
+
+async function setPhotoCaptionEnabled(enabled) {
+  if (photoCaptionSaving.value) return
+  photoCaptionSaving.value = true
+  try {
+    await photoApi.setAiCaption(enabled)
+    photoCaptionEnabled.value = enabled
+  } catch {
+    // The request interceptor displays the server error.
+  } finally {
+    photoCaptionSaving.value = false
+  }
+}
 
 async function setAssistantEnabled(enabled) {
   if (assistantSaving.value) return
@@ -215,8 +244,14 @@ const loadAiConfig = async () => {
   if (!userStore.isLoggedIn || !canManageAi.value) return
   aiLoading.value = true
   try {
-    const [models, features, status] = await Promise.all([aiApi.models(), aiApi.features(), assistantApi.status()])
+    const [models, features, status, photoCaption] = await Promise.all([
+      aiApi.models(),
+      aiApi.features(),
+      assistantApi.status(),
+      photoApi.aiCaptionStatus(),
+    ])
     assistantEnabled.value = status.enabled
+    photoCaptionEnabled.value = !!photoCaption?.enabled
     aiModels.value = models || []
     aiFeatures.value = (features || []).map((f) => ({ ...f, modelId: f.modelId ?? null, fallbackModelId: f.fallbackModelId ?? null }))
   } catch (e) {

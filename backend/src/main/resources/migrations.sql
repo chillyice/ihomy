@@ -3948,3 +3948,20 @@ CREATE TABLE IF NOT EXISTS `sys_ai_action` (
   KEY `idx_scope_status` (`user_id`,`family_id`,`status`,`id`),
   KEY `idx_expire` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手确认卡与执行记录';
+
+-- 照片 AI 标题描述:照片新增 title(与 description 分开);家庭级总开关默认关闭。
+SET @photo_title_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE content_photo ADD COLUMN title VARCHAR(100) DEFAULT NULL COMMENT ''照片标题(AI 或手动补充)'' AFTER url',
+  'SELECT 1') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'content_photo' AND COLUMN_NAME = 'title');
+PREPARE photo_title_stmt FROM @photo_title_ddl;
+EXECUTE photo_title_stmt;
+DEALLOCATE PREPARE photo_title_stmt;
+
+SET @photo_caption_ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE sys_family_info ADD COLUMN photo_ai_caption_enabled TINYINT NOT NULL DEFAULT 0 COMMENT ''照片 AI 标题描述总开关(0=关闭;开启后新上传照片自动生成)''',
+  'SELECT 1') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'sys_family_info' AND COLUMN_NAME = 'photo_ai_caption_enabled');
+PREPARE photo_caption_stmt FROM @photo_caption_ddl;
+EXECUTE photo_caption_stmt;
+DEALLOCATE PREPARE photo_caption_stmt;

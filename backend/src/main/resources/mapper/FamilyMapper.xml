@@ -6,4 +6,11 @@
         SELECT * FROM sys_family_info WHERE is_default = 1 AND deleted = 0 LIMIT 1
     </select>
 
+    <select id="photoCaptionEnabled" resultType="boolean">
+        SELECT photo_ai_caption_enabled FROM sys_family_info WHERE id=#{fid} AND deleted=0
+    </select>
+
+    <update id="setPhotoCaptionEnabled">
+        UPDATE sys_family_info SET photo_ai_caption_enabled=#{enabled} WHERE id=#{fid} AND deleted=0
+    </update>
 </mapper>

@@ -165,11 +165,21 @@ export const photoApi = {
     return request.post(`/album/${albumId}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }) // 上传不限时(家庭宽带上行慢,15s 默认超时曾致并发上传全部取消)
   },
   updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
+  /** 更新照片标题与描述:只传要改的字段,空串=清空(未传的保持原值) */
+  updatePhoto: (id, data) => request.put(`/photo/${id}`, data),
   remove: (id) => request.delete(`/photo/${id}`),
   /** 批量移动照片到另一本相册,返回实际移动张数 */
   batchMove: (photoIds, albumId) => request.put('/photo/batch/move', { photoIds, albumId }),
   cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
   saveFromUrl: (albumId, data) => request.post(`/album/${albumId}/photos/from-url`, data),
+  /** AI 看图:preview=true 只返回标题/描述不落库(编辑弹窗先预览);识别可能超过默认 15s */
+  aiCaption: (id, preview = true) =>
+    request.post(`/photo/${id}/ai-caption`, null, { params: { preview }, timeout: preview ? 60000 : 90000 }),
+  /** AI 批量生成:后端逐张守门,结果含 updated/failed */
+  aiCaptionBatch: (photoIds) => request.post('/photo/batch/ai-caption', { photoIds }, { timeout: 0 }),
+  /** 家庭总开关与模型绑定状态(available=false 时不显示 AI 入口) */
+  aiCaptionStatus: () => request.get('/photo/ai-caption'),
+  setAiCaption: (enabled) => request.put('/photo/ai-caption/settings', { enabled }),
   /** 自动备份单张照片:带内容哈希,服务端命中已存在的会返回 skipped=true */
   backupUpload: (albumId, file, checksum, takenAt) => {
     const form = new FormData()

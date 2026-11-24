@@ -28,6 +28,13 @@
             t('album.moveSelected')
           }}</el-button>
           <el-button
+            v-if="aiCaption.available && !isMapped && !readOnly"
+            :disabled="!selectedIds.length"
+            :loading="aiCaption.batchRunning"
+            @click="onAiCaptionSelected"
+            >{{ t('album.aiCaptionSelected') }}</el-button
+          >
+          <el-button
             type="danger"
             :loading="batchDeleting"
             :disabled="!selectedChildIds.length && !selectedIds.length"
@@ -236,7 +243,7 @@
             <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
           </div>
           <div class="rl-main">
-            <span class="rl-name">{{ p.description || t('album.photoFallbackName') }}</span>
+            <span class="rl-name">{{ p.title || p.description || t('album.photoFallbackName') }}</span>
             <span class="rl-meta">
               <template v-if="p.uploaderName">{{ p.uploaderName }} · </template>{{ formatDateTime(p.takenAt) || p.location }}
             </span>
@@ -262,7 +269,7 @@
             @pointerleave="cancelPress"
             @contextmenu.prevent
           >
-            <AlbumThumbnail :url="p.url" :alt="p.description || album.name" />
+            <AlbumThumbnail :url="p.url" :alt="p.title || p.description || album.name" />
             <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11">
@@ -280,6 +287,9 @@
               <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"
                 ><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span
               >
+              <span v-a11y-click v-if="canManagePhoto(p) && aiCaption.available" @click.stop="openAiCaption(p)"
+                ><el-icon><MagicStick /></el-icon>{{ t('album.aiCaption') }}</span
+              >
               <span v-a11y-click v-if="canManagePhoto(p) && canSharePhotos" @click.stop="openPhotoAudience(p)"
                 ><el-icon><Share /></el-icon>{{ t('album.share') }}</span
               >
@@ -288,6 +298,7 @@
               >
             </div>
           </div>
+          <div v-if="p.title" class="photo-title">{{ p.title }}</div>
           <div v-if="p.description" class="photo-desc">{{ p.description }}</div>
           <div v-if="p.location || p.takenAt" class="photo-meta">
             <el-icon v-if="p.location"><Location /></el-icon>{{ p.location }} <el-icon v-if="p.takenAt"><Clock /></el-icon
@@ -319,11 +330,21 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="descEditor.visible" append-to-body :title="t('album.noteTitle')" width="420px">
+    <el-dialog v-model="descEditor.visible" append-to-body :title="t('album.noteTitle')" width="480px">
+      <el-input
+        v-model="descEditor.title"
+        class="desc-title-input"
+        maxlength="100"
+        show-word-limit
+        :placeholder="t('album.titlePlaceholder')"
+      />
       <el-input v-model="descEditor.value" type="textarea" :rows="3" :placeholder="t('album.notePlaceholder')" />
       <template #footer>
+        <el-button v-if="aiCaption.available" class="desc-ai-btn" :loading="descEditor.generating" @click="generateIntoEditor">
+          <el-icon><MagicStick /></el-icon>{{ t('album.aiCaption') }}
+        </el-button>
         <el-button @click="descEditor.visible = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="onSaveDesc">{{ t('common.save') }}</el-button>
+        <el-button type="primary" :loading="descEditor.saving" @click="onSaveDesc">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
@@ -362,7 +383,7 @@ import { usePickSelect } from '@/composables/usePickSelect'
 import { useViewMode } from '@/composables/useViewMode'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, Location, Clock, Share } from '@element-plus/icons-vue'
+import { Edit, Delete, Location, Clock, Share, MagicStick } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
@@ -397,7 +418,10 @@ const refreshing = ref(false)
 const loading = ref(false)
 const loadError = ref(false)
 let loadSequence = 0
-const descEditor = reactive({ visible: false, value: '', currentId: null })
+const descEditor = reactive({ visible: false, title: '', value: '', currentId: null, generating: false, saving: false })
+// 照片 AI 标题描述:available=家庭已绑定看图模型(没绑定就不显示入口);enabled=新上传照片自动生成
+const aiCaption = reactive({ available: false, enabled: false, batchRunning: false })
+let aiCaptionStateLoaded = false
 const viewer = reactive({ visible: false, index: 0 })
 // 单张照片的分享范围(亲友圈):不选圈 = 只给自家人
 const photoAudience = reactive({ visible: false, loading: false, photoId: null })
@@ -476,6 +500,7 @@ const load = async () => {
     if (album.value.id && !currentShareToken.value) localStorage.setItem(albumMemoryKey(userStore.userInfo), String(album.value.id))
     // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页(仅整页分享模式;右栏嵌入不受 URL 旧参数影响)
     openPhotoQuery()
+    ensureAiCaptionState()
   } catch {
     if (sequence === loadSequence) loadError.value = true
   } finally {
@@ -569,18 +594,88 @@ const copyAlbumShare = async () => {
   }
 }
 
-// 打开备注编辑框,记录当前照片 id
+// 照片 AI 标题描述:只查一次配置状态;分享模式/只读相册不显示入口
+const loadAiCaptionState = async () => {
+  if (!userStore.isLoggedIn || currentShareToken.value || readOnly.value) {
+    aiCaption.available = false
+    return
+  }
+  try {
+    const s = await photoApi.aiCaptionStatus()
+    aiCaption.available = !!s?.available
+    aiCaption.enabled = !!s?.enabled
+  } catch {
+    aiCaption.available = false
+  }
+}
+const ensureAiCaptionState = () => {
+  if (aiCaptionStateLoaded) return
+  aiCaptionStateLoaded = true
+  loadAiCaptionState()
+}
+
+// 打开标题/备注编辑框,记录当前照片
 const openDesc = (p) => {
   descEditor.currentId = p.id
+  descEditor.title = p.title || ''
   descEditor.value = p.description || ''
   descEditor.visible = true
 }
 
+// 悬停「AI 生成」:打开编辑框并先跑一次预览,用户看过再决定保存
+const openAiCaption = (p) => {
+  openDesc(p)
+  generateIntoEditor()
+}
+
+// 只生成不落库(预览),填进弹窗输入框;失败由请求层提示并保留原内容
+const generateIntoEditor = async () => {
+  if (!descEditor.currentId || descEditor.generating) return
+  descEditor.generating = true
+  try {
+    const r = await photoApi.aiCaption(descEditor.currentId, true)
+    if (r?.title) descEditor.title = r.title
+    if (r?.description) descEditor.value = r.description
+  } catch {
+    /* 请求层已提示 */
+  } finally {
+    descEditor.generating = false
+  }
+}
+
 const onSaveDesc = async () => {
-  await photoApi.updateDesc(descEditor.currentId, descEditor.value)
-  ElMessage.success(t('common.saved'))
-  descEditor.visible = false
-  load()
+  if (descEditor.saving) return
+  descEditor.saving = true
+  try {
+    await photoApi.updatePhoto(descEditor.currentId, { title: descEditor.title, description: descEditor.value })
+    ElMessage.success(t('common.saved'))
+    descEditor.visible = false
+    load()
+  } finally {
+    descEditor.saving = false
+  }
+}
+
+// 多选批量生成:后端逐张校验并保存,失败的只统计数量
+const onAiCaptionSelected = async () => {
+  if (!selectedIds.value.length || aiCaption.batchRunning) return
+  if (selectedIds.value.length > 20) {
+    ElMessage.warning(t('album.aiCaptionTooMany', { n: 20 }))
+    return
+  }
+  aiCaption.batchRunning = true
+  try {
+    const r = await photoApi.aiCaptionBatch([...selectedIds.value])
+    if (r?.failed) ElMessage.warning(t('album.aiCaptionPartial', { ok: r.updated || 0, failed: r.failed }))
+    else ElMessage.success(t('album.aiCaptionDone', { n: r?.updated || 0 }))
+    exit()
+    selectedChildIds.value = []
+    load()
+  } catch {
+    /* 请求层已提示 */
+  } finally {
+    aiCaption.batchRunning = false
+  }
 }
 
 const onDelPhoto = async (p) => {
@@ -1180,11 +1275,27 @@ onBeforeUnmount(() => {
 .photo-hover span.danger:hover {
   background: rgba(214, 48, 49, 0.7);
 }
+.photo-title {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .photo-desc {
   margin-top: 6px;
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.4;
+}
+.desc-title-input {
+  margin-bottom: 10px;
+}
+.desc-ai-btn {
+  margin-right: auto;
 }
 .photo-meta {
   display: flex;

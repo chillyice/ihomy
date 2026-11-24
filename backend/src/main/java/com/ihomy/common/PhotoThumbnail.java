@@ -25,6 +25,14 @@ public final class PhotoThumbnail {
 
     /** Unsupported, animated, malformed or already small images keep their original representation. */
     public static Encoded create(ImageInputStream input) throws IOException {
+        return create(input, MAX_SIDE);
+    }
+
+    /**
+     * 与 {@link #create(ImageInputStream)} 相同,但可指定最长边。
+     * AI 看图需要比网页缩略图大一点的图(默认 480px 对细节识别偏小),故留出入口。
+     */
+    public static Encoded create(ImageInputStream input, int maxSide) throws IOException {
         if (input == null) return null;
         var readers = ImageIO.getImageReaders(input);
         if (!readers.hasNext()) return null;
@@ -35,16 +43,16 @@ public final class PhotoThumbnail {
             reader.setInput(input);
             int width = reader.getWidth(0), height = reader.getHeight(0);
             int longest = Math.max(width, height);
-            if (longest <= MAX_SIDE) return null;
+            if (longest <= maxSide) return null;
             IIOMetadata metadata = reader.getImageMetadata(0);
             int orientation = orientation(metadata.getAsTree(metadata.getNativeMetadataFormatName()));
             if (orientation < 1 || orientation > 8) return null;
-            int sample = Math.max(1, longest / MAX_SIDE);
+            int sample = Math.max(1, longest / maxSide);
             var param = reader.getDefaultReadParam();
             param.setSourceSubsampling(sample, sample, 0, 0);
             BufferedImage src = reader.read(0, param);
-            int w = Math.max(1, (int) Math.round((double) width * MAX_SIDE / longest));
-            int h = Math.max(1, (int) Math.round((double) height * MAX_SIDE / longest));
+            int w = Math.max(1, (int) Math.round((double) width * maxSide / longest));
+            int h = Math.max(1, (int) Math.round((double) height * maxSide / longest));
             boolean alpha = src.getColorModel().hasAlpha();
             BufferedImage dst = new BufferedImage(orientation >= 5 ? h : w, orientation >= 5 ? w : h,
                     alpha ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);

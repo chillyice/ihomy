@@ -18,6 +18,8 @@ public class Photo {
     private Long id;
     private Long albumId;
     private String url;
+    /** 标题(AI 看图或手动填写);描述单独存 description */
+    private String title;
     private String description;
     private java.time.LocalDateTime takenAt;
     private String location;

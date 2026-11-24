@@ -92,6 +92,26 @@ public class AiService {
                 familyAiConfigService.resolveForFeature(familyId, featureCode), messages, true, null));
     }
 
+    /** 单轮看图问答并解析 JSON 回复:content 数组携带文本 + data URL 图片,按功能绑定模型(主/兜底) */
+    public JsonNode visionJson(Long familyId, String featureCode, String systemPrompt, String userPrompt,
+                               String imageDataUrl) {
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        messages.add(Map.of("role", "user", "content", List.of(
+                Map.of("type", "text", "text", userPrompt),
+                Map.of("type", "image_url", "image_url", Map.of("url", imageDataUrl)))));
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, featureCode);
+        try {
+            return parseJson(doChat(familyId, featureCode, chain.primary(), messages, true, 0.3));
+        } catch (RuntimeException e) {
+            if (chain.hasFallback()) {
+                log.warn("[AI看图] 主模型失败,回退兜底模型 err={}", e.getMessage());
+                return parseJson(doChat(familyId, featureCode, chain.fallback(), messages, true, 0.3));
+            }
+            throw e;
+        }
+    }
+
     /** 单轮问答并解析 JSON 回复:显式指定模型配置(找物/放物用兜底模型时传 fallback 配置) */
     public JsonNode chatJson(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
                              String systemPrompt, String userContent) {
@@ -102,7 +122,7 @@ public class AiService {
     }
 
     private String doChat(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
-                          List<Map<String, String>> messages, boolean jsonMode, Double temperature) {
+                          List<?> messages, boolean jsonMode, Double temperature) {
         return requestMessage(familyId, featureCode, c, messages, jsonMode, temperature, List.of(),
                 Integer.MAX_VALUE).path("content").asText();
     }

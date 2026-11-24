@@ -30,7 +30,7 @@
                 v-else-if="photoUrl"
                 :key="retryKey"
                 :src="photoUrl"
-                :alt="current.description || ''"
+                :alt="current.title || current.description || ''"
                 draggable="false"
                 @load="settleImage($event, false)"
                 @error="settleImage($event, true)"
@@ -151,6 +151,7 @@
           <!-- 照片元信息 -->
           <transition name="pv-info-fade">
             <div v-if="hasMeta" class="pv-meta">
+              <p v-if="current.title" class="pv-title">{{ current.title }}</p>
               <p v-if="current.description" class="pv-desc">{{ current.description }}</p>
               <div class="pv-meta-row">
                 <span v-if="current.uploaderName" class="pv-meta-item">
@@ -262,7 +263,9 @@ watch([() => props.visible, () => current.value.id, photoUrl], ([visible]) => {
   imgFailed.value = visible && !photoUrl.value
   imgLoading.value = visible && !!photoUrl.value
 })
-const hasMeta = computed(() => current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt)
+const hasMeta = computed(
+  () => current.value.title || current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt,
+)
 
 const canDeleteCurrent = computed(() => {
   return Boolean(props.canDeleteOf && userStore.isLoggedIn && current.value.id && props.canDeleteOf(current.value))
@@ -751,6 +754,14 @@ onBeforeUnmount(() => {
 .pv-meta {
   text-align: center;
   max-width: 600px;
+}
+.pv-title {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .pv-desc {
   color: rgba(255, 255, 255, 0.95);
