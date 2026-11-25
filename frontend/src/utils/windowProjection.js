@@ -1,6 +1,6 @@
 import { drawWindowFoliage } from './windowFoliage'
 import { applyDeskShadowMask } from './deskShadowMask'
-import { floorShadowDirection } from './windowLight'
+import { floorShadowDirection, groundShadowPerHeight } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
 // Keep both pane heights when sizing the frame outwards from the glazing bar.
@@ -25,27 +25,30 @@ export const LIGHTNING_SOURCE = {
   palette: { core: 'rgba(230,242,255,0.64)', mid: 'rgba(214,231,255,0.48)', ambient: 'rgba(201,218,250,0.22)' },
 }
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = altitude) {
-  const radians = Math.PI / 180
+const equinoxAltitude = 90 - 36.65
+
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
   const direction = floorShadowDirection(azimuth)
-  // Calibrate the day's noon footprint against the Jinan solstices (36.65° N).
-  const phase = (90 - 36.65 - noonAltitude) / 23.44
+  // Infer one effective window height for the day from its calibrated noon footprint.
+  // Above the Jinan summer-solstice altitude, retain that height even at the zenith.
+  const calibrationAltitude = Math.min(noonAltitude, equinoxAltitude + 23.44)
+  const phase = (equinoxAltitude - calibrationAltitude) / 23.44
   const winterSummerRatio = 1.15
   const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
-  const noonReach = height * 0.9 * (1 + amplitude * phase)
-  // A bounded inverse curve keeps low-sun shadows visible on a finite screen.
-  // It grows from the noon footprint to three times that length at the horizon.
-  const relativeAltitude = noonAltitude > 0 ? Math.max(0, Math.min(1, altitude / noonAltitude)) : 1
-  const correctedReach = (3 * noonReach) / (1 + 2 * relativeAltitude)
-  // The 1.5 m opening spans two viewport heights (0.75 m per viewport). Its sill is 15% of the opening above the floor.
-  const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 2) / Math.tan(altitude * radians) : 0
-  const reach = correctedReach + (realReach - correctedReach) * realWeight
+  const referenceReach = height * 0.9 * (1 + amplitude * phase)
+  const correctedHeight = referenceReach * Math.tan((calibrationAltitude * Math.PI) / 180)
+  // A 1.5 m opening spans two viewport heights at real scale (0.75 m per viewport).
+  const windowHeight = correctedHeight * (1 - realWeight) + 2 * height * realWeight
+  const shadowPerHeight = groundShadowPerHeight(altitude)
+  const reach = windowHeight * shadowPerHeight
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
-  const correctedTop = height * (0.05 + 0.04 * phase) + 0.15 * (correctedReach - noonReach) * direction.y
-  const top = correctedTop + (0.15 * realReach * direction.y - correctedTop) * realWeight
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, top]
+  // Keep the near edge in frame in the corrected view. The real sill projects from 15% of the window height.
+  const realSillReach = 0.15 * 2 * height * shadowPerHeight
+  const sillReach = (1 - realWeight) * 0.15 * referenceReach + realWeight * realSillReach
+  const top = (1 - realWeight) * height * (0.05 + 0.04 * phase) + realWeight * realSillReach * direction.y
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + direction.x * sillReach, top]
 }
 
 // Average a small disk of shifted copies of the aperture. Each sample represents

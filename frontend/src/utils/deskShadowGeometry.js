@@ -1,5 +1,5 @@
 import { DESK_OBJECT_PROFILES } from './deskObjectProfiles'
-import { floorShadowDirection } from './windowLight'
+import { floorShadowDirection, groundShadowPerHeight } from './windowLight'
 
 export function deskShadowVector(scene, spriteSize, kind) {
   const altitude = scene?.altitude
@@ -8,7 +8,7 @@ export function deskShadowVector(scene, spriteSize, kind) {
     return null
   if (!(heightRatio > 0) || !Number.isFinite(spriteSize) || spriteSize <= 0) return null
   const height = spriteSize * heightRatio
-  const length = height / Math.tan((altitude * Math.PI) / 180)
+  const length = height * groundShadowPerHeight(altitude)
   const direction = floorShadowDirection(scene.azimuth)
   return { x: direction.x * length, y: direction.y * length, blur: 1 + height * 0.12 + length * 0.1 }
 }

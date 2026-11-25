@@ -95,9 +95,10 @@ describe('window-plane projection', () => {
     [1200, 800],
     [390, 844],
   ])('matches the Jinan noon landmarks at %i by %i', (width, height) => {
-    const summer = windowTransform(width, height, 76.79, 180)
-    const equinox = windowTransform(width, height, 53.35, 180)
-    const winter = windowTransform(width, height, 29.91, 180)
+    const noon = (altitude) => windowTransform(width, height, altitude, 180, 0, altitude)
+    const summer = noon(76.79)
+    const equinox = noon(53.35)
+    const winter = noon(29.91)
     expect(summer[5] / height).toBeCloseTo(0.01, 8)
     expect(equinox[5] / height).toBeCloseTo(0.05, 8)
     expect((equinox[5] + equinox[3]) / height).toBeCloseTo(0.95, 8)
@@ -125,10 +126,27 @@ describe('window-plane projection', () => {
     const [morning, midMorning, noon, afternoon, evening] = lengths
     expect(morning).toBeGreaterThan(midMorning)
     expect(midMorning).toBeGreaterThan(noon)
-    expect(morning / noon).toBeGreaterThan(2)
-    expect(morning / noon).toBeLessThan(3)
+    expect(morning / noon).toBeCloseTo(Math.tan((peak * Math.PI) / 180) / Math.tan((2 * Math.PI) / 180), 8)
     expect(afternoon).toBeCloseTo(midMorning)
     expect(evening).toBeCloseTo(morning)
+  })
+
+  it.each([0, 1])('keeps extending past the viewport as the sun approaches the horizon (real weight %i)', (realWeight) => {
+    const reach = (altitude) => {
+      const [, , dx, dy] = windowTransform(390, 844, altitude, 115, realWeight, 40)
+      return Math.hypot(dx, dy)
+    }
+    for (const altitude of [1, 0.1, 0.01]) {
+      expect(reach(altitude / 10) / reach(altitude)).toBeCloseTo(10, 2)
+    }
+  })
+
+  it('projects a finite window height on days when the solar noon reaches the zenith', () => {
+    const reach = (altitude) => windowTransform(1200, 800, altitude, 180, 0, 90)[3]
+    expect(reach(1)).toBeGreaterThan(reach(45))
+    expect(reach(45)).toBeLessThan(8000)
+    expect(reach(89.999)).toBeLessThan(1)
+    expect(reach(90)).toBe(0)
   })
 
   it('projects a south-facing vertical window onto the floor using both solar angles', () => {

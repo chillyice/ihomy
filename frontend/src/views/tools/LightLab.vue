@@ -976,7 +976,7 @@ function applyLightType() {
     l.shadow.bias = -0.0002
     l.position.copy(pos)
     manualLightTarget = new THREE.Object3D()
-    manualLightTarget.position.set(0, 1.0, 0)
+    manualLightTarget.position.copy(sunLight.target.position)
     l.target = manualLightTarget
     scene.add(l)
     scene.add(manualLightTarget)
@@ -988,7 +988,7 @@ function applyLightType() {
     l.shadow.bias = -0.0002
     l.position.copy(pos)
     manualLightTarget = new THREE.Object3D()
-    manualLightTarget.position.set(0, 1.0, 0)
+    manualLightTarget.position.copy(sunLight.target.position)
     l.target = manualLightTarget
     scene.add(l)
     scene.add(manualLightTarget)
@@ -1044,7 +1044,7 @@ function sunColorHex(alt) {
 function applySunPosition() {
   latestSun = sunPosition(lat.value, lng.value, dateStr.value, minutesOfDay)
   const dir = sunDirection(latestSun.altitude, latestSun.azimuth)
-  sunLight.position.copy(dir).multiplyScalar(SUN_DISTANCE)
+  sunLight.position.copy(sunLight.target.position).addScaledVector(dir, SUN_DISTANCE)
   if (latestSun.altitude > 0) {
     sunLight.intensity = SUN_BASE_INTENSITY * Math.max(0, Math.sin(latestSun.altitude * RAD))
     _sunColor.setHex(sunColorHex(latestSun.altitude))

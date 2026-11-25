@@ -7736,6 +7736,7 @@ export default {
     },
   },
   lightTest: {
+    groundShadow: '室外 1 米立杆影长 {length} 米',
     title: '光影测试',
     drag: '拖动',
     dateHint: '日期(济南)',

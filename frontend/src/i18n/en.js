@@ -7860,6 +7860,7 @@ export default {
     },
   },
   lightTest: {
+    groundShadow: 'Outdoor shadow of a 1 m pole: {length} m',
     title: 'Light effects test',
     drag: 'Drag',
     dateHint: 'Date (Jinan)',

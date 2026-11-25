@@ -31,6 +31,7 @@
       :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
       :standard="projectionStandard"
+      :preview="lightTestMode"
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
       :desk-casters="deskCasters"
@@ -177,6 +178,7 @@ const {
   lampColor,
   shadowEnabled,
   projectionStandard,
+  lightTestMode,
   shadowAlpha,
   weatherShadowOpacity,
   lightLayerOpacity,

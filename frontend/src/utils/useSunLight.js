@@ -288,9 +288,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   }
 
   // 光照测试:开启后每 208ms 推进一个时隙(5 分钟),288 个时隙=1 天循环
-  const startLightTest = () => {
-    lightTestMode.value = true
-    lightTestPaused.value = false
+  const scheduleTestPlayback = () => {
     if (testTimer) clearInterval(testTimer)
     testTimer = setInterval(() => {
       if (lightTestPaused.value) return
@@ -298,23 +296,21 @@ export function useSunLight(canReadEnvironment = () => true) {
       refreshScene()
     }, 208 / testSpeed.value)
   }
-  // 调试用变速:改速度要重建定时器,且只在「测试运行中且未暂停」时才重建;
-  // 208ms 是一帧时隙基准(288 个时隙 ≈ 一天),间隔 = 208 / 速度
+  const startLightTest = () => {
+    lightTestMode.value = true
+    lightTestPaused.value = false
+    scheduleTestPlayback()
+  }
+  // 暂停期间也更新下一次播放的间隔。
   const setTestSpeed = (sp) => {
     testSpeed.value = sp
-    if (testTimer && lightTestMode.value && !lightTestPaused.value) {
-      clearInterval(testTimer)
-      testTimer = setInterval(() => {
-        if (lightTestPaused.value) return
-        slotIdx.value = (slotIdx.value + 1) % 288
-        refreshScene()
-      }, 208 / sp)
-    }
+    if (lightTestMode.value) scheduleTestPlayback()
   }
   const pauseLightTest = () => {
     lightTestPaused.value = !lightTestPaused.value
   }
   const stepLightTest = (dir) => {
+    lightTestPaused.value = true
     slotIdx.value = (slotIdx.value + dir + 288) % 288
     refreshScene()
   }
@@ -332,6 +328,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   }
 
   const setSlot = (idx) => {
+    lightTestPaused.value = true
     slotIdx.value = Math.max(0, Math.min(287, idx))
     refreshScene()
   }

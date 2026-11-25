@@ -7,6 +7,11 @@ export function floorShadowDirection(azimuth) {
   return { x: Math.sin(bearing), y: Math.cos(bearing) }
 }
 
+// Horizontal ground projection of a unit-height vertical object in direct sunlight.
+export function groundShadowPerHeight(altitude) {
+  return altitude > 0 && altitude < 90 ? 1 / Math.tan((altitude * Math.PI) / 180) : 0
+}
+
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return null
   const parts = String(timeStr).split(':').map(Number)

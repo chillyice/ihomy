@@ -14,6 +14,7 @@ import { drawWindowProjection } from '@/utils/windowProjection'
 const props = defineProps({
   scene: { type: Object, required: true },
   standard: { type: String, default: 'corrected' },
+  preview: Boolean,
   weather: { type: String, required: true },
   shadowAlpha: { type: Number, required: true },
   occluders: { type: Array, default: () => [] },
@@ -54,7 +55,7 @@ function schedulePaint() {
       start = displayed ?? target
       startedAt = now
     }
-    const t = start === target ? 1 : Math.min(1, (now - startedAt) / 600)
+    const t = props.preview || start === target ? 1 : Math.min(1, (now - startedAt) / 600)
     const blend = t * t * (3 - 2 * t)
     displayed = {
       realWeight: start.realWeight + (target.realWeight - start.realWeight) * blend,
@@ -107,7 +108,7 @@ onMounted(() => {
   observer.observe(surface.value)
 })
 watch(
-  () => [props.standard, props.scene, props.weather, props.shadowAlpha, props.sashes, props.deskCasters, ...props.occluders],
+  () => [props.standard, props.preview, props.scene, props.weather, props.shadowAlpha, props.sashes, props.deskCasters, ...props.occluders],
   schedulePaint,
   {
     flush: 'post',

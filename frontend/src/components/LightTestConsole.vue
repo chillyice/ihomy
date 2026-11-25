@@ -16,6 +16,9 @@
     <div class="lt-info" v-if="light?.sunInfo?.value">
       <span>{{ $t('lightTest.sunrise') }} {{ light.sunInfo.value.sunrise || '--' }}</span>
       <span>{{ $t('lightTest.sunset') }} {{ light.sunInfo.value.sunset || '--' }}</span>
+      <span v-if="light.sunScene.value.altitude > 0">{{
+        $t('lightTest.groundShadow', { length: $n(groundShadowPerHeight(light.sunScene.value.altitude), { maximumFractionDigits: 2 }) })
+      }}</span>
     </div>
     <div class="lt-controls">
       <button class="lt-btn" @click="light.stepLightTest(-1)" :title="$t('lightTest.back5')">⏮</button>
@@ -181,6 +184,7 @@
 <script setup>
 import { inject, computed, ref, watch } from 'vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { groundShadowPerHeight } from '@/utils/windowLight'
 import { useI18n } from 'vue-i18n'
 import { useDragResize } from '@/utils/useDragResize'
 import { useThemeStore } from '@/stores/theme'
