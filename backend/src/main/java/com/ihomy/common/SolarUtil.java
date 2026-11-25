@@ -41,8 +41,8 @@ public class SolarUtil {
             slots.add(Map.of(
                     "slot", i,
                     "time", String.format("%02d:%02d", t.getHour(), t.getMinute()),
-                    "altitude", Math.round(altAz[0] * 100000) / 100000.0,
-                    "azimuth", Math.round(altAz[1] * 100000) / 100000.0
+                    "altitude", Math.round(altAz[0] * 10) / 10.0,
+                    "azimuth", Math.round(altAz[1] * 10) / 10.0
             ));
         }
         return slots;
@@ -429,9 +429,9 @@ public class SolarUtil {
             return new double[]{ alt * DEG, 0 };
         }
         // atan2(y, x): y=东分量, x=北分量 → 方位角从正北顺时针
-        double east = -Math.cos(decR) * Math.sin(haR);
-        double north = Math.cos(latR) * Math.sin(decR) - Math.sin(latR) * Math.cos(decR) * Math.cos(haR);
-        double az = Math.atan2(east, north) * DEG;
+        double y = -Math.sin(haR);
+        double x = (Math.sin(decR) - Math.sin(latR) * sinAlt) / (Math.cos(latR) * cosAlt);
+        double az = Math.atan2(y, x) * DEG;
         // atan2 返回 -180~180(正北=0,东=90,西=-90),转为 0~360
         if (az < 0) az += 360;
         return new double[]{ alt * DEG, az };

@@ -29,7 +29,7 @@ function paintBody(ctx, caster, scaleX, scaleY) {
 
 // Remove blocked sunlight from the existing transmission map. One final color/
 // alpha pass then shades the window frame, foliage and desk objects together.
-export function applyDeskShadowMask(light, work, casters, scene, width, height, realWeight) {
+export function applyDeskShadowMask(light, work, casters, scene, width, height) {
   if (!casters.length) return
   const canvas = light.canvas
   const w = canvas.width
@@ -48,7 +48,7 @@ export function applyDeskShadowMask(light, work, casters, scene, width, height, 
   cast.clearRect(0, 0, w, h)
 
   for (const caster of casters) {
-    const vector = deskShadowVector(scene, caster.size, caster.kind, realWeight)
+    const vector = deskShadowVector(scene, caster.size, caster.kind)
     if (!vector || !caster.image.naturalWidth) continue
     work.clearRect(0, 0, work.canvas.width, work.canvas.height)
     paintBody(work, caster, scaleX, scaleY)

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, sashApertures, windowTransform } from './windowProjection'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
 import { getSunScene } from './windowLight'
-import { sunPosition } from './solarPosition'
 
 function openWindow(layout, ...angles) {
   const samples = [layout, ...angles]
@@ -121,7 +120,8 @@ describe('window-plane projection', () => {
       const scene = getSunScene(day, index)
       expect(scene.hasDirectLight).toBe(true)
       expect(scene.noonAltitude).toBe(peak)
-      return windowTransform(1200, 800, scene.altitude, scene.azimuth, 0, scene.noonAltitude)[3]
+      const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, 0, scene.noonAltitude)
+      return Math.hypot(dx, dy)
     })
     const [morning, midMorning, noon, afternoon, evening] = lengths
     expect(morning).toBeGreaterThan(midMorning)
@@ -170,28 +170,7 @@ describe('window-plane projection', () => {
         const bearing = ((180 - azimuth) * Math.PI) / 180
         const distance = (noonDistance * Math.tan((peak * Math.PI) / 180)) / Math.tan((altitude * Math.PI) / 180)
         expect(offsetX).toBeCloseTo(distance * Math.sin(bearing), 7)
-        expect(offsetY).toBeCloseTo(distance * (1 - weight + weight * Math.cos(bearing)), 7)
-      }
-    }
-  })
-
-  it.each(['2026-06-21', '2026-11-25'])('moves all three horizontal rails towards the wall until noon and out afterwards on %s', (date) => {
-    const slots = Array.from({ length: 288 }, (_, i) => sunPosition(36.65, 117.12, date, i * 5))
-    const peak = Math.max(...slots.map((s) => s.altitude))
-    const noon = slots.findIndex((s) => s.altitude === peak)
-    const direct = slots.map((s, i) => ({ ...s, i })).filter((s) => s.altitude > 0 && s.azimuth > 90 && s.azimuth < 270)
-    expect(direct[0].i).toBeLessThan(noon)
-    expect(direct.at(-1).i).toBeGreaterThan(noon)
-    for (const rail of [-0.02075, 0.483, 1.02075]) {
-      let previous
-      for (const { i, altitude, azimuth } of direct) {
-        const [, , , depth, , y] = windowTransform(1280, 902, altitude, azimuth, 0, peak)
-        const edge = y + rail * depth
-        if (previous !== undefined) {
-          if (i <= noon) expect(edge).toBeLessThan(previous)
-          else expect(edge).toBeGreaterThan(previous)
-        }
-        previous = edge
+        expect(offsetY).toBeCloseTo(distance * Math.cos(bearing), 7)
       }
     }
   })

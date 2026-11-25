@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 太阳信息服务:IP 定位(lat/lng/timezone)→ NOAA/Meeus 算法计算 288 时隙太阳位置、日月与晨昏时刻。
+ * 太阳信息服务:IP 定位(lat/lng/timezone)→ NOAA/Meeus 算法计算 96 时隙太阳位置、日月与晨昏时刻。
  * Redis 缓存 6 小时(IP→位置) + 当日缓存(时隙表)。
  */
 @Slf4j
@@ -30,11 +30,11 @@ public class SunService {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final String LOC_PREFIX = "ihomy:sun:loc:";
-    private static final String SLOTS_PREFIX = "ihomy:sun:slots:v2:";
+    private static final String SLOTS_PREFIX = "ihomy:sun:slots:";
     /** 每日月相列表天数(天气页「日月与晨昏」卡片的月相条) */
     private static final int MOON_DAYS = 7;
 
-    /** 主入口:返回位置 + 日出日落/三档晨昏/月出月落月相 + 288 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
+    /** 主入口:返回位置 + 日出日落/三档晨昏/月出月落月相 + 96 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
     public Map<String, Object> getSunInfo(String ip, LocalDate date, String[] familyLocation) {
         String[] loc = resolveLocation(ip, familyLocation);
         double lat = Double.parseDouble(loc[0]);
@@ -74,8 +74,8 @@ public class SunService {
         }
         data.put("moonDays", moonDays);
 
-        // 五分钟时隙以地点当地时间编号。
-        String slotsKey = SLOTS_PREFIX + today + ":" + tzId + ":" + Math.round(lat * 100) + ":" + Math.round(lng * 100);
+        // 96 时隙表(按日期+坐标缓存)
+        String slotsKey = SLOTS_PREFIX + today + ":" + Math.round(lat * 100) + ":" + Math.round(lng * 100);
         String cached = redis.opsForValue().get(slotsKey);
         if (cached != null) {
             try {

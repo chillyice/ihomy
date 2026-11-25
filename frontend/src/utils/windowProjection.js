@@ -29,7 +29,7 @@ const equinoxAltitude = 90 - 36.65
 const sillHeightRatio = 0.15
 
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
-  const direction = floorShadowDirection(azimuth, realWeight)
+  const direction = floorShadowDirection(azimuth)
   // Infer one effective window height for the day from its calibrated noon footprint.
   // Above the Jinan summer-solstice altitude, retain that height even at the zenith.
   const calibrationAltitude = Math.min(noonAltitude, equinoxAltitude + 23.44)
@@ -183,7 +183,7 @@ export function drawWindowProjection(
   ctx.globalAlpha = 1 / samples.length
   for (const [dx, dy] of samples) ctx.drawImage(scratch, dx * radius - pad, dy * radius - pad)
   ctx.restore()
-  applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height, realWeight)
+  applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height)
 
   const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
   transmittedLight.addColorStop(0, scene.palette.core)
