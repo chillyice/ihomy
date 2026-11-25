@@ -32,7 +32,7 @@
     <WindowDesk
       v-if="
         routeReady &&
-        (isTablet || (isWide && !isMobile)) &&
+        (regularDesk || showDoingDesk) &&
         desk.enabled &&
         !standalone &&
         !userStore.isPureOps &&
@@ -40,6 +40,8 @@
         !appStore.homeEditMode &&
         !userStore.mustChangePassword
       "
+      :regular="regularDesk"
+      :resume="showDoingDesk"
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
       :plan="desk.plan"
@@ -58,7 +60,7 @@
     <WebUpdateBanner v-if="!isNative && routeReady" />
     <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页);儿童模式不显示 -->
     <ChatFloat v-if="userStore.isLoggedIn && !userStore.isPureOps && !isChild" />
-    <!-- 上次在做:平板/窄屏电脑的贴边浮卡(宽屏电脑改为侧栏停靠,手机改为首页顶部) -->
+    <!-- 上次在做:窄窗口电脑的续做浮卡 -->
     <LastDoingFloat v-if="showDoingFloat" />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
     <CallOverlay v-if="userStore.isLoggedIn && !userStore.isPureOps" />
@@ -177,8 +179,9 @@ watch(
 )
 onBeforeUnmount(() => document.documentElement.classList.remove('warm-paper-page'))
 
-// 上次在做浮卡:平板/窄窗口电脑用贴边浮卡;宽屏电脑停靠侧栏、手机走首页顶部
-const showDoingFloat = computed(
+const regularDesk = computed(() => isTablet.value || (isWide.value && !isMobile.value))
+const doingMode = computed(() => lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }))
+const canResume = computed(
   () =>
     routeReady.value &&
     !standalone.value &&
@@ -189,8 +192,11 @@ const showDoingFloat = computed(
     !isChild.value &&
     !isElder.value &&
     userStore.isLoggedIn &&
-    lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }) === 'float',
+    !route.query.hid &&
+    !route.query.home_id,
 )
+const showDoingDesk = computed(() => canResume.value && doingMode.value === 'desk')
+const showDoingFloat = computed(() => canResume.value && doingMode.value === 'float')
 
 // 站内窗边页面允许低视力成员双指放大，独立产品及旧主题沿用原来的视口约定。
 const viewport = document.querySelector('meta[name="viewport"]')

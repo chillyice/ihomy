@@ -179,10 +179,10 @@ describe('buildDoingPath', () => {
 })
 
 describe('lastDoingMode', () => {
-  it('手机移动布局 → mobile,平板/窄窗口 → float,宽屏电脑 → dock', () => {
-    expect(lastDoingMode({ isMobile: true, isTablet: false, isWide: false })).toBe('mobile')
+  it('手机和平板 → desk,窄窗口电脑 → float,宽屏电脑 → dock', () => {
+    expect(lastDoingMode({ isMobile: true, isTablet: false, isWide: false })).toBe('desk')
     expect(lastDoingMode({ isMobile: false, isTablet: false, isWide: false })).toBe('float')
-    expect(lastDoingMode({ isMobile: false, isTablet: true, isWide: true })).toBe('float')
+    expect(lastDoingMode({ isMobile: false, isTablet: true, isWide: true })).toBe('desk')
     expect(lastDoingMode({ isMobile: false, isTablet: false, isWide: true })).toBe('dock')
   })
 })

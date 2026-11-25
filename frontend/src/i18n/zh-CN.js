@@ -6773,6 +6773,7 @@ export default {
     },
   },
   lastDoing: {
+    bookmark: '上次在… {title}',
     title: '上次在…',
     book: '电子书',
     cinema: '放映厅',

@@ -30,38 +30,20 @@ function visibleRect(node) {
   return rect.width && rect.height && getComputedStyle(node).visibility !== 'hidden' ? rect : null
 }
 
-function samePlacements(left, right) {
-  return (
-    left.length === right.length &&
-    left.every((p, i) => {
-      const q = right[i]
-      return (
-        p.item === q.item &&
-        p.x === q.x &&
-        p.y === q.y &&
-        p.size === q.size &&
-        p.cropWidth === q.cropWidth &&
-        p.angle === q.angle &&
-        p.edge === q.edge
-      )
-    })
-  )
-}
-
-// 只在整页结构发生变化时收集边界元素。滚动、尺寸和浮窗的拖动复用已收集的元素。
+// Reuse a layout while its page, viewport and object selection are stable.
 export function useDeskSpace(items, plan) {
   const placements = shallowRef([])
-  const { isTablet } = useDevice()
+  const { isTablet, isMobile } = useDevice()
   const modalOpen = shallowRef(false)
   let running = false,
     refresh = true,
     frame = 0
   let nodes, resize, attributes, tree
-  let controlObserver
-  let controls = new Set()
-  const visibleControls = new Set()
+  let controls = []
+  let layout
 
   function clearScene() {
+    layout = null
     if (placements.value.length) placements.value = []
   }
   function collect() {
@@ -80,20 +62,7 @@ export function useDeskSpace(items, plan) {
       editHosts: matching(EDITHOST),
       floats: matching(DESK_FLOATS),
     }
-    if (controlObserver) {
-      // The lighting controls float over the scene under inspection, including its desk shadows.
-      const current = new Set(
-        [...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],.light-test-console,' + MODAL)),
-      )
-      for (const node of controls) {
-        if (!current.has(node)) {
-          controlObserver.unobserve(node)
-          visibleControls.delete(node)
-        }
-      }
-      for (const node of current) if (!controls.has(node)) controlObserver.observe(node)
-      controls = current
-    }
+    controls = [...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],.light-test-console,' + MODAL))
     resize.disconnect()
     attributes.disconnect()
     // 日照系统也会改 html 的内联变量，只有类名切换才可能改变整个页面的布局。
@@ -117,9 +86,9 @@ export function useDeskSpace(items, plan) {
       clearScene()
       return
     }
-    const board = nodes.board.some(visibleRect)
-    const center =
-      nodes.centers.map(visibleRect).find(Boolean) || (!board && isTablet.value && nodes.tabletPages.map(visibleRect).find(Boolean))
+    const board = nodes.board.find(visibleRect)
+    const host = nodes.centers.find(visibleRect) || (!board && (isTablet.value || isMobile.value) && nodes.tabletPages.find(visibleRect))
+    const center = host && visibleRect(host)
     if (!center && !board) {
       clearScene()
       return
@@ -127,10 +96,32 @@ export function useDeskSpace(items, plan) {
     const navRight = Math.max(0, ...nodes.nav.map((node) => visibleRect(node)?.right || 0))
     const width = document.documentElement.clientWidth
     const height = window.innerHeight
+    const objects = toValue(items)
+    const slots = toValue(plan)
+    const keys = JSON.stringify(objects.map((item) => item.key))
+    // Keep the chosen viewport coordinates even when scrolling changes the controls beneath them.
+    if (
+      layout &&
+      layout.host === (host || board) &&
+      layout.width === width &&
+      layout.navRight === navRight &&
+      layout.plan === slots &&
+      layout.keys === keys &&
+      (layout.height === height || (isMobile.value && placements.value.length && placements.value.every((p) => p.y + p.size / 2 <= height)))
+    ) {
+      if (layout.objects !== objects || layout.height !== height) {
+        const byKey = new Map(objects.map((item) => [item.key, item]))
+        placements.value = placements.value.map((p) => ({ ...p, height, item: byKey.get(p.item.key) }))
+        layout.objects = objects
+        layout.height = height
+      }
+      return
+    }
+    layout = { host: host || board, width, height, navRight, plan: slots, keys, objects }
     const lanes = deskLanes(width, height, navRight, center)
     const cards = nodes.cards.map(visibleRect).filter(Boolean)
     const objectObstacles = nodes.floats.concat(nodes.rails).map(visibleRect).filter(Boolean)
-    for (const node of visibleControls) {
+    for (const node of controls) {
       const rect = node.getBoundingClientRect()
       // 大卡片由正文边界限制露出量，独立按钮和输入区保留完整点击面。
       const largeCard = rect.width > width / 2 || (rect.width >= 160 && rect.height >= 96)
@@ -139,8 +130,9 @@ export function useDeskSpace(items, plan) {
     }
     // 自由画板没有固定正文列，按候选高度附近的卡片实测剩余空间。
     const objectLanes = board && !center ? deskLanes(width, height, navRight, null, width) : lanes
-    const next = placeDeskItems(toValue(items), toValue(plan), objectLanes, objectObstacles, cards)
-    if (!samePlacements(placements.value, next)) placements.value = next
+    const next = placeDeskItems(objects, slots, objectLanes, objectObstacles, cards)
+    if (!next.length) layout = null
+    placements.value = next.map((seat) => ({ ...seat, width, height, navRight }))
   }
   function schedule() {
     if (running && !document.hidden && !frame) frame = requestAnimationFrame(measure)
@@ -169,18 +161,10 @@ export function useDeskSpace(items, plan) {
     running = true
     refresh = true
     resize = new ResizeObserver(schedule)
-    controlObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting && controls.has(entry.target)) visibleControls.add(entry.target)
-        else visibleControls.delete(entry.target)
-      }
-      schedule()
-    })
     attributes = new MutationObserver(schedule)
     tree = new MutationObserver(onTreeChange)
     tree.observe(document.body, { childList: true, subtree: true })
     window.addEventListener('resize', schedule)
-    document.addEventListener('scroll', schedule, { capture: true, passive: true })
     document.addEventListener('transitionend', onTransition)
     document.addEventListener('fullscreenchange', schedule)
     document.addEventListener('visibilitychange', onVisibilityChange)
@@ -193,13 +177,10 @@ export function useDeskSpace(items, plan) {
     if (!running) return
     running = false
     resize.disconnect()
-    controlObserver?.disconnect()
-    controls.clear()
-    visibleControls.clear()
+    controls = []
     attributes.disconnect()
     tree.disconnect()
     window.removeEventListener('resize', schedule)
-    document.removeEventListener('scroll', schedule, true)
     document.removeEventListener('transitionend', onTransition)
     document.removeEventListener('fullscreenchange', schedule)
     document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -209,7 +190,13 @@ export function useDeskSpace(items, plan) {
     nodes = null
   }
   watch([() => toValue(items), () => toValue(plan)], schedule, { flush: 'post' })
-  onMounted(start)
+  onMounted(() => {
+    watch(
+      () => toValue(items).length > 0,
+      (active) => (active ? start() : stop()),
+      { immediate: true },
+    )
+  })
   onBeforeUnmount(stop)
   return { placements, modalOpen }
 }

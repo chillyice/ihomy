@@ -123,10 +123,10 @@ export function buildDoingPath(entry) {
   return '/'
 }
 
-/** 三种形态:手机首页顶部 / 平板与窄屏浮卡 / 宽屏侧栏停靠 */
+/** 三种形态:手机和平板桌沿书签 / 窄屏电脑浮卡 / 宽屏侧栏停靠 */
 export function lastDoingMode({ isMobile, isTablet, isWide }) {
-  if (isMobile) return 'mobile'
-  if (isTablet || !isWide) return 'float'
+  if (isMobile || isTablet) return 'desk'
+  if (!isWide) return 'float'
   return 'dock'
 }
 

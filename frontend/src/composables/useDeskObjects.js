@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { buildDeskObjects, deskPathAllowed } from '@/utils/deskObjects'
+import { buildDoingPath, useLastDoing, visibleDoing } from '@/utils/lastDoing'
 import { materialSeed } from '@/utils/warmMaterials'
 import { NEED_FILE_ORIGIN, SERVER_ORIGIN } from '@/utils/assetUrl'
 import { useDisplayMode } from './useDisplayMode'
@@ -48,20 +49,21 @@ function useSummary(scope, active, clock, revision, load) {
   return value
 }
 
-export function useDeskObjects(enabled, destinations = {}, arrangement = 0) {
+export function useDeskObjects(enabled, destinations = {}, arrangement = 0, resume = false) {
   const app = useAppStore()
   const user = useUserStore()
   const chat = useChatStore()
   const route = useRoute()
   const { t } = useI18n()
   const { isChild } = useDisplayMode()
+  const { items: recent } = useLastDoing()
   const now = shallowRef(new Date())
   const visible = ref(!document.hidden)
   const awake = computed(() => !!toValue(enabled) && visible.value)
   let timer
   const tick = () => {
     visible.value = !document.hidden
-    if (awake.value) now.value = new Date()
+    if (visible.value) now.value = new Date()
   }
   onMounted(() => {
     document.addEventListener('visibilitychange', tick)
@@ -112,8 +114,25 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0) {
   )
 
   const candidates = computed(() => {
-    if (!toValue(enabled) || !app.familyLoaded || user.isPureOps || user.mustChangePassword) return []
-    return buildDeskObjects({
+    if (!app.familyLoaded || user.isPureOps || user.mustChangePassword) return []
+    const entry =
+      toValue(resume) &&
+      ownFamily.value &&
+      visibleDoing(recent.value, now.value.getTime()).find((row) => deskPathAllowed(buildDoingPath(row), app.modules, isChild.value))
+    const bookmark = entry
+      ? [
+          {
+            key: 'resume',
+            kind: 'bookmark',
+            art: 'bookmark',
+            to: buildDoingPath(entry),
+            labelKey: 'lastDoing.bookmark',
+            labelParams: { title: entry.title },
+          },
+        ]
+      : []
+    if (!toValue(enabled)) return bookmark
+    const objects = buildDeskObjects({
       now: now.value,
       seed: materialSeed + (Number(toValue(arrangement)) || 0),
       origin: NEED_FILE_ORIGIN ? SERVER_ORIGIN : location.origin,
@@ -136,6 +155,7 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0) {
           }
         : item,
     )
+    return entry ? [...bookmark, ...objects.filter((item) => item.kind !== 'bookmark')] : objects
   })
   return { candidates }
 }

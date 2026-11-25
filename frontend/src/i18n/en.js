@@ -6839,6 +6839,7 @@ export default {
     },
   },
   lastDoing: {
+    bookmark: 'Resume {title}',
     title: 'Last at…',
     book: 'Book',
     cinema: 'Cinema',

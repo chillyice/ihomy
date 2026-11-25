@@ -10,9 +10,12 @@
       :aria-hidden="modalOpen || undefined"
     >
       <router-link
-        v-for="{ item, x, y, size, cropWidth, angle, edge } in placements"
+        v-for="({ item, x, y, size, cropWidth, angle, edge }, index) in placements"
         :key="item.key"
         :to="item.to"
+        draggable="false"
+        @pointerdown="startMove($event, placements[index])"
+        @click.capture="guardClick"
         :aria-label="t(item.labelKey, item.labelParams || {})"
         :tabindex="modalOpen ? -1 : undefined"
         class="desk-object"
@@ -50,13 +53,17 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, ref, shallowRef, watchPostEffect } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, shallowRef, watch, watchPostEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeskObjects } from '@/composables/useDeskObjects'
 import { useDeskSpace } from '@/composables/useDeskSpace'
+import { useDragResize } from '@/utils/useDragResize'
+import { useWindowDeskStore } from '@/stores/windowDesk'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
+  regular: { type: Boolean, default: true },
+  resume: Boolean,
   destinations: { type: Object, default: () => ({}) },
   arrangement: { type: Number, default: 0 },
   plan: { type: Array, required: true },
@@ -76,10 +83,76 @@ const hideMissingImage = (item) => {
   missingImages.value = new Set(missingImages.value).add(imageOf(item))
 }
 const arrangement = () => props.arrangement
-const { candidates } = useDeskObjects(true, () => props.destinations, arrangement)
+const { candidates } = useDeskObjects(
+  () => props.regular,
+  () => props.destinations,
+  arrangement,
+  () => props.resume,
+)
 const drawable = computed(() => candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))))
-const { placements, modalOpen } = useDeskSpace(drawable, () => props.plan)
+const bookmarkPlan = [{ side: 1, u: 0.5, v: 0.5, angle: -12 }]
+const { placements: seats, modalOpen } = useDeskSpace(drawable, () =>
+  props.plan.length || drawable.value[0]?.key !== 'resume' ? props.plan : bookmarkPlan,
+)
 
+const desk = useWindowDeskStore()
+const { pos, size: dragSize, dragging, onDragStart } = useDragResize({ w: 1, h: 1 })
+let activeSeat
+let ignoreClick = false
+const preview = shallowRef(null)
+function startMove(event, seat) {
+  if (event.button !== 0 || event.isPrimary === false) return
+  const w = seat.cropWidth || seat.size
+  dragSize.value = { w, h: seat.size }
+  pos.value = { x: seat.x - w / 2, y: seat.y - seat.size / 2 }
+  activeSeat = seat
+  ignoreClick = false
+  onDragStart(event)
+}
+watch(
+  pos,
+  (point) => {
+    if (!dragging.value || !activeSeat) return
+    const { width, size, cropWidth, positionKey } = activeSeat
+    preview.value = { positionKey, x: (point.x + (cropWidth || size) / 2) / width, y: point.y + size / 2 }
+  },
+  { flush: 'sync' },
+)
+watch(
+  dragging,
+  (moving) => {
+    if (moving || !preview.value) return
+    const { positionKey, x, y } = preview.value
+    desk.move(positionKey, { x, y })
+    preview.value = null
+    ignoreClick = true
+  },
+  { flush: 'sync' },
+)
+function guardClick(event) {
+  if (ignoreClick && event.detail !== 0) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+  ignoreClick = false
+}
+const placements = computed(() =>
+  seats.value.map((seat, index) => {
+    const positionKey = seat.item.key === 'resume' ? 'resume' : seat.item.kind === 'photo' ? 'photo-' + index : seat.item.kind
+    const point = preview.value?.positionKey === positionKey ? preview.value : desk.positions[positionKey]
+    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return { ...seat, positionKey }
+    const { size, cropWidth, width, height, navRight } = seat
+    const edge = point.x * width < (width + navRight) / 2 ? 'left' : 'right'
+    const half = (cropWidth || size) / 2
+    const x = cropWidth
+      ? edge === 'left'
+        ? navRight + half
+        : width - half
+      : Math.max(navRight + half, Math.min(width - half, point.x * width))
+    const y = Math.max(size / 2, Math.min(height - size / 2, point.y))
+    return { ...seat, positionKey, edge, x, y }
+  }),
+)
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const deskLayer = ref(null)
 
@@ -166,7 +239,12 @@ function paperStyle(item) {
   color: var(--color-text);
   text-decoration: none;
   pointer-events: auto;
-  touch-action: manipulation;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.desk-object:active {
+  cursor: grabbing;
 }
 .desk-object.round-object {
   border-radius: 50%;
