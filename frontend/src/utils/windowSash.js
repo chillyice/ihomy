@@ -17,15 +17,18 @@ export function weatherClosesWindow(weather) {
   return scales.some((scale) => Number(scale) >= 6) || Number.parseFloat(weather.nowFull?.windSpeed ?? weather.windSpeed) >= 39
 }
 
-export function chooseWindowSash(random = Math.random) {
-  if (random() < 0.45) return null
-  const { hinge, latch } = CASEMENTS[random() < 0.5 ? 0 : 1]
-  const angle = ((30 + random() * 45) * Math.PI) / 180
-  const span = latch - hinge
-  return {
-    hinge,
-    latch,
-    tipX: hinge + span * Math.cos(angle),
-    depth: Math.abs(span) * Math.sin(angle),
-  }
+export function chooseWindowSashes(random = Math.random) {
+  if (random() < 0.45) return CASEMENTS
+  const openings = ['left', 'right', 'both'][Math.floor(random() * 3)]
+  return CASEMENTS.map((sash, index) => {
+    const side = index === 0 ? 'left' : 'right'
+    if (openings !== 'both' && openings !== side) return sash
+    const angle = ((30 + random() * 45) * Math.PI) / 180
+    const span = sash.latch - sash.hinge
+    return {
+      ...sash,
+      tipX: sash.hinge + span * Math.cos(angle),
+      depth: Math.abs(span) * Math.sin(angle),
+    }
+  })
 }

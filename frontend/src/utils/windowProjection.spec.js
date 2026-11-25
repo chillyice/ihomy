@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, windowTransform } from './windowProjection'
-import { CASEMENTS, chooseWindowSash, weatherClosesWindow } from './windowSash'
+import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
+
+function openWindow(layout, ...angles) {
+  const samples = [0.8, layout, ...angles]
+  return chooseWindowSashes(() => samples.shift())
+}
 
 describe('window sash', () => {
   it.each([
@@ -21,7 +26,7 @@ describe('window sash', () => {
   })
 
   it('can keep both casements shut', () => {
-    expect(chooseWindowSash(() => 0.2)).toBeNull()
+    expect(chooseWindowSashes(() => 0.2)).toEqual(CASEMENTS)
   })
 
   it('lets the two meeting stiles own the whole centre seam', () => {
@@ -31,15 +36,22 @@ describe('window sash', () => {
   })
 
   it.each([0, 0.5, 0.999])('mirrors the open gap around the meeting stiles at sample %f', (sample) => {
-    const opening = (side) => chooseWindowSash(vi.fn().mockReturnValueOnce(0.8).mockReturnValueOnce(side).mockReturnValue(sample))
-    const left = opening(0)
-    const right = opening(1)
+    const [left, shutRight] = openWindow(0.1, sample)
+    const [shutLeft, right] = openWindow(0.5, sample)
+    expect([shutLeft, shutRight]).toEqual(CASEMENTS)
     expect(left.hinge).toBeLessThan(left.tipX)
     expect(left.tipX).toBeLessThan(left.latch)
     expect(left.tipX + right.tipX).toBeCloseTo(1)
     expect(left.depth).toBeCloseTo(right.depth)
     expect(Math.hypot(left.tipX - left.hinge, left.depth)).toBeCloseTo(left.latch - left.hinge)
     expect(left.depth).toBeCloseTo((left.latch - left.hinge) * Math.sin(((30 + 45 * sample) * Math.PI) / 180))
+  })
+
+  it('draws an independent opening angle for each sash when both are open', () => {
+    const [left, right] = openWindow(0.9, 0.1, 0.85)
+    expect(left).toEqual(openWindow(0.1, 0.1)[0])
+    expect(right).toEqual(openWindow(0.5, 0.85)[1])
+    expect(left.depth).toBeLessThan(right.depth)
   })
 })
 

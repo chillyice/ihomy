@@ -34,14 +34,14 @@
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
       :desk-casters="deskCasters"
-      :sash="windowSash"
+      :sashes="windowSashes"
       :style="stormLight ? undefined : { opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
     />
     <WindowDrift
-      v-if="windowSash && shadowEnabled && weatherEffectEnabled && driftKind"
+      v-if="openSashes.length && shadowEnabled && weatherEffectEnabled && driftKind"
       :key="driftKind"
       :kind="driftKind"
-      :sash="windowSash"
+      :open-sashes="openSashes"
     />
 
     <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
@@ -170,7 +170,7 @@ if (!light) {
 const {
   sunScene,
   deskCasters,
-  windowSash,
+  windowSashes,
   lampMask,
   lampDivOpacity,
   lampRadius,
@@ -192,6 +192,7 @@ const {
 } = light || {}
 
 const stormLight = computed(() => shadowEnabled.value && weatherMode.value === 'thunder')
+const openSashes = computed(() => windowSashes.value.filter((sash) => sash.depth > 0))
 const driftKind = computed(() => {
   const mode = weatherMode.value
   if (mode === 'rain' || mode === 'thunder' || mode === 'snow') return precipLevel.value > 0 ? (mode === 'snow' ? 'snow' : 'rain') : null

@@ -3,17 +3,15 @@ import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
-// One solid sash with two glazed openings, in hinge-to-latch × sill-to-head coordinates.
+// The outer sash has depth. Its central glazing bar lies in the front plane.
 const stileWidth = 0.093
 const railHeight = 0.065
 const frameDepth = 0.032 // fraction of the full window width, perpendicular to the sash
-const halfTransom = 0.055 / 2
-const transomTop = 0.483 - halfTransom
-const transomBottom = 0.483 + halfTransom
+const transomHeight = 0.0825
+const transomTop = 0.483 - transomHeight / 2
 const sashContours = [
   [0, 0, 1, 1],
-  [stileWidth, railHeight, 1 - 2 * stileWidth, transomTop - railHeight],
-  [stileWidth, transomBottom, 1 - 2 * stileWidth, 1 - railHeight - transomBottom],
+  [stileWidth, railHeight, 1 - 2 * stileWidth, 1 - 2 * railHeight],
 ]
 
 // A source above and slightly to one side of the window, independent of the sun at night.
@@ -73,8 +71,9 @@ function castSash(mask, { hinge, latch, tipX = latch, depth = 0 }, paneWidth, ri
   mask.beginPath()
   for (const [u, v, width, height] of sashContours) mask.rect(u, v, width, height)
   mask.fill('evenodd')
+  mask.fillRect(0, transomTop, 1, transomHeight)
 
-  // Sweep every rim (outside and around both panes) to the back face.
+  // Sweep the outer frame's two rims to the back face.
   // Along a ray, any point beyond the front profile is reached through one of these sides.
   for (const [u, v, width, height] of sashContours) {
     for (const edgeV of [v, v + height]) {
@@ -102,7 +101,7 @@ export function drawWindowProjection(
     foliageTime = 0,
     occluders = [],
     deskCasters = [],
-    sash = null,
+    sashes = CASEMENTS,
   },
 ) {
   const scale = Math.min(0.5, 512 / Math.max(1, width, height))
@@ -141,9 +140,7 @@ export function drawWindowProjection(
   mask.fillRect(left.hinge, 0, right.hinge - left.hinge, 1)
   mask.globalCompositeOperation = 'destination-out'
   mask.save()
-  for (const closed of CASEMENTS) {
-    castSash(mask, sash?.hinge === closed.hinge ? sash : closed, a, c, d, x + pad, y + pad)
-  }
+  for (const sash of sashes) castSash(mask, sash, a, c, d, x + pad, y + pad)
   mask.restore()
   drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
