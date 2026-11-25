@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getSunScene, lampFromShadow, LAMP_SHADOW_ON, LAMP_SHADOW_OFF, solarClock } from './windowLight'
+import { ambientShadowOpacity, getSkyTint, getSunScene, lampFromShadow, LAMP_SHADOW_ON, LAMP_SHADOW_OFF, solarClock } from './windowLight'
 
 it('selects the date and five-minute slot on the clock used to build the solar table', () => {
   const instant = new Date('2026-11-25T16:04:59Z')
@@ -92,3 +92,23 @@ it('南窗收到低角度直射光时长影可见，太阳降到地平线或转�
   expect(opacity[2]).toBeCloseTo(Math.sqrt(Math.sin((55 * Math.PI) / 180)))
   expect(opacity.slice(3)).toEqual([0, 0])
 })
+
+it('keeps a fully blocked point at the same shade while the direct beam appears or fades', () => {
+  for (const shade of [0, 0.3, 0.7, 1]) {
+    for (const direct of [0, 0.01, 0.5, 0.99, 1]) {
+      const ambient = ambientShadowOpacity(shade, direct)
+      expect((1 - ambient) * (1 - shade * direct)).toBeCloseTo(1 - shade, 10)
+    }
+  }
+})
+
+it.each(['clear', 'cloud', 'overcast', 'fog', 'rain', 'snow', 'thunder'])(
+  'joins the same night sky at both daylight boundaries in %s',
+  (weather) => {
+    const night = getSkyTint({ isNight: true, dayProgress: 1 }, weather)
+    expect(night.daylightShare).toBeCloseTo(0)
+    for (const dayProgress of [0, 1]) {
+      expect(getSkyTint({ isNight: false, dayProgress }, weather)).toEqual(night)
+    }
+  },
+)

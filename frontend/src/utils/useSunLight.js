@@ -4,7 +4,7 @@
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
-import { getSunScene, currentSlotIndex, solarClock } from '@/utils/windowLight'
+import { ambientShadowOpacity, getSkyTint, getSunScene, currentSlotIndex, solarClock } from '@/utils/windowLight'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from '@/utils/windowSash'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
@@ -53,8 +53,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     rays: [],
     shadowIntensity: 0.7,
     shadowColor: 'rgb(8,12,28)',
-    brightSpotColor: 'rgb(8,12,28)',
-    brightSpotOpacity: 0.7,
     lightOpacity: 0,
     lampOpacity: 1,
     isNight: true,
@@ -233,9 +231,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     cloudTimer = setInterval(tick, 4000 + Math.random() * 4000)
   }
 
-  watch(weatherMode, (mode) => {
-    startCloudFlicker(mode === 'cloud')
-  })
+  watch(() => weatherMode.value === 'cloud' && sunScene.value.hasDirectLight, startCloudFlicker)
   watch([weatherMode, activeWeather], ([mode]) => {
     if (DIM_MODES.includes(mode)) playTransient()
     else stopTransient()
@@ -250,14 +246,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     return 1
   })
 
-  // 天气覆盖阴影层:雨雪雷不再压暗(粒子常驻但页面明暗保持正常);阴天压暗常驻(3 秒后自动开灯补光);
-  // 多云随 cloudFlicker 平滑反向变化;晴天/雾不显示(雾的观感由雾层承担)
-  const weatherShadowOpacity = computed(() => {
-    if (!shadowEnabled.value) return 0
-    if (weatherMode.value === 'overcast') return 0.85
-    if (weatherMode.value === 'cloud') return Math.max(0, 1 - cloudFlicker.value)
-    return 0
-  })
   // 阴影层不透明度:把时间曲线强度(夜间 0.7 → 正午 0.3)按个性化「阴影深度」等比缩放。
   // 深度 70 = 乘数 1(与旧版观感一致);100 = 夜间压到近全黑;0 = 无阴影。上限 1 防止叠加过黑。
   const shadowAlpha = computed(() => Math.max(0, Math.min(1, (shadowDepth.value / 70) * (sunScene.value.shadowIntensity ?? 0.7))))
@@ -450,15 +438,19 @@ export function useSunLight(canReadEnvironment = () => true) {
   // 同一束直射光决定窗投影和光路中浮尘的可见度。
   const lightLayerOpacity = computed(() => (shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0))
 
-  const brightSpotStyle = computed(() => {
-    if (!shadowEnabled.value) return { opacity: 0 }
-    const scene = sunScene.value
+  const skyTint = computed(() => getSkyTint(sunScene.value, weatherMode.value))
+  const castShade = computed(() => {
     const mode = weatherMode.value
-    if (scene.isNight || mode === 'clear') {
-      return { background: scene.brightSpotColor, opacity: scene.brightSpotOpacity }
-    }
-    const sky = DIFFUSE_SKY[mode]
-    if (!sky) return { opacity: 0 }
+    // Diffuse weather has little or no directional shadow. Cloud passing in
+    // front of the sun changes the lit aperture, never the exposure in shade.
+    const weight = DIFFUSE_SKY[mode] ? weatherLightMul.value : 1
+    return shadowAlpha.value * skyTint.value.daylightShare * weight
+  })
+  const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))
+  const diffuseSkyStyle = computed(() => {
+    const scene = sunScene.value
+    const sky = DIFFUSE_SKY[weatherMode.value]
+    if (!sky || scene.isNight) return null
     return {
       background: `radial-gradient(ellipse 110% 100% at ${scene.source.x} 0%, ${sky.color} 0%, transparent 100%)`,
       opacity: sky.opacity * Math.sin(scene.dayProgress * Math.PI),
@@ -646,7 +638,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     (s) => {
       if (s && s.azimuth != null) {
         setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
-        themeStore.applyAuto(s.isNight)
+        themeStore.applyAuto(s.isNight, { sweep: !lightTestMode.value })
       }
     },
     { immediate: true },
@@ -720,9 +712,11 @@ export function useSunLight(canReadEnvironment = () => true) {
     dustParticles,
     snowParticles,
     rainParticles,
-    weatherShadowOpacity,
+    castShade,
+    roomShade,
     lightLayerOpacity,
-    brightSpotStyle,
+    skyTint,
+    diffuseSkyStyle,
     lightTestMode,
     lightTestPaused,
     testSpeed,

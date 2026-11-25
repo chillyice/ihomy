@@ -85,7 +85,7 @@ it('freezes the live slot on entry, evaluates both sources identically and resum
   light.setSlot(8)
   await nextTick()
   expect(light.sunScene.value).toEqual(getSunScene(day, 8))
-  expect(applyAuto).toHaveBeenLastCalledWith(true)
+  expect(applyAuto).toHaveBeenLastCalledWith(true, { sweep: false })
 
   const otherDay = sunDay('2026-06-21', 76)
   request.get.mockResolvedValueOnce(otherDay)
@@ -105,7 +105,7 @@ it('freezes the live slot on entry, evaluates both sources identically and resum
   await nextTick()
   expect(light.slotIdx.value).toBe(145)
   expect(light.sunScene.value).toEqual(getSunScene(latest, 145))
-  expect(applyAuto).toHaveBeenLastCalledWith(false)
+  expect(applyAuto).toHaveBeenLastCalledWith(false, { sweep: true })
 })
 
 it('keeps the selected day and manual time through stepping, pending playback and a live refresh', async () => {
@@ -249,3 +249,79 @@ it('uses the same weather gate and scene rotation and keeps simulated storms out
   expect(light.weatherMode.value).toBe('rain')
   expect(light.precipLevel.value).toBe(2)
 })
+
+// Jinan /public/sun-info samples: near the solstice the sun crosses each side
+// of the south window during daylight; in November it crosses the horizon first.
+it.each([
+  {
+    date: '2026-06-21',
+    sunrise: '04:53',
+    sunset: '19:33',
+    noon: 147,
+    observations: [
+      [58, -1.37, 59.09],
+      [60, 0.36, 60.59],
+      [103, 41.63, 89.88],
+      [104, 42.63, 90.63],
+      [147, 76.78, 181.73],
+      [189, 42.94, 269.13],
+      [190, 41.94, 269.89],
+      [191, 40.93, 270.63],
+      [234, -0.24, 299.93],
+      [235, -1.11, 300.68],
+      [236, -1.97, 301.44],
+    ],
+  },
+  {
+    date: '2026-11-25',
+    sunrise: '06:59',
+    sunset: '16:57',
+    noon: 144,
+    observations: [
+      [83, -1.56, 114.86],
+      [84, -0.65, 115.6],
+      [85, 0.25, 116.34],
+      [144, 32.61, 180.45],
+      [200, 2.3, 241.82],
+      [202, 0.51, 243.33],
+      [203, -0.38, 244.08],
+      [204, -1.29, 244.82],
+      [205, -2.2, 245.55],
+    ],
+  },
+])(
+  'keeps a shaded white surface brighter towards noon and darker towards night with the lamp off on $date',
+  async ({ date, sunrise, sunset, noon, observations }) => {
+    const day = { ...sunDay(date), sunrise, sunset }
+    for (const [slot, altitude, azimuth] of observations) Object.assign(day.slots[slot], { altitude, azimuth })
+    await mountLight(day)
+    light.startLightTest()
+    light.lampMode.value = 'off'
+    for (const weather of ['clear', 'cloud', 'overcast', 'fog', 'rain', 'snow', 'thunder']) {
+      light.setWeather(weather)
+      for (const depth of [0, 70, 100]) {
+        light.shadowDepth.value = depth
+        const levels = observations.map(([slot]) => {
+          light.setSlot(slot)
+          const { background, opacity } = light.skyTint.value
+          const [r, g, b] = background.slice(4, -1).split(',').map(Number)
+          // White paper at the transparent edge of the diffuse gradient: multiply
+          // by the sky tint and composite both black shadow layers at this point.
+          const sky = 255 * (1 - opacity) + opacity * (0.2126 * r + 0.7152 * g + 0.0722 * b)
+          return sky * (1 - light.roomShade.value) * (1 - light.castShade.value * light.lightLayerOpacity.value)
+        })
+        for (let i = 1; i < levels.length; i++) {
+          const slot = observations[i][0]
+          const delta = (levels[i] - levels[i - 1]) * (slot <= noon ? 1 : -1)
+          expect(delta, `${weather}, depth ${depth}, ${day.slots[slot].time}`).toBeGreaterThanOrEqual(-0.001)
+        }
+        expect(levels.at(-1)).toBeCloseTo(levels[0], 8)
+        expect(levels.at(-1)).toBe(levels.at(-2))
+        expect(Math.max(...levels)).toBeGreaterThan(levels[0])
+      }
+    }
+    await nextTick()
+    expect(light.lampMask.value).toBe('none')
+    expect(light.lampDivOpacity.value).toBe(0)
+  },
+)

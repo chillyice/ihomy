@@ -1803,7 +1803,9 @@ body,
 }
 html.theme-sweeping,
 html.theme-sweeping body,
-html.theme-sweeping #app {
+html.theme-sweeping #app,
+html:has(> body > .light-test-console),
+html:has(> body > .light-test-console) :is(body, #app) {
   transition: none !important;
 }
 

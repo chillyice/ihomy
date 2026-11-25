@@ -25,11 +25,42 @@ function parseTimeToMinutes(timeStr) {
   return parts[0] * 60 + parts[1]
 }
 
-function lerpColor(c1, c2, t) {
-  const r = Math.round(c1[0] + (c2[0] - c1[0]) * t)
-  const g = Math.round(c1[1] + (c2[1] - c1[1]) * t)
-  const b = Math.round(c1[2] + (c2[2] - c1[2]) * t)
-  return `rgba(${r},${g},${b},1)`
+// Each stop describes the multiply tint on the page, independent of the window's bearing.
+const nightTint = { at: 0, rgb: [8, 12, 28], opacity: 0.7 }
+const clearSky = [
+  nightTint,
+  { at: 0.1, rgb: [255, 200, 80], opacity: 0.7 },
+  { at: 0.3, rgb: [255, 250, 230], opacity: 0.1 },
+  { at: 0.5, rgb: [255, 250, 230], opacity: 0 },
+  { at: 0.7, rgb: [255, 250, 230], opacity: 0 },
+  { at: 0.9, rgb: [255, 140, 50], opacity: 0.7 },
+  { ...nightTint, at: 1 },
+]
+const graySky = [nightTint, { ...nightTint, at: 0.1, opacity: 0 }, { ...nightTint, at: 0.9, opacity: 0 }, { ...nightTint, at: 1 }]
+
+function tintTransmission([r, g, b], opacity) {
+  return 1 - opacity * (1 - (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255)
+}
+const nightTransmission = tintTransmission(nightTint.rgb, nightTint.opacity)
+
+export function getSkyTint(scene, weather) {
+  const stops = weather === 'clear' ? clearSky : graySky
+  const progress = scene.isNight ? 0 : scene.dayProgress
+  const end = stops.findIndex((stop, i) => i > 0 && progress <= stop.at)
+  const from = stops[end - 1]
+  const to = stops[end]
+  const t = (progress - from.at) / (to.at - from.at)
+  const rgb = from.rgb.map((channel, i) => channel + (to.rgb[i] - channel) * t)
+  const opacity = from.opacity + (to.opacity - from.opacity) * t
+  // Only daylight above the existing night tint can be blocked by the window.
+  const daylightShare = Math.max(0, 1 - nightTransmission / tintTransmission(rgb, opacity))
+  return { background: `rgb(${rgb.join(',')})`, opacity, daylightShare }
+}
+
+// The canvas already shades blocked pixels by shade * direct. Supply the rest
+// underneath so a blocked point keeps the same exposure as direct light fades.
+export function ambientShadowOpacity(shade, direct) {
+  return direct >= 1 ? 0 : (shade * (1 - direct)) / (1 - shade * direct)
 }
 
 // 台灯自动开关阈值(以窗口阴影强度为口径:正午 0.3 → 日出日落 0.7 → 夜间 0.7):
@@ -94,38 +125,6 @@ export function getSunScene(sunInfo, slotIndex) {
   // 阴影颜色:夜间深蓝黑,日间纯黑
   const shadowColor = isNight ? 'rgb(8,12,28)' : 'rgb(0,0,0)'
 
-  // 亮斑颜色与不透明度:夜黑→凌晨黄→清晨白→日间透明→傍晚橙→日落红→深夜黑
-  let brightSpotColor, brightSpotOpacity
-  if (isNight) {
-    brightSpotColor = 'rgb(8,12,28)'
-    brightSpotOpacity = 0.7
-  } else if (dayProgress < 0.1) {
-    // 凌晨:深蓝黑→黄
-    const t = dayProgress / 0.1
-    brightSpotColor = lerpColor([8, 12, 28], [255, 200, 80], t)
-    brightSpotOpacity = 0.7
-  } else if (dayProgress < 0.3) {
-    // 清晨:黄→白,不透明度 0.7→0.1
-    const t = (dayProgress - 0.1) / 0.2
-    brightSpotColor = lerpColor([255, 200, 80], [255, 250, 230], t)
-    brightSpotOpacity = 0.7 - t * 0.6
-  } else if (dayProgress < 0.7) {
-    // 日间:白→透明
-    const t = (dayProgress - 0.3) / 0.4
-    brightSpotColor = 'rgba(255,250,230,1)'
-    brightSpotOpacity = 0.1 * (1 - t)
-  } else if (dayProgress < 0.9) {
-    // 傍晚:透明→橙,不透明度 0→0.7
-    const t = (dayProgress - 0.7) / 0.2
-    brightSpotColor = lerpColor([255, 250, 230], [255, 140, 50], t)
-    brightSpotOpacity = t * 0.7
-  } else {
-    // 日落:橙→深蓝黑,不透明度 0.7
-    const t = (dayProgress - 0.9) / 0.1
-    brightSpotColor = lerpColor([255, 140, 50], [8, 12, 28], t)
-    brightSpotOpacity = 0.7
-  }
-
   // 光柱颜色:夜间全透明(不发光),日间基于高度角
   let palette, rayBaseOpacity
   if (!hasDirectLight) {
@@ -187,8 +186,6 @@ export function getSunScene(sunInfo, slotIndex) {
     rays: makeRays(rayOpacity),
     shadowIntensity,
     shadowColor,
-    brightSpotColor,
-    brightSpotOpacity,
     lightOpacity,
     lampOpacity,
     altitude: alt,

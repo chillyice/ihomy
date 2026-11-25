@@ -1,6 +1,6 @@
 <!-- 全局窗光投影与天气氛围，光影层级随 --z-deco / --z-atmos 盖在弹窗之上。 -->
 <template>
-  <div class="sun-light-layer" aria-hidden="true">
+  <div class="sun-light-layer" :class="{ 'is-preview': lightTestMode }" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
     <div v-if="blobsEnabled" class="bg-blobs">
       <div class="blob blob-1"></div>
@@ -15,23 +15,19 @@
 
     <!-- 晨暮环境色与台灯补光 -->
     <div
-      v-if="shadowEnabled && (brightSpotStyle?.opacity ?? 0) > 0.01"
+      v-if="shadowEnabled && skyTint.opacity > 0"
       class="bright-spot"
-      :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"
+      :style="{ background: skyTint.background, opacity: skyTint.opacity, '--lamp-mask': lampMask }"
     ></div>
-
-    <div
-      v-if="shadowEnabled && weatherShadowOpacity > 0 && shadowAlpha > 0"
-      class="weather-shade"
-      :style="{ background: sunScene.shadowColor, opacity: weatherShadowOpacity * shadowAlpha, '--lamp-mask': lampMask }"
-    ></div>
+    <div v-if="shadowEnabled && diffuseSkyStyle" class="bright-spot" :style="{ ...diffuseSkyStyle, '--lamp-mask': lampMask }"></div>
+    <div v-if="shadowEnabled && roomShade > 0" class="room-shade" :style="{ opacity: roomShade, '--lamp-mask': lampMask }"></div>
     <WindowProjection
       v-if="lightLayerOpacity > 0 || stormLight"
       :key="stormLight ? 'lightning' : 'sun'"
       :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
       :standard="projectionStandard"
-      :shadow-alpha="shadowAlpha"
+      :shadow-alpha="castShade"
       :occluders="occluders"
       :desk-casters="deskCasters"
       :sashes="windowSashes"
@@ -48,11 +44,7 @@
     <div v-if="shadowEnabled" class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
 
     <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
-    <div
-      v-if="themeStore.theme === 'warm' && lightLayerOpacity > 0"
-      class="light-layer"
-      :style="{ opacity: lightLayerOpacity ?? 0, transition: sunScene.isNight ? 'none' : 'opacity 3s ease' }"
-    >
+    <div v-if="themeStore.theme === 'warm' && lightLayerOpacity > 0" class="light-layer" :style="{ opacity: lightLayerOpacity }">
       <div
         class="light-bloom"
         :style="{
@@ -169,6 +161,7 @@ if (!light) {
 }
 const {
   sunScene,
+  lightTestMode,
   deskCasters,
   windowSashes,
   lampMask,
@@ -177,8 +170,8 @@ const {
   lampColor,
   shadowEnabled,
   projectionStandard,
-  shadowAlpha,
-  weatherShadowOpacity,
+  castShade,
+  roomShade,
   lightLayerOpacity,
   blobsEnabled,
   dustParticles,
@@ -187,7 +180,8 @@ const {
   weatherMode,
   weatherEffectEnabled,
   precipLevel,
-  brightSpotStyle,
+  skyTint,
+  diffuseSkyStyle,
   fogVisible,
 } = light || {}
 
@@ -403,9 +397,6 @@ html.dark .blob-5 {
   mix-blend-mode: multiply;
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
-  transition:
-    background 3s ease,
-    opacity 3s ease;
   transform: translateZ(0);
 }
 
@@ -418,11 +409,12 @@ html.dark .blob-5 {
   filter: blur(20px);
 }
 
-/* 阴天和云遮日时，漫射底色独立于直射投影，台灯中心仍透光。 */
-.weather-shade {
+/* 背光处仅受环境天光影响；台灯补光处仍由同一遮罩透光。 */
+.room-shade {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-deco) + 1);
+  background: black;
   pointer-events: none;
   mix-blend-mode: multiply;
   -webkit-mask-image: var(--lamp-mask, none);
@@ -438,6 +430,7 @@ html.dark .blob-5 {
   pointer-events: none;
   mix-blend-mode: screen;
   overflow: hidden;
+  transition: opacity 3s ease;
   transform: translateZ(0);
 }
 .light-bloom {
@@ -472,6 +465,11 @@ html.dark .blob-5 {
     filter 3s ease,
     transform 3s ease,
     background 3s ease;
+}
+
+/* 控制台每次跳转或步进都直接显示所选时刻。 */
+.sun-light-layer.is-preview :is(.blob, .light-layer, .light-bloom, .light-source, .light-ray) {
+  transition: none;
 }
 
 .vignette {

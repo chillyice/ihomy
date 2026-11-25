@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createPinia } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 import { loadTheme, SELECTABLE_THEME_IDS, THEMES, THEME_STORAGE_KEY } from './index'
 
 // 窗边主题已下线:可选集只剩暖居/光尘,旧偏好加载时要回落暖居(不能留着不可选的 theme-id)
@@ -12,6 +14,20 @@ function stubStorage(raw) {
 }
 
 afterEach(() => vi.unstubAllGlobals())
+
+it('光影预览跨越日落和日出时直接切换主题', () => {
+  stubStorage()
+  const classList = { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() }
+  const createElement = vi.fn()
+  vi.stubGlobal('document', { documentElement: { classList }, querySelector: () => null, createElement })
+  const theme = useThemeStore(createPinia())
+  theme.setPreference({ theme: 'warm', mode: 'dawn', autoMode: true }, { sweep: false })
+  theme.applyAuto(true, { sweep: false })
+  expect(classList.toggle).toHaveBeenLastCalledWith('dark', true)
+  theme.applyAuto(false, { sweep: false })
+  expect(classList.toggle).toHaveBeenLastCalledWith('dark', false)
+  expect(createElement).not.toHaveBeenCalled()
+})
 
 describe('主题可选集', () => {
   it('只列暖居与光尘,窗边条目仍留给遗留样式', () => {

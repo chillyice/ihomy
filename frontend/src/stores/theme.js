@@ -47,12 +47,12 @@ export const useThemeStore = defineStore('theme', {
       this._apply()
     },
     // 日出日落自动切晨暮:仅 autoMode 时生效,只切 mode 不切 theme
-    applyAuto(isNight) {
+    applyAuto(isNight, opts) {
       if (!this.autoMode) return
       const mode = isNight ? 'dusk' : 'dawn'
       if (this.mode === mode) return
       this.mode = mode
-      this._apply()
+      this._apply(opts)
     },
   },
 })
