@@ -7,7 +7,7 @@ import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 const stileWidth = 0.093
 const railHeight = 0.065
 const frameDepth = 0.032 // fraction of the full window width, perpendicular to the sash
-const halfTransom = 0.0825 / 2
+const halfTransom = 0.055 / 2
 const transomTop = 0.483 - halfTransom
 const transomBottom = 0.483 + halfTransom
 const sashContours = [
