@@ -27,7 +27,7 @@
     <div v-loading="loading" class="shelf-main">
       <div class="shelf">
         <div v-a11y-click v-for="b in books" :key="b.authorId" class="notebook" @click="router.push(`/diary/book/${b.authorId}`)">
-          <div class="nb-cover">
+          <div class="nb-cover" :data-cover="journalArt(b.authorId)">
             <div class="nb-spine"></div>
             <div class="nb-label paper-surface">
               <div class="nb-name" :title="b.authorName">{{ b.authorName || '-' }}</div>
@@ -61,6 +61,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { diaryApi } from '@/api'
+import { journalArt } from '@/utils/warmMaterials'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -254,6 +255,41 @@ html.dark .nb-count {
 }
 html.dark .nb-latest {
   color: rgba(232, 220, 200, 0.45);
+}
+
+html.theme-warm .nb-cover[data-cover='journal-linen'] {
+  background:
+    var(--album-cloth-texture) center / 110px,
+    color-mix(in srgb, #aa976f 68%, var(--color-bg));
+  background-blend-mode: soft-light;
+}
+html.theme-warm .nb-cover[data-cover='journal-linen'] .nb-spine {
+  width: 10%;
+  background: color-mix(in srgb, #536977 78%, var(--color-bg));
+  border-right: 1px dashed #b5b4a1;
+}
+html.theme-warm .nb-cover[data-cover='journal-linen'] .nb-band {
+  background: #536977;
+}
+html.theme-warm .nb-cover[data-cover='journal-floral'] {
+  background:
+    var(--album-cloth-texture) center / 96px,
+    color-mix(in srgb, #a05240 72%, var(--color-bg));
+  background-blend-mode: soft-light;
+}
+html.theme-warm .nb-cover[data-cover='journal-floral']::before {
+  inset: 9px 10px 9px 19px;
+  border: 3px double #cda878;
+  border-radius: 2px 6px 6px 2px;
+  background: none;
+}
+html.theme-warm .nb-cover[data-cover='journal-floral'] .nb-band {
+  right: 9%;
+  width: 7px;
+  background: #694438;
+}
+html.theme-warm.dark .nb-label :is(.nb-shared, .nb-latest div) {
+  color: var(--color-text-secondary);
 }
 
 .empty-state {

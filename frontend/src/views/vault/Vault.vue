@@ -622,7 +622,7 @@ onBeforeUnmount(() => {
   width: 130px;
 }
 .vault-count {
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 12px;
   margin-right: 4px;
 }
@@ -664,7 +664,7 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .vc-label {
-  color: #999;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   width: 40px;
 }
@@ -682,7 +682,7 @@ onBeforeUnmount(() => {
   color: #777;
 }
 .vc-empty {
-  color: #bbb;
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 .vc-link {
@@ -696,7 +696,7 @@ onBeforeUnmount(() => {
 /* 行内小图标:用 transform 反馈 hover,不引 box-shadow(避免触发毛玻璃重算) */
 .vc-icon {
   cursor: pointer;
-  color: #999;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   display: inline-flex;
   transition:
@@ -721,7 +721,7 @@ onBeforeUnmount(() => {
 .vc-foot {
   display: flex;
   justify-content: space-between;
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 12px;
   margin-top: auto;
 }
@@ -736,7 +736,7 @@ onBeforeUnmount(() => {
   margin-left: 4px;
 }
 .vault-empty-hint {
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -790,7 +790,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .vault-strength-hint {
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 12px;
   margin-top: 4px;
 }

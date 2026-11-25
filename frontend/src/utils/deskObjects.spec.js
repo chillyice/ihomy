@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildDeskObjects, DESK_DESTINATIONS, DESK_DEFAULT_PATHS } from './deskObjects'
 import { shareId } from './shareId'
+import { cardPaper, journalArt } from './warmMaterials'
 
 const now = new Date(2026, 10, 22, 12, 30)
 const modules = ['album', 'plan', 'chat', 'kitchen', 'music', 'library', 'diary'].map((code) => ({ code, enabled: 1 }))
@@ -53,6 +54,32 @@ describe('window desk objects', () => {
     expect(kind(spring, 'fruit').art).toBe('fruit-pear')
     expect(kind(desk({ now: new Date(2026, 6, 1) }), 'fruit').art).toBe('fruit-peach')
     expect(kind(desk({ now: new Date(2026, 11, 1) }), 'leaf').art).toBe('leaf-winter')
+  })
+
+  it('draws all stationery finishes across visits and keeps a task or book recognizable during refreshes', () => {
+    const agenda = { plans: [{ id: 8, overdueDays: 2 }] }
+    const notes = new Set()
+    const journals = new Set()
+    const covers = new Set()
+    const papers = new Set()
+    for (let seed = 0; seed < 48; seed++) {
+      const items = desk({ seed, agenda })
+      const note = kind(items, 'note')
+      const journal = kind(items, 'journal')
+      expect(note.to).toBe('/plan?tab=plan&focus=8')
+      expect(journal.to).toBe('/diary')
+      const refreshed = desk({ seed, agenda, messages: 1 })
+      expect(kind(refreshed, 'note').art).toBe(note.art)
+      expect(kind(refreshed, 'journal').art).toBe(journal.art)
+      notes.add(note.art)
+      journals.add(journal.art)
+      covers.add(journalArt(42, seed))
+      papers.add(cardPaper('feed', seed))
+    }
+    expect([...notes].sort()).toEqual(['note', 'note-grid', 'note-sage'])
+    expect([...journals].sort()).toEqual(['journal', 'journal-floral', 'journal-linen'])
+    expect(covers).toEqual(journals)
+    expect([...papers].sort()).toEqual(['laid', 'plain', 'pressed'])
   })
 
   it('validates rebinding, module access and child-mode destinations including the item tooltip', () => {

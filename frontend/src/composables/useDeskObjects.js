@@ -7,10 +7,10 @@ import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { buildDeskObjects, deskPathAllowed } from '@/utils/deskObjects'
+import { materialSeed } from '@/utils/warmMaterials'
 import { NEED_FILE_ORIGIN, SERVER_ORIGIN } from '@/utils/assetUrl'
 import { useDisplayMode } from './useDisplayMode'
 
-const sessionSeed = Math.floor(Math.random() * 0x100000000)
 const REFRESH_MS = 3 * 60 * 1000
 
 // Keep two independent summaries: a change to a plan never refetches the unread count.
@@ -115,7 +115,7 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0) {
     if (!toValue(enabled) || !app.familyLoaded || user.isPureOps || user.mustChangePassword) return []
     return buildDeskObjects({
       now: now.value,
-      seed: sessionSeed + (Number(toValue(arrangement)) || 0),
+      seed: materialSeed + (Number(toValue(arrangement)) || 0),
       origin: NEED_FILE_ORIGIN ? SERVER_ORIGIN : location.origin,
       photos: app.photosRevision === activityRevision.photos && !route.query.hid && !route.query.home_id ? app.photos : [],
       familyId: app.family?.id,

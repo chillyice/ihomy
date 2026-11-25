@@ -426,14 +426,12 @@ html.theme-warm .mobile-home .filter-scroll::before {
   content: none;
 }
 
-/* 桌面按组件分纸，拖动后仍是同一张；动态流按阅读顺序交替。 */
-html.theme-warm .gc-home :is([data-wid='feed'], [data-wid='finance'], [data-wid='wish']),
-html.theme-warm .mobile-home .feed-card:nth-child(3n + 2) {
+/* 同次浏览按组件或动态条目选纸，拖动、筛选和翻页都保留原来的纸张。 */
+html.theme-warm :is(.gc-home, .mobile-home) [data-paper='pressed'] {
   --card-art: url('@/assets/materials/painted-card-pressed.webp?no-inline');
   --card-cut: 106 54 46 132 fill / 24px 12px 12px 31px;
 }
-html.theme-warm .gc-home :is([data-wid='anni'], [data-wid='reminder'], [data-wid='task']),
-html.theme-warm .mobile-home .feed-card:nth-child(3n) {
+html.theme-warm :is(.gc-home, .mobile-home) [data-paper='laid'] {
   --card-art: url('@/assets/materials/painted-card-laid.webp?no-inline');
   --card-cut: 38 38 60 59 fill / 10px 10px 15px 15px;
 }

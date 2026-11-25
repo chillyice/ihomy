@@ -37,6 +37,7 @@
             v-for="(f, i) in filteredFeeds"
             :key="f.type + '-' + (f.id ?? i)"
             class="feed-card anim-rise"
+            :data-paper="isWarm ? cardPaper(f.type + '-' + (f.id ?? f.createdAt)) : undefined"
             :style="{ '--i': Math.min(i, 12) }"
             v-a11y-click
             @click="goFeed(f)"
@@ -95,6 +96,7 @@ import { showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
+import { cardPaper } from '@/utils/warmMaterials'
 
 const router = useRouter()
 const userStore = useUserStore()

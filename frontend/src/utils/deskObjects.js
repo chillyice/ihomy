@@ -1,7 +1,7 @@
 import { daysBetween, toDateStr } from './date'
 import { isChildAllowedPath } from './displayMode'
 import { shareId } from './shareId'
-import { seededRng } from './games/seededRng'
+import { journalArt, keyedDraw as draw, noteArt } from './warmMaterials'
 
 export const DESK_DESTINATIONS = [
   { path: '/weather', labelKey: 'weatherPage.title' },
@@ -27,13 +27,6 @@ export function deskPathAllowed(path, modules, child) {
   if (child && !isChildAllowedPath(path)) return false
   const code = path.split(/[/?]/)[1]
   return code === 'weather' || code === 'notification' || modules.some((m) => m.code === code && m.enabled !== 0)
-}
-
-// Each object's draw is independent so a new unread or a removed photo cannot reshuffle its neighbors.
-function draw(seed, key) {
-  let hash = seed >>> 0
-  for (const char of key) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619)
-  return seededRng(hash)()
 }
 
 function photoItems(rows, now, origin, seed, familyId) {
@@ -82,7 +75,7 @@ function deskNote(agenda, now, seed) {
       item: {
         key,
         kind: 'note',
-        art: 'note',
+        art: noteArt(key, seed),
         to,
         ageDays,
         paperTone: Math.floor(draw(seed, key + ':stock') * 3),
@@ -132,6 +125,7 @@ export function buildDeskObjects({
     cup: hour < 12 ? 'coffee' : 'tea',
     fruit: { spring: 'fruit-pear', summer: 'fruit-peach', autumn: 'fruit', winter: 'fruit' }[season],
     leaf: 'leaf-' + season,
+    journal: journalArt('desk', seed),
   }
   const candidates = []
   for (const [kind, fallback] of Object.entries(DESK_DEFAULT_PATHS)) {

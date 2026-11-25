@@ -38,6 +38,7 @@
         :key="w.id"
         class="gc-card"
         :data-wid="w.id"
+        :data-paper="cardPaper(w.id)"
         :inert="w.kind === 'preview'"
         :class="[
           `gc-c${w.span}`,
@@ -406,6 +407,7 @@ import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { useWarmCardReorder } from '@/composables/useWarmCardReorder'
 import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
+import { cardPaper } from '@/utils/warmMaterials'
 import { bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'

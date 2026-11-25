@@ -398,7 +398,7 @@ onMounted(() => {
   transform: translateY(-2px);
 }
 .stat-name {
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 .stat-num {
