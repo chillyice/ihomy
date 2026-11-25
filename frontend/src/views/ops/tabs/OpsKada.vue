@@ -37,35 +37,50 @@
 
   <el-alert v-if="!loading && !page.records.length" type="info" :closable="false" show-icon :title="$t('ops.kada.empty')" />
   <el-table v-else v-loading="loading" :data="page.records" border stripe>
-    <el-table-column prop="createdAt" :label="$t('ops.kada.created')" width="165" />
-    <el-table-column :label="$t('ops.kada.name')" min-width="200" show-overflow-tooltip>
+    <OpsDetailsColumn :title="$t('ops.kada.title')" v-slot="{ row }">
+      <dt>{{ $t('ops.kada.created') }}</dt>
+      <dd>{{ row.createdAt ?? '—' }}</dd>
+      <dt>{{ $t('ops.kada.name') }}</dt>
+      <dd>
+        <span class="kada-name" v-a11y-click @click="openDetail(row.id)">{{ row.name }}</span>
+      </dd>
+      <dt>{{ $t('ops.kada.author') }}</dt>
+      <dd>{{ row.author ?? '—' }}</dd>
+      <dt>{{ $t('ops.kada.level') }}</dt>
+      <dd>
+        <el-tag size="small" :type="levelTagType(row.dangerLevel)">
+          {{ $t(`ops.kada.level${row.dangerLevel}`) }}
+        </el-tag>
+      </dd>
+      <dt>{{ $t('ops.kada.legal') }}</dt>
+      <dd>
+        <el-tag v-if="parseList(row.legalFlagsJson).length" size="small" type="danger">
+          {{ $t('ops.kada.legalFlag') }}
+        </el-tag>
+      </dd>
+    </OpsDetailsColumn>
+    <el-table-column v-if="!isMobile" prop="createdAt" :label="$t('ops.kada.created')" width="165" />
+    <el-table-column :label="$t('ops.kada.name')" :min-width="isMobile ? 90 : 200" show-overflow-tooltip>
       <template #default="{ row }">
         <span class="kada-name" v-a11y-click @click="openDetail(row.id)">{{ row.name }}</span>
       </template>
     </el-table-column>
-    <el-table-column prop="author" :label="$t('ops.kada.author')" width="120" show-overflow-tooltip />
-    <el-table-column :label="$t('ops.kada.level')" width="100">
+    <el-table-column v-if="!isMobile" prop="author" :label="$t('ops.kada.author')" width="120" show-overflow-tooltip />
+    <el-table-column v-if="!isMobile" :label="$t('ops.kada.level')" width="100">
       <template #default="{ row }">
         <el-tag size="small" :type="levelTagType(row.dangerLevel)">
           {{ $t(`ops.kada.level${row.dangerLevel}`) }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.kada.legal')" width="90">
-      <template #default="{ row }">
-        <el-tag v-if="parseList(row.legalFlagsJson).length" size="small" type="danger">
-          {{ $t('ops.kada.legalFlag') }}
-        </el-tag>
-      </template>
-    </el-table-column>
-    <el-table-column :label="$t('ops.kada.status')" width="100">
+    <el-table-column :label="$t('ops.kada.status')" :width="isMobile ? 72 : 100">
       <template #default="{ row }">
         <el-tag size="small" :type="statusTagType(row.status)">
           {{ $t(statusKey(row.status)) }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('common.actions')" width="100" fixed="right">
+    <el-table-column :label="$t('common.actions')" :width="isMobile ? 76 : 100" fixed="right">
       <template #default="{ row }">
         <el-tooltip :content="$t('ops.kada.view')" placement="top" :show-after="300">
           <el-button size="small" text @click="openDetail(row.id)"
@@ -149,12 +164,15 @@
 </template>
 
 <script setup>
+import OpsDetailsColumn from '../OpsDetailsColumn.vue'
+import { useDevice } from '@/composables/useDevice'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View, Link } from '@element-plus/icons-vue'
 import { opsApi } from '@/api'
 
+const { isMobile } = useDevice()
 const props = defineProps({
   // 每次切回该标签都重新查询（与 OpsAlerts 一致）
   active: { type: Boolean, default: false },

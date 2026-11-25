@@ -2,6 +2,9 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.ihomy.common.BizException;
+import com.ihomy.common.ResultCode;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ihomy.entity.*;
@@ -44,7 +47,7 @@ import java.util.regex.Pattern;
  * - stats:   各资源表总数量（可按创建时间/用户/家庭过滤）
  * - server:  服务器/JVM 状态（内存、线程、磁盘用量）
  * - logs:    全系统操作日志检索（带过滤分页）
- * 本类仅返回系统级聚合信息,不涉及任何用户/家庭内容明细。
+ * 资源统计与分页记录共用同一筛选口径，记录只返回编号、归属与创建时间。
  */
 @Service
 @RequiredArgsConstructor
@@ -83,57 +86,82 @@ public class OpsService {
     /** 访问明细返回上限(时间序=最近 N 条 / 耗时序=最慢 N 条) */
     private static final int MAX_DETAIL = 200;
 
-    /** 各资源统计:可按开始/结束日期(含)、用户 ID、家庭 ID 过滤;缺省为全量 */
-    public Map<String, Long> stats(LocalDate startDate, LocalDate endDate, Long userId, Long familyId) {
-        LocalDateTime start = startDate == null ? null : startDate.atStartOfDay();
-        LocalDateTime end = endDate == null ? null : endDate.plusDays(1).atStartOfDay().minusSeconds(1);
-
-        Map<String, Long> m = new LinkedHashMap<>();
-        m.put("users", sysUserMapper.selectCount(new LambdaQueryWrapper<SysUser>()
-                .ge(start != null, SysUser::getCreatedAt, start).le(end != null, SysUser::getCreatedAt, end)));
-        m.put("families", familyMapper.selectCount(new LambdaQueryWrapper<Family>()
-                .ge(start != null, Family::getCreatedAt, start).le(end != null, Family::getCreatedAt, end)));
-        m.put("blogs", blogMapper.selectCount(filt(new LambdaQueryWrapper<Blog>(),
-                start, end, userId, familyId, Blog::getCreatedAt, Blog::getAuthorId, Blog::getFamilyId)));
-        m.put("diaries", diaryMapper.selectCount(filt(new LambdaQueryWrapper<Diary>(),
-                start, end, userId, familyId, Diary::getCreatedAt, Diary::getAuthorId, Diary::getFamilyId)));
-        m.put("albums", albumMapper.selectCount(filt(new LambdaQueryWrapper<Album>(),
-                start, end, userId, familyId, Album::getCreatedAt, Album::getCreatedBy, Album::getFamilyId)));
-        m.put("photos", photoMapper.selectCount(filt(new LambdaQueryWrapper<Photo>(),
-                start, end, userId, familyId, Photo::getCreatedAt, Photo::getAuthorId, Photo::getFamilyId)));
-        m.put("videos", videoMapper.selectCount(filt(new LambdaQueryWrapper<Video>(),
-                start, end, userId, familyId, Video::getCreatedAt, Video::getUploaderId, Video::getFamilyId)));
-        m.put("comments", commentMapper.selectCount(filt(new LambdaQueryWrapper<Comment>(),
-                start, end, userId, familyId, Comment::getCreatedAt, Comment::getAuthorId, Comment::getFamilyId)));
-        m.put("likes", likeMapper.selectCount(filt(new LambdaQueryWrapper<ContentLike>(),
-                start, end, userId, familyId, ContentLike::getCreatedAt, ContentLike::getUserId, ContentLike::getFamilyId)));
-        m.put("checkins", checkinMapper.selectCount(filt(new LambdaQueryWrapper<Checkin>(),
-                start, end, userId, familyId, Checkin::getCreatedAt, Checkin::getUserId, Checkin::getFamilyId)));
-        m.put("plans", planMapper.selectCount(filt(new LambdaQueryWrapper<FamilyPlan>(),
-                start, end, userId, familyId, FamilyPlan::getCreatedAt, FamilyPlan::getCreatedBy, FamilyPlan::getFamilyId)));
-        m.put("wishes", wishMapper.selectCount(filt(new LambdaQueryWrapper<Wish>(),
-                start, end, userId, familyId, Wish::getCreatedAt, Wish::getRequesterId, Wish::getFamilyId)));
-        m.put("bookRecords", bookMapper.selectCount(filt(new LambdaQueryWrapper<BookRecord>(),
-                start, end, userId, familyId, BookRecord::getCreatedAt, BookRecord::getCreatedBy, BookRecord::getFamilyId)));
-        m.put("reminders", reminderMapper.selectCount(filt(new LambdaQueryWrapper<Reminder>(),
-                start, end, userId, familyId, Reminder::getCreatedAt, Reminder::getCreatedBy, Reminder::getFamilyId)));
-        m.put("operationLogs", logMapper.selectCount(filt(new LambdaQueryWrapper<SysOperationLog>(),
-                start, end, userId, null, SysOperationLog::getCreatedAt, SysOperationLog::getOperatorId, null)));
-        return m;
+    /** 同一资源描述决定计数、明细的筛选口径及允许返回的列。 */
+    private Map<String, Resource<?>> resources() {
+        Map<String, Resource<?>> resources = new LinkedHashMap<>();
+        resources.put("users", new Resource<>(sysUserMapper, SysUser::getId, SysUser::getCreatedAt,
+                null, null));
+        resources.put("families", new Resource<>(familyMapper, Family::getId, Family::getCreatedAt,
+                null, null));
+        resources.put("blogs", new Resource<>(blogMapper, Blog::getId, Blog::getCreatedAt,
+                Blog::getAuthorId, Blog::getFamilyId));
+        resources.put("diaries", new Resource<>(diaryMapper, Diary::getId, Diary::getCreatedAt,
+                Diary::getAuthorId, Diary::getFamilyId));
+        resources.put("albums", new Resource<>(albumMapper, Album::getId, Album::getCreatedAt,
+                Album::getCreatedBy, Album::getFamilyId));
+        resources.put("photos", new Resource<>(photoMapper, Photo::getId, Photo::getCreatedAt,
+                Photo::getAuthorId, Photo::getFamilyId));
+        resources.put("videos", new Resource<>(videoMapper, Video::getId, Video::getCreatedAt,
+                Video::getUploaderId, Video::getFamilyId));
+        resources.put("comments", new Resource<>(commentMapper, Comment::getId, Comment::getCreatedAt,
+                Comment::getAuthorId, Comment::getFamilyId));
+        resources.put("likes", new Resource<>(likeMapper, ContentLike::getId, ContentLike::getCreatedAt,
+                ContentLike::getUserId, ContentLike::getFamilyId));
+        resources.put("checkins", new Resource<>(checkinMapper, Checkin::getId, Checkin::getCreatedAt,
+                Checkin::getUserId, Checkin::getFamilyId));
+        resources.put("plans", new Resource<>(planMapper, FamilyPlan::getId, FamilyPlan::getCreatedAt,
+                FamilyPlan::getCreatedBy, FamilyPlan::getFamilyId));
+        resources.put("wishes", new Resource<>(wishMapper, Wish::getId, Wish::getCreatedAt,
+                Wish::getRequesterId, Wish::getFamilyId));
+        resources.put("bookRecords", new Resource<>(bookMapper, BookRecord::getId, BookRecord::getCreatedAt,
+                BookRecord::getCreatedBy, BookRecord::getFamilyId));
+        resources.put("reminders", new Resource<>(reminderMapper, Reminder::getId, Reminder::getCreatedAt,
+                Reminder::getCreatedBy, Reminder::getFamilyId));
+        resources.put("operationLogs", new Resource<>(logMapper, SysOperationLog::getId, SysOperationLog::getCreatedAt,
+                SysOperationLog::getOperatorId, null));
+        return resources;
     }
 
-    /** 组装通用过滤条件(时间/用户/家庭均可选;列引用为空则跳过对应过滤) */
-    private <T> LambdaQueryWrapper<T> filt(LambdaQueryWrapper<T> w,
-                                           LocalDateTime start, LocalDateTime end,
-                                           Long userId, Long familyId,
-                                           SFunction<T, ?> createdAtCol,
-                                           SFunction<T, ?> userCol,
-                                           SFunction<T, ?> famCol) {
-        if (start != null) w.ge(createdAtCol, start);
-        if (end != null) w.le(createdAtCol, end);
-        if (userId != null && userCol != null) w.eq(userCol, userId);
-        if (familyId != null && famCol != null) w.eq(famCol, familyId);
-        return w;
+    public record ResourceRow(Long id, LocalDateTime createdAt, Long userId, Long familyId) {}
+
+    private record Resource<T>(BaseMapper<T> mapper, SFunction<T, Long> id, SFunction<T, LocalDateTime> createdAt,
+                               SFunction<T, Long> user, SFunction<T, Long> family) {
+        LambdaQueryWrapper<T> filter(LocalDate start, LocalDate end, Long userId, Long familyId) {
+            LambdaQueryWrapper<T> query = new LambdaQueryWrapper<>();
+            if (start != null) query.ge(createdAt, start.atStartOfDay());
+            if (end != null) query.lt(createdAt, end.plusDays(1).atStartOfDay());
+            if (user != null && userId != null) query.eq(user, userId);
+            if (family != null && familyId != null) query.eq(family, familyId);
+            return query;
+        }
+
+        long count(LocalDate start, LocalDate end, Long userId, Long familyId) {
+            return mapper.selectCount(filter(start, end, userId, familyId));
+        }
+
+        IPage<ResourceRow> rows(int current, int size, LocalDate start, LocalDate end, Long userId, Long familyId) {
+            List<SFunction<T, ?>> columns = new ArrayList<>(List.of(id, createdAt));
+            if (user != null) columns.add(user);
+            if (family != null) columns.add(family);
+            var query = filter(start, end, userId, familyId).select(columns).orderByDesc(id);
+            return mapper.selectPage(new Page<>(current, size), query).convert(row ->
+                    new ResourceRow(id.apply(row), createdAt.apply(row),
+                            user == null ? null : user.apply(row), family == null ? null : family.apply(row)));
+        }
+    }
+
+    public Map<String, Long> stats(LocalDate start, LocalDate end, Long userId, Long familyId) {
+        Map<String, Long> totals = new LinkedHashMap<>();
+        resources().forEach((key, resource) -> totals.put(key, resource.count(start, end, userId, familyId)));
+        return totals;
+    }
+
+    public IPage<ResourceRow> resourceRows(String kind, int current, int size, LocalDate start, LocalDate end,
+                                           Long userId, Long familyId) {
+        Resource<?> resource = resources().get(kind);
+        if (resource == null) throw new BizException(ResultCode.NOT_FOUND);
+        if (current < 1 || size < 1 || size > 100) throw new BizException(ResultCode.BAD_REQUEST);
+        return resource.rows(current, size, start, end, userId, familyId);
     }
 
     /**

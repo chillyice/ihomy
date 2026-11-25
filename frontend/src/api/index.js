@@ -573,6 +573,7 @@ export const loanApi = {
 // 传 null 表示不带该参数(空数组同样传 null,避免出现 types= 这种空值参数)
 export const opsApi = {
   stats: (params) => request.get('/ops/stats', { params }),
+  resourceRecords: (params) => request.get('/ops/stats/records', { params }),
   server: () => request.get('/ops/server'),
   logs: (params) => request.get('/ops/logs', { params }),
   logOptions: () => request.get('/ops/logs/options'),

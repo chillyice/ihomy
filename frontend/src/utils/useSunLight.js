@@ -21,7 +21,7 @@ const DIFFUSE_SKY = {
   fog: { color: 'rgb(244, 241, 230)', opacity: 0.16 },
 }
 
-export function useSunLight() {
+export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
   const sunInfo = ref(null)
@@ -459,6 +459,7 @@ export function useSunLight() {
   let weatherTimer = null
 
   const loadSunInfo = async () => {
+    if (!canReadEnvironment()) return
     try {
       applySunInfo(await request.get('/public/sun-info'))
     } catch (e) {}
@@ -495,6 +496,7 @@ export function useSunLight() {
 
   // 拉取真实天气并同步到光影系统(非光照测试模式)
   const loadWeather = async () => {
+    if (!canReadEnvironment()) return
     loadWeatherDetail() // 详情(预警+今日高低温)与简版天气并行,供侧边栏迷你天气/首页天气卡片
     try {
       const data = await request.get('/public/weather')
@@ -521,6 +523,13 @@ export function useSunLight() {
     }
     refreshSunInfoIfStale()
   }
+
+  watch(canReadEnvironment, (allowed) => {
+    if (allowed) {
+      loadSunInfo()
+      loadWeather()
+    }
+  })
 
   onMounted(() => {
     loadSunInfo()

@@ -27,7 +27,7 @@ import java.util.Map;
 /**
  * 运维接口（V3.8）:系统资源统计/服务器状态/操作日志检索。
  * 仅 OPS 角色可访问（@RequirePermission + OpsAccessFilter 双保险）,
- * 只返回聚合信息,不涉及用户隐私。
+ * 资源明细只读记录索引，业务正文仍由各家庭管理。
  */
 @Tag(name = "运维管理")
 @RestController
@@ -57,6 +57,20 @@ public class OpsController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Long familyId) {
         return Result.success(opsService.stats(startDate, endDate, userId, familyId));
+    }
+
+    @Operation(summary = "查看资源记录的编号、归属与创建时间")
+    @RequirePermission("ops:view")
+    @GetMapping("/stats/records")
+    public Result<IPage<OpsService.ResourceRow>> resourceRows(
+            @RequestParam String kind,
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long familyId) {
+        return Result.success(opsService.resourceRows(kind, current, size, startDate, endDate, userId, familyId));
     }
 
     @Operation(summary = "服务器/JVM 状态(内存/线程/磁盘)")

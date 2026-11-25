@@ -1624,8 +1624,7 @@ html.theme-warm .gc-main:has(.web-game-page) .wg-stage {
  * 光尘仍是窗口滚动 + 固定顶栏,保留各组件里的 42px 不动。 */
 html.theme-warm .settings-side,
 html.theme-warm .category-side,
-html.theme-warm .toc-aside,
-html.theme-warm .ops-tabs .el-tabs__header {
+html.theme-warm .toc-aside {
   top: 0;
 }
 
@@ -1841,6 +1840,12 @@ a {
   max-width: 1100px;
   margin: 0 auto;
   padding: 16px;
+}
+.page.ops-page {
+  max-width: 1680px;
+}
+.app-main > .page.ops-page {
+  padding: clamp(12px, 2vw, 30px);
 }
 /* 网页游戏页(V11.32):iframe 外壳吃满可用宽度,不受 1100px 内容宽限制 */
 .page.web-game-page {

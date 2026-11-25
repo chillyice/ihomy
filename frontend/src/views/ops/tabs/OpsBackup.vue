@@ -42,21 +42,43 @@
     <div class="card backup-policies">
       <div class="section-label">{{ $t('ops.backup.policies') }}</div>
       <el-table :data="policies" border stripe size="small" row-key="id" :empty-text="$t('ops.backup.noPolicies')">
-        <el-table-column :label="$t('ops.backup.name')" min-width="150">
-          <template #default="{ row }">
+        <OpsDetailsColumn :title="$t('ops.backup.policies')" v-slot="{ row }">
+          <dt>{{ $t('ops.backup.name') }}</dt>
+          <dd>
             <div class="policy-name">{{ row.name }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column :label="$t('ops.backup.modules')" min-width="230">
-          <template #default="{ row }">
+          </dd>
+          <dt>{{ $t('ops.backup.modules') }}</dt>
+          <dd>
             <div class="module-tags">
               <el-tag v-for="m in row.modules" :key="m" size="small" class="module-tag">
                 {{ moduleText(m, t) }}
               </el-tag>
             </div>
+          </dd>
+          <dt>{{ $t('ops.backup.schedule') }}</dt>
+          <dd>
+            <div>{{ scheduleText(row, t) }}</div>
+            <div class="backup-sub">
+              {{ row.enabled ? $t('ops.backup.nextRunAt', { time: row.nextRunAt || '—' }) : $t('ops.backup.disabled') }}
+            </div>
+          </dd>
+          <dt>{{ $t('ops.backup.retention') }}</dt>
+          <dd>{{ retentionText(row.retentionDays, t) }}</dd>
+          <dt>{{ $t('ops.backup.lastRun') }}</dt>
+          <dd>
+            <template v-if="row.lastJob">
+              <el-tag size="small" :type="statusTag(row.lastJob.status)">{{ statusLabel(row.lastJob.status) }}</el-tag>
+              <div class="backup-sub">{{ formatDateTime(row.lastJob.startedAt) || '—' }}</div>
+            </template>
+            <span v-else class="backup-sub">{{ $t('ops.backup.neverRun') }}</span>
+          </dd>
+        </OpsDetailsColumn>
+        <el-table-column :label="$t('ops.backup.name')" :min-width="isMobile ? 80 : 150">
+          <template #default="{ row }">
+            <div class="policy-name">{{ row.name }}</div>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.schedule')" min-width="170">
+        <el-table-column v-if="!isMobile" :label="$t('ops.backup.schedule')" min-width="170">
           <template #default="{ row }">
             <div>{{ scheduleText(row, t) }}</div>
             <div class="backup-sub">
@@ -64,10 +86,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.retention')" width="120">
-          <template #default="{ row }">{{ retentionText(row.retentionDays, t) }}</template>
-        </el-table-column>
-        <el-table-column :label="$t('ops.backup.lastRun')" min-width="150">
+        <el-table-column v-if="!isMobile" :label="$t('ops.backup.lastRun')" min-width="150">
           <template #default="{ row }">
             <template v-if="row.lastJob">
               <el-tag size="small" :type="statusTag(row.lastJob.status)">{{ statusLabel(row.lastJob.status) }}</el-tag>
@@ -76,12 +95,12 @@
             <span v-else class="backup-sub">{{ $t('ops.backup.neverRun') }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.enabled')" width="92" align="center">
+        <el-table-column :label="$t('ops.backup.enabled')" :width="isMobile ? 60 : 92" align="center">
           <template #default="{ row }">
             <el-switch :model-value="row.enabled" @change="(v) => togglePolicy(row, v)" />
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.actions')" width="128" fixed="right">
+        <el-table-column :label="$t('common.actions')" :width="isMobile ? 88 : 128" fixed="right">
           <template #default="{ row }">
             <el-tooltip :content="$t('ops.backup.runPolicy')" placement="top" :show-after="300">
               <el-button size="small" text :disabled="overview.running" @click="runPolicy(row)">
@@ -126,40 +145,48 @@
       </div>
 
       <el-table v-loading="jobsLoading" :data="jobs.records" border stripe size="small" :empty-text="$t('ops.backup.noJobs')">
-        <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column :label="$t('ops.backup.kind')" width="105">
+        <OpsDetailsColumn :title="$t('ops.backup.jobs')" v-slot="{ row }">
+          <dt>ID</dt>
+          <dd>{{ row.id ?? '—' }}</dd>
+          <dt>{{ $t('ops.backup.kind') }}</dt>
+          <dd>
+            <el-tag size="small" :type="kindTag(row.kind)">{{ kindLabel(row.kind) }}</el-tag>
+          </dd>
+          <dt>{{ $t('ops.backup.trigger') }}</dt>
+          <dd>{{ $t('ops.backup.trigger_' + String(row.triggerType).toLowerCase()) }}</dd>
+          <dt>{{ $t('ops.backup.startedAt') }}</dt>
+          <dd>{{ formatDateTime(row.startedAt) || '—' }}</dd>
+          <dt>{{ $t('ops.backup.duration') }}</dt>
+          <dd>{{ durationText(row.durationMs, t) }}</dd>
+          <dt>{{ $t('ops.backup.size') }}</dt>
+          <dd>{{ formatBytes(row.sizeBytes) }}</dd>
+          <dt>{{ $t('ops.backup.fileCount') }}</dt>
+          <dd>{{ row.fileCount || 0 }}</dd>
+          <dt>{{ $t('ops.backup.rowCount') }}</dt>
+          <dd>{{ row.dbRowCount || 0 }}</dd>
+          <dt>{{ $t('ops.backup.message') }}</dt>
+          <dd>{{ row.message ?? '—' }}</dd>
+        </OpsDetailsColumn>
+        <el-table-column v-if="!isMobile" :label="$t('ops.backup.kind')" width="105">
           <template #default="{ row }">
             <el-tag size="small" :type="kindTag(row.kind)">{{ kindLabel(row.kind) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.policy')" min-width="130" show-overflow-tooltip>
+        <el-table-column :label="$t('ops.backup.policy')" :min-width="isMobile ? 80 : 130" show-overflow-tooltip>
           <template #default="{ row }">{{ policyName(row.policyId) }}</template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.trigger')" width="90">
-          <template #default="{ row }">{{ $t('ops.backup.trigger_' + String(row.triggerType).toLowerCase()) }}</template>
-        </el-table-column>
-        <el-table-column :label="$t('ops.backup.status')" width="90">
+        <el-table-column :label="$t('ops.backup.status')" :width="isMobile ? 72 : 90">
           <template #default="{ row }">
             <el-tag size="small" :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.startedAt')" width="165">
+        <el-table-column v-if="!isMobile" :label="$t('ops.backup.startedAt')" width="165">
           <template #default="{ row }">{{ formatDateTime(row.startedAt) || '—' }}</template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.duration')" width="105">
-          <template #default="{ row }">{{ durationText(row.durationMs, t) }}</template>
-        </el-table-column>
-        <el-table-column :label="$t('ops.backup.size')" width="100">
+        <el-table-column v-if="!isMobile" :label="$t('ops.backup.size')" width="100">
           <template #default="{ row }">{{ formatBytes(row.sizeBytes) }}</template>
         </el-table-column>
-        <el-table-column :label="$t('ops.backup.fileCount')" width="85">
-          <template #default="{ row }">{{ row.fileCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column :label="$t('ops.backup.rowCount')" width="95">
-          <template #default="{ row }">{{ row.dbRowCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column prop="message" :label="$t('ops.backup.message')" min-width="180" show-overflow-tooltip />
-        <el-table-column :label="$t('common.actions')" width="130" fixed="right">
+        <el-table-column :label="$t('common.actions')" :width="isMobile ? 84 : 130" fixed="right">
           <template #default="{ row }">
             <el-tooltip v-if="row.status === 'SUCCESS'" :content="$t('ops.backup.download')" placement="top" :show-after="300">
               <el-button size="small" text @click="download(row)"
@@ -256,6 +283,8 @@
 </template>
 
 <script setup>
+import OpsDetailsColumn from '../OpsDetailsColumn.vue'
+import { useDevice } from '@/composables/useDevice'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -265,6 +294,7 @@ import { durationText, formatBytes, moduleText, retentionText, scheduleDays, sch
 import { saveBlobResponse } from '@/utils/download'
 import { formatDateTime } from '@/utils/datetime'
 
+const { isMobile } = useDevice()
 const { t } = useI18n()
 
 const loading = ref(false)

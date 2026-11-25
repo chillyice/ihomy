@@ -1,6 +1,10 @@
 <template>
   <div class="filter-row">
     <el-input v-model="logFilter.keyword" :placeholder="$t('ops.logKeyword')" clearable style="width: 200px" @keyup.enter="loadLogs(1)" />
+    <el-button type="primary" @click="loadLogs(1)">{{ $t('ops.query') }}</el-button>
+    <el-button :aria-expanded="showFilters" @click="showFilters = !showFilters">{{ $t('ops.filters') }}</el-button>
+  </div>
+  <div v-if="showFilters" class="filter-row">
     <el-input v-model.number="logFilter.operatorId" :placeholder="$t('ops.operatorId')" style="width: 130px" />
     <el-select
       v-model="logFilter.modules"
@@ -44,29 +48,39 @@
     </el-select>
     <el-date-picker v-model="logFilter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
     <el-date-picker v-model="logFilter.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.endDate')" />
-    <el-button type="primary" @click="loadLogs(1)">{{ $t('ops.query') }}</el-button>
   </div>
   <el-table v-loading="logsLoading" :data="logPage.records" border stripe>
-    <el-table-column prop="createdAt" :label="$t('ops.time')" width="165" />
-    <el-table-column prop="operatorName" :label="$t('ops.operator')" width="110" />
-    <el-table-column prop="module" :label="$t('ops.module')" width="90" />
-    <el-table-column prop="operationType" :label="$t('ops.type')" width="90" />
-    <el-table-column prop="description" :label="$t('ops.description')" min-width="180" show-overflow-tooltip />
-    <el-table-column prop="requestUrl" label="URL" min-width="160" show-overflow-tooltip />
-    <el-table-column prop="resultStatus" :label="$t('ops.result')" width="70">
+    <OpsDetailsColumn :title="$t('ops.logs')" v-slot="{ row, close }">
+      <dt>{{ $t('ops.time') }}</dt>
+      <dd>{{ row.createdAt ?? '—' }}</dd>
+      <dt>{{ $t('ops.operator') }}</dt>
+      <dd>{{ row.operatorName ?? '—' }}</dd>
+      <dt>{{ $t('ops.module') }}</dt>
+      <dd>{{ row.module ?? '—' }}</dd>
+      <dt>{{ $t('ops.type') }}</dt>
+      <dd>{{ row.operationType ?? '—' }}</dd>
+      <dt>{{ $t('ops.description') }}</dt>
+      <dd>{{ row.description ?? '—' }}</dd>
+      <dt>URL</dt>
+      <dd>{{ row.requestUrl ?? '—' }}</dd>
+      <dt>{{ $t('ops.costTime') }}</dt>
+      <dd>{{ row.costTime ?? '—' }}</dd>
+      <dt>TID</dt>
+      <dd>
+        <span v-a11y-click v-if="row.traceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row, close)">{{
+          row.traceId
+        }}</span>
+        <span v-else>-</span>
+      </dd>
+    </OpsDetailsColumn>
+    <el-table-column v-if="!isMobile" prop="createdAt" :label="$t('ops.time')" width="165" />
+    <el-table-column v-if="!isMobile" prop="operatorName" :label="$t('ops.operator')" width="110" />
+    <el-table-column prop="description" :label="$t('ops.description')" :min-width="isMobile ? 96 : 180" show-overflow-tooltip />
+    <el-table-column prop="resultStatus" :label="$t('ops.result')" :width="isMobile ? 64 : 70">
       <template #default="{ row }">
         <el-tag :type="row.resultStatus === 'SUCCESS' ? 'success' : 'danger'" size="small">
           {{ row.resultStatus === 'SUCCESS' ? $t('ops.success') : $t('ops.fail') }}
         </el-tag>
-      </template>
-    </el-table-column>
-    <el-table-column prop="costTime" :label="$t('ops.costTime')" width="90" />
-    <el-table-column prop="traceId" label="TID" width="150">
-      <template #default="{ row }">
-        <span v-a11y-click v-if="row.traceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row)">{{
-          row.traceId
-        }}</span>
-        <span v-else>-</span>
       </template>
     </el-table-column>
   </el-table>
@@ -83,11 +97,15 @@
 </template>
 
 <script setup>
+import OpsDetailsColumn from '../OpsDetailsColumn.vue'
+import { useDevice } from '@/composables/useDevice'
 import { onMounted, reactive, ref } from 'vue'
 import { opsApi } from '@/api'
 
+const { isMobile } = useDevice()
 const emit = defineEmits(['navigate-trace'])
 
+const showFilters = ref(false)
 const logsLoading = ref(false)
 const logPage = ref({ records: [] })
 const logTotal = ref(0)
@@ -127,7 +145,8 @@ const loadLogs = async (page = logPageNum.value) => {
 }
 
 /** 操作日志行点击 TID:交给外壳跳到详细日志标签并按该条日志的日期直接查询 */
-const jumpToTrace = (row) => {
+const jumpToTrace = (row, close) => {
+  close()
   emit('navigate-trace', { tid: row.traceId, date: (row.createdAt || '').slice(0, 10) || '' })
 }
 

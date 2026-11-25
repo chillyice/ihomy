@@ -35,33 +35,47 @@
   </div>
   <el-alert v-if="!alertsLoading && !alertPage.records.length" type="info" :closable="false" show-icon :title="$t('ops.alertEmpty')" />
   <el-table v-else v-loading="alertsLoading" :data="alertPage.records" border stripe>
-    <el-table-column prop="lastSeen" :label="$t('ops.alertLastSeen')" width="165" />
-    <el-table-column prop="level" :label="$t('ops.alertLevel')" width="80">
+    <OpsDetailsColumn :title="$t('ops.alerts')" v-slot="{ row, close }">
+      <dt>{{ $t('ops.alertLastSeen') }}</dt>
+      <dd>{{ row.lastSeen ?? '—' }}</dd>
+      <dt>{{ $t('ops.alertLevel') }}</dt>
+      <dd>
+        <el-tag size="small" :type="levelTagType(row.level)">{{ row.level }}</el-tag>
+      </dd>
+      <dt>{{ $t('ops.alertTitle') }}</dt>
+      <dd>{{ row.title ?? '—' }}</dd>
+      <dt>{{ $t('ops.alertLogger') }}</dt>
+      <dd>{{ row.logger ?? '—' }}</dd>
+      <dt>{{ $t('ops.alertCount') }}</dt>
+      <dd>{{ $t('ops.alertTimes', { n: row.occurrenceCount }) }} / {{ $t('ops.alertSeconds', { n: row.windowSeconds }) }}</dd>
+      <dt>{{ $t('ops.alertSample') }}</dt>
+      <dd>
+        <span class="mono" :title="row.sampleMessage">{{ row.sampleMessage }}</span>
+        <span v-a11y-click v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row, close)"
+          >TID</span
+        >
+      </dd>
+    </OpsDetailsColumn>
+    <el-table-column v-if="!isMobile" prop="lastSeen" :label="$t('ops.alertLastSeen')" width="165" />
+    <el-table-column v-if="!isMobile" prop="level" :label="$t('ops.alertLevel')" width="80">
       <template #default="{ row }">
         <el-tag size="small" :type="levelTagType(row.level)">{{ row.level }}</el-tag>
       </template>
     </el-table-column>
-    <el-table-column prop="title" :label="$t('ops.alertTitle')" min-width="230" show-overflow-tooltip />
-    <el-table-column prop="logger" :label="$t('ops.alertLogger')" width="170" show-overflow-tooltip />
-    <el-table-column :label="$t('ops.alertCount')" width="150">
+    <el-table-column prop="title" :label="$t('ops.alertTitle')" :min-width="isMobile ? 94 : 230" show-overflow-tooltip />
+    <el-table-column v-if="!isMobile" :label="$t('ops.alertCount')" width="150">
       <template #default="{ row }">
         {{ $t('ops.alertTimes', { n: row.occurrenceCount }) }} / {{ $t('ops.alertSeconds', { n: row.windowSeconds }) }}
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.alertStatus')" width="90">
+    <el-table-column :label="$t('ops.alertStatus')" :width="isMobile ? 76 : 90">
       <template #default="{ row }">
         <el-tag size="small" :type="row.status === 'OPEN' ? 'danger' : 'success'">
           {{ row.status === 'OPEN' ? $t('ops.alertStatusOpen') : $t('ops.alertStatusAcked') }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.alertSample')" min-width="240">
-      <template #default="{ row }">
-        <span class="alert-sample mono" :title="row.sampleMessage">{{ row.sampleMessage }}</span>
-        <span v-a11y-click v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row)">TID</span>
-      </template>
-    </el-table-column>
-    <el-table-column :label="$t('common.actions')" width="80" fixed="right">
+    <el-table-column :label="$t('common.actions')" :width="isMobile ? 52 : 80" fixed="right">
       <template #default="{ row }">
         <el-tooltip v-if="row.status === 'OPEN'" :content="$t('ops.alertAck')" placement="top" :show-after="300">
           <el-button size="small" text @click="ackAlert(row)"
@@ -85,12 +99,15 @@
 </template>
 
 <script setup>
+import OpsDetailsColumn from '../OpsDetailsColumn.vue'
+import { useDevice } from '@/composables/useDevice'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Check, QuestionFilled } from '@element-plus/icons-vue'
 
+const { isMobile } = useDevice()
 const emit = defineEmits(['navigate-trace', 'refresh-summary'])
 
 const props = defineProps({
@@ -164,7 +181,8 @@ const ackAllAlerts = async () => {
   await loadAlerts(1)
 }
 // 预警摘录里的 tid 跳「详细日志」:异步链路(定时任务)没有 tid 时不跳
-const jumpAlertTrace = (row) => {
+const jumpAlertTrace = (row, close) => {
+  close()
   if (!row.sampleTraceId) return
   emit('navigate-trace', { tid: row.sampleTraceId, date: (row.lastSeen || '').slice(0, 10) || '' })
 }
@@ -229,16 +247,6 @@ watch(
   color: var(--color-accent);
 }
 .alert-sum-lbl {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-.alert-sample {
-  display: inline-block;
-  max-width: calc(100% - 40px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
   font-size: 12px;
   color: var(--color-text-secondary);
 }

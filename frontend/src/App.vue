@@ -5,9 +5,9 @@
       <component :is="Component" :key="route.path" />
     </router-view>
     <template v-else-if="routeReady">
-      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+      <SunLightLayer v-if="anyEffectEnabled && !immersive && !userStore.isPureOps" />
       <WindowShell v-if="windowShell" />
-      <MobileLayout v-else-if="isMobile" />
+      <MobileLayout v-else-if="isMobile && !userStore.isPureOps" />
       <WarmLayout v-else-if="isWarm" />
       <template v-else>
         <AppSidebar v-if="!userStore.isPureOps && !immersive" />
@@ -24,7 +24,7 @@
         <InstallPrompt />
       </template>
       <WindowMusicPlayer v-if="windowShell && userStore.isLoggedIn" />
-      <MusicPlayer v-if="!isWindow && (isMobile || !immersive) && floatsStore.music" />
+      <MusicPlayer v-if="!userStore.isPureOps && !isWindow && (isMobile || !immersive) && floatsStore.music" />
       <LightTestConsole v-if="!isMobile && lightTestMode" />
       <SiteFooter v-if="!isMobile && !immersive" />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
@@ -56,11 +56,11 @@
     <!-- 网页端新版本提示(仅 Web):线上 dist 已更新就提示刷新,别让 PWA 预缓存拖着跑旧 bundle -->
     <WebUpdateBanner v-if="!isNative && routeReady" />
     <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页);儿童模式不显示 -->
-    <ChatFloat v-if="userStore.isLoggedIn && !isChild" />
+    <ChatFloat v-if="userStore.isLoggedIn && !userStore.isPureOps && !isChild" />
     <!-- 上次在做:平板/窄屏电脑的贴边浮卡(宽屏电脑改为侧栏停靠,手机改为首页顶部) -->
     <LastDoingFloat v-if="showDoingFloat" />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
-    <CallOverlay v-if="userStore.isLoggedIn" />
+    <CallOverlay v-if="userStore.isLoggedIn && !userStore.isPureOps" />
     <!-- 应用内更新弹窗(仅原生壳):懒加载,Web 端永不加载 Capacitor 运行时 -->
     <AppUpdateDialog v-if="isNative" />
     <!-- 命令面板(Ctrl/⌘+K):独立页与沉浸页不渲染,触屏由组件内 hasPointer 兜底;儿童模式关闭 -->
@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
 })
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
-const sunLight = useSunLight()
+const sunLight = useSunLight(() => !userStore.isPureOps)
 provide(SUN_LIGHT_KEY, sunLight)
 const { anyEffectEnabled, lightTestMode } = sunLight
 
@@ -232,7 +232,7 @@ watch(
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
 function loadFamily() {
-  if (!routeReady.value || standalone.value || userStore.mustChangePassword) return
+  if (!routeReady.value || standalone.value || userStore.mustChangePassword || userStore.isPureOps) return
   appStore.init()
 }
 
@@ -266,8 +266,8 @@ watch(
 watch(
   [() => userStore.isLoggedIn, () => userStore.userInfo?.id],
   ([logged, uid]) => {
-    if (logged && uid) initLastDoing()
-    else if (!logged) resetLastDoing()
+    if (logged && uid && !userStore.isPureOps) initLastDoing()
+    else resetLastDoing()
   },
   { immediate: true },
 )

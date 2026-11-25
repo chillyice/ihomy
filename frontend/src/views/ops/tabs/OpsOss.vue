@@ -37,20 +37,63 @@
     </el-select>
   </div>
   <el-table v-loading="ossLoading" :data="filteredOssRows" border stripe size="small">
-    <el-table-column :label="$t('ops.oss.name')" min-width="180">
+    <OpsDetailsColumn :title="$t('ops.oss.title')" v-slot="{ row }">
+      <dt>{{ $t('ops.oss.name') }}</dt>
+      <dd>
+        <div>{{ row.name }}</div>
+        <div class="oss-purpose">{{ row.purpose }}</div>
+      </dd>
+      <dt>{{ $t('ops.oss.componentType') }}</dt>
+      <dd>
+        <el-tag size="small" :type="ossTypeTag(row.componentType)">{{
+          $t('ops.oss.type_' + String(row.componentType).toLowerCase())
+        }}</el-tag>
+      </dd>
+      <dt>{{ $t('ops.oss.currentVersion') }}</dt>
+      <dd>
+        <span class="mono">{{ row.currentVersion || '—' }}</span>
+        <el-tooltip v-if="row.probeType" :content="ossProbeTip(row)" placement="top">
+          <span class="oss-probe-tag">{{ $t('ops.oss.probed') }}</span>
+        </el-tooltip>
+      </dd>
+      <dt>{{ $t('ops.oss.latestVersion') }}</dt>
+      <dd>
+        <span class="mono">{{ row.latestVersion || '—' }}</span>
+      </dd>
+      <dt>{{ $t('ops.oss.updateType') }}</dt>
+      <dd>
+        <el-tag v-if="isOssUpdatable(row)" size="small" :type="ossUpdateTag(row.updateType)">{{
+          $t('ops.oss.update_' + String(row.updateType).toLowerCase())
+        }}</el-tag>
+        <span v-else class="oss-none">—</span>
+      </dd>
+      <dt>{{ $t('ops.oss.integration') }}</dt>
+      <dd>{{ $t('ops.oss.integ_' + String(row.integrationStatus).toLowerCase()) }}</dd>
+      <dt>{{ $t('ops.oss.license') }}</dt>
+      <dd>{{ row.license ?? '—' }}</dd>
+      <dt>{{ $t('ops.oss.managedBy') }}</dt>
+      <dd>
+        <el-tag v-if="row.managedBy === 'RENOVATE'" size="small" type="info">{{ $t('ops.oss.managedRenovate') }}</el-tag>
+        <span v-else class="oss-none">—</span>
+      </dd>
+      <dt>{{ $t('ops.oss.vuln') }}</dt>
+      <dd>
+        <el-tag
+          v-if="row.vulnCount"
+          size="small"
+          :type="row.vulnSeverity === 'CRITICAL' || row.vulnSeverity === 'HIGH' ? 'danger' : 'warning'"
+          >{{ row.vulnCount }}</el-tag
+        >
+        <span v-else class="oss-none">—</span>
+      </dd>
+    </OpsDetailsColumn>
+    <el-table-column :label="$t('ops.oss.name')" :min-width="isMobile ? 95 : 180">
       <template #default="{ row }">
         <div>{{ row.name }}</div>
         <div class="oss-purpose">{{ row.purpose }}</div>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.componentType')" width="90">
-      <template #default="{ row }">
-        <el-tag size="small" :type="ossTypeTag(row.componentType)">{{
-          $t('ops.oss.type_' + String(row.componentType).toLowerCase())
-        }}</el-tag>
-      </template>
-    </el-table-column>
-    <el-table-column :label="$t('ops.oss.currentVersion')" width="140">
+    <el-table-column v-if="!isMobile" :label="$t('ops.oss.currentVersion')" width="140">
       <template #default="{ row }">
         <span class="mono">{{ row.currentVersion || '—' }}</span>
         <el-tooltip v-if="row.probeType" :content="ossProbeTip(row)" placement="top">
@@ -58,12 +101,12 @@
         </el-tooltip>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.latestVersion')" width="110">
+    <el-table-column v-if="!isMobile" :label="$t('ops.oss.latestVersion')" width="110">
       <template #default="{ row }"
         ><span class="mono">{{ row.latestVersion || '—' }}</span></template
       >
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.updateType')" width="90">
+    <el-table-column v-if="!isMobile" :label="$t('ops.oss.updateType')" width="90">
       <template #default="{ row }">
         <el-tag v-if="isOssUpdatable(row)" size="small" :type="ossUpdateTag(row.updateType)">{{
           $t('ops.oss.update_' + String(row.updateType).toLowerCase())
@@ -71,17 +114,7 @@
         <span v-else class="oss-none">—</span>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.integration')" width="100">
-      <template #default="{ row }">{{ $t('ops.oss.integ_' + String(row.integrationStatus).toLowerCase()) }}</template>
-    </el-table-column>
-    <el-table-column prop="license" :label="$t('ops.oss.license')" width="120" show-overflow-tooltip />
-    <el-table-column :label="$t('ops.oss.managedBy')" width="90">
-      <template #default="{ row }">
-        <el-tag v-if="row.managedBy === 'RENOVATE'" size="small" type="info">{{ $t('ops.oss.managedRenovate') }}</el-tag>
-        <span v-else class="oss-none">—</span>
-      </template>
-    </el-table-column>
-    <el-table-column :label="$t('ops.oss.vuln')" width="80">
+    <el-table-column v-if="!isMobile" :label="$t('ops.oss.vuln')" width="80">
       <template #default="{ row }">
         <el-tag
           v-if="row.vulnCount"
@@ -92,7 +125,7 @@
         <span v-else class="oss-none">—</span>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.actions')" width="220">
+    <el-table-column :label="$t('ops.oss.actions')" :width="isMobile ? 105 : 220">
       <template #default="{ row }">
         <el-tooltip v-if="row.probeType" :content="$t('ops.oss.probe')" placement="top" :show-after="300">
           <el-button size="small" text type="primary" :loading="probingOssId === row.id" @click="probeOss(row)"
@@ -253,6 +286,8 @@
 </template>
 
 <script setup>
+import OpsDetailsColumn from '../OpsDetailsColumn.vue'
+import { useDevice } from '@/composables/useDevice'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
@@ -260,6 +295,7 @@ import { ElMessage } from 'element-plus'
 import { Search, Document, CircleCheck, Hide, RefreshLeft, Edit } from '@element-plus/icons-vue'
 import { formatDateTime } from '@/utils/datetime'
 
+const { isMobile } = useDevice()
 const { t } = useI18n()
 
 // ---------- 开源组件台账(版本检测 + 升级提示) ----------

@@ -194,7 +194,7 @@ onUnmounted(stopServerPoll)
 <style scoped>
 .server-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 580px), 1fr));
   gap: 14px;
 }
 .server-row h3 {

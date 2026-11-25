@@ -1,66 +1,54 @@
-<!-- 运维管理页(V3.8):仅 OPS 角色可见。标签聚合外壳:
-     资源总览 / 服务器状态 / 访问统计 / 操作日志 / 详细日志 / 异常预警 / AI 统计 / 和风天气 / 开源组件台账 / 备份与迁移。
-     各标签内容拆为 tabs/ 下的子组件,首次切到该标签才挂载(onMounted 取数),离开后保留状态。 -->
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('ops.log') }]" />
-    <el-tabs v-model="tab" class="ops-tabs">
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.overview')" name="stats" lazy>
-        <OpsStats />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.server')" name="server" lazy>
-        <OpsServer :active="tab === 'server'" />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.traffic')" name="traffic" lazy>
-        <OpsTraffic @navigate-trace="navigateTrace" />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.logs')" name="logs" lazy>
-        <OpsLogs @navigate-trace="navigateTrace" />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.traceLogs')" name="trace" lazy>
-        <OpsTrace :preset="tracePreset" />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" name="alerts" lazy>
-        <template #label>
-          <span
-            >{{ $t('ops.alerts')
-            }}<em v-if="alertSummary.open" class="alert-count">{{ alertSummary.open > 99 ? '99+' : alertSummary.open }}</em></span
-          >
-        </template>
-        <OpsAlerts :summary="alertSummary" :active="tab === 'alerts'" @navigate-trace="navigateTrace" @refresh-summary="loadAlertSummary" />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.kada.title')" name="kada" lazy>
-        <OpsKada :active="tab === 'kada'" />
-      </el-tab-pane>
-
-      <el-tab-pane :label="$t('ops.ai')" name="ai" lazy>
-        <OpsAi />
-      </el-tab-pane>
-
-      <el-tab-pane :label="$t('ops.weather')" name="weather" lazy>
-        <OpsWeather />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.oss.title')" name="oss" lazy>
-        <OpsOss />
-      </el-tab-pane>
-
-      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.backup.title')" name="backup" lazy>
-        <OpsBackup />
-      </el-tab-pane>
-    </el-tabs>
+  <div class="page ops-page">
+    <header v-if="userStore.isPureOps" class="console-header">
+      <strong>{{ $t('mobile.title.ops') }}</strong>
+      <el-button text @click="logout">{{ $t('nav.logout') }}</el-button>
+    </header>
+    <Breadcrumb v-else :items="[{ label: $t('mobile.title.ops') }]" />
+    <nav v-if="groups.length > 1" class="workspace-nav" :aria-label="$t('mobile.title.ops')">
+      <button
+        v-for="g in groups"
+        :key="g.key"
+        type="button"
+        :aria-current="g === group ? 'true' : undefined"
+        @click="go(g === group ? tab : g.items[0].key)"
+      >
+        <el-icon><component :is="g.icon" /></el-icon>
+        {{ $t(g.label) }}
+      </button>
+    </nav>
+    <nav class="section-nav" :aria-label="$t(group.label)">
+      <button
+        v-for="item in group.items"
+        :key="item.key"
+        type="button"
+        :aria-current="tab === item.key ? 'page' : undefined"
+        @click="go(item.key)"
+      >
+        {{ $t(item.label) }}<span v-if="item.key === 'alerts' && summary?.open" class="alert-count">{{ summary.open }}</span>
+      </button>
+    </nav>
+    <button v-if="tab === 'stats'" type="button" class="alert-entry" :class="{ pending: summary?.open }" @click="go('alerts')">
+      <el-icon><Bell /></el-icon>
+      <span class="alert-text"
+        ><span>{{ $t('ops.alerts') }}</span
+        ><strong>{{
+          summary ? $t(summary.open ? 'ops.pendingAlerts' : 'ops.noPendingAlerts', { n: summary.open }) : $t('ops.viewAlerts')
+        }}</strong></span
+      >
+      <el-icon><ArrowRight /></el-icon>
+    </button>
+    <template v-for="item in available" :key="item.key">
+      <section v-if="visited.has(item.key)" v-show="tab === item.key" class="ops-panel" :aria-label="$t(item.label)">
+        <component :is="item.panel" v-bind="panelProps(item.key)" v-on="panelEvents(item.key)" />
+      </section>
+    </template>
   </div>
 </template>
-
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Monitor, Tickets, Connection, Tools, Bell, ArrowRight } from '@element-plus/icons-vue'
 import { opsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -76,77 +64,219 @@ import OpsWeather from './tabs/OpsWeather.vue'
 import OpsOss from './tabs/OpsOss.vue'
 import OpsBackup from './tabs/OpsBackup.vue'
 
-// 运维管理:数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
+const catalog = [
+  {
+    key: 'monitor',
+    label: 'ops.monitorGroup',
+    icon: Monitor,
+    items: [
+      { key: 'stats', label: 'ops.overview', panel: OpsStats },
+      { key: 'server', label: 'ops.server', panel: OpsServer },
+      { key: 'traffic', label: 'ops.traffic', panel: OpsTraffic },
+    ],
+  },
+  {
+    key: 'diagnose',
+    label: 'ops.diagnoseGroup',
+    icon: Tickets,
+    items: [
+      { key: 'alerts', label: 'ops.alerts', panel: OpsAlerts },
+      { key: 'logs', label: 'ops.logs', panel: OpsLogs },
+      { key: 'trace', label: 'ops.traceLogs', panel: OpsTrace },
+    ],
+  },
+  {
+    key: 'services',
+    label: 'ops.servicesGroup',
+    icon: Connection,
+    items: [
+      { key: 'ai', label: 'ops.ai', panel: OpsAi },
+      { key: 'weather', label: 'ops.weather', panel: OpsWeather },
+    ],
+  },
+  {
+    key: 'maintain',
+    label: 'ops.maintainGroup',
+    icon: Tools,
+    items: [
+      { key: 'backup', label: 'ops.backup.title', panel: OpsBackup },
+      { key: 'oss', label: 'ops.oss.title', panel: OpsOss },
+      { key: 'kada', label: 'ops.kada.title', panel: OpsKada },
+    ],
+  },
+]
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
+const groups = computed(() => catalog.filter((g) => userStore.isOps || g.key === 'services'))
+const available = computed(() => groups.value.flatMap((g) => g.items))
+const tab = computed(() => available.value.find((item) => item.key === route.query.tab)?.key || available.value[0].key)
+const group = computed(() => groups.value.find((g) => g.items.some((item) => item.key === tab.value)))
+const visited = reactive(new Set())
+watch(tab, (key) => visited.add(key), { immediate: true })
 
-// 角色渲染:家长(OWNER 非 OPS)只见「AI 统计」「天气」;OPS 见全部标签(含系统级报表)
-const isOps = computed(() => userStore.isOps)
-const showSystemTabs = computed(() => isOps.value)
+function logout() {
+  userStore.logout()
+  router.replace({ name: 'Login' })
+}
 
-const tab = ref(isOps.value ? 'stats' : 'ai')
+function go(key, extra = {}) {
+  if (key === tab.value && !extra.tid) return
+  const query = { ...route.query, tab: key }
+  delete query.tid
+  delete query.date
+  router.push({ query: { ...query, ...extra } })
+}
 
-// 角标与异常预警卡片共用同一份汇总数(进入运维页即取,不必切到该标签)
-const alertSummary = ref({ open: 0, today: 0, total: 0 })
-const loadAlertSummary = async () => {
+const summary = ref(null)
+async function loadSummary() {
   try {
-    alertSummary.value = await opsApi.alertSummary()
-  } catch (e) {
-    /* 角标失败不阻塞其它标签 */
+    summary.value = await opsApi.alertSummary()
+  } catch {
+    summary.value = null
   }
 }
-
-// 操作日志 / 异常预警里的 TID 点击 → 切到「详细日志」标签并按该日期直接查询(nonce 触发子组件重查)
-const tracePreset = reactive({ tid: '', date: '', nonce: 0 })
-const navigateTrace = ({ tid, date }) => {
-  tracePreset.tid = tid
-  tracePreset.date = date || ''
-  tracePreset.nonce++
-  tab.value = 'trace'
+watch(
+  () => userStore.isOps,
+  (enabled) => {
+    if (enabled) loadSummary()
+  },
+  { immediate: true },
+)
+const tracePreset = computed(() => ({
+  tid: String(route.query.tid || ''),
+  date: String(route.query.date || ''),
+  nonce: route.fullPath,
+}))
+function panelProps(key) {
+  if (key === 'trace') return { preset: tracePreset.value }
+  if (key === 'alerts') return { active: key === tab.value, summary: summary.value || {} }
+  if (key === 'server' || key === 'kada') return { active: key === tab.value }
+  return {}
 }
-
-onMounted(() => {
-  if (!isOps.value) return
-  // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 或 /ops?tab=traffic 直达(分享/书签)
-  if (route.query.tab === 'trace' && route.query.tid) {
-    tab.value = 'trace'
-    tracePreset.tid = String(route.query.tid)
-    tracePreset.date = route.query.date ? String(route.query.date) : ''
-  }
-  if (route.query.tab === 'traffic') tab.value = 'traffic'
-  if (route.query.tab === 'alerts') tab.value = 'alerts'
-  if (route.query.tab === 'kada') tab.value = 'kada'
-  loadAlertSummary()
-})
+const navigateTrace = ({ tid, date }) => go('trace', date ? { tid, date } : { tid })
+function panelEvents(key) {
+  if (key === 'alerts') return { navigateTrace, refreshSummary: loadSummary }
+  if (key === 'logs' || key === 'traffic') return { navigateTrace }
+  return {}
+}
 </script>
-
 <style scoped>
-/* 标签页头随滚动冻结:光尘下窗口滚动,顶到 sticky 面包屑下方(42px);暖居下 gc-main 内部滚动,
- * 顶到内容上边界(0,由 main.css html.theme-warm 覆写)。背景取页面底色,盖住滚过的卡片。 */
-.ops-tabs :deep(.el-tabs__header) {
-  position: sticky;
-  top: 42px;
-  z-index: 15;
-  background: var(--color-bg);
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
-/* 运维只给导航页签加书布，表格固定列与图表保持各自的实底。 */
-html.theme-warm .ops-tabs > :deep(.el-tabs__header) {
-  background-color: var(--color-card-2);
-  background-image: var(--album-cloth-texture);
-  background-blend-mode: soft-light;
-  background-size: 128px 128px;
+.console-header strong {
+  font-size: 20px;
 }
-/* 异常预警:标签页角标 */
+.workspace-nav,
+.section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.workspace-nav {
+  border-bottom: 1px solid var(--color-border);
+  padding: 6px 0 13px;
+}
+.workspace-nav button,
+.section-nav button,
+.alert-entry {
+  font: inherit;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+.workspace-nav button,
+.section-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 14px;
+}
+.workspace-nav button[aria-current] {
+  color: var(--color-brand-text);
+  background: var(--color-brand);
+  font-weight: 650;
+}
+.section-nav {
+  margin: 12px 0 20px;
+}
+.section-nav button {
+  font-size: 14px;
+  border-radius: 8px;
+}
+.section-nav button[aria-current],
+.workspace-nav button:not([aria-current]):hover,
+.section-nav button:hover {
+  background: var(--el-color-primary-light-9);
+  color: var(--color-brand);
+}
+.section-nav button[aria-current] {
+  font-weight: 700;
+}
 .alert-count {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 9px;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 11px;
-  font-style: normal;
-  line-height: 16px;
-  vertical-align: 1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--el-color-danger);
+}
+.alert-entry {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: start;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-inline-start: 4px solid var(--color-brand);
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+}
+.alert-entry.pending {
+  border-inline-start-color: var(--el-color-warning);
+}
+.alert-entry > .el-icon:first-child {
+  font-size: 22px;
+  color: var(--color-brand);
+}
+.alert-text {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+.alert-text strong {
+  font-size: clamp(18px, 2vw, 24px);
+  color: var(--color-text);
+}
+.ops-panel {
+  min-width: 0;
+  container-type: inline-size;
+}
+.ops-panel :deep(.el-pagination) {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+@media (max-width: 600px) {
+  .workspace-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace-nav button {
+    justify-content: flex-start;
+  }
+  .section-nav {
+    gap: 2px;
+  }
+  .section-nav button {
+    padding: 8px;
+  }
 }
 </style>
