@@ -58,8 +58,8 @@ watch(() => props.openSashes, nextPass)
   animation: drift-in linear both;
 }
 .leaf {
-  width: 18px;
-  height: 18px;
+  width: 54px;
+  height: 54px;
   background: url('@/assets/windowdesk/leaf-autumn.webp') center / contain no-repeat;
 }
 .window-drift .leaf {
@@ -67,14 +67,14 @@ watch(() => props.openSashes, nextPass)
   animation-timing-function: ease-in-out;
 }
 .rain {
-  width: 1.5px;
-  height: 9px;
+  width: 4.5px;
+  height: 27px;
   border-radius: 50%;
   background: linear-gradient(transparent, #7099ba);
 }
 .snow {
-  width: 5px;
-  height: 5px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: radial-gradient(circle, #fff 25%, #abc4d6 65%, transparent 75%);
 }
