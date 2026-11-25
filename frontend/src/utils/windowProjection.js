@@ -8,6 +8,15 @@ const halfTransom = 0.0825 / 2
 const transomTop = 0.483 - halfTransom
 const transomBottom = 0.483 + halfTransom
 
+// A source above and slightly to one side of the window, independent of the sun at night.
+export const LIGHTNING_SOURCE = {
+  kind: 'lightning',
+  altitude: 64,
+  azimuth: 174,
+  hasDirectLight: true,
+  palette: { core: 'rgba(230,242,255,0.64)', mid: 'rgba(214,231,255,0.48)', ambient: 'rgba(201,218,250,0.22)' },
+}
+
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
   const direction = floorShadowDirection(azimuth)
@@ -71,7 +80,7 @@ export function drawWindowProjection(
     !scene?.hasDirectLight ||
     scene.altitude <= 0 ||
     scene.altitude >= 90 ||
-    ['rain', 'snow', 'thunder'].includes(weather) ||
+    (scene.kind !== 'lightning' && ['rain', 'snow', 'thunder'].includes(weather)) ||
     width <= 0 ||
     height <= 0
   )
@@ -127,15 +136,24 @@ export function drawWindowProjection(
   ctx.restore()
   applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height)
 
+  const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
+  transmittedLight.addColorStop(0, scene.palette.core)
+  transmittedLight.addColorStop(0.6, scene.palette.mid)
+  transmittedLight.addColorStop(1, scene.palette.ambient)
+  if (scene.kind === 'lightning') {
+    ctx.save()
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.fillStyle = transmittedLight
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
+    return true
+  }
+
   mask.clearRect(0, 0, scratch.width, scratch.height)
   mask.drawImage(canvas, 0, 0)
   mask.save()
   mask.globalCompositeOperation = 'source-in'
-  const sunlight = mask.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
-  sunlight.addColorStop(0, scene.palette.core)
-  sunlight.addColorStop(0.6, scene.palette.mid)
-  sunlight.addColorStop(1, scene.palette.ambient)
-  mask.fillStyle = sunlight
+  mask.fillStyle = transmittedLight
   mask.globalAlpha = 0.22
   mask.fillRect(0, 0, w, h)
   mask.restore()

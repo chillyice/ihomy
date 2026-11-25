@@ -1,8 +1,25 @@
 import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, windowTransform } from './windowProjection'
-import { chooseWindowSash } from './windowSash'
+import { chooseWindowSash, weatherClosesWindow } from './windowSash'
 
 describe('window sash', () => {
+  it.each([
+    [null, false],
+    [{ condition: 'rain', precipLevel: 2 }, false],
+    [{ condition: 'rain', precipLevel: '3' }, true],
+    [{ condition: 'snow', precipLevel: 2 }, false],
+    [{ condition: 'snow', precipLevel: 3 }, true],
+    [{ condition: 'rain', iconCode: '302', precipLevel: 1 }, true],
+    [{ condition: 'rain', precipLevel: 1, text: '冻雨' }, true],
+    [{ condition: 'rain', precipLevel: 1, nowFull: { text: '强阵雨' } }, true],
+    [{ condition: 'clear', nowFull: { windScale: '4-5', windSpeed: '38' } }, false],
+    [{ condition: 'cloud', nowFull: { windScale: '5-6' } }, true],
+    [{ condition: 'clear', windScale: 6 }, true],
+    [{ condition: 'clear', nowFull: { windSpeed: '39' } }, true],
+  ])('applies the storm closure rule to %j', (weather, closed) => {
+    expect(weatherClosesWindow(weather)).toBe(closed)
+  })
+
   it('can keep both casements shut', () => {
     expect(chooseWindowSash(() => 0.2)).toBeNull()
   })

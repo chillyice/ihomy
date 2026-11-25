@@ -26,15 +26,16 @@
       :style="{ background: sunScene.shadowColor, opacity: weatherShadowOpacity * shadowAlpha, '--lamp-mask': lampMask }"
     ></div>
     <WindowProjection
-      v-if="lightLayerOpacity > 0"
-      :scene="sunScene"
+      v-if="lightLayerOpacity > 0 || stormLight"
+      :key="stormLight ? 'lightning' : 'sun'"
+      :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
       :standard="projectionStandard"
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
       :desk-casters="deskCasters"
       :sash="windowSash"
-      :style="{ opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
+      :style="stormLight ? undefined : { opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
     />
     <WindowDrift
       v-if="windowSash && shadowEnabled && weatherEffectEnabled && driftKind"
@@ -125,9 +126,6 @@
       </div>
     </div>
 
-    <!-- 雷雨闪电:瞬间增亮全屏,screen 混合(闪电时显示) -->
-    <div v-if="shadowEnabled && (lightningFlash ?? 0) > 0.01" class="lightning-flash" :style="{ opacity: lightningFlash }"></div>
-
     <!-- 雨滴粒子:快速下落,数量=降水等级×10 -->
     <div v-if="rainParticles.length" class="rain-layer">
       <div
@@ -157,6 +155,7 @@
 import { computed, inject } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { LIGHTNING_SOURCE } from '@/utils/windowProjection'
 import WindowProjection from './WindowProjection.vue'
 import WindowDrift from './WindowDrift.vue'
 
@@ -189,10 +188,10 @@ const {
   weatherEffectEnabled,
   precipLevel,
   brightSpotStyle,
-  lightningFlash,
   fogVisible,
 } = light || {}
 
+const stormLight = computed(() => shadowEnabled.value && weatherMode.value === 'thunder')
 const driftKind = computed(() => {
   const mode = weatherMode.value
   if (mode === 'rain' || mode === 'thunder' || mode === 'snow') return precipLevel.value > 0 ? (mode === 'snow' ? 'snow' : 'rain') : null
@@ -601,17 +600,6 @@ html.dark .blob-5 {
     transform: translateY(100vh);
     opacity: 0.3;
   }
-}
-
-/* 雷雨闪电:全屏瞬间增亮,screen 混合(氛围层) */
-.lightning-flash {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-atmos) + 6);
-  pointer-events: none;
-  mix-blend-mode: screen;
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateZ(0);
 }
 
 /* 雾霭层(背景光影最高一处):高斯噪声雾,三层不同颗粒尺寸/漂移速度叠出云絮感(减少平铺接缝感);

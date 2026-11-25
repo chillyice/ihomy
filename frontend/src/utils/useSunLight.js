@@ -5,7 +5,7 @@
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
-import { chooseWindowSash } from '@/utils/windowSash'
+import { chooseWindowSash, weatherClosesWindow } from '@/utils/windowSash'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
 import { setSunContext } from '@/theme'
@@ -25,7 +25,7 @@ const DIFFUSE_SKY = {
 export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
-  const windowSash = chooseWindowSash()
+  const fairWeatherSash = chooseWindowSash()
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
@@ -127,7 +127,9 @@ export function useSunLight(canReadEnvironment = () => true) {
   const weather = ref(null)
   const weatherDetail = ref(null)
   const previewWeather = ref(null)
-  const activeWeather = computed(() => (lightTestMode.value && previewWeather.value) || (weatherEffectEnabled.value ? weather.value : null))
+  const weatherOverride = computed(() => (lightTestMode.value ? previewWeather.value : null))
+  const activeWeather = computed(() => weatherOverride.value ?? (weatherEffectEnabled.value ? weather.value : null))
+  const windowSash = computed(() => (weatherClosesWindow(weatherOverride.value ?? weather.value) ? null : fairWeatherSash))
   const weatherMode = computed(() => resolveMorningWeather(activeWeather.value))
   const setWeather = (condition, level = 0) => {
     previewWeather.value = { condition, precipLevel: level }
@@ -203,39 +205,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     cloudTimer = setInterval(tick, 4000 + Math.random() * 4000)
   }
 
-  // 雷雨闪电:随机间隔触发,瞬间增亮(0→1→0.3→1→0 快速闪烁),模拟打雷闪电光
-  const lightningFlash = ref(0)
-  let lightningTimer = null
-  let lightningTimeline = null
-  const startLightning = (on) => {
-    if (lightningTimer) {
-      clearTimeout(lightningTimer)
-      lightningTimer = null
-    }
-    lightningTimeline?.kill()
-    lightningTimeline = null
-    lightningFlash.value = 0
-    if (!on) return
-    const scheduleNext = () => {
-      lightningTimer = setTimeout(
-        () => {
-          lightningTimeline = gsap.timeline()
-          lightningTimeline
-            .to(lightningFlash, { value: 1, duration: 0.05 })
-            .to(lightningFlash, { value: 0.3, duration: 0.1 })
-            .to(lightningFlash, { value: 1, duration: 0.05 })
-            .to(lightningFlash, { value: 0, duration: 0.4, ease: 'power2.out' })
-          scheduleNext()
-        },
-        3000 + Math.random() * 7000,
-      )
-    }
-    scheduleNext()
-  }
-
   watch(weatherMode, (mode) => {
     startCloudFlicker(mode === 'cloud')
-    startLightning(mode === 'thunder')
   })
   watch([weatherMode, activeWeather], ([mode]) => {
     if (DIM_MODES.includes(mode)) playTransient()
@@ -565,8 +536,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     cloudTween?.kill()
     if (lampAutoTimer) clearTimeout(lampAutoTimer)
     if (fogTimer) clearTimeout(fogTimer)
-    if (lightningTimer) clearTimeout(lightningTimer)
-    lightningTimeline?.kill()
     if (slotTimer) clearInterval(slotTimer)
     if (weatherTimer) clearInterval(weatherTimer)
     if (testTimer) clearInterval(testTimer)
@@ -668,7 +637,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     weatherShadowOpacity,
     lightLayerOpacity,
     brightSpotStyle,
-    lightningFlash,
     lightTestMode,
     lightTestPaused,
     testSpeed,
