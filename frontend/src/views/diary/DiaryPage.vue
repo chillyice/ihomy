@@ -1,6 +1,6 @@
 <!-- 日记书单页:首页带页眉(日期/时间/心情/天气)+ 正文裁剪窗口(504px/页)+ 页脚页码 -->
 <template>
-  <div class="sheet" :class="sideClass">
+  <div class="sheet diary-paper" :class="sideClass">
     <div v-if="page.blank" class="sheet-head"></div>
     <div v-else class="sheet-head">
       <template v-if="page.first">
@@ -73,6 +73,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
+import './diaryPaper.css'
 import { Edit, Delete, Share } from '@element-plus/icons-vue'
 import { PAGE_H, moodLabel, weatherLabel } from '@/utils/diary'
 import { parseDoodle, doodleExtentY, renderStrokes, setupCanvas, clearCanvas } from '@/utils/doodle'
@@ -128,18 +129,10 @@ watch([strokes, () => props.page.p], renderDoodle)
 .sheet {
   width: calc(28 * 16px + 24px * 2);
   flex-shrink: 0;
-  background: #fffdf8;
-  box-shadow: 0 4px 24px rgba(58, 46, 34, 0.1);
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
-  --ruling-color: rgba(100, 130, 180, 0.15);
-}
-html.dark .sheet {
-  background: var(--color-card);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --ruling-color: rgba(232, 220, 200, 0.06);
 }
 .sheet-left {
   border-radius: 14px 3px 3px 14px;

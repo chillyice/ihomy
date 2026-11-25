@@ -1,0 +1,27 @@
+/* 页边印线和纸纹只画在底层，保留正文与笔迹共用的坐标。 */
+.diary-paper {
+  --ruling-color: rgba(var(--color-brand-rgb), 0.21);
+  --break-color: rgba(var(--color-brand-rgb), 0.42);
+  --diary-margin: rgba(var(--color-brand-rgb), 0.29);
+  background-color: var(--color-card);
+  background-image: linear-gradient(to right, transparent 16px, var(--diary-margin) 16px 17px, transparent 17px);
+  box-shadow:
+    inset 0 0 0 1px var(--color-border),
+    var(--shadow);
+}
+
+html.theme-warm .diary-paper {
+  --diary-margin: rgba(var(--color-danger-rgb), 0.3);
+  --diary-wash: rgba(var(--color-card-rgb), 0.91);
+  background-image:
+    linear-gradient(
+      to right,
+      transparent 13px,
+      var(--diary-margin) 13px 14px,
+      transparent 14px 17px,
+      var(--diary-margin) 17px 18px,
+      transparent 18px
+    ),
+    linear-gradient(var(--diary-wash), var(--diary-wash)), var(--home-grain);
+  background-size: auto, auto, var(--home-grain-size);
+}

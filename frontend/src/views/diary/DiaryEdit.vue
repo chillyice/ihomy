@@ -1,13 +1,24 @@
 <!-- 日记编辑页:单张信纸按整页(18行)自适应高度,涂鸦区 sticky 固定右侧 -->
 <template>
-  <div class="page">
+  <div class="page diary-editor">
     <Breadcrumb :items="[{ label: $t('diary.title'), to: '/diary' }, { label: isEdit ? $t('diary.editDiary') : $t('diary.newDiary') }]" />
 
-    <div class="diary-layout">
+    <div ref="layoutRef" class="diary-layout" :class="{ compact: compactTray }">
+      <DoodleTray
+        v-model:brush="activeBrush"
+        v-model:size="brushSize"
+        v-model:alpha="brushAlpha"
+        v-model:brush-color="brushColor"
+        :compact="compactTray"
+        :can-undo="canUndo"
+        :can-redo="canRedo"
+        @undo="undo"
+        @redo="redo"
+      />
       <!-- 左侧:纸张(移动端等比缩放适配屏幕宽度) -->
-      <div class="paper-scaler" :style="scalerStyle">
-        <div ref="paperRef" class="paper-stack" :style="paperTransform">
-          <div class="paper-sheet">
+      <div class="paper-column">
+        <div class="paper-scaler" :class="{ scaled: paperScale < 1 }" :style="scalerStyle">
+          <div ref="paperRef" class="paper-sheet diary-paper" :style="paperTransform">
             <!-- 页眉 -->
             <div class="paper-header">
               <div class="header-row">
@@ -74,31 +85,18 @@
                 @pointercancel="onPointerUp"
               ></canvas>
             </div>
-
-            <!-- 页脚 -->
-            <div class="paper-footer">
-              <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
-              <div class="vis-row">
-                <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" button size="small" />
-                <el-button v-if="form.visibility === 'CIRCLE'" size="small" @click="openShare">{{ $t('audience.label') }}</el-button>
-                <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
-              </div>
-            </div>
+          </div>
+        </div>
+        <!-- 页脚控件保留实际触控尺寸，只有纸张参与缩放。 -->
+        <div class="paper-footer">
+          <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
+          <div class="vis-row">
+            <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" button size="small" />
+            <el-button v-if="form.visibility === 'CIRCLE'" size="small" @click="openShare">{{ $t('audience.label') }}</el-button>
+            <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
           </div>
         </div>
       </div>
-
-      <!-- 右侧:涂鸦笔盘 sticky -->
-      <DoodleTray
-        v-model:brush="activeBrush"
-        v-model:size="brushSize"
-        v-model:alpha="brushAlpha"
-        v-model:brush-color="brushColor"
-        :can-undo="canUndo"
-        :can-redo="canRedo"
-        @undo="undo"
-        @redo="redo"
-      />
     </div>
 
     <!-- 心情/天气选择弹窗 -->
@@ -152,11 +150,14 @@ import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { useAudience } from '@/composables/useAudience'
 import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 import DoodleTray from './DoodleTray.vue'
+import { useDiaryWidth } from './useDiaryWidth'
+import './diaryPaper.css'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
 import { recordDoing } from '@/utils/lastDoing'
 import { useDevice } from '@/composables/useDevice'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -211,20 +212,16 @@ const bodyHeight = ref(PAGE_H)
 
 /* ---------- 移动端信纸等比缩放:纸张固定 496px,小屏按视口宽度缩放,保持涂鸦坐标系与查看页一致 ---------- */
 const paperRef = ref(null)
-const paperScale = ref(1)
+const layoutRef = ref(null)
+const layoutWidth = useDiaryWidth(layoutRef)
+// 496px 信纸 + 272px 笔盘 + 16px 间距。
+const compactTray = computed(() => isMobile.value || layoutWidth.value < PAPER_W + 272 + 16)
+const paperScale = computed(() => Math.min(1, (layoutWidth.value || PAPER_W) / PAPER_W))
 const scalerH = ref(PAGE_H)
 const paperTransform = computed(() =>
   paperScale.value < 1 ? { transform: `scale(${paperScale.value})`, transformOrigin: 'top left' } : {},
 )
 const scalerStyle = computed(() => (paperScale.value < 1 ? { width: `${PAPER_W * paperScale.value}px`, height: `${scalerH.value}px` } : {}))
-const syncScale = () => {
-  if (!isMobile.value) {
-    paperScale.value = 1
-    return
-  }
-  const avail = window.innerWidth - 24 // .page 移动端左右 padding 12px*2
-  paperScale.value = Math.min(1, avail / PAPER_W)
-}
 const syncHeight = () => {
   if (paperRef.value) scalerH.value = Math.ceil(paperRef.value.offsetHeight * paperScale.value)
 }
@@ -299,7 +296,14 @@ const autoResize = () => {
 const activeBrush = ref(null) // null = 写字模式
 const brushSize = ref(4)
 const brushAlpha = ref(100) // 百分比 10-100
-const brushColor = ref(INK_COLORS[0])
+const themeStore = useThemeStore()
+const pickedColor = ref(null)
+const brushColor = computed({
+  get: () => pickedColor.value ?? (themeStore.isDusk ? '#F5F2EA' : INK_COLORS[0]),
+  set: (color) => {
+    pickedColor.value = color
+  },
+})
 const strokes = ref([])
 const inkBaseRef = ref(null)
 const markBaseRef = ref(null)
@@ -588,12 +592,10 @@ onMounted(async () => {
   nextTick(() => {
     autoResize()
     redrawBase()
-    textareaRef.value?.focus()
+    if (!compactTray.value) textareaRef.value?.focus({ preventScroll: true })
   })
   window.addEventListener('keydown', onKeydown)
-  syncScale()
   syncHeight()
-  window.addEventListener('resize', onResize)
   window.addEventListener('pagehide', flushDraftIfDirty)
   document.addEventListener('visibilitychange', flushDraftIfDirty)
   if (typeof ResizeObserver !== 'undefined' && paperRef.value) {
@@ -603,14 +605,8 @@ onMounted(async () => {
   draftReady = true
 })
 
-const onResize = () => {
-  syncScale()
-  syncHeight()
-}
-
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('resize', onResize)
   window.removeEventListener('pagehide', flushDraftIfDirty)
   document.removeEventListener('visibilitychange', flushDraftIfDirty)
   scaleObserver?.disconnect()
@@ -618,10 +614,6 @@ onBeforeUnmount(() => {
 
 watch(content, () => autoResize())
 watch(paperScale, () => syncHeight())
-watch(isMobile, () => {
-  syncScale()
-  syncHeight()
-})
 // 草稿自动保存:任何内容/心情天气/涂鸦变更(初始装载完成后)防抖落盘
 watch([content, () => form.mood, () => form.weather, () => form.date, () => form.time, () => form.visibility, strokes], () => {
   if (!draftReady) return
@@ -631,38 +623,44 @@ watch([content, () => form.mood, () => form.weather, () => form.date, () => form
 </script>
 
 <style scoped>
+.page.diary-editor {
+  overflow-x: clip;
+}
 .diary-layout {
   display: flex;
-  gap: 8px;
+  margin-inline: min(2vw, 8px);
+  gap: 16px;
   justify-content: center;
   align-items: flex-start;
 }
-
-.paper-scaler {
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.paper-stack {
-  display: flex;
+.diary-layout.compact {
   flex-direction: column;
-  flex-shrink: 0;
-  width: calc(28 * 16px + 24px * 2);
+  align-items: center;
+  gap: 8px;
 }
 
-.paper-sheet {
-  background: #fffdf8;
+.paper-column {
+  width: min(100%, 496px);
+  order: -1;
+  background-color: var(--color-card);
   border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(58, 46, 34, 0.1);
+  box-shadow: var(--shadow);
+  overflow: clip;
+}
+.compact .paper-column {
+  order: 0;
+}
+.mobile-layout.has-tabbar .diary-layout {
+  padding-bottom: 64px;
+}
+.paper-scaler.scaled {
+  overflow: clip;
+}
+.paper-sheet {
+  width: calc(28 * 16px + 24px * 2);
+  box-shadow: none;
   overflow: hidden;
   position: relative;
-  --ruling-color: rgba(100, 130, 180, 0.15);
-  --break-color: rgba(100, 130, 180, 0.35);
-}
-html.dark .paper-sheet {
-  background: var(--color-card);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --ruling-color: rgba(232, 220, 200, 0.06);
-  --break-color: rgba(232, 220, 200, 0.15);
 }
 
 :deep(.el-date-editor.el-input),
@@ -798,10 +796,12 @@ html.dark .paper-sheet {
 
 .paper-footer {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 24px 14px;
-  border-top: 1px solid var(--ruling-color);
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border);
 }
 .page-num {
   font-size: 12px;
@@ -810,8 +810,10 @@ html.dark .paper-sheet {
 }
 .vis-row {
   display: flex;
+  flex-wrap: wrap;
+  margin-left: auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 .audience-tip {
   margin: 0;
@@ -947,16 +949,5 @@ html.dark .picker-cell.active {
 html.dark .picker-clear {
   background: rgba(201, 116, 116, 0.08);
   color: var(--color-danger);
-}
-
-@media (max-width: 768px) {
-  .diary-layout {
-    flex-direction: column;
-    align-items: center;
-    padding-bottom: 96px;
-  }
-  .paper-scaler {
-    margin: 0 auto;
-  }
 }
 </style>

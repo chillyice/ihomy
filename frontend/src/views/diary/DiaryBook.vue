@@ -7,13 +7,13 @@
       <div v-if="!loading && entries.length" class="book-wrap">
         <!-- 缩放外壳:小屏按可用宽度等比缩放信纸(与编辑页一致);翻页动画挂在外壳,缩放 transform 挂在内层互不覆盖 -->
         <div
-          :key="pos + (isMobile ? 'm' : 'd')"
+          :key="pos + (singlePage ? 'm' : 'd')"
           class="book-scaler"
           :class="['flip-' + dir, { scaled: spreadScale < 1 }]"
           :style="scalerStyle"
         >
           <div ref="spreadRef" class="book-spread" :style="spreadStyle">
-            <template v-if="!isMobile">
+            <template v-if="!singlePage">
               <DiaryPage
                 :page="pages[pos * 2] || blankPage"
                 :no="pos * 2 + 1"
@@ -114,7 +114,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -128,6 +128,7 @@ import { shareText, absoluteUrl } from '@/native/shareOut'
 import { parseDoodle, doodleExtentY } from '@/utils/doodle'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import DiaryPage from './DiaryPage.vue'
+import { useDiaryWidth } from './useDiaryWidth'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -145,17 +146,20 @@ const blankPage = { blank: true }
 const bookTitle = computed(() => (authorName.value ? t('diary.bookOf', { name: authorName.value }) : t('diary.title')))
 const authorName = computed(() => entries.value[0]?.authorName || '')
 
-const maxPos = computed(() => (isMobile.value ? pages.value.length - 1 : Math.ceil(pages.value.length / 2) - 1))
+const maxPos = computed(() => Math.max(0, (singlePage.value ? pages.value.length : Math.ceil(pages.value.length / 2)) - 1))
 const canPrev = computed(() => pos.value > 0)
 const canNext = computed(() => pos.value < maxPos.value)
 
 /* ---------- 信纸缩放:查看页与编辑页一致,可用宽度不足时整版等比缩放(涂鸦/分页坐标系不变,仅视觉缩放) ---------- */
 const DESKTOP_SPREAD_W = PAPER_W * 2 + 10 // 双页信纸 + 10px 书缝
 const mainRef = ref(null)
+const availableWidth = useDiaryWidth(mainRef)
+// 双页缩放后每行至少保留约 13px 的正文字号。
+const singlePage = computed(() => isMobile.value || availableWidth.value < DESKTOP_SPREAD_W * 0.8)
 const spreadRef = ref(null)
-const spreadScale = ref(1)
 const scalerH = ref(0)
-const spreadW = computed(() => (isMobile.value ? PAPER_W : DESKTOP_SPREAD_W))
+const spreadW = computed(() => (singlePage.value ? PAPER_W : DESKTOP_SPREAD_W))
+const spreadScale = computed(() => Math.min(1, (availableWidth.value || spreadW.value) / spreadW.value))
 const spreadStyle = computed(() =>
   spreadScale.value < 1 ? { transform: `scale(${spreadScale.value})`, transformOrigin: 'top left', width: spreadW.value + 'px' } : {},
 )
@@ -168,18 +172,11 @@ const scalerStyle = computed(() => {
 const syncScalerHeight = () => {
   if (spreadRef.value) scalerH.value = Math.ceil(spreadRef.value.offsetHeight * spreadScale.value)
 }
-const syncSpreadScale = () => {
-  // 可用宽度取页面内容盒实测值(桌面含左侧导航让位,手机为视口减 padding)
-  const avail = mainRef.value?.clientWidth || window.innerWidth
-  spreadScale.value = Math.min(1, avail / spreadW.value)
-  nextTick(syncScalerHeight)
-}
-const onResize = () => syncSpreadScale()
 
 const indicator = computed(() => {
   const n = pages.value.length
   if (!n) return ''
-  if (isMobile.value) return t('diary.singlePageOf', { a: pos.value + 1, n })
+  if (singlePage.value) return t('diary.singlePageOf', { a: pos.value + 1, n })
   const a = pos.value * 2 + 1
   const b = Math.min(pos.value * 2 + 2, n)
   return b > a ? t('diary.pageOf', { a, b, n }) : t('diary.singlePageOf', { a, n })
@@ -224,7 +221,6 @@ const load = async () => {
     buildPages()
     pos.value = 0
     if (entryId) jumpToEntry(entries.value.findIndex((e) => String(e.id) === entryId))
-    nextTick(syncSpreadScale)
   } catch (e) {
     if (sequence === loadSequence) {
       entries.value = []
@@ -247,8 +243,8 @@ const jumpToEntry = (i) => {
   const e = entries.value[i]
   if (!e) return
   const idx = e._firstPage ?? 0
-  dir.value = idx > (isMobile.value ? pos.value : pos.value * 2) ? 'next' : 'prev'
-  pos.value = isMobile.value ? idx : Math.floor(idx / 2)
+  dir.value = idx > (singlePage.value ? pos.value : pos.value * 2) ? 'next' : 'prev'
+  pos.value = singlePage.value ? idx : Math.floor(idx / 2)
 }
 
 // 分享当前日记页:正文 + 回作者日记本的链接(单篇无独立路由);游客/无读权限不显示入口
@@ -314,28 +310,26 @@ const onKeydown = (e) => {
 }
 
 // 桌面<->移动切换时转换页码语义(双页spread <-> 单页),并按新布局重算缩放
-watch(isMobile, (m) => {
+watch(singlePage, (m) => {
   pos.value = m ? Math.min(maxPos.value, pos.value * 2) : Math.floor(pos.value / 2)
-  nextTick(syncSpreadScale)
 })
 // 翻页重挂载后重测高度(首页/空白页页眉高度略有差异)
-watch(pos, () => nextTick(syncScalerHeight))
+watch([spreadRef, spreadScale], syncScalerHeight, { flush: 'post' })
 watch(() => [route.params.authorId, route.query.entry], load)
 
 onMounted(() => {
   load()
   window.addEventListener('keydown', onKeydown)
-  window.addEventListener('resize', onResize)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('resize', onResize)
 })
 </script>
 
 <style scoped>
 .book-main {
   min-width: 0;
+  margin-inline: min(2vw, 8px);
 }
 
 .book-wrap {
@@ -395,18 +389,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  background-color: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  max-width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 8px 14px;
-  box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
-}
-html.dark .book-toolbar {
-  background-color: rgba(var(--color-card-rgb), 0.45);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow);
 }
 
 .page-indicator {
@@ -440,11 +430,11 @@ html.dark .book-toolbar {
     gap: 0;
   }
   .book-toolbar {
-    gap: 8px;
+    gap: 6px;
     padding: 6px 10px;
   }
   .page-indicator {
-    min-width: 90px;
+    min-width: 0;
     font-size: 12px;
   }
 }

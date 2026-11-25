@@ -1,17 +1,18 @@
-<!-- 日记涂鸦笔盘:不同笔尖的画笔陈列 + 粗细调节 + 调色盘;点击画笔选中/取消;移动端为底部可收起抽屉 -->
+<!-- 日记涂鸦笔盘：宽屏放在纸旁，窄屏在纸张上方收放。 -->
 <template>
-  <div class="doodle-area" :class="{ collapsed, mobile: isMobile }">
+  <section class="doodle-area" :class="{ compact }" :aria-label="$t('diary.doodleTitle')">
     <!-- 仅箭头把手可收起/展开:整行标题不做开关,防止手写笔书写时手掌误触抽屉弹跳 -->
     <div class="tray-title">
-      <span class="tray-name">{{ collapsed && brush ? activeBrushLabel : $t('diary.doodleTitle') }}</span>
+      <span v-if="brush" class="ink-sample" :style="{ backgroundColor: brushColor }" aria-hidden="true"></span>
+      <span class="tray-name">{{ compact && collapsed && brush ? activeBrushLabel : $t('diary.doodleTitle') }}</span>
       <button
-        v-if="isMobile"
+        v-if="compact"
         type="button"
         class="tray-toggle"
-        :class="{ up: !collapsed }"
+        :class="{ up: collapsed }"
         :aria-expanded="!collapsed"
         :title="collapsed ? $t('common.expand') : $t('common.collapse')"
-        @click="toggle"
+        @click="collapsed = !collapsed"
       >
         <svg
           viewBox="0 0 24 24"
@@ -28,7 +29,7 @@
       </button>
     </div>
 
-    <div v-show="!collapsed || !isMobile" class="tray-body">
+    <div v-show="!collapsed || !compact" class="tray-body">
       <div class="pen-grid">
         <button
           v-for="b in BRUSHES"
@@ -123,17 +124,51 @@
       </div>
 
       <div class="tray-row">
-        <span class="tray-label">{{ $t('diary.thickness') }}</span>
-        <el-slider :model-value="size" :min="1" :max="12" :step="1" size="small" @update:model-value="(v) => $emit('update:size', v)" />
+        <span class="tray-label"
+          >{{ $t('diary.thickness') }} <b>{{ size }}</b></span
+        >
+        <el-slider
+          :aria-label="$t('diary.thickness')"
+          :model-value="size"
+          :min="1"
+          :max="12"
+          :step="1"
+          size="small"
+          @update:model-value="(v) => $emit('update:size', v)"
+        />
       </div>
 
       <div class="tray-row">
-        <span class="tray-label">{{ $t('diary.alphaLabel') }}</span>
-        <el-slider :model-value="alpha" :min="10" :max="100" :step="5" size="small" @update:model-value="(v) => $emit('update:alpha', v)" />
+        <span class="tray-label"
+          >{{ $t('diary.alphaLabel') }} <b>{{ alpha }}%</b></span
+        >
+        <el-slider
+          :aria-label="$t('diary.alphaLabel')"
+          :model-value="alpha"
+          :min="10"
+          :max="100"
+          :step="5"
+          size="small"
+          @update:model-value="(v) => $emit('update:alpha', v)"
+        />
       </div>
 
       <div class="tray-row palette-row">
-        <span class="tray-label">{{ $t('diary.colorLabel') }}</span>
+        <div class="palette-heading">
+          <span class="tray-label">{{ $t('diary.colorLabel') }}</span>
+          <label
+            class="swatch custom"
+            :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }"
+            :title="$t('diary.customColor')"
+          >
+            <input
+              type="color"
+              :aria-label="$t('diary.customColor')"
+              :value="safeColor"
+              @input="(e) => $emit('update:brushColor', e.target.value)"
+            />
+          </label>
+        </div>
         <div class="palette">
           <button
             v-for="c in INK_COLORS"
@@ -141,16 +176,11 @@
             type="button"
             class="swatch"
             :class="{ active: brushColor.toLowerCase() === c.toLowerCase() }"
+            :aria-label="`${$t('diary.colorLabel')} ${c}`"
+            :aria-pressed="brushColor.toLowerCase() === c.toLowerCase()"
             :style="{ background: c }"
             @click="$emit('update:brushColor', c)"
           />
-          <label
-            class="swatch custom"
-            :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }"
-            :title="$t('diary.customColor')"
-          >
-            <input type="color" :value="safeColor" @input="(e) => $emit('update:brushColor', e.target.value)" />
-          </label>
         </div>
       </div>
 
@@ -191,24 +221,19 @@
 
       <div class="tray-hint">{{ $t('diary.trayHint') }}</div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BRUSHES, INK_COLORS } from '@/utils/doodle'
-import { useDevice } from '@/composables/useDevice'
 
 const { t } = useI18n()
-const { isMobile } = useDevice()
 const collapsed = ref(true)
 
-const toggle = () => {
-  if (isMobile.value) collapsed.value = !collapsed.value
-}
-
 const props = defineProps({
+  compact: Boolean,
   brush: { type: String, default: null },
   size: { type: Number, default: 4 },
   alpha: { type: Number, default: 100 },
@@ -221,7 +246,7 @@ const emit = defineEmits(['update:brush', 'update:size', 'update:alpha', 'update
 // 选笔后移动端自动收起抽屉:笔盘不再遮挡纸面,手掌也碰不到笔盘控件;换笔点箭头重新展开
 const pickBrush = (b) => {
   emit('update:brush', props.brush === b.id ? null : b.id)
-  if (isMobile.value) collapsed.value = true
+  if (props.compact) collapsed.value = true
 }
 
 const activeBrushLabel = computed(() => t(BRUSHES.find((b) => b.id === props.brush)?.labelKey || 'diary.doodleTitle'))
@@ -231,55 +256,62 @@ const safeColor = computed(() => (/^#[0-9a-fA-F]{6}$/.test(props.brushColor) ? p
 
 <style scoped>
 .doodle-area {
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  background-color: rgb(var(--color-card-rgb));
   border-radius: 14px;
-  width: calc(14 * 16px + 24px * 2);
+  width: 272px;
+  box-sizing: border-box;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
   flex-shrink: 0;
   position: sticky;
   top: 16px;
   align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 100px);
+  z-index: var(--z-sticky);
 }
-html.dark .doodle-area {
-  background: rgba(var(--color-card-rgb), 0.45);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+.tray-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
 }
 
 .tray-title {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-secondary);
-  margin-bottom: 10px;
-  text-align: center;
-  letter-spacing: 2px;
+  color: var(--color-text);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.ink-sample {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-text-secondary);
 }
 
 /* 移动端标题栏 + 箭头把手(唯一开关,触控目标 ≥40px) */
-.mobile .tray-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 0;
-  padding: 2px 0;
+.compact .tray-title {
+  padding: 0;
+  border: 0;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
-.mobile .tray-title .tray-name {
-  line-height: 36px;
+.compact .tray-name {
+  flex: 1;
 }
 .tray-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  height: 36px;
-  margin: 0 -6px;
+  min-width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   background: transparent;
@@ -336,6 +368,7 @@ html.dark .pen-item:hover {
 .pen-item.active {
   color: var(--color-text);
   background: rgba(var(--color-brand-rgb), 0.1);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
 }
 html.dark .pen-item.active {
   background: rgba(var(--color-brand-rgb), 0.12);
@@ -347,9 +380,8 @@ html.dark .pen-item.active {
 }
 
 .pen-name {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--color-text-secondary);
-  opacity: 0.75;
 }
 .pen-item.active .pen-name {
   color: var(--color-brand);
@@ -374,6 +406,26 @@ html.dark .pen-item.active .pen-name {
 }
 .tray-row .el-slider {
   flex: 1;
+  margin-inline: 8px;
+  width: auto;
+}
+.tray-label b {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.palette-row {
+  align-items: flex-start;
+  flex-direction: column;
+}
+.palette-heading {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.doodle-area :is(button:focus-visible, .custom:focus-within) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
 .palette {
@@ -382,10 +434,11 @@ html.dark .pen-item.active .pen-name {
   gap: 6px;
   flex: 1;
   justify-items: center;
+  width: 100%;
 }
 .swatch {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.8);
   cursor: pointer;
@@ -427,7 +480,9 @@ html.dark .swatch {
 }
 .swatch.custom input {
   position: absolute;
-  inset: -4px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
   cursor: pointer;
 }
@@ -445,27 +500,17 @@ html.dark .swatch {
 .tray-hint {
   font-size: 11px;
   color: var(--color-text-secondary);
-  opacity: 0.55;
   line-height: 1.6;
   margin-top: 12px;
 }
 
-.doodle-area.mobile {
-  box-sizing: border-box;
-  width: 100%;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: auto;
-  border-radius: 14px 14px 0 0;
-  z-index: var(--z-action);
+.doodle-area.compact {
+  align-self: center;
+  width: min(100%, 496px);
+  top: calc(var(--mobile-header-space, 0px) + 4px);
   max-height: 48vh;
   max-height: 48dvh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  padding: 0 12px;
   /* 标题栏固定抽屉顶部,工具内容在 body 内部滚动(收起把手始终可见) */
   .tray-body {
     display: grid;
@@ -475,7 +520,8 @@ html.dark .swatch {
     min-height: 0;
     overflow-y: auto;
     overflow-x: clip;
-    padding: 4px;
+    border-top: 1px solid var(--color-border);
+    padding: 8px 4px;
     overscroll-behavior: contain;
   }
   .pen-grid,
@@ -485,7 +531,7 @@ html.dark .swatch {
     grid-column: 1 / -1;
   }
   .pen-grid {
-    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
   }
   .pen-item {
@@ -515,19 +561,7 @@ html.dark .swatch {
   }
   .tray-row .el-slider {
     flex: none;
-  }
-  .swatch {
-    width: 24px;
-    height: 24px;
-  }
-  .swatch.custom input {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  .palette {
-    grid-template-columns: repeat(auto-fit, minmax(24px, 1fr));
-    min-width: 0;
+    margin-inline: 0;
   }
 }
 </style>
