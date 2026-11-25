@@ -5,9 +5,12 @@ import { todayStr } from './date'
 // Screen axes for a south-facing window: +x to the right, +y into the room.
 export function floorShadowDirection(azimuth, realWeight = 1) {
   const bearing = ((180 - azimuth) * Math.PI) / 180
-  // In the corrected view, elevation sets the vertical position of each rail
-  // and bearing moves it sideways, as in the original window bars.
-  return { x: Math.sin(bearing), y: 1 - realWeight + realWeight * Math.cos(bearing) }
+  const sideways = Math.sin(bearing)
+  const inward = Math.cos(bearing)
+  if (realWeight === 1 || inward <= Number.EPSILON) return { x: sideways, y: inward }
+  // Scale along the ray to the calibrated screen depth, preserving its bearing.
+  const depth = 1 - realWeight + realWeight * inward
+  return { x: (sideways / inward) * depth, y: depth }
 }
 
 // Horizontal ground projection of a unit-height vertical object in direct sunlight.

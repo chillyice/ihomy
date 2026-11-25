@@ -133,6 +133,34 @@ describe('window-plane projection', () => {
     expect(realLength(november) / realLength(june)).toBeCloseTo(tanAltitude(june) / tanAltitude(november), 8)
   })
 
+  it('aligns both projection standards and their transition with direct sunlight throughout the year', () => {
+    for (let day = 1; day <= 365; day++) {
+      const date = new Date(Date.UTC(2026, 0, day)).toISOString().slice(0, 10)
+      const slots = Array.from({ length: 288 }, (_, i) => sunPosition(36.65, 117.12, date, i * 5))
+      const peak = Math.max(...slots.map((s) => s.altitude))
+      let maxAngleError = 0
+      for (const { altitude, azimuth } of slots) {
+        if (altitude <= 0 || azimuth <= 90 || azimuth >= 270) continue
+        for (const weight of [0, 0.5, 1]) {
+          const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth, weight, peak)
+          const tilt = (Math.atan2(dx, dy) * 180) / Math.PI
+          maxAngleError = Math.max(maxAngleError, Math.abs(tilt - (180 - azimuth)))
+        }
+      }
+      expect(maxAngleError, date).toBeLessThan(1e-8)
+    }
+  })
+
+  it.each([
+    [0.01, 90.00001],
+    [89.999, 180],
+    [0.01, 269.99999],
+  ])('preserves the bearing at altitude %f and azimuth %f', (altitude, azimuth) => {
+    const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth, 0, 89.999)
+    expect(Number.isFinite(dx) && Number.isFinite(dy)).toBe(true)
+    expect((Math.atan2(dx, dy) * 180) / Math.PI).toBeCloseTo(180 - azimuth, 8)
+  })
+
   it.each([30, 65])('shortens the corrected shadow towards a daily peak of %i° and lengthens it again before sunset', (peak) => {
     const slots = [
       { time: '07:05', altitude: 2, azimuth: 115 },
@@ -194,7 +222,7 @@ describe('window-plane projection', () => {
         const offsetY = y + v * dy - wallY
         const bearing = ((180 - azimuth) * Math.PI) / 180
         const distance = (noonDistance * Math.tan((peak * Math.PI) / 180)) / Math.tan((altitude * Math.PI) / 180)
-        expect(offsetX).toBeCloseTo(distance * Math.sin(bearing), 7)
+        expect(Math.atan2(offsetX, offsetY)).toBeCloseTo(bearing, 8)
         expect(offsetY).toBeCloseTo(distance * (1 - weight + weight * Math.cos(bearing)), 7)
       }
     }
