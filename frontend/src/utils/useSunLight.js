@@ -13,6 +13,7 @@ import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
+const SASH_SESSION_KEY = 'ihomy:window:last-pose'
 
 // 漫射天光从窗户上方铺开。积雪的反照最亮，雷云下只留少量灰蓝色天光。
 const DIFFUSE_SKY = {
@@ -25,7 +26,13 @@ const DIFFUSE_SKY = {
 export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
-  const fairWeatherSashes = shallowRef(chooseWindowSashes())
+  let lastPoseWasOpen = false
+  try {
+    lastPoseWasOpen = sessionStorage.getItem(SASH_SESSION_KEY) === 'open'
+  } catch {
+    // A WebView without session storage starts with an open sash in fair weather.
+  }
+  const fairWeatherSashes = shallowRef(chooseWindowSashes(lastPoseWasOpen))
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
@@ -131,6 +138,17 @@ export function useSunLight(canReadEnvironment = () => true) {
   const activeWeather = computed(() => weatherOverride.value ?? (weatherEffectEnabled.value ? weather.value : null))
   const stormClosed = computed(() => weatherClosesWindow(weatherOverride.value ?? weather.value))
   const windowSashes = computed(() => (stormClosed.value ? CASEMENTS : fairWeatherSashes.value))
+  watch(
+    windowSashes,
+    (sashes) => {
+      try {
+        sessionStorage.setItem(SASH_SESSION_KEY, sashes === CASEMENTS ? 'closed' : 'open')
+      } catch {
+        // In-session rotations still use the current pose.
+      }
+    },
+    { immediate: true },
+  )
   const weatherMode = computed(() => resolveMorningWeather(activeWeather.value))
   const setWeather = (condition, level = 0) => {
     previewWeather.value = { condition, precipLevel: level }
@@ -418,7 +436,7 @@ export function useSunLight(canReadEnvironment = () => true) {
 
   function rearrangeScene() {
     if (lightTestMode.value) return
-    if (!stormClosed.value) fairWeatherSashes.value = chooseWindowSashes(Math.random, fairWeatherSashes.value)
+    if (!stormClosed.value) fairWeatherSashes.value = chooseWindowSashes(fairWeatherSashes.value !== CASEMENTS)
     dustParticles.value = sampleDust()
     refreshPrecipitation()
   }

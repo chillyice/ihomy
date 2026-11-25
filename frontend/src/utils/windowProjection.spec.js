@@ -3,8 +3,8 @@ import { drawWindowProjection, windowTransform } from './windowProjection'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
 
 function openWindow(layout, ...angles) {
-  const samples = [0.8, layout, ...angles]
-  return chooseWindowSashes(() => samples.shift())
+  const samples = [layout, ...angles]
+  return chooseWindowSashes(false, () => samples.shift())
 }
 
 describe('window sash', () => {
@@ -25,14 +25,18 @@ describe('window sash', () => {
     expect(weatherClosesWindow(weather)).toBe(closed)
   })
 
-  it('can keep both casements shut', () => {
-    expect(chooseWindowSashes(() => 0.2)).toEqual(CASEMENTS)
-    const next = chooseWindowSashes(() => 0.2, CASEMENTS)
-    expect(next.some((sash) => sash.depth > 0)).toBe(true)
+  it('only allows a shut pose after an open one, even when the random draw repeats', () => {
+    let wasOpen = false
+    const poses = Array.from({ length: 5 }, () => {
+      wasOpen = chooseWindowSashes(wasOpen, () => 0.2).some((sash) => sash.depth > 0)
+      return wasOpen
+    })
+    expect(poses).toEqual([true, false, true, false, true])
   })
 
   it('lets the two meeting stiles own the whole centre seam', () => {
     const [left, right] = CASEMENTS
+    expect([left.hinge, left.glassEdge, right.glassEdge, right.hinge]).toEqual([0.012, 0.464, 0.536, 0.988])
     expect(left.latch).toBe(right.latch)
     expect(left.latch - left.hinge).toBeCloseTo(right.hinge - right.latch)
   })

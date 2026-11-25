@@ -3,16 +3,14 @@ import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
-// The outer sash has depth. Its central glazing bar lies in the front plane.
-const stileWidth = 0.093
-const railHeight = 0.065
-const frameDepth = 0.032 // fraction of the full window width, perpendicular to the sash
+// The glass runs from the hinge to glassEdge and from sill (0) to lintel (1).
+// The hinge stile and both rails wrap around that opening on the outside.
+const hingeStile = 0.024 // fraction of the full window width
+const railHeight = 0.028 // fraction of the window height
+const frameDepth = 0.012 // fraction of the full window width, perpendicular to the sash
 const transomHeight = 0.0825
 const transomTop = 0.483 - transomHeight / 2
-const sashContours = [
-  [0, 0, 1, 1],
-  [stileWidth, railHeight, 1 - 2 * stileWidth, 1 - 2 * railHeight],
-]
+const transomBottom = transomTop + transomHeight
 
 // A source above and slightly to one side of the window, independent of the sun at night.
 export const LIGHTNING_SOURCE = {
@@ -58,20 +56,26 @@ function resize(canvas, width, height) {
   if (canvas.height !== height) canvas.height = height
 }
 
-function castSash(mask, { hinge, latch, tipX = latch, depth = 0 }, paneWidth, riseX, riseY, originX, originY) {
+function castOpenSash(mask, { hinge, glassEdge, latch, tipX, depth }, paneWidth, riseX, riseY, originX, originY) {
   const span = latch - hinge
+  const outerHinge = -hingeStile / Math.abs(span)
+  const glassWidth = (glassEdge - hinge) / span
+  const sashContours = [
+    [outerHinge, -railHeight, 1 - outerHinge, 1 + 2 * railHeight],
+    [0, 0, glassWidth, 1],
+  ]
   const uX = paneWidth * (tipX - hinge)
   const uY = paneWidth * depth
   // The frame's thickness turns with it. When seen edge-on the reveals still block light.
-  const thicknessX = (-uY * frameDepth) / span
-  const thicknessY = (uX * frameDepth) / span
+  const thicknessX = (uY * frameDepth) / span
+  const thicknessY = (-uX * frameDepth) / span
   const hingeX = originX + paneWidth * hinge
 
   mask.setTransform(uX, uY, riseX, riseY, hingeX, originY)
   mask.beginPath()
   for (const [u, v, width, height] of sashContours) mask.rect(u, v, width, height)
   mask.fill('evenodd')
-  mask.fillRect(0, transomTop, 1, transomHeight)
+  mask.fillRect(0, transomTop, glassWidth, transomHeight)
 
   // Sweep the outer frame's two rims to the back face.
   // Along a ray, any point beyond the front profile is reached through one of these sides.
@@ -136,11 +140,26 @@ export function drawWindowProjection(
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  const [left, right] = CASEMENTS
-  mask.fillRect(left.hinge, 0, right.hinge - left.hinge, 1)
+  // A shut sash transmits just its two original panes. An open one frees the
+  // entire half-opening up to the meeting line, including its former stile.
+  mask.beginPath()
+  for (const { hinge, glassEdge, latch, depth } of sashes) {
+    const edge = depth ? latch : glassEdge
+    const left = Math.min(hinge, edge)
+    const span = Math.abs(edge - hinge)
+    if (depth)
+      mask.rect(left, 0, span, 1) // Fill adjoining open halves together to avoid a seam.
+    else {
+      mask.fillRect(left, 0, span, transomTop)
+      mask.fillRect(left, transomBottom, span, 1 - transomBottom)
+    }
+  }
+  mask.fill()
   mask.globalCompositeOperation = 'destination-out'
   mask.save()
-  for (const sash of sashes) castSash(mask, sash, a, c, d, x + pad, y + pad)
+  for (const sash of sashes) {
+    if (sash.depth) castOpenSash(mask, sash, a, c, d, x + pad, y + pad)
+  }
   mask.restore()
   drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)

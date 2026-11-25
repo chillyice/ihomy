@@ -3,8 +3,8 @@ import { resolveMorningWeather } from './morningWeather'
 // The two meeting stiles meet in the middle; only the outer jambs are fixed.
 export const WINDOW_WIDTH_RATIO = 0.88
 export const CASEMENTS = [
-  { hinge: 0.012, latch: 0.5 },
-  { hinge: 1 - 0.012, latch: 0.5 },
+  { hinge: 0.012, glassEdge: 0.5 - 0.036, latch: 0.5 },
+  { hinge: 1 - 0.012, glassEdge: 0.5 + 0.036, latch: 0.5 },
 ]
 
 export function weatherClosesWindow(weather) {
@@ -17,8 +17,8 @@ export function weatherClosesWindow(weather) {
   return scales.some((scale) => Number(scale) >= 6) || Number.parseFloat(weather.nowFull?.windSpeed ?? weather.windSpeed) >= 39
 }
 
-export function chooseWindowSashes(random = Math.random, previous) {
-  if (random() < 0.45 && previous !== CASEMENTS) return CASEMENTS
+export function chooseWindowSashes(allowClosed, random = Math.random) {
+  if (allowClosed && random() < 0.45) return CASEMENTS
   const openings = ['left', 'right', 'both'][Math.floor(random() * 3)]
   return CASEMENTS.map((sash, index) => {
     const side = index === 0 ? 'left' : 'right'
