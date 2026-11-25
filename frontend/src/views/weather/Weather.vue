@@ -8,7 +8,12 @@
     <div v-loading="loading" class="weather-page-body">
       <!-- ── L1 实况(预警右起排在实况右侧) ── -->
       <div class="wt-zone">
-        <div class="wt-zone-label">{{ $t('weatherPage.zone.now') }}</div>
+        <div class="wt-now-heading">
+          <span class="wt-zone-label">{{ $t('weatherPage.zone.now') }}</span>
+          <router-link v-if="userStore.isLoggedIn" to="/tools/ai-playground#weather-background">{{
+            $t('tools.aiPlayground.weatherBgSettings')
+          }}</router-link>
+        </div>
         <div class="card wt-hero">
           <div class="wt-hero-top">
             <div class="wt-now">
@@ -525,8 +530,10 @@ import TerminatorMap from '@/views/weather/TerminatorMap.vue'
 import { aqiColor, warnLevelColor, WARN_LEVEL_ORDER, indexCatTone } from '@/utils/dict'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { publicApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const loading = ref(false)
@@ -919,6 +926,16 @@ onBeforeUnmount(() => {
   font-size: 12px;
   letter-spacing: 0.5px;
   color: var(--color-text-tertiary);
+}
+.wt-now-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.wt-now-heading a {
+  color: var(--color-brand);
+  font-size: 13px;
 }
 /* L3 安静块:去掉阴影与悬浮位移,标题收小,靠内层 --color-card-2 分层 */
 .wt-card-quiet {

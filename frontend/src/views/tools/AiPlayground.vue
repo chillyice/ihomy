@@ -251,8 +251,13 @@
     </div>
 
     <!-- ===== 天气背景 AI 生成(关联设置) ===== -->
-    <div class="card pg-weather">
-      <button :class="['pg-weatherhead', { on: weatherOpen }]" type="button" @click="weatherOpen = !weatherOpen">
+    <div id="weather-background" ref="weatherPanel" class="card pg-weather">
+      <button
+        :class="['pg-weatherhead', { on: weatherOpen }]"
+        :aria-expanded="weatherOpen"
+        type="button"
+        @click="weatherOpen = !weatherOpen"
+      >
         <span class="pg-weathertitle">{{ $t('tools.aiPlayground.weatherBgTitle') }}</span>
         <span class="pg-more-chev">{{ weatherOpen ? '▴' : '▾' }}</span>
       </button>
@@ -266,8 +271,8 @@
             </div>
             <div class="pg-field">
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgStyle') }}</span>
-              <el-select v-model="weatherCfg.style" size="small" style="width: 100%">
-                <el-option v-for="s in weatherStyles" :key="s" :label="s" :value="s" />
+              <el-select v-model="weatherCfg.style" :aria-label="$t('tools.aiPlayground.weatherBgStyle')" size="small" style="width: 100%">
+                <el-option v-for="id in weatherStyleIds" :key="id" :label="$t('tools.aiPlayground.weatherStyles.' + id)" :value="id" />
               </el-select>
             </div>
             <div class="pg-field">
@@ -288,6 +293,7 @@
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgScene') }}</span>
               <el-input
                 v-model="weatherCfg.scene"
+                maxlength="200"
                 type="textarea"
                 :rows="2"
                 :placeholder="$t('tools.aiPlayground.weatherBgScenePlaceholder')"
@@ -307,9 +313,11 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { aiApi, albumApi, photoApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { readWeatherBgConfig, saveWeatherBgConfig, weatherStyleIds } from '@/utils/weatherBackground'
 
 const { t } = useI18n()
 
@@ -320,7 +328,7 @@ const statusLoaded = ref(false)
 const currentStatus = computed(() => statusMap.value[capability.value] || { available: false, model: '' })
 
 onMounted(async () => {
-  loadWeatherCfg()
+  if (weatherOpen.value) weatherPanel.value?.scrollIntoView({ block: 'start' })
   try {
     statusMap.value = await aiApi.status()
     statusLoaded.value = true
@@ -535,22 +543,13 @@ const doTranscribe = async () => {
 }
 
 // ---- 天气背景 AI 生成配置(localStorage 持久化,作用于首页「天气」组件) ----
-const WEATHER_CFG_KEY = 'ihomy:weather-bg-config:v1'
-const weatherStyles = ['温柔插画风格', '写实摄影质感', '水彩手绘风', '油画细腻笔触', '极简扁平插画']
 const weatherSizes = ['2048x2048', '2560x1440', '1440x2560', '1920x1920']
-const weatherOpen = ref(false)
-const weatherCfg = ref({ enabled: true, style: '温柔插画风格', size: '2048x2048', refreshDays: 7, scene: '', watermark: false })
-const loadWeatherCfg = () => {
-  try {
-    const raw = localStorage.getItem(WEATHER_CFG_KEY)
-    if (raw) weatherCfg.value = { ...weatherCfg.value, ...JSON.parse(raw) }
-  } catch (e) {
-    /* ignore */
-  }
-}
+const weatherPanel = ref(null)
+const weatherOpen = ref(useRoute().hash === '#weather-background')
+const weatherCfg = ref(readWeatherBgConfig())
 const saveWeatherCfg = () => {
   try {
-    localStorage.setItem(WEATHER_CFG_KEY, JSON.stringify(weatherCfg.value))
+    saveWeatherBgConfig(weatherCfg.value)
     ElMessage.success(t('tools.aiPlayground.weatherBgSaved'))
   } catch (e) {
     ElMessage.error(t('common.saveFailed'))

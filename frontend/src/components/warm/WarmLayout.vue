@@ -214,6 +214,13 @@ const topWarningBadge = computed(() => topWarning(sidebarWarnings.value))
 
 // 天气→AI 生图的全屏氛围背景(「活窗」放大到整屏,最底层)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
+// 外壳在设置页和首页之间常驻；回到天气窗时读取刚保存的风格。
+watch(
+  () => route.path === '/home',
+  (home) => {
+    if (home && sunLight?.weather?.value) loadWeatherBg(sunLight.weather.value)
+  },
+)
 watch(
   () => sunLight?.weather?.value,
   (w) => {

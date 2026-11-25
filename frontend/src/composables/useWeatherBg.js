@@ -4,17 +4,13 @@
 import { ref } from 'vue'
 import { aiApi, albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { readWeatherBgConfig, weatherArtwork } from '@/utils/weatherBackground'
 
 const FEATURE = 'WEATHER_IMAGE'
 const CACHE_KEY = 'ihomy:weather-bg:v1'
-const CFG_KEY = 'ihomy:weather-bg-config:v1'
-const CFG_DEFAULT = { enabled: true, size: '2048x2048', refreshDays: 7, watermark: false }
 const ALBUM_NAME = 'AI 生图'
-
-// 风格/地点随机池:风格不固定(摄影/手绘/油画…),地点不固定(突出天气氛围,弱化地标)
-const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插画', '复古胶片', '日系动漫', '水墨淡彩']
-const WEATHER_SCENES = ['城市街道', '公园', '海边', '山间', '郊野', '湖边', '窗前']
-const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
+// 同一页面内首页、外壳与屏保可能同时取图，共享生成及入册操作。
+const pending = new Map()
 
 // 本机缓存治理:data: URL(内联图,体积大)只留内存不落盘;条目上限 + 最长保留期,写入前裁剪
 const CACHE_MAX = 12
@@ -89,46 +85,12 @@ export async function lastWeatherBgUrl(w, isLoggedIn) {
 
 export function useWeatherBg() {
   const weatherBg = ref('')
-  const loading = ref(false)
+  let latestLoad = 0
   const userStore = useUserStore()
   let aiStatusChecked = false
   let aiImageAvail = false
   let albumPromise = null
 
-  const readCfg = () => {
-    try {
-      const raw = localStorage.getItem(CFG_KEY)
-      return raw ? { ...CFG_DEFAULT, ...JSON.parse(raw) } : { ...CFG_DEFAULT }
-    } catch {
-      return { ...CFG_DEFAULT }
-    }
-  }
-  const season = () => {
-    const m = new Date().getMonth() + 1
-    return m >= 3 && m <= 5 ? '春' : m >= 6 && m <= 8 ? '夏' : m >= 9 && m <= 11 ? '秋' : '冬'
-  }
-  const dayNight = () => {
-    const h = new Date().getHours()
-    return h >= 6 && h < 19 ? 'day' : 'night'
-  }
-  // 缓存键 = 城市|天气文字|图标码|昼夜|季节:任一变化都视为新场景,需重新取图/生图
-  // (键太粗会张冠李戴地复用别的天气的图,太细则频繁触发生图)
-  const keyOf = (w) => [w?.city, w?.text, w?.iconCode, dayNight(), season()].join('|')
-
-  const dateLabel = () => {
-    const d = new Date()
-    return `${d.getMonth() + 1}月${d.getDate()}日`
-  }
-  const timeOfDayLabel = () => {
-    const h = new Date().getHours()
-    if (h < 5) return '凌晨'
-    if (h < 8) return '清晨'
-    if (h < 11) return '上午'
-    if (h < 14) return '午后'
-    if (h < 17) return '下午'
-    if (h < 19) return '傍晚'
-    return '夜晚'
-  }
   // 落库文件名:城市-日期-上下午-时间(如 济南-2026-09-13-下午-17:30,冒号由后端落盘时归一为 _)
   const weatherImageName = (city) => {
     const d = new Date()
@@ -157,15 +119,45 @@ export function useWeatherBg() {
     return albumPromise
   }
 
+  const generate = async (w, cfg, prompt, key) => {
+    if (!aiStatusChecked) {
+      aiImageAvail = !!(await aiApi.status())?.weatherImage?.available
+      aiStatusChecked = true
+    }
+    if (!aiImageAvail) return ''
+    const res = await aiApi.image({ prompt, size: cfg.size, watermark: cfg.watermark === true }, FEATURE)
+    const first = res?.[0] || {}
+    let url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
+    if (!url) return ''
+    const albumId = await ensureAlbum()
+    if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) {
+      try {
+        // 相册描述限 255 字；完整提示词只发给模型。
+        const description = [w.city, w.text, cfg.scene].filter(Boolean).join(' · ').slice(0, 255)
+        const photos = await photoApi.saveFromUrl(albumId, { url, name: weatherImageName(w.city), description })
+        url = photos?.[0]?.url || url
+      } catch {}
+    }
+    writeCache(key, url)
+    return url
+  }
+
   const load = async (w) => {
-    // 无天气数据:有「上次生成的最后一张」就顶上,不留白
-    if (!w) {
-      if (!weatherBg.value) weatherBg.value = await lastWeatherBgUrl(null, userStore.isLoggedIn)
+    const seq = ++latestLoad
+    const cfg = readWeatherBgConfig()
+    if (!cfg.enabled) {
+      weatherBg.value = ''
       return
     }
-    const cfg = readCfg()
-    if (cfg.enabled === false) return
-    const key = keyOf(w)
+    // 无天气数据:有「上次生成的最后一张」就顶上,不留白
+    if (!w) {
+      if (!weatherBg.value) {
+        const url = await lastWeatherBgUrl(null, userStore.isLoggedIn)
+        if (seq === latestLoad) weatherBg.value = url
+      }
+      return
+    }
+    const { key, prompt } = weatherArtwork(w, cfg)
     const ttl = Math.max(1, cfg.refreshDays ?? 7) * 86400000
     // 当前天气状态有缓存且在保鲜期内:直接命中
     try {
@@ -183,43 +175,22 @@ export function useWeatherBg() {
       if (cached) weatherBg.value = cached
       else if (userStore.isLoggedIn)
         lastWeatherBgUrl(w, true).then((u) => {
-          if (u && !weatherBg.value) weatherBg.value = u
+          if (seq === latestLoad && u && !weatherBg.value) weatherBg.value = u
         })
     }
     if (!userStore.isLoggedIn) return
-    if (loading.value) return
-    loading.value = true
+    const requestKey = JSON.stringify([userStore.userInfo?.familyId, key])
     try {
-      if (!aiStatusChecked) {
-        try {
-          aiImageAvail = !!(await aiApi.status())?.weatherImage?.available
-        } catch {}
-        aiStatusChecked = true
+      if (!pending.has(requestKey)) {
+        pending.set(
+          requestKey,
+          generate(w, cfg, prompt, key).finally(() => pending.delete(requestKey)),
+        )
       }
-      if (!aiImageAvail) {
-        if (!weatherBg.value) weatherBg.value = await lastWeatherBgUrl(w, true)
-        return
-      }
-      const prompt = `${pickRandom(WEATHER_STYLES)},${dateLabel()}${timeOfDayLabel()},${season()}季,${w.city || ''} ${w.text || ''},${pickRandom(WEATHER_SCENES)},突出天气氛围,弱化地点地标,柔和高级色调,高清#`
-      const res = await aiApi.image({ prompt, size: cfg.size || '2048x2048', watermark: cfg.watermark === true }, FEATURE)
-      const first = res?.[0] || {}
-      const url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
-      if (url) {
-        weatherBg.value = url
-        writeCache(key, url)
-        const albumId = await ensureAlbum()
-        if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) {
-          try {
-            await photoApi.saveFromUrl(albumId, { url, name: weatherImageName(w.city), description: prompt })
-          } catch {}
-        }
-      } else if (!weatherBg.value) {
-        weatherBg.value = await lastWeatherBgUrl(w, true)
-      }
+      const url = await pending.get(requestKey)
+      if (seq === latestLoad && url) weatherBg.value = url
     } catch {
-      if (!weatherBg.value) weatherBg.value = await lastWeatherBgUrl(w, true)
-    } finally {
-      loading.value = false
+      // 本机或家庭相册的兜底图继续展示，下次加载可重试。
     }
   }
 
