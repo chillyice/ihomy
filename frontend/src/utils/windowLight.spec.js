@@ -89,6 +89,6 @@ it('南窗收到低角度直射光时长影可见，太阳降到地平线或转�
   expect(opacity[0]).toBe(0)
   expect(opacity[1]).toBeGreaterThan(0.1)
   expect(opacity[1]).toBeLessThan(opacity[2])
-  expect(opacity[2]).toBeCloseTo(1)
+  expect(opacity[2]).toBeCloseTo(Math.sqrt(Math.sin((55 * Math.PI) / 180)))
   expect(opacity.slice(3)).toEqual([0, 0])
 })

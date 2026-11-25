@@ -350,9 +350,15 @@ export function useSunLight(canReadEnvironment = () => true) {
   // mask-image 不支持 CSS transition,统一由 GSAP 补间驱动
   const lampAnim = reactive({ v: lampStrength.value })
   let lampTween = null
-  watch(lampStrength, (nv) => {
+  watch([lampStrength, lightTestMode], ([strength, testing]) => {
     lampTween?.kill()
-    lampTween = gsap.to(lampAnim, { v: nv, duration: 2, ease: 'power2.out', overwrite: true })
+    if (testing) {
+      // A seek or playback tick represents a new solar time, even when only milliseconds elapsed.
+      lampAnim.v = strength
+      lampTween = null
+    } else {
+      lampTween = gsap.to(lampAnim, { v: strength, duration: 2, ease: 'power2.out', overwrite: true })
+    }
   })
   const lampStrengthAnim = computed(() => lampAnim.v)
   const lampB = computed(() => lampBrightness.value / 100)

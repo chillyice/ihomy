@@ -200,6 +200,28 @@ it('refreshes the live day once at local midnight without changing a paused prev
   expect(request.get).toHaveBeenCalledTimes(2)
 })
 
+it('shows the selected slot’s lamp and shadow mask immediately when seeking or playing past sunset', async () => {
+  await mountLight(sunDay('2026-11-25'))
+  light.startLightTest()
+  light.setSlot(144)
+  await nextTick()
+  expect(light.lampDivOpacity.value).toBe(0)
+  light.setSlot(217)
+  await nextTick()
+  expect(light.lightLayerOpacity.value).toBe(0)
+  expect(light.lampStrengthAnim.value).toBe(1)
+  const nightMask = light.lampMask.value
+  light.setTestSpeed(8)
+  light.pauseLightTest()
+  await vi.advanceTimersByTimeAsync(260)
+  expect(light.slotIdx.value).toBe(227)
+  expect(light.lampMask.value).toBe(nightMask)
+  expect(light.lampDivOpacity.value).toBe(0.3)
+  light.setSlot(144)
+  await nextTick()
+  expect(light.lampMask.value).toBe('none')
+})
+
 it('uses the same weather gate and scene rotation and keeps simulated storms out of persisted window state', async () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.9)
   await mountLight(sunDay('2026-11-25'))

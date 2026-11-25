@@ -48,7 +48,6 @@ export function getSunScene(sunInfo, slotIndex) {
   const slot = slots[idx] || { altitude: -30, azimuth: 0, time: '12:00' }
 
   const alt = slot.altitude
-  const noonAltitude = slots.reduce((peak, sample) => (sample?.altitude > peak ? sample.altitude : peak), alt)
   const az = slot.azimuth
   const time = slot.time
 
@@ -173,9 +172,7 @@ export function getSunScene(sunInfo, slotIndex) {
 
   // 低角度的长影仍需可辨；按当天太阳高度与南窗入射角渐显，地平线和窗侧都自然淡出。
   const windowIncidence = Math.sin((Math.max(0, windowAngle) * Math.PI) / 180)
-  const lightOpacity = hasDirectLight
-    ? Math.sqrt((Math.sin((alt * Math.PI) / 180) / Math.sin((noonAltitude * Math.PI) / 180)) * windowIncidence)
-    : 0
+  const lightOpacity = hasDirectLight ? Math.sqrt(Math.sin((alt * Math.PI) / 180) * windowIncidence) : 0
 
   // 台灯:由阴影强度驱动(见 lampFromShadow),不再按方位角一刀切
   const lampOpacity = lampFromShadow(shadowIntensity)
@@ -192,7 +189,6 @@ export function getSunScene(sunInfo, slotIndex) {
     lightOpacity,
     lampOpacity,
     altitude: alt,
-    noonAltitude,
     azimuth: az,
     isNight,
     dayProgress,
