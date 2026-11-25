@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { drawWindowProjection, windowTransform } from './windowProjection'
+import { drawWindowProjection, sashApertures, windowTransform } from './windowProjection'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
 
 function openWindow(layout, ...angles) {
@@ -36,7 +36,6 @@ describe('window sash', () => {
 
   it('lets the two meeting stiles own the whole centre seam', () => {
     const [left, right] = CASEMENTS
-    expect([left.hinge, left.glassEdge, right.glassEdge, right.hinge]).toEqual([0.012, 0.464, 0.536, 0.988])
     expect(left.latch).toBe(right.latch)
     expect(left.latch - left.hinge).toBeCloseTo(right.hinge - right.latch)
   })
@@ -62,6 +61,22 @@ describe('window sash', () => {
 })
 
 describe('window-plane projection', () => {
+  it.each([0, 1])('releases both rail strips and the stiles on open side %i while keeping the other panes intact', (side) => {
+    const shut = CASEMENTS.map(sashApertures)
+    const open = openWindow(side === 0 ? 0.1 : 0.5, 0.65).map(sashApertures)
+    expect(open[1 - side]).toEqual(shut[1 - side])
+    expect(open[side]).toHaveLength(1)
+    const [[jamb, sill, openingWidth, openingHeight]] = open[side]
+    const [[left, glassSill, width, lowerHeight], [, upperStart, , upperHeight]] = shut[side]
+    expect(width).toBeCloseTo(0.452)
+    expect(lowerHeight).toBeCloseTo(0.44175)
+    expect(upperHeight).toBeCloseTo(0.47575)
+    expect(glassSill - sill).toBeCloseTo(0.036)
+    expect(sill + openingHeight - (upperStart + upperHeight)).toBeCloseTo(0.036)
+    expect(jamb).toBeLessThan(left)
+    expect(jamb + openingWidth).toBeGreaterThan(left + width)
+  })
+
   it.each([
     [1200, 800],
     [390, 844],

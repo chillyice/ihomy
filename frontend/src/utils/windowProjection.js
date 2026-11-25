@@ -3,14 +3,18 @@ import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
-// The glass runs from the hinge to glassEdge and from sill (0) to lintel (1).
-// The hinge stile and both rails wrap around that opening on the outside.
-const hingeStile = 0.024 // fraction of the full window width
-const railHeight = 0.028 // fraction of the window height
-const frameDepth = 0.012 // fraction of the full window width, perpendicular to the sash
-const transomHeight = 0.0825
+// Keep both pane heights when sizing the frame outwards from the glazing bar.
+const lowerPaneHeight = 0.44175
+const upperPaneHeight = 0.47575
+const railHeight = 0.036
+const frameDepth = 0.015 // fraction of the full window width, perpendicular to the sash
+const transomHeight = 0.088
 const transomTop = 0.483 - transomHeight / 2
 const transomBottom = transomTop + transomHeight
+const glassSill = transomTop - lowerPaneHeight
+const glassLintel = transomBottom + upperPaneHeight
+const frameSill = glassSill - railHeight
+const frameHeight = glassLintel + railHeight - frameSill
 
 // A source above and slightly to one side of the window, independent of the sun at night.
 export const LIGHTNING_SOURCE = {
@@ -56,13 +60,25 @@ function resize(canvas, width, height) {
   if (canvas.height !== height) canvas.height = height
 }
 
-function castOpenSash(mask, { hinge, glassEdge, latch, tipX, depth }, paneWidth, riseX, riseY, originX, originY) {
+// An open sash frees the whole wall opening, including the space occupied by
+// its rails when shut. Its moving frame is then projected onto that light.
+export function sashApertures({ hinge, glassStart, glassEdge, latch, depth }) {
+  if (depth) return [[Math.min(hinge, latch), frameSill, Math.abs(latch - hinge), frameHeight]]
+  const left = Math.min(glassStart, glassEdge)
+  const width = Math.abs(glassEdge - glassStart)
+  return [
+    [left, glassSill, width, lowerPaneHeight],
+    [left, transomBottom, width, upperPaneHeight],
+  ]
+}
+
+function castOpenSash(mask, { hinge, glassStart, glassEdge, latch, tipX, depth }, paneWidth, riseX, riseY, originX, originY) {
   const span = latch - hinge
-  const outerHinge = -hingeStile / Math.abs(span)
-  const glassWidth = (glassEdge - hinge) / span
+  const glassU = (glassStart - hinge) / span
+  const glassWidth = (glassEdge - glassStart) / span
   const sashContours = [
-    [outerHinge, -railHeight, 1 - outerHinge, 1 + 2 * railHeight],
-    [0, 0, glassWidth, 1],
+    [0, frameSill, 1, frameHeight],
+    [glassU, glassSill, glassWidth, glassLintel - glassSill],
   ]
   const uX = paneWidth * (tipX - hinge)
   const uY = paneWidth * depth
@@ -75,7 +91,7 @@ function castOpenSash(mask, { hinge, glassEdge, latch, tipX, depth }, paneWidth,
   mask.beginPath()
   for (const [u, v, width, height] of sashContours) mask.rect(u, v, width, height)
   mask.fill('evenodd')
-  mask.fillRect(0, transomTop, glassWidth, transomHeight)
+  mask.fillRect(glassU, transomTop, glassWidth, transomHeight)
 
   // Sweep the outer frame's two rims to the back face.
   // Along a ray, any point beyond the front profile is reached through one of these sides.
@@ -140,20 +156,9 @@ export function drawWindowProjection(
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  // A shut sash transmits just its two original panes. An open one frees the
-  // entire half-opening up to the meeting line, including its former stile.
+  // Fill adjoining openings together to avoid a hairline seam between them.
   mask.beginPath()
-  for (const { hinge, glassEdge, latch, depth } of sashes) {
-    const edge = depth ? latch : glassEdge
-    const left = Math.min(hinge, edge)
-    const span = Math.abs(edge - hinge)
-    if (depth)
-      mask.rect(left, 0, span, 1) // Fill adjoining open halves together to avoid a seam.
-    else {
-      mask.fillRect(left, 0, span, transomTop)
-      mask.fillRect(left, transomBottom, span, 1 - transomBottom)
-    }
-  }
+  for (const sash of sashes) for (const rect of sashApertures(sash)) mask.rect(...rect)
   mask.fill()
   mask.globalCompositeOperation = 'destination-out'
   mask.save()

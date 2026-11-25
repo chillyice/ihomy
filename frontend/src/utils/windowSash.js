@@ -1,10 +1,16 @@
 import { resolveMorningWeather } from './morningWeather'
 
-// The two meeting stiles meet in the middle; only the outer jambs are fixed.
+// Measure from the meeting line outwards, keeping the clear pane width fixed.
 export const WINDOW_WIDTH_RATIO = 0.88
+const paneWidth = 0.452
+const meetingStile = 0.04
+const hingeStile = 0.03
+const glassEdge = 0.5 - meetingStile
+const glassStart = glassEdge - paneWidth
+const hinge = glassStart - hingeStile
 export const CASEMENTS = [
-  { hinge: 0.012, glassEdge: 0.5 - 0.036, latch: 0.5 },
-  { hinge: 1 - 0.012, glassEdge: 0.5 + 0.036, latch: 0.5 },
+  { hinge, glassStart, glassEdge, latch: 0.5 },
+  { hinge: 1 - hinge, glassStart: 1 - glassStart, glassEdge: 1 - glassEdge, latch: 0.5 },
 ]
 
 export function weatherClosesWindow(weather) {
