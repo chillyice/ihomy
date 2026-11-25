@@ -13,6 +13,7 @@ const props = defineProps({
   shadowAlpha: { type: Number, required: true },
   occluders: { type: Array, default: () => [] },
   deskCasters: { type: Array, default: () => [] },
+  sash: { type: Object, default: null },
 })
 const surface = ref(null)
 let observer
@@ -72,9 +73,13 @@ onMounted(() => {
   observer = new ResizeObserver(schedulePaint)
   observer.observe(surface.value)
 })
-watch(() => [props.standard, props.scene, props.weather, props.shadowAlpha, props.deskCasters, ...props.occluders], schedulePaint, {
-  flush: 'post',
-})
+watch(
+  () => [props.standard, props.scene, props.weather, props.shadowAlpha, props.sash, props.deskCasters, ...props.occluders],
+  schedulePaint,
+  {
+    flush: 'post',
+  },
+)
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', schedulePaint)
   reducedMotion?.removeEventListener('change', schedulePaint)

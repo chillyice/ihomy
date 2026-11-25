@@ -1,17 +1,12 @@
 import { drawWindowFoliage } from './windowFoliage'
 import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection } from './windowLight'
+import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
 // Clear glass in normalized window coordinates. Everything else blocks transmission.
-const halfMullion = 0.072 / 2
 const halfTransom = 0.0825 / 2
-export const WINDOW_PANES = [
-  [0.012, 0.5 - halfMullion],
-  [0.5 + halfMullion, 1 - 0.012],
-].flatMap(([left, right]) => [
-  { left, right, top: 0, bottom: 0.483 - halfTransom },
-  { left, right, top: 0.483 + halfTransom, bottom: 1 },
-])
+const transomTop = 0.483 - halfTransom
+const transomBottom = 0.483 + halfTransom
 
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
   const radians = Math.PI / 180
@@ -25,7 +20,7 @@ export function windowTransform(width, height, altitude, azimuth, realWeight = 0
   // The 1.5 m opening spans two viewport heights (0.75 m per viewport). Its sill is 15% of the opening above the floor.
   const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 2) / Math.tan(altitude * radians) : 0
   const reach = correctedReach + (realReach - correctedReach) * realWeight
-  const paneWidth = width * 0.88
+  const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
   const correctedTop = height * (0.05 + 0.04 * phase)
@@ -52,7 +47,18 @@ function resize(canvas, width, height) {
 // coordinates. Overlapping silhouettes block the same light only once.
 export function drawWindowProjection(
   canvas,
-  { width, height, scene, weather = 'clear', shadowAlpha = 0, realWeight = 0, foliageTime = 0, occluders = [], deskCasters = [] },
+  {
+    width,
+    height,
+    scene,
+    weather = 'clear',
+    shadowAlpha = 0,
+    realWeight = 0,
+    foliageTime = 0,
+    occluders = [],
+    deskCasters = [],
+    sash = null,
+  },
 ) {
   const scale = Math.min(0.5, 512 / Math.max(1, width, height))
   const w = Math.max(1, Math.round(width * scale))
@@ -86,8 +92,28 @@ export function drawWindowProjection(
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  for (const { left, right, top, bottom } of WINDOW_PANES) mask.fillRect(left, top, right - left, bottom - top)
+  for (const { hinge, latch } of CASEMENTS) {
+    const left = Math.min(hinge, latch)
+    const span = Math.abs(latch - hinge)
+    if (sash?.hinge === hinge) {
+      mask.fillRect(left, 0, span, 1)
+    } else {
+      mask.fillRect(left, 0, span, transomTop)
+      mask.fillRect(left, transomBottom, span, 1 - transomBottom)
+    }
+  }
   mask.globalCompositeOperation = 'destination-out'
+  if (sash) {
+    // The hinge stays in the window plane. The free edge swings onto the floor's
+    // depth axis while vertical rails still cast along the solar vector (c, d).
+    mask.save()
+    mask.setTransform(a * (sash.tipX - sash.hinge), a * sash.depth, c, d, x + pad + a * sash.hinge, y + pad)
+    mask.fillRect(0, transomTop, 1, 2 * halfTransom)
+    mask.fillRect(0.94, 0, 0.06, 1)
+    mask.fillRect(0, 0, 1, 0.025)
+    mask.fillRect(0, 0.975, 1, 0.025)
+    mask.restore()
+  }
   drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()

@@ -5,6 +5,7 @@
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
+import { chooseWindowSash } from '@/utils/windowSash'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
 import { setSunContext } from '@/theme'
@@ -24,6 +25,7 @@ const DIFFUSE_SKY = {
 export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
+  const windowSash = chooseWindowSash()
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
@@ -628,6 +630,7 @@ export function useSunLight(canReadEnvironment = () => true) {
 
   return {
     deskCasters,
+    windowSash,
     sunInfo,
     sunInfoAt,
     sunInfoAge,

@@ -33,7 +33,14 @@
       :shadow-alpha="shadowAlpha"
       :occluders="occluders"
       :desk-casters="deskCasters"
+      :sash="windowSash"
       :style="{ opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
+    />
+    <WindowDrift
+      v-if="windowSash && shadowEnabled && weatherEffectEnabled && driftKind"
+      :key="driftKind"
+      :kind="driftKind"
+      :sash="windowSash"
     />
 
     <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
@@ -151,6 +158,7 @@ import { computed, inject } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import WindowProjection from './WindowProjection.vue'
+import WindowDrift from './WindowDrift.vue'
 
 const themeStore = useThemeStore()
 defineProps({ occluders: { type: Array, default: () => [] } })
@@ -163,6 +171,7 @@ if (!light) {
 const {
   sunScene,
   deskCasters,
+  windowSash,
   lampMask,
   lampDivOpacity,
   lampRadius,
@@ -177,10 +186,18 @@ const {
   snowParticles,
   rainParticles,
   weatherMode,
+  weatherEffectEnabled,
+  precipLevel,
   brightSpotStyle,
   lightningFlash,
   fogVisible,
 } = light || {}
+
+const driftKind = computed(() => {
+  const mode = weatherMode.value
+  if (mode === 'rain' || mode === 'thunder' || mode === 'snow') return precipLevel.value > 0 ? (mode === 'snow' ? 'snow' : 'rain') : null
+  return 'leaf'
+})
 
 // 雾层用「高斯噪声」而不是几个径向渐变雾团:内联 SVG 的 feTurbulence(fractalNoise)
 // 生成一张可无缝平铺(stitchTiles)的云絮噪声图,经 feGaussianBlur 软化(高斯模糊后的噪声 =

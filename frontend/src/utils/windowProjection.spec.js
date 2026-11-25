@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, windowTransform } from './windowProjection'
+import { chooseWindowSash } from './windowSash'
+
+describe('window sash', () => {
+  it('can keep both casements shut', () => {
+    expect(chooseWindowSash(() => 0.2)).toBeNull()
+  })
+
+  it.each([0, 0.5, 0.999])('mirrors the open gap around the central mullion at sample %f', (sample) => {
+    const opening = (side) => chooseWindowSash(vi.fn().mockReturnValueOnce(0.8).mockReturnValueOnce(side).mockReturnValue(sample))
+    const left = opening(0)
+    const right = opening(1)
+    expect(left.hinge).toBeLessThan(left.tipX)
+    expect(left.tipX).toBeLessThan(left.latch)
+    expect(left.tipX + right.tipX).toBeCloseTo(1)
+    expect(left.depth).toBeCloseTo(right.depth)
+    expect(Math.hypot(left.tipX - left.hinge, left.depth)).toBeCloseTo(left.latch - left.hinge)
+    expect(left.depth).toBeCloseTo((left.latch - left.hinge) * Math.sin(((30 + 45 * sample) * Math.PI) / 180))
+  })
+})
 
 describe('window-plane projection', () => {
   it.each([
