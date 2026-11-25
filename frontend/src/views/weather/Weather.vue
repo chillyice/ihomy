@@ -878,8 +878,7 @@ const load = async (background = false) => {
   }
   if (sun) {
     applyAstro(sun, 0)
-    // 顺手把共享实例换新(光影层/设置页的日出日落跟着更新);光照测试台按别的日期看数据时不覆盖
-    if (!sunLight?.lightTestMode?.value) sunLight?.applySunInfo?.(sun)
+    sunLight?.applySunInfo?.(sun)
   }
   lastLoadAt.value = Date.now()
   if (!background) loading.value = false

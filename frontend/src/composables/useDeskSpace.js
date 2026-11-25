@@ -81,7 +81,10 @@ export function useDeskSpace(items, plan) {
       floats: matching(DESK_FLOATS),
     }
     if (controlObserver) {
-      const current = new Set([...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],' + MODAL)))
+      // The lighting controls float over the scene under inspection, including its desk shadows.
+      const current = new Set(
+        [...document.querySelectorAll(CONTROL)].filter((node) => !node.closest('[data-desk-layer],.light-test-console,' + MODAL)),
+      )
       for (const node of controls) {
         if (!current.has(node)) {
           controlObserver.unobserve(node)

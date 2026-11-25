@@ -26,6 +26,7 @@ export const LIGHTNING_SOURCE = {
 }
 
 const equinoxAltitude = 90 - 36.65
+const sillHeightRatio = 0.15
 
 export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
   const direction = floorShadowDirection(azimuth)
@@ -39,16 +40,15 @@ export function windowTransform(width, height, altitude, azimuth, realWeight = 0
   const correctedHeight = referenceReach * Math.tan((calibrationAltitude * Math.PI) / 180)
   // A 1.5 m opening spans two viewport heights at real scale (0.75 m per viewport).
   const windowHeight = correctedHeight * (1 - realWeight) + 2 * height * realWeight
-  const shadowPerHeight = groundShadowPerHeight(altitude)
-  const reach = windowHeight * shadowPerHeight
+  const reach = windowHeight * groundShadowPerHeight(altitude)
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
-  // Keep the near edge in frame in the corrected view. The real sill projects from 15% of the window height.
-  const realSillReach = 0.15 * 2 * height * shadowPerHeight
-  const sillReach = (1 - realWeight) * 0.15 * referenceReach + realWeight * realSillReach
-  const top = (1 - realWeight) * height * (0.05 + 0.04 * phase) + realWeight * realSillReach * direction.y
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + direction.x * sillReach, top]
+  // The ground at the foot of the wall stays fixed all day. Frame the corrected view
+  // at noon, then project the raised sill along the very same rays as the rails above it.
+  const noonSillY = height * (0.05 + 0.04 * phase)
+  const wallY = (1 - realWeight) * (noonSillY - sillHeightRatio * referenceReach)
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + sillHeightRatio * shear, wallY + sillHeightRatio * depth]
 }
 
 // Average a small disk of shifted copies of the aperture. Each sample represents

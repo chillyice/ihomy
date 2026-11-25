@@ -14,7 +14,6 @@ import { drawWindowProjection } from '@/utils/windowProjection'
 const props = defineProps({
   scene: { type: Object, required: true },
   standard: { type: String, default: 'corrected' },
-  preview: Boolean,
   weather: { type: String, required: true },
   shadowAlpha: { type: Number, required: true },
   occluders: { type: Array, default: () => [] },
@@ -28,10 +27,10 @@ let breezeTimer
 let reducedMotion
 let strike
 let foliageTime = 0
-let displayed
-let start
-let target
-let startedAt
+let targetWeight = props.standard === 'real' ? 1 : 0
+let realWeight = targetWeight
+let startWeight = realWeight
+let startedAt = 0
 
 // Coalesce a resize, time step and slider change into one paint. Cloud cover
 // and the lamp mask are composited by CSS and never invalidate the aperture.
@@ -42,37 +41,26 @@ function schedulePaint() {
     frame = 0
     const canvas = surface.value
     const scene = props.scene
-    const realWeight = props.standard === 'real' ? 1 : 0
-    const noonAltitude = scene.noonAltitude ?? scene.altitude
-    if (
-      !target ||
-      target.realWeight !== realWeight ||
-      target.altitude !== scene.altitude ||
-      target.azimuth !== scene.azimuth ||
-      target.noonAltitude !== noonAltitude
-    ) {
-      target = { altitude: scene.altitude, azimuth: scene.azimuth, noonAltitude, realWeight }
-      start = displayed ?? target
+    const nextWeight = props.standard === 'real' ? 1 : 0
+    if (targetWeight !== nextWeight) {
+      startWeight = realWeight
+      targetWeight = nextWeight
       startedAt = now
     }
-    const t = props.preview || start === target ? 1 : Math.min(1, (now - startedAt) / 600)
-    const blend = t * t * (3 - 2 * t)
-    displayed = {
-      realWeight: start.realWeight + (target.realWeight - start.realWeight) * blend,
-      altitude: start.altitude + (target.altitude - start.altitude) * blend,
-      noonAltitude: start.noonAltitude + (target.noonAltitude - start.noonAltitude) * blend,
-      azimuth: start.azimuth + (target.azimuth - start.azimuth) * blend,
+    if (realWeight !== targetWeight) {
+      const t = reducedMotion.matches ? 1 : Math.min(1, (now - startedAt) / 600)
+      const blend = t * t * (3 - 2 * t)
+      realWeight = t === 1 ? targetWeight : startWeight + (targetWeight - startWeight) * blend
     }
     if (!reducedMotion.matches) foliageTime = now / 1000
     const painted = drawWindowProjection(canvas, {
       ...props,
       foliageTime,
-      realWeight: displayed.realWeight,
-      scene: { ...scene, ...displayed },
+      realWeight,
       width: canvas.clientWidth,
       height: canvas.clientHeight,
     })
-    if (t < 1) schedulePaint()
+    if (realWeight !== targetWeight) schedulePaint()
     // Slow movement only needs about twelve samples per second on a stationary window.
     else if (painted && scene.kind !== 'lightning' && !reducedMotion.matches) breezeTimer = setTimeout(schedulePaint, 80)
   })
@@ -108,7 +96,7 @@ onMounted(() => {
   observer.observe(surface.value)
 })
 watch(
-  () => [props.standard, props.preview, props.scene, props.weather, props.shadowAlpha, props.sashes, props.deskCasters, ...props.occluders],
+  () => [props.standard, props.scene, props.weather, props.shadowAlpha, props.sashes, props.deskCasters, ...props.occluders],
   schedulePaint,
   {
     flush: 'post',

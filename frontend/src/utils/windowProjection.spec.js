@@ -141,6 +141,40 @@ describe('window-plane projection', () => {
     }
   })
 
+  it.each([
+    [0, 76.79],
+    [0, 29.91],
+    [0.5, 53.35],
+    [1, 53.35],
+  ])('casts the sill, transom and head from their heights above one fixed wall foot (weight %f, noon %f°)', (weight, peak) => {
+    const width = 1200
+    const at = (altitude, azimuth) => windowTransform(width, 800, altitude, azimuth, weight, peak)
+    const [paneWidth, , , noonRise, , noonSillY] = at(peak, 180)
+    const wallX = (width - paneWidth) / 2
+    const wallY = noonSillY - 0.15 * noonRise
+    const [[, frameBottom, , frameHeight]] = sashApertures(openWindow(0.1, 0.5)[0])
+    const [[, glassBottom, , glassHeight], [, upperGlassBottom]] = sashApertures(CASEMENTS[0])
+    const transom = (glassBottom + glassHeight + upperGlassBottom) / 2
+    for (const v of [frameBottom, glassBottom, transom, frameBottom + frameHeight]) {
+      const noonDistance = noonSillY + v * noonRise - wallY
+      expect(noonDistance).toBeGreaterThan(0)
+      for (const [altitude, azimuth] of [
+        [1, 110],
+        [15, 145],
+        [15, 215],
+        [1, 250],
+      ]) {
+        const [, , dx, dy, x, y] = at(altitude, azimuth)
+        const offsetX = x + v * dx - wallX
+        const offsetY = y + v * dy - wallY
+        const bearing = ((180 - azimuth) * Math.PI) / 180
+        const distance = (noonDistance * Math.tan((peak * Math.PI) / 180)) / Math.tan((altitude * Math.PI) / 180)
+        expect(offsetX).toBeCloseTo(distance * Math.sin(bearing), 7)
+        expect(offsetY).toBeCloseTo(distance * Math.cos(bearing), 7)
+      }
+    }
+  })
+
   it('projects a finite window height on days when the solar noon reaches the zenith', () => {
     const reach = (altitude) => windowTransform(1200, 800, altitude, 180, 0, 90)[3]
     expect(reach(1)).toBeGreaterThan(reach(45))

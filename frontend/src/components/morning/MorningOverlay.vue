@@ -192,7 +192,7 @@ const windDeg = computed(() => {
 })
 const windDir = computed(() => String(nowFull.value.windDir || weather.value?.windDir || ''))
 // 没有 sun-info 时,光影的初始场景并不代表实况,昼夜按本地小时兜底。
-const sunScene = computed(() => (sunLight?.sunInfo?.value?.slots?.length ? sunLight.sunScene.value : null))
+const sunScene = computed(() => (sunLight?.activeSunInfo?.value?.slots?.length ? sunLight.sunScene.value : null))
 const isNight = computed(() => sunScene.value?.isNight ?? (now.value.getHours() < 6 || now.value.getHours() >= 19))
 const familyName = computed(() => appStore.familyName)
 

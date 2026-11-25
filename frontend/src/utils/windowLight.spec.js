@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { getSunScene, lampFromShadow, LAMP_SHADOW_ON, LAMP_SHADOW_OFF } from './windowLight'
+import { getSunScene, lampFromShadow, LAMP_SHADOW_ON, LAMP_SHADOW_OFF, solarClock } from './windowLight'
+
+it('selects the date and five-minute slot on the clock used to build the solar table', () => {
+  const instant = new Date('2026-11-25T16:04:59Z')
+  expect(solarClock('Asia/Shanghai', instant)).toEqual({ date: '2026-11-26', slot: 0 })
+  expect(solarClock('America/New_York', instant)).toEqual({ date: '2026-11-25', slot: 132 })
+  expect(solarClock('Asia/Shanghai', new Date('2026-11-25T16:05:00Z')).slot).toBe(1)
+  expect(solarClock('invalid', instant)).toEqual(solarClock(undefined, instant))
+})
 
 // 造一天:6:00 日出、18:00 日落,高度角/方位角随时隙近似推进
 function makeDay() {

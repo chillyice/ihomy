@@ -4,7 +4,7 @@
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
-import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
+import { getSunScene, currentSlotIndex, solarClock } from '@/utils/windowLight'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from '@/utils/windowSash'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
@@ -36,8 +36,15 @@ export function useSunLight(canReadEnvironment = () => true) {
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
-  const slotIdx = ref(currentSlotIndex())
-  const sunScene = ref({
+  const liveSlot = ref(currentSlotIndex())
+  const lightTestMode = ref(false)
+  const lightTestPaused = ref(true)
+  const previewSunInfo = ref(null)
+  const previewSlot = ref(null)
+  let previewRequest = null
+  const activeSunInfo = computed(() => (lightTestMode.value ? (previewSunInfo.value ?? sunInfo.value) : sunInfo.value))
+  const slotIdx = computed(() => (lightTestMode.value ? (previewSlot.value ?? liveSlot.value) : liveSlot.value))
+  const initialScene = {
     source: { x: '50%', y: '-15%' },
     rotation: 0,
     palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' },
@@ -52,7 +59,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     dayProgress: 0,
     windowAngle: 0,
     hasDirectLight: false,
-  })
+  }
+  const sunScene = computed(() => (activeSunInfo.value ? getSunScene(activeSunInfo.value, slotIdx.value) : initialScene))
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
   let _suspended = null
@@ -128,18 +136,17 @@ export function useSunLight(canReadEnvironment = () => true) {
     () => shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off',
   )
   // 光照测试模式:开启后可手动控制 slotIdx 循环
-  const lightTestMode = ref(false)
-  const lightTestPaused = ref(false)
   const testSpeed = ref(1)
   const weather = ref(null)
   const weatherDetail = ref(null)
   const previewWeather = ref(null)
-  const weatherOverride = computed(() => (lightTestMode.value ? previewWeather.value : null))
-  const activeWeather = computed(() => weatherOverride.value ?? (weatherEffectEnabled.value ? weather.value : null))
-  const stormClosed = computed(() => weatherClosesWindow(weatherOverride.value ?? weather.value))
+  const selectedWeather = computed(() => (lightTestMode.value ? (previewWeather.value ?? weather.value) : weather.value))
+  const activeWeather = computed(() => (weatherEffectEnabled.value ? selectedWeather.value : null))
+  const realStormClosed = computed(() => weatherClosesWindow(weather.value))
+  const stormClosed = computed(() => weatherClosesWindow(selectedWeather.value))
   const windowSashes = computed(() => (stormClosed.value ? CASEMENTS : fairWeatherSashes.value))
   watch(
-    windowSashes,
+    () => (realStormClosed.value ? CASEMENTS : fairWeatherSashes.value),
     (sashes) => {
       try {
         sessionStorage.setItem(SASH_SESSION_KEY, sashes === CASEMENTS ? 'closed' : 'open')
@@ -232,11 +239,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     else stopTransient()
   })
 
-  const refreshScene = () => {
-    if (!sunInfo.value) return
-    sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
-  }
-
   // 天气光照系数(实时响应 cloudFlicker):雨雪雷=0(雨天无光柱),雾/阴=0.15(昏暗压光,
   // 由雾层/阴影+3 秒后自动开灯承担观感),多云=cloudFlicker,晴=1
   const weatherLightMul = computed(() => {
@@ -290,16 +292,18 @@ export function useSunLight(canReadEnvironment = () => true) {
   // 光照测试:开启后每 208ms 推进一个时隙(5 分钟),288 个时隙=1 天循环
   const scheduleTestPlayback = () => {
     if (testTimer) clearInterval(testTimer)
+    testTimer = null
+    if (!lightTestMode.value || lightTestPaused.value) return
     testTimer = setInterval(() => {
-      if (lightTestPaused.value) return
-      slotIdx.value = (slotIdx.value + 1) % 288
-      refreshScene()
+      previewSlot.value = (slotIdx.value + 1) % 288
     }, 208 / testSpeed.value)
   }
   const startLightTest = () => {
+    if (lightTestMode.value) return
+    previewSunInfo.value = sunInfo.value
+    previewSlot.value = sunInfo.value ? liveSlot.value : null
+    lightTestPaused.value = true
     lightTestMode.value = true
-    lightTestPaused.value = false
-    scheduleTestPlayback()
   }
   // 暂停期间也更新下一次播放的间隔。
   const setTestSpeed = (sp) => {
@@ -308,29 +312,25 @@ export function useSunLight(canReadEnvironment = () => true) {
   }
   const pauseLightTest = () => {
     lightTestPaused.value = !lightTestPaused.value
+    scheduleTestPlayback()
   }
   const stepLightTest = (dir) => {
-    lightTestPaused.value = true
-    slotIdx.value = (slotIdx.value + dir + 288) % 288
-    refreshScene()
+    setSlot((slotIdx.value + dir + 288) % 288)
   }
   const stopLightTest = () => {
+    previewRequest = null
+    previewSunInfo.value = null
     lightTestMode.value = false
+    lightTestPaused.value = true
     previewWeather.value = null
-    if (testTimer) {
-      clearInterval(testTimer)
-      testTimer = null
-    }
-    slotIdx.value = currentSlotIndex()
-    if (sunInfo.value) {
-      sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
-    }
+    scheduleTestPlayback()
+    syncLiveClock()
   }
 
   const setSlot = (idx) => {
     lightTestPaused.value = true
-    slotIdx.value = Math.max(0, Math.min(287, idx))
-    refreshScene()
+    scheduleTestPlayback()
+    previewSlot.value = Math.max(0, Math.min(287, idx))
   }
 
   const lampStrength = computed(() => {
@@ -432,8 +432,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   watch([weatherMode, precipLevel], refreshPrecipitation, { immediate: true })
 
   function rearrangeScene() {
-    if (lightTestMode.value) return
-    if (!stormClosed.value) fairWeatherSashes.value = chooseWindowSashes(fairWeatherSashes.value !== CASEMENTS)
+    if (!realStormClosed.value) fairWeatherSashes.value = chooseWindowSashes(fairWeatherSashes.value !== CASEMENTS)
     dustParticles.value = sampleDust()
     refreshPrecipitation()
   }
@@ -463,41 +462,60 @@ export function useSunLight(canReadEnvironment = () => true) {
   let weatherVisible = false
   let nextWeatherAt = 0
   let currentWeatherRun = null
+  let liveRequest = null
+  let retrySunAfter = 0
 
   const loadSunInfo = async () => {
-    if (!canReadEnvironment()) return
+    if (!canReadEnvironment() || liveRequest || Date.now() < retrySunAfter) return
+    const run = Symbol()
+    liveRequest = run
     try {
-      applySunInfo(await request.get('/public/sun-info'))
-    } catch (e) {}
+      const data = await request.get('/public/sun-info')
+      if (liveRequest === run) applySunInfo(data)
+    } catch {
+      if (liveRequest === run) retrySunAfter = Date.now() + 5 * 60_000
+    } finally {
+      if (liveRequest === run) liveRequest = null
+    }
   }
 
   const loadSunInfoForDate = async (dateStr) => {
+    if (!lightTestMode.value || !canReadEnvironment()) return false
+    const run = Symbol()
+    previewRequest = run
     try {
-      // 光照测试台按日期取:沿用当前时隙(测试台会自己步进),不重置 slotIdx
-      applySunInfo(await request.get('/public/sun-info', { params: { date: dateStr } }), { resetSlot: false })
-    } catch (e) {}
+      const data = await request.get('/public/sun-info', { params: { date: dateStr } })
+      if (!data || previewRequest !== run) return false
+      previewSunInfo.value = data
+      previewSlot.value ??= currentSlotIndex(data.timezone)
+      return true
+    } catch {
+      return false
+    }
   }
 
-  // 把一份 /public/sun-info 落到全局:记录取数时刻(供天气页判断共享数据是否还能复用,
-  // 用本地时钟算时长,避免前后端时钟差)并同步光影场景与晨暮主题
-  const applySunInfo = (data, { resetSlot = true } = {}) => {
+  // 实时缓存也供天气页复用；预览的日期、时刻独立保留。
+  const applySunInfo = (data) => {
     if (!data) return
+    if (Date.parse(data.generatedAt) < Date.parse(sunInfo.value?.generatedAt)) return
     sunInfo.value = data
     sunInfoAt.value = Date.now()
-    if (resetSlot) slotIdx.value = currentSlotIndex()
-    sunScene.value = getSunScene(data, slotIdx.value)
-    themeStore.applyAuto(sunScene.value.isNight)
+    liveSlot.value = currentSlotIndex(data.timezone)
+    if (lightTestMode.value && !previewSunInfo.value) {
+      previewSunInfo.value = data
+      previewSlot.value ??= liveSlot.value
+    }
   }
 
   // 共享 sun-info 距取数的时长(ms);从未取到返回 Infinity
   const sunInfoAge = () => (sunInfoAt.value ? Date.now() - sunInfoAt.value : Infinity)
 
-  // 长开兜底:日出日落/时隙表/月相与天气数据同频,每 30 分钟换一次;
-  // 跨零点后时隙表也随之换成新一天(光照测试台按别的日期看数据时不动它)
+  // 日表按地点当地日期换新，白天每半小时更新一次实时天文数据。
   const SUN_INFO_TTL = 30 * 60 * 1000
-  const refreshSunInfoIfStale = () => {
-    if (!sunInfo.value || lightTestMode.value) return
-    if (sunInfoAge() > SUN_INFO_TTL) loadSunInfo()
+  function syncLiveClock() {
+    const { date, slot } = solarClock(sunInfo.value?.timezone)
+    liveSlot.value = slot
+    if (sunInfo.value?.date !== date || sunInfoAge() >= SUN_INFO_TTL) loadSunInfo()
   }
 
   // Keep the last observation on failure. A manual city change supersedes any older request.
@@ -532,18 +550,13 @@ export function useSunLight(canReadEnvironment = () => true) {
   }
 
   const onVisibilityChange = () => {
-    if (document.hidden || !sunInfo.value || lightTestMode.value) return
-    // 后台期间定时器会被浏览器节流:回到前台先把时隙对齐到现在,再按需补取天文数据
-    const idx = currentSlotIndex()
-    if (idx !== slotIdx.value) {
-      slotIdx.value = idx
-      refreshScene()
-      themeStore.applyAuto(sunScene.value.isNight)
-    }
-    refreshSunInfoIfStale()
+    if (!document.hidden) syncLiveClock()
   }
 
   watch(canReadEnvironment, (allowed) => {
+    liveRequest = null
+    previewRequest = null
+    retrySunAfter = 0
     currentWeatherRun = null
     nextWeatherAt = 0
     if (allowed) loadSunInfo()
@@ -558,19 +571,18 @@ export function useSunLight(canReadEnvironment = () => true) {
     IDLE_EVENTS_THROTTLED.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
     document.addEventListener('visibilitychange', onVisibilityChange)
     resetIdle()
-    // 每 5 分钟更新时隙
-    slotTimer = setInterval(() => {
-      if (sunInfo.value && !lightTestMode.value) {
-        const newIdx = currentSlotIndex()
-        if (newIdx !== slotIdx.value) {
-          slotIdx.value = newIdx
-          refreshScene()
-          themeStore.applyAuto(sunScene.value.isNight)
-        }
-        // 长开/跨零点:时隙表与日出日落到点换新(光照测试台按日期看数据时不覆盖)
-        refreshSunInfoIfStale()
-      }
-    }, 300000)
+    // 在实际五分钟刻度推进；标签页后台节流后重新对齐。
+    const slotDuration = 5 * 60_000
+    function scheduleSlot() {
+      slotTimer = setTimeout(
+        () => {
+          syncLiveClock()
+          scheduleSlot()
+        },
+        slotDuration - (Date.now() % slotDuration),
+      )
+    }
+    scheduleSlot()
   })
 
   onUnmounted(() => {
@@ -579,7 +591,9 @@ export function useSunLight(canReadEnvironment = () => true) {
     cloudTween?.kill()
     if (lampAutoTimer) clearTimeout(lampAutoTimer)
     if (fogTimer) clearTimeout(fogTimer)
-    if (slotTimer) clearInterval(slotTimer)
+    if (slotTimer) clearTimeout(slotTimer)
+    liveRequest = null
+    previewRequest = null
     currentWeatherRun = null
     clearTimeout(weatherTimer)
     if (testTimer) clearInterval(testTimer)
@@ -591,10 +605,7 @@ export function useSunLight(canReadEnvironment = () => true) {
 
   // 特效从全部关闭→开启时:立即刷新场景,避免等待下一个定时器周期
   watch(anyEffectEnabled, (enabled) => {
-    if (enabled && sunInfo.value) {
-      slotIdx.value = currentSlotIndex()
-      refreshScene()
-    }
+    if (enabled) syncLiveClock()
   })
 
   // 毛玻璃开关:在 <html> 上切换 .no-glass 类,全局禁用 backdrop-filter
@@ -610,7 +621,10 @@ export function useSunLight(canReadEnvironment = () => true) {
   watch(
     sunScene,
     (s) => {
-      if (s && s.azimuth != null) setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
+      if (s && s.azimuth != null) {
+        setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
+        themeStore.applyAuto(s.isNight)
+      }
     },
     { immediate: true },
   )
@@ -647,6 +661,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     rearrangeScene,
     setWeatherVisible,
     sunInfo,
+    activeSunInfo,
     sunInfoAt,
     sunInfoAge,
     applySunInfo,
@@ -697,7 +712,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     stepLightTest,
     stopLightTest,
     setSlot,
-    refreshScene,
     suspendEffects,
     restoreEffects,
   }

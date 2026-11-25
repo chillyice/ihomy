@@ -3,8 +3,14 @@
   <div v-if="light?.lightTestMode?.value" class="light-test-console" :style="{ left: pos.x + 'px', top: pos.y + 'px' }">
     <div class="lt-header">
       <span class="lt-title lt-drag" @pointerdown="onDragStart" :title="$t('lightTest.drag')">≡ {{ $t('lightTest.title') }}</span>
-      <input type="date" v-model="dateInput" @change="onDateChange" class="lt-date-input" :title="$t('lightTest.dateHint')" />
-      <input type="time" v-model="timeInput" @change="onTimeChange" class="lt-time-input" />
+      <input
+        type="date"
+        :value="activeSunInfo?.date || ''"
+        @change="onDateChange"
+        class="lt-date-input"
+        :title="$t('lightTest.dateHint')"
+      />
+      <input type="time" :value="slotTime" @change="onTimeChange" class="lt-time-input" />
       <button class="lt-btn lt-reset" @click="light.stopLightTest" :title="$t('lightTest.resetTitle')">⏹</button>
     </div>
     <div class="lt-info">
@@ -13,9 +19,9 @@
       <span>{{ $t('lightTest.windowAngle') }} {{ (light.sunScene.value.windowAngle ?? 0).toFixed(1) }}°</span>
       <span class="lt-phase">{{ testPhase }}</span>
     </div>
-    <div class="lt-info" v-if="light?.sunInfo?.value">
-      <span>{{ $t('lightTest.sunrise') }} {{ light.sunInfo.value.sunrise || '--' }}</span>
-      <span>{{ $t('lightTest.sunset') }} {{ light.sunInfo.value.sunset || '--' }}</span>
+    <div class="lt-info" v-if="activeSunInfo">
+      <span>{{ $t('lightTest.sunrise') }} {{ activeSunInfo.sunrise || '--' }}</span>
+      <span>{{ $t('lightTest.sunset') }} {{ activeSunInfo.sunset || '--' }}</span>
       <span v-if="light.sunScene.value.altitude > 0">{{
         $t('lightTest.groundShadow', { length: $n(groundShadowPerHeight(light.sunScene.value.altitude), { maximumFractionDigits: 2 }) })
       }}</span>
@@ -182,7 +188,7 @@
 </template>
 
 <script setup>
-import { inject, computed, ref, watch } from 'vue'
+import { inject, computed } from 'vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { groundShadowPerHeight } from '@/utils/windowLight'
 import { useI18n } from 'vue-i18n'
@@ -219,30 +225,21 @@ const testPhase = computed(() => {
   return t('home.testPhase.sunset')
 })
 
-const timeInput = ref('')
-watch(
-  () => light?.slotIdx?.value,
-  (idx) => {
-    if (idx == null) return
-    const totalMin = idx * 5
-    const h = Math.floor(totalMin / 60)
-    const m = totalMin % 60
-    timeInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-  },
-  { immediate: true },
-)
+const activeSunInfo = light.activeSunInfo
+const slotTime = computed(() => activeSunInfo.value?.slots?.[light.slotIdx.value]?.time ?? '')
 
-const onTimeChange = () => {
-  const [h, m] = timeInput.value.split(':').map(Number)
-  if (isNaN(h) || isNaN(m)) return
-  const idx = Math.floor((h * 60 + m) / 5)
-  light.setSlot?.(idx)
+const onTimeChange = ({ currentTarget: input }) => {
+  if (input.value) {
+    const [hour, minute] = input.value.split(':').map(Number)
+    light.setSlot(Math.floor((hour * 60 + minute) / 5))
+  }
+  input.value = slotTime.value
 }
 
-const dateInput = ref(new Date().toISOString().slice(0, 10))
-const onDateChange = () => {
-  if (!dateInput.value) return
-  light.loadSunInfoForDate?.(dateInput.value)
+const onDateChange = async ({ currentTarget: input }) => {
+  const date = input.value
+  if (date) await light.loadSunInfoForDate(date)
+  if (input.value === date) input.value = activeSunInfo.value?.date ?? ''
 }
 </script>
 

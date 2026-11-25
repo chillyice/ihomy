@@ -22,7 +22,6 @@ export const DESK_FLOATS = [
   '.chat-float-bubble',
   '.last-doing-float',
   '.call-mini',
-  '.light-test-console',
   '.daily-add-fab',
   '.home-page .door-sign',
   '.el-popper',

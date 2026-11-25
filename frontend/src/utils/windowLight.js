@@ -1,5 +1,6 @@
 // 光线与天气:基于太阳位置(高度角/方位角/日出日落)生成光影参数
 // 被 useSunLight.js 调用,提供全页面共享的光影状态
+import { todayStr } from './date'
 
 // Screen axes for a south-facing window: +x to the right, +y into the room.
 export function floorShadowDirection(azimuth) {
@@ -212,10 +213,28 @@ function makeRays(opacityScale) {
   return base.map((r) => ({ ...r, opacity: r.opacity * opacityScale }))
 }
 
-// 根据当前时间获取时隙索引(0-287)
-export function currentSlotIndex() {
-  const now = new Date()
-  const h = now.getHours()
-  const m = now.getMinutes()
-  return Math.floor((h * 60 + m) / 5)
+// The backend labels each five-minute slot in the sun-info location's time zone.
+export function solarClock(timezone, now = new Date()) {
+  if (timezone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }).formatToParts(now)
+      const { year, month, day, hour, minute } = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+      return { date: `${year}-${month}-${day}`, slot: Math.floor((Number(hour) * 60 + Number(minute)) / 5) }
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error
+    }
+  }
+  return { date: todayStr(now), slot: Math.floor((now.getHours() * 60 + now.getMinutes()) / 5) }
+}
+
+export function currentSlotIndex(timezone) {
+  return solarClock(timezone).slot
 }
