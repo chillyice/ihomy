@@ -39,10 +39,12 @@ export function useSunLight(canReadEnvironment = () => true) {
   const liveSlot = ref(currentSlotIndex())
   const lightTestMode = ref(false)
   const lightTestPaused = ref(true)
+  const previewDate = ref('')
+  const previewLoadFailed = ref(false)
   const previewSunInfo = ref(null)
   const previewSlot = ref(null)
   let previewRequest = null
-  const activeSunInfo = computed(() => (lightTestMode.value ? (previewSunInfo.value ?? sunInfo.value) : sunInfo.value))
+  const activeSunInfo = computed(() => (lightTestMode.value ? previewSunInfo.value : sunInfo.value))
   const slotIdx = computed(() => (lightTestMode.value ? (previewSlot.value ?? liveSlot.value) : liveSlot.value))
   const initialScene = {
     source: { x: '50%', y: '-15%' },
@@ -293,7 +295,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   const scheduleTestPlayback = () => {
     if (testTimer) clearInterval(testTimer)
     testTimer = null
-    if (!lightTestMode.value || lightTestPaused.value) return
+    if (!lightTestMode.value || lightTestPaused.value || !previewSunInfo.value) return
     testTimer = setInterval(() => {
       previewSlot.value = (slotIdx.value + 1) % 288
     }, 208 / testSpeed.value)
@@ -301,6 +303,8 @@ export function useSunLight(canReadEnvironment = () => true) {
   const startLightTest = () => {
     if (lightTestMode.value) return
     previewSunInfo.value = sunInfo.value
+    previewDate.value = sunInfo.value?.date ?? ''
+    previewLoadFailed.value = false
     previewSlot.value = sunInfo.value ? liveSlot.value : null
     lightTestPaused.value = true
     lightTestMode.value = true
@@ -483,14 +487,25 @@ export function useSunLight(canReadEnvironment = () => true) {
     if (!lightTestMode.value || !canReadEnvironment()) return false
     const run = Symbol()
     previewRequest = run
+    previewDate.value = dateStr
+    previewLoadFailed.value = false
+    previewSunInfo.value = null
+    scheduleTestPlayback()
     try {
       const data = await request.get('/public/sun-info', { params: { date: dateStr } })
-      if (!data || previewRequest !== run) return false
+      if (previewRequest !== run || data?.date !== dateStr) return false
       previewSunInfo.value = data
       previewSlot.value ??= currentSlotIndex(data.timezone)
       return true
     } catch {
       return false
+    } finally {
+      if (previewRequest === run) {
+        previewRequest = null
+        previewLoadFailed.value = !previewSunInfo.value
+        if (previewLoadFailed.value) lightTestPaused.value = true
+        scheduleTestPlayback()
+      }
     }
   }
 
@@ -501,9 +516,11 @@ export function useSunLight(canReadEnvironment = () => true) {
     sunInfo.value = data
     sunInfoAt.value = Date.now()
     liveSlot.value = currentSlotIndex(data.timezone)
-    if (lightTestMode.value && !previewSunInfo.value) {
+    if (lightTestMode.value && !previewDate.value) {
+      previewDate.value = data.date
       previewSunInfo.value = data
       previewSlot.value ??= liveSlot.value
+      scheduleTestPlayback()
     }
   }
 
@@ -661,6 +678,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     rearrangeScene,
     setWeatherVisible,
     sunInfo,
+    previewDate,
+    previewLoadFailed,
     activeSunInfo,
     sunInfoAt,
     sunInfoAge,

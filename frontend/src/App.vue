@@ -25,7 +25,7 @@
       </template>
       <WindowMusicPlayer v-if="windowShell && userStore.isLoggedIn" />
       <MusicPlayer v-if="!userStore.isPureOps && !isWindow && (isMobile || !immersive) && floatsStore.music" />
-      <LightTestConsole v-if="!isMobile && lightTestMode" />
+      <Teleport v-if="!isMobile && lightTestMode" to="body"><LightTestConsole /></Teleport>
       <SiteFooter v-if="!isMobile && !immersive" />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
     </template>

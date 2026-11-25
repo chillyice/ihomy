@@ -5,19 +5,27 @@
       <span class="lt-title lt-drag" @pointerdown="onDragStart" :title="$t('lightTest.drag')">≡ {{ $t('lightTest.title') }}</span>
       <input
         type="date"
-        :value="activeSunInfo?.date || ''"
+        :value="light.previewDate.value"
+        @focus="pauseForEdit"
         @change="onDateChange"
         class="lt-date-input"
         :title="$t('lightTest.dateHint')"
       />
-      <input type="time" :value="slotTime" @change="onTimeChange" class="lt-time-input" />
+      <input type="time" :value="slotTime" @focus="pauseForEdit" @change="onTimeChange" class="lt-time-input" />
       <button class="lt-btn lt-reset" @click="light.stopLightTest" :title="$t('lightTest.resetTitle')">⏹</button>
     </div>
-    <div class="lt-info">
+    <div v-if="activeSunInfo" class="lt-info">
       <span>{{ $t('lightTest.altitude') }} {{ light.sunScene.value.altitude?.toFixed(1) }}°</span>
       <span>{{ $t('lightTest.azimuth') }} {{ light.sunScene.value.azimuth?.toFixed(1) }}°</span>
       <span>{{ $t('lightTest.windowAngle') }} {{ (light.sunScene.value.windowAngle ?? 0).toFixed(1) }}°</span>
       <span class="lt-phase">{{ testPhase }}</span>
+    </div>
+    <div v-else class="lt-info" role="status">
+      <template v-if="light.previewLoadFailed.value">
+        {{ $t('common.loadFailed') }}
+        <button class="lt-btn" @click="light.loadSunInfoForDate(light.previewDate.value)">{{ $t('common.retry') }}</button>
+      </template>
+      <template v-else>{{ $t('common.loading') }}</template>
     </div>
     <div class="lt-info" v-if="activeSunInfo">
       <span>{{ $t('lightTest.sunrise') }} {{ activeSunInfo.sunrise || '--' }}</span>
@@ -28,7 +36,9 @@
     </div>
     <div class="lt-controls">
       <button class="lt-btn" @click="light.stepLightTest(-1)" :title="$t('lightTest.back5')">⏮</button>
-      <button class="lt-btn lt-main" @click="light.pauseLightTest">{{ light.lightTestPaused.value ? '▶' : '⏸' }}</button>
+      <button class="lt-btn lt-main" :disabled="light.previewLoadFailed.value" @click="light.pauseLightTest">
+        {{ light.lightTestPaused.value ? '▶' : '⏸' }}
+      </button>
       <button class="lt-btn" @click="light.stepLightTest(1)" :title="$t('lightTest.forward5')">⏭</button>
     </div>
     <div class="lt-speed">
@@ -226,7 +236,14 @@ const testPhase = computed(() => {
 })
 
 const activeSunInfo = light.activeSunInfo
-const slotTime = computed(() => activeSunInfo.value?.slots?.[light.slotIdx.value]?.time ?? '')
+const slotTime = computed(() => {
+  const minutes = light.slotIdx.value * 5
+  return [Math.floor(minutes / 60), minutes % 60].map((part) => String(part).padStart(2, '0')).join(':')
+})
+
+const pauseForEdit = () => {
+  if (!light.lightTestPaused.value) light.pauseLightTest()
+}
 
 const onTimeChange = ({ currentTarget: input }) => {
   if (input.value) {
@@ -236,10 +253,9 @@ const onTimeChange = ({ currentTarget: input }) => {
   input.value = slotTime.value
 }
 
-const onDateChange = async ({ currentTarget: input }) => {
-  const date = input.value
-  if (date) await light.loadSunInfoForDate(date)
-  if (input.value === date) input.value = activeSunInfo.value?.date ?? ''
+const onDateChange = ({ currentTarget: input }) => {
+  if (input.value) light.loadSunInfoForDate(input.value)
+  else input.value = light.previewDate.value
 }
 </script>
 
@@ -258,6 +274,10 @@ const onDateChange = async ({ currentTarget: input }) => {
   min-width: 280px;
   max-height: calc(100vh - 60px);
   overflow-y: auto;
+}
+/* Keep the live controls visible while the old page snapshot sweeps across the screen. */
+:global(body:has(> .theme-sweep-old) > .light-test-console) {
+  z-index: calc(var(--z-topmost) + 1);
 }
 .lt-header {
   display: flex;
