@@ -34,7 +34,7 @@ const shoots = [
 
 let silhouettes
 
-export function drawWindowFoliage(mask, timeSeconds = 0) {
+export function drawWindowFoliage(mask, timeSeconds, frameSill) {
   silhouettes ??= Object.fromEntries(Object.entries(paths).map(([name, path]) => [name, new Path2D(path)]))
   const breeze = Math.sin(timeSeconds * 0.9) + 0.38 * Math.sin(timeSeconds * 1.57)
   mask.save()
@@ -59,7 +59,8 @@ export function drawWindowFoliage(mask, timeSeconds = 0) {
   }
   mask.restore()
 
-  mask.translate(76, 90.5)
+  // Anchor the bottom of the pot path to the underside of the frame.
+  mask.translate(76, (1 - frameSill) * 100 - 9.6)
   mask.fill(silhouettes.pot)
   mask.rotate(0.025 * breeze)
   mask.fill(silhouettes.plant)

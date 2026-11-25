@@ -172,7 +172,7 @@ export function drawWindowProjection(
     if (sash.depth) castOpenSash(mask, sash, a, c, d, x + pad, y + pad)
   }
   mask.restore()
-  drawWindowFoliage(mask, foliageTime)
+  drawWindowFoliage(mask, foliageTime, frameSill)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()
 
