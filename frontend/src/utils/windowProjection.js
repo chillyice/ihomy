@@ -25,19 +25,30 @@ export const LIGHTNING_SOURCE = {
   palette: { core: 'rgba(230,242,255,0.64)', mid: 'rgba(214,231,255,0.48)', ambient: 'rgba(201,218,250,0.22)' },
 }
 
-// Calibrate the corrected framing once: 90% of the viewport at the Jinan equinox.
-const correctedHeightRatio = 0.9 * Math.tan(((90 - 36.65) * Math.PI) / 180)
+const equinoxAltitude = 90 - 36.65
 const sillHeightRatio = 0.15
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
   const direction = floorShadowDirection(azimuth, realWeight)
+  // Infer one effective window height for the day from its calibrated noon footprint.
+  // Above the Jinan summer-solstice altitude, retain that height even at the zenith.
+  const calibrationAltitude = Math.min(noonAltitude, equinoxAltitude + 23.44)
+  const phase = (equinoxAltitude - calibrationAltitude) / 23.44
+  const winterSummerRatio = 1.15
+  const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
+  const referenceReach = height * 0.9 * (1 + amplitude * phase)
+  const correctedHeight = referenceReach * Math.tan((calibrationAltitude * Math.PI) / 180)
   // A 1.5 m opening spans two viewport heights at real scale (0.75 m per viewport).
-  const windowHeight = height * (correctedHeightRatio * (1 - realWeight) + 2 * realWeight)
+  const windowHeight = correctedHeight * (1 - realWeight) + 2 * height * realWeight
   const reach = windowHeight * groundShadowPerHeight(altitude)
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + sillHeightRatio * shear, sillHeightRatio * depth]
+  // The ground at the foot of the wall stays fixed all day. Frame the corrected view
+  // at noon, then project the raised sill along the very same rays as the rails above it.
+  const noonSillY = height * (0.05 + 0.04 * phase)
+  const wallY = (1 - realWeight) * (noonSillY - sillHeightRatio * referenceReach)
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + sillHeightRatio * shear, wallY + sillHeightRatio * depth]
 }
 
 // Average a small disk of shifted copies of the aperture. Each sample represents
@@ -147,7 +158,7 @@ export function drawWindowProjection(
   const mask = scratch.getContext('2d')
   if (!mask) return
   mask.clearRect(0, 0, scratch.width, scratch.height)
-  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight)
+  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude)
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'

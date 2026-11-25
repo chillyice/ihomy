@@ -189,6 +189,7 @@ export function getSunScene(sunInfo, slotIndex) {
     lightOpacity,
     lampOpacity,
     altitude: alt,
+    noonAltitude: slots.reduce((peak, sample) => (sample?.altitude > peak ? sample.altitude : peak), alt),
     azimuth: az,
     isNight,
     dayProgress,

@@ -95,20 +95,42 @@ describe('window-plane projection', () => {
   it.each([
     [1200, 800],
     [390, 844],
-  ])('projects the same window at noon on two selected dates at %i by %i', (width, height) => {
-    const atNoon = (date) => {
+  ])('matches the Jinan noon landmarks at %i by %i', (width, height) => {
+    const noon = (altitude) => windowTransform(width, height, altitude, 180, 0, altitude)
+    const summer = noon(76.79)
+    const equinox = noon(53.35)
+    const winter = noon(29.91)
+    expect(summer[5] / height).toBeCloseTo(0.01, 8)
+    expect(equinox[5] / height).toBeCloseTo(0.05, 8)
+    expect((equinox[5] + equinox[3]) / height).toBeCloseTo(0.95, 8)
+    expect(winter[5] / height).toBeCloseTo(0.09, 8)
+    expect(winter[3] / summer[3]).toBeCloseTo(1.15, 8)
+    expect((summer[3] + winter[3]) / (2 * height)).toBeCloseTo(0.9, 8)
+  })
+
+  it('keeps the far frame edge in its summer framing while date and projection standard change', () => {
+    const atMidday = (date) => {
       const slots = Array.from({ length: 288 }, (_, i) => sunPosition(36.65, 117.12, date, i * 5))
-      const scene = getSunScene({ slots, sunrise: '06:00', sunset: '18:00' }, 144)
-      return { scene, transform: windowTransform(width, height, scene.altitude, scene.azimuth) }
+      return getSunScene({ slots, sunrise: '06:00', sunset: '18:00' }, 144)
     }
-    const summer = atNoon('2026-06-21')
-    const autumn = atNoon('2026-11-25')
-    const cotRatio = Math.tan((summer.scene.altitude * Math.PI) / 180) / Math.tan((autumn.scene.altitude * Math.PI) / 180)
-    expect(cotRatio).toBeGreaterThan(6)
-    expect(autumn.transform[3] / summer.transform[3]).toBeCloseTo(cotRatio, 8)
-    expect(autumn.transform[5] / summer.transform[5]).toBeCloseTo(cotRatio, 8)
-    expect(summer.scene.lightOpacity).toBeGreaterThan(autumn.scene.lightOpacity)
-    expect(windowTransform(width, height, 53.35, 180)[3] / height).toBeCloseTo(0.9, 8)
+    const june = atMidday('2026-06-21')
+    const november = atMidday('2026-11-25')
+    const transform = (scene, weight) => windowTransform(1200, 800, scene.altitude, scene.azimuth, weight, scene.noonAltitude)
+    const [[, bottom, , frameHeight]] = sashApertures(openWindow(0.1, 0.5)[0])
+    const farEdge = (scene) => {
+      const [, , , depth, , originY] = transform(scene, 0)
+      return (originY + (bottom + frameHeight) * depth) / 800
+    }
+    expect(farEdge(june)).toBeGreaterThan(0.86)
+    expect(farEdge(june)).toBeLessThan(0.92)
+    expect(farEdge(november)).toBeGreaterThan(farEdge(june))
+    expect(june.lightOpacity).toBeGreaterThan(november.lightOpacity)
+    const realLength = (scene) => {
+      const [, , dx, dy] = transform(scene, 1)
+      return Math.hypot(dx, dy)
+    }
+    const tanAltitude = (scene) => Math.tan((scene.altitude * Math.PI) / 180)
+    expect(realLength(november) / realLength(june)).toBeCloseTo(tanAltitude(june) / tanAltitude(november), 8)
   })
 
   it.each([30, 65])('shortens the corrected shadow towards a daily peak of %i° and lengthens it again before sunset', (peak) => {
@@ -123,7 +145,8 @@ describe('window-plane projection', () => {
     const lengths = slots.map((_, index) => {
       const scene = getSunScene(day, index)
       expect(scene.hasDirectLight).toBe(true)
-      return windowTransform(1200, 800, scene.altitude, scene.azimuth)[3]
+      expect(scene.noonAltitude).toBe(peak)
+      return windowTransform(1200, 800, scene.altitude, scene.azimuth, 0, scene.noonAltitude)[3]
     })
     const [morning, midMorning, noon, afternoon, evening] = lengths
     expect(morning).toBeGreaterThan(midMorning)
@@ -135,7 +158,7 @@ describe('window-plane projection', () => {
 
   it.each([0, 1])('keeps extending past the viewport as the sun approaches the horizon (real weight %i)', (realWeight) => {
     const reach = (altitude) => {
-      const [, , dx, dy] = windowTransform(390, 844, altitude, 115, realWeight)
+      const [, , dx, dy] = windowTransform(390, 844, altitude, 115, realWeight, 40)
       return Math.hypot(dx, dy)
     }
     for (const altitude of [1, 0.1, 0.01]) {
@@ -150,7 +173,7 @@ describe('window-plane projection', () => {
     [1, 53.35],
   ])('casts the sill, transom and head from their heights above one fixed wall foot (weight %f, noon %f°)', (weight, peak) => {
     const width = 1200
-    const at = (altitude, azimuth) => windowTransform(width, 800, altitude, azimuth, weight)
+    const at = (altitude, azimuth) => windowTransform(width, 800, altitude, azimuth, weight, peak)
     const [paneWidth, , , noonRise, , noonSillY] = at(peak, 180)
     const wallX = (width - paneWidth) / 2
     const wallY = noonSillY - 0.15 * noonRise
@@ -187,7 +210,7 @@ describe('window-plane projection', () => {
     for (const rail of [-0.02075, 0.483, 1.02075]) {
       let previous
       for (const { i, altitude, azimuth } of direct) {
-        const [, , , depth, , y] = windowTransform(1280, 902, altitude, azimuth)
+        const [, , , depth, , y] = windowTransform(1280, 902, altitude, azimuth, 0, peak)
         const edge = y + rail * depth
         if (previous !== undefined) {
           if (i <= noon) expect(edge).toBeLessThan(previous)
@@ -199,7 +222,7 @@ describe('window-plane projection', () => {
   })
 
   it('projects a finite window height on days when the solar noon reaches the zenith', () => {
-    const reach = (altitude) => windowTransform(1200, 800, altitude, 180)[3]
+    const reach = (altitude) => windowTransform(1200, 800, altitude, 180, 0, 90)[3]
     expect(reach(1)).toBeGreaterThan(reach(45))
     expect(reach(45)).toBeLessThan(8000)
     expect(reach(89.999)).toBeLessThan(1)
@@ -207,7 +230,7 @@ describe('window-plane projection', () => {
   })
 
   it('projects a south-facing vertical window onto the floor using both solar angles', () => {
-    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1)
+    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1, 65)
     expect(Math.hypot(dx, dy)).toBeCloseTo(2000 * Math.sqrt(3))
     expect(dy).toBeCloseTo((2000 * Math.sqrt(3)) / 2)
     expect(dx).toBeCloseTo(3000)
