@@ -32,6 +32,21 @@ class SolarUtilTest {
     }
 
     @Test
+    void obliqueSummerSunPointsTowardsTheSubsolarLatitude() {
+        double lat = Math.toRadians(36.65);
+        LocalDate date = LocalDate.of(2026, 6, 21);
+        var slots = SolarUtil.buildSlots(36.65, 117.12, date, SH);
+        for (int hour : List.of(9, 10, 11, 13, 14, 15)) {
+            var slot = slots.get(hour * 12);
+            double altitude = Math.toRadians((double) slot.get("altitude"));
+            double azimuth = Math.toRadians((double) slot.get("azimuth"));
+            // The local up and north components determine declination independently of the hour angle.
+            double sinDec = Math.sin(lat) * Math.sin(altitude) + Math.cos(lat) * Math.cos(altitude) * Math.cos(azimuth);
+            assertThat(Math.toDegrees(Math.asin(sinDec))).isCloseTo(23.44, within(0.05));
+        }
+    }
+
+    @Test
     void astroTimesOrderedCorrectlyAtSummerSolstice() {
         Map<String, String> t = SolarUtil.astroTimes(LAT, LNG, LocalDate.of(2026, 6, 21), SH);
         assertThat(t.get("sunrise")).isNotBlank();

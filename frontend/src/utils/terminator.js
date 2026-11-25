@@ -41,16 +41,20 @@ export function solarAltitude(lat, lng, subsolarLat, subsolarLng) {
  * 只做几何,不做天文——赤纬与直射经度均由后端 subsolar 下发。
  */
 export function solarPosition(lat, lng, subsolar) {
+  return equatorialToHorizontal(lat, subsolar.lat, lng - subsolar.lng)
+}
+
+export function equatorialToHorizontal(lat, declination, hourAngle) {
   const latR = lat * RAD
-  const decR = subsolar.lat * RAD
-  const hR = (lng - subsolar.lng) * RAD
+  const decR = declination * RAD
+  const hR = hourAngle * RAD
   const sinAlt = clamp1(Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(hR))
   const alt = Math.asin(sinAlt)
   const cosAlt = Math.cos(alt)
   if (Math.abs(cosAlt) < 1e-10) return { altitude: alt / RAD, azimuth: 0 }
-  const y = -Math.sin(hR)
-  const x = (Math.sin(decR) - Math.sin(latR) * sinAlt) / (Math.cos(latR) * cosAlt)
-  const az = Math.atan2(y, x) / RAD
+  const east = -Math.cos(decR) * Math.sin(hR)
+  const north = Math.cos(latR) * Math.sin(decR) - Math.sin(latR) * Math.cos(decR) * Math.cos(hR)
+  const az = Math.atan2(east, north) / RAD
   return { altitude: alt / RAD, azimuth: az < 0 ? az + 360 : az }
 }
 
