@@ -1,5 +1,5 @@
 <template>
-  <section v-loading="loading" class="inventory">
+  <section v-loading="loading" class="inventory paper-surface">
     <header class="inventory-head">
       <h2 class="section-label">{{ $t('ops.overview') }}</h2>
       <el-button :aria-expanded="showFilters" :icon="Filter" @click="showFilters = !showFilters">{{ $t('ops.filters') }}</el-button>

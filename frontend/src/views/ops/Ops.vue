@@ -1,34 +1,42 @@
 <template>
   <div class="page ops-page">
-    <header v-if="userStore.isPureOps" class="console-header">
-      <strong>{{ $t('mobile.title.ops') }}</strong>
-      <el-button text @click="logout">{{ $t('nav.logout') }}</el-button>
-    </header>
-    <Breadcrumb v-else :items="[{ label: $t('mobile.title.ops') }]" />
-    <nav v-if="groups.length > 1" class="workspace-nav" :aria-label="$t('mobile.title.ops')">
-      <button
-        v-for="g in groups"
-        :key="g.key"
-        type="button"
-        :aria-current="g === group ? 'true' : undefined"
-        @click="go(g === group ? tab : g.items[0].key)"
-      >
-        <el-icon><component :is="g.icon" /></el-icon>
-        {{ $t(g.label) }}
-      </button>
-    </nav>
-    <nav class="section-nav" :aria-label="$t(group.label)">
-      <button
-        v-for="item in group.items"
-        :key="item.key"
-        type="button"
-        :aria-current="tab === item.key ? 'page' : undefined"
-        @click="go(item.key)"
-      >
-        {{ $t(item.label) }}<span v-if="item.key === 'alerts' && summary?.open" class="alert-count">{{ summary.open }}</span>
-      </button>
-    </nav>
-    <button v-if="tab === 'stats'" type="button" class="alert-entry" :class="{ pending: summary?.open }" @click="go('alerts')">
+    <Breadcrumb v-if="!userStore.isPureOps" :items="[{ label: $t('mobile.title.ops') }]" />
+    <div class="ops-directory">
+      <header v-if="userStore.isPureOps" class="console-header">
+        <strong>{{ $t('mobile.title.ops') }}</strong>
+        <el-button text @click="logout">{{ $t('nav.logout') }}</el-button>
+      </header>
+      <nav v-if="groups.length > 1" class="workspace-nav" :aria-label="$t('mobile.title.ops')">
+        <button
+          v-for="g in groups"
+          :key="g.key"
+          type="button"
+          :aria-current="g === group ? 'true' : undefined"
+          @click="go(g === group ? tab : g.items[0].key)"
+        >
+          <el-icon><component :is="g.icon" /></el-icon>
+          {{ $t(g.label) }}
+        </button>
+      </nav>
+      <nav class="section-nav" :aria-label="$t(group.label)">
+        <button
+          v-for="item in group.items"
+          :key="item.key"
+          type="button"
+          :aria-current="tab === item.key ? 'page' : undefined"
+          @click="go(item.key)"
+        >
+          {{ $t(item.label) }}<span v-if="item.key === 'alerts' && summary?.open" class="alert-count">{{ summary.open }}</span>
+        </button>
+      </nav>
+    </div>
+    <button
+      v-if="tab === 'stats'"
+      type="button"
+      class="alert-entry paper-surface"
+      :class="{ pending: summary?.open }"
+      @click="go('alerts')"
+    >
       <el-icon><Bell /></el-icon>
       <span class="alert-text"
         ><span>{{ $t('ops.alerts') }}</span
@@ -263,6 +271,72 @@ function panelEvents(key) {
 .ops-panel :deep(.el-pagination) {
   flex-wrap: wrap;
   row-gap: 6px;
+}
+/* 暖居桌面的书布导航与纸签，沿用全站晨暮材质。 */
+html.warm-paper-page .ops-page {
+  color: var(--color-text);
+}
+html.warm-paper-page .ops-directory {
+  margin-bottom: 20px;
+  background-color: var(--color-card-2);
+  background-image: var(--album-cloth-texture);
+  background-size: 128px 128px;
+  background-blend-mode: soft-light;
+  border: 1px solid var(--album-fold);
+  border-radius: 12px 19px 16px 10px;
+  box-shadow:
+    0 2px var(--album-paper),
+    0 3px var(--album-fold);
+}
+html.warm-paper-page .console-header {
+  margin: 0;
+  padding: 14px clamp(14px, 2vw, 24px) 2px;
+}
+html.warm-paper-page .workspace-nav {
+  padding: 10px clamp(10px, 1.5vw, 20px);
+  border: 0;
+}
+html.warm-paper-page .workspace-nav button {
+  color: var(--color-text);
+}
+html.warm-paper-page .workspace-nav button[aria-current] {
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  background-size: auto, var(--home-grain-size);
+  color: var(--color-brand);
+  box-shadow:
+    inset 0 0 0 1px var(--mat-edge),
+    0 2px 3px var(--album-fold);
+}
+html.warm-paper-page .section-nav {
+  margin: 0;
+  padding: 6px clamp(10px, 1.5vw, 20px);
+  border-radius: inherit;
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  background-size: auto, var(--home-grain-size);
+}
+html.warm-paper-page .workspace-nav + .section-nav {
+  border-radius: 0 0 16px 10px;
+  border-top: 1px solid var(--album-fold);
+}
+html.warm-paper-page .section-nav button[aria-current] {
+  box-shadow: inset 0 -2px var(--color-brand);
+  border-radius: 4px;
+}
+html.warm-paper-page .alert-entry {
+  border-radius: 6px 12px 12px 6px;
+  box-shadow: 0 1px 3px var(--album-fold);
+}
+html.warm-paper-page .ops-panel :deep(:is(.finance-card, .metric-card, .backup-stat, .stat-card)) {
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  background-size: auto, var(--home-grain-size);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+html.warm-paper-page .ops-panel :deep(.chart-wrap) {
+  background-color: var(--color-card);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
 @media (max-width: 600px) {
   .workspace-nav {

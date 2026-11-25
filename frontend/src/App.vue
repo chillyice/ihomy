@@ -167,8 +167,7 @@ watch(
     themeStore.theme === 'warm' &&
     !standalone.value &&
     !immersive.value &&
-    !route.meta.ops &&
-    !userStore.isPureOps &&
+    (!userStore.isPureOps || route.meta.ops) &&
     route.name !== 'MindMapEditor' &&
     !isMobileGamePath(route.path),
   (active) => document.documentElement.classList.toggle('warm-paper-page', active),
