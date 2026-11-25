@@ -42,19 +42,24 @@ function schedulePaint() {
     const canvas = surface.value
     const scene = props.scene
     const realWeight = props.standard === 'real' ? 1 : 0
-    if (!target || target.realWeight !== realWeight || target.altitude !== scene.altitude || target.azimuth !== scene.azimuth) {
-      start = displayed ?? { ...scene, realWeight }
-      target = { altitude: scene.altitude, azimuth: scene.azimuth, realWeight }
+    const noonAltitude = scene.noonAltitude ?? scene.altitude
+    if (
+      !target ||
+      target.realWeight !== realWeight ||
+      target.altitude !== scene.altitude ||
+      target.azimuth !== scene.azimuth ||
+      target.noonAltitude !== noonAltitude
+    ) {
+      target = { altitude: scene.altitude, azimuth: scene.azimuth, noonAltitude, realWeight }
+      start = displayed ?? target
       startedAt = now
     }
-    const t =
-      start.altitude === target.altitude && start.azimuth === target.azimuth && start.realWeight === target.realWeight
-        ? 1
-        : Math.min(1, (now - startedAt) / 600)
+    const t = start === target ? 1 : Math.min(1, (now - startedAt) / 600)
     const blend = t * t * (3 - 2 * t)
     displayed = {
       realWeight: start.realWeight + (target.realWeight - start.realWeight) * blend,
       altitude: start.altitude + (target.altitude - start.altitude) * blend,
+      noonAltitude: start.noonAltitude + (target.noonAltitude - start.noonAltitude) * blend,
       azimuth: start.azimuth + (target.azimuth - start.azimuth) * blend,
     }
     if (!reducedMotion.matches) foliageTime = now / 1000

@@ -67,3 +67,20 @@ describe('getSunScene 台灯时机', () => {
     expect(getSunScene(day, 222).lampOpacity).toBe(1) // 18:30
   })
 })
+
+it('南窗收到低角度直射光时长影可见，太阳降到地平线或转到窗后时自然光影消失', () => {
+  const slots = [
+    { time: '06:00', altitude: 0, azimuth: 115 },
+    { time: '06:05', altitude: 2, azimuth: 115 },
+    { time: '12:00', altitude: 55, azimuth: 180 },
+    { time: '17:00', altitude: 2, azimuth: 275 },
+    { time: '19:00', altitude: -8, azimuth: 280 },
+  ]
+  const day = { sunrise: '06:00', sunset: '18:00', slots }
+  const opacity = slots.map((_, index) => getSunScene(day, index).lightOpacity)
+  expect(opacity[0]).toBe(0)
+  expect(opacity[1]).toBeGreaterThan(0.1)
+  expect(opacity[1]).toBeLessThan(opacity[2])
+  expect(opacity[2]).toBeCloseTo(1)
+  expect(opacity.slice(3)).toEqual([0, 0])
+})

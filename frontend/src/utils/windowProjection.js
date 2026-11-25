@@ -25,22 +25,25 @@ export const LIGHTNING_SOURCE = {
   palette: { core: 'rgba(230,242,255,0.64)', mid: 'rgba(214,231,255,0.48)', ambient: 'rgba(201,218,250,0.22)' },
 }
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = altitude) {
   const radians = Math.PI / 180
   const direction = floorShadowDirection(azimuth)
-  // Calibrate against solar noon in Jinan (36.65° N). Outside noon the
-  // same continuous curve follows the actual solar elevation and bearing.
-  const phase = (90 - 36.65 - altitude) / 23.44
+  // Calibrate the day's noon footprint against the Jinan solstices (36.65° N).
+  const phase = (90 - 36.65 - noonAltitude) / 23.44
   const winterSummerRatio = 1.15
   const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
-  const correctedReach = height * 0.9 * (1 + amplitude * phase)
+  const noonReach = height * 0.9 * (1 + amplitude * phase)
+  // A bounded inverse curve keeps low-sun shadows visible on a finite screen.
+  // It grows from the noon footprint to three times that length at the horizon.
+  const relativeAltitude = noonAltitude > 0 ? Math.max(0, Math.min(1, altitude / noonAltitude)) : 1
+  const correctedReach = (3 * noonReach) / (1 + 2 * relativeAltitude)
   // The 1.5 m opening spans two viewport heights (0.75 m per viewport). Its sill is 15% of the opening above the floor.
   const realReach = realWeight > 0 && altitude > 0 && altitude < 90 ? (height * 2) / Math.tan(altitude * radians) : 0
   const reach = correctedReach + (realReach - correctedReach) * realWeight
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
-  const correctedTop = height * (0.05 + 0.04 * phase)
+  const correctedTop = height * (0.05 + 0.04 * phase) + 0.15 * (correctedReach - noonReach) * direction.y
   const top = correctedTop + (0.15 * realReach * direction.y - correctedTop) * realWeight
   return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + shear * 0.15, top]
 }
@@ -152,7 +155,7 @@ export function drawWindowProjection(
   const mask = scratch.getContext('2d')
   if (!mask) return
   mask.clearRect(0, 0, scratch.width, scratch.height)
-  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight)
+  const [a, b, c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude)
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, sashApertures, windowTransform } from './windowProjection'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
+import { getSunScene } from './windowLight'
 
 function openWindow(layout, ...angles) {
   const samples = [layout, ...angles]
@@ -105,8 +106,33 @@ describe('window-plane projection', () => {
     expect((summer[3] + winter[3]) / (2 * height)).toBeCloseTo(0.9, 8)
   })
 
+  it.each([30, 65])('shortens the corrected shadow towards a daily peak of %i° and lengthens it again before sunset', (peak) => {
+    const slots = [
+      { time: '07:05', altitude: 2, azimuth: 115 },
+      { time: '08:30', altitude: 15, azimuth: 130 },
+      { time: '12:20', altitude: peak, azimuth: 180 },
+      { time: '16:10', altitude: 15, azimuth: 230 },
+      { time: '17:35', altitude: 2, azimuth: 245 },
+    ]
+    const day = { sunrise: '07:00', sunset: '17:40', slots }
+    const lengths = slots.map((_, index) => {
+      const scene = getSunScene(day, index)
+      expect(scene.hasDirectLight).toBe(true)
+      expect(scene.noonAltitude).toBe(peak)
+      const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, 0, scene.noonAltitude)
+      return Math.hypot(dx, dy)
+    })
+    const [morning, midMorning, noon, afternoon, evening] = lengths
+    expect(morning).toBeGreaterThan(midMorning)
+    expect(midMorning).toBeGreaterThan(noon)
+    expect(morning / noon).toBeGreaterThan(2)
+    expect(morning / noon).toBeLessThan(3)
+    expect(afternoon).toBeCloseTo(midMorning)
+    expect(evening).toBeCloseTo(morning)
+  })
+
   it('projects a south-facing vertical window onto the floor using both solar angles', () => {
-    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1)
+    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1, 65)
     expect(Math.hypot(dx, dy)).toBeCloseTo(2000 * Math.sqrt(3))
     expect(dy).toBeCloseTo((2000 * Math.sqrt(3)) / 2)
     expect(dx).toBeCloseTo(3000)
