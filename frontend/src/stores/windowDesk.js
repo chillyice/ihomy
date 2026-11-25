@@ -16,15 +16,10 @@ export const useWindowDeskStore = defineStore('windowDesk', () => {
   const destinations = ref(
     saved?.destinations && typeof saved.destinations === 'object' && !Array.isArray(saved.destinations) ? saved.destinations : {},
   )
-  const positions = ref(saved?.positions || {})
-  function move(key, position) {
-    positions.value = { ...positions.value, [key]: position }
-  }
   const arrangement = ref(0)
   const plan = shallowRef(sampleDeskPlan())
 
   function rearrange({ manual = false } = {}) {
-    if (manual) positions.value = {}
     plan.value = sampleDeskPlan(Math.random, manual || !plan.value.length ? 1 : 0)
     arrangement.value++
   }
@@ -36,16 +31,15 @@ export const useWindowDeskStore = defineStore('windowDesk', () => {
     destinations.value = next
   }
 
-  watch([enabled, destinations, positions], () => {
+  function savePreferences() {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ enabled: enabled.value, destinations: destinations.value, positions: positions.value }),
-      )
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: enabled.value, destinations: destinations.value }))
     } catch {
       // 本机存储不可用，保留内存中的选择。
     }
-  })
+  }
+  if (saved?.positions) savePreferences()
+  watch([enabled, destinations], savePreferences)
 
-  return { enabled, destinations, arrangement, plan, positions, move, rearrange, setDestination }
+  return { enabled, destinations, arrangement, plan, rearrange, setDestination }
 })

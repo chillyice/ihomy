@@ -58,7 +58,7 @@ import { useI18n } from 'vue-i18n'
 import { useDeskObjects } from '@/composables/useDeskObjects'
 import { useDeskSpace } from '@/composables/useDeskSpace'
 import { useDragResize } from '@/utils/useDragResize'
-import { useWindowDeskStore } from '@/stores/windowDesk'
+import { useRoute } from 'vue-router'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
@@ -95,11 +95,15 @@ const { placements: seats, modalOpen } = useDeskSpace(drawable, () =>
   props.plan.length || drawable.value[0]?.key !== 'resume' ? props.plan : bookmarkPlan,
 )
 
-const desk = useWindowDeskStore()
+const route = useRoute()
+const temporaryPositions = shallowRef({})
 const { pos, size: dragSize, dragging, onDragStart } = useDragResize({ w: 1, h: 1 })
 let activeSeat
 let ignoreClick = false
-const preview = shallowRef(null)
+watch([() => route.fullPath, arrangement], () => {
+  temporaryPositions.value = {}
+  activeSeat = null
+})
 function startMove(event, seat) {
   if (event.button !== 0 || event.isPrimary === false) return
   const w = seat.cropWidth || seat.size
@@ -113,18 +117,19 @@ watch(
   pos,
   (point) => {
     if (!dragging.value || !activeSeat) return
-    const { width, size, cropWidth, positionKey } = activeSeat
-    preview.value = { positionKey, x: (point.x + (cropWidth || size) / 2) / width, y: point.y + size / 2 }
+    const { width, size, cropWidth, item } = activeSeat
+    temporaryPositions.value = {
+      ...temporaryPositions.value,
+      [item.key]: { x: (point.x + (cropWidth || size) / 2) / width, y: point.y + size / 2 },
+    }
   },
   { flush: 'sync' },
 )
 watch(
   dragging,
   (moving) => {
-    if (moving || !preview.value) return
-    const { positionKey, x, y } = preview.value
-    desk.move(positionKey, { x, y })
-    preview.value = null
+    if (moving) return
+    activeSeat = null
     ignoreClick = true
   },
   { flush: 'sync' },
@@ -137,10 +142,9 @@ function guardClick(event) {
   ignoreClick = false
 }
 const placements = computed(() =>
-  seats.value.map((seat, index) => {
-    const positionKey = seat.item.key === 'resume' ? 'resume' : seat.item.kind === 'photo' ? 'photo-' + index : seat.item.kind
-    const point = preview.value?.positionKey === positionKey ? preview.value : desk.positions[positionKey]
-    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return { ...seat, positionKey }
+  seats.value.map((seat) => {
+    const point = temporaryPositions.value[seat.item.key]
+    if (!point) return seat
     const { size, cropWidth, width, height, navRight } = seat
     const edge = point.x * width < (width + navRight) / 2 ? 'left' : 'right'
     const half = (cropWidth || size) / 2
@@ -150,7 +154,7 @@ const placements = computed(() =>
         : width - half
       : Math.max(navRight + half, Math.min(width - half, point.x * width))
     const y = Math.max(size / 2, Math.min(height - size / 2, point.y))
-    return { ...seat, positionKey, edge, x, y }
+    return { ...seat, edge, x, y }
   }),
 )
 const sunLight = inject(SUN_LIGHT_KEY, null)
