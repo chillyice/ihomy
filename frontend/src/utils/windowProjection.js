@@ -3,10 +3,18 @@ import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
-// Clear glass in normalized window coordinates. Everything else blocks transmission.
+// One solid sash with two glazed openings, in hinge-to-latch × sill-to-head coordinates.
+const stileWidth = 0.093
+const railHeight = 0.065
+const frameDepth = 0.032 // fraction of the full window width, perpendicular to the sash
 const halfTransom = 0.0825 / 2
 const transomTop = 0.483 - halfTransom
 const transomBottom = 0.483 + halfTransom
+const sashContours = [
+  [0, 0, 1, 1],
+  [stileWidth, railHeight, 1 - 2 * stileWidth, transomTop - railHeight],
+  [stileWidth, transomBottom, 1 - 2 * stileWidth, 1 - railHeight - transomBottom],
+]
 
 // A source above and slightly to one side of the window, independent of the sun at night.
 export const LIGHTNING_SOURCE = {
@@ -50,6 +58,34 @@ const scratchBuffers = new WeakMap()
 function resize(canvas, width, height) {
   if (canvas.width !== width) canvas.width = width
   if (canvas.height !== height) canvas.height = height
+}
+
+function castSash(mask, { hinge, latch, tipX = latch, depth = 0 }, paneWidth, riseX, riseY, originX, originY) {
+  const span = latch - hinge
+  const uX = paneWidth * (tipX - hinge)
+  const uY = paneWidth * depth
+  // The frame's thickness turns with it. When seen edge-on the reveals still block light.
+  const thicknessX = (-uY * frameDepth) / span
+  const thicknessY = (uX * frameDepth) / span
+  const hingeX = originX + paneWidth * hinge
+
+  mask.setTransform(uX, uY, riseX, riseY, hingeX, originY)
+  mask.beginPath()
+  for (const [u, v, width, height] of sashContours) mask.rect(u, v, width, height)
+  mask.fill('evenodd')
+
+  // Sweep every rim (outside and around both panes) to the back face.
+  // Along a ray, any point beyond the front profile is reached through one of these sides.
+  for (const [u, v, width, height] of sashContours) {
+    for (const edgeV of [v, v + height]) {
+      mask.setTransform(uX, uY, thicknessX, thicknessY, hingeX + riseX * edgeV, originY + riseY * edgeV)
+      mask.fillRect(u, 0, width, 1)
+    }
+    for (const edgeU of [u, u + width]) {
+      mask.setTransform(riseX, riseY, thicknessX, thicknessY, hingeX + uX * edgeU, originY + uY * edgeU)
+      mask.fillRect(v, 0, height, 1)
+    }
+  }
 }
 
 // occluders accepts filled SVG path strings or Path2D objects in window-plane
@@ -101,28 +137,14 @@ export function drawWindowProjection(
   mask.save()
   mask.setTransform(a, b, c, d, x + pad, y + pad)
   mask.fillStyle = '#fff'
-  for (const { hinge, latch } of CASEMENTS) {
-    const left = Math.min(hinge, latch)
-    const span = Math.abs(latch - hinge)
-    if (sash?.hinge === hinge) {
-      mask.fillRect(left, 0, span, 1)
-    } else {
-      mask.fillRect(left, 0, span, transomTop)
-      mask.fillRect(left, transomBottom, span, 1 - transomBottom)
-    }
-  }
+  const [left, right] = CASEMENTS
+  mask.fillRect(left.hinge, 0, right.hinge - left.hinge, 1)
   mask.globalCompositeOperation = 'destination-out'
-  if (sash) {
-    // The hinge stays in the window plane. The free edge swings onto the floor's
-    // depth axis while vertical rails still cast along the solar vector (c, d).
-    mask.save()
-    mask.setTransform(a * (sash.tipX - sash.hinge), a * sash.depth, c, d, x + pad + a * sash.hinge, y + pad)
-    mask.fillRect(0, transomTop, 1, 2 * halfTransom)
-    mask.fillRect(0.94, 0, 0.06, 1)
-    mask.fillRect(0, 0, 1, 0.025)
-    mask.fillRect(0, 0.975, 1, 0.025)
-    mask.restore()
+  mask.save()
+  for (const closed of CASEMENTS) {
+    castSash(mask, sash?.hinge === closed.hinge ? sash : closed, a, c, d, x + pad, y + pad)
   }
+  mask.restore()
   drawWindowFoliage(mask, foliageTime)
   for (const shape of occluders) mask.fill(typeof shape === 'string' ? new Path2D(shape) : shape)
   mask.restore()

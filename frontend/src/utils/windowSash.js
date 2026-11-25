@@ -1,10 +1,10 @@
 import { resolveMorningWeather } from './morningWeather'
 
-// Coordinates across the fixed jambs and central mullion of the window.
+// The two meeting stiles meet in the middle; only the outer jambs are fixed.
 export const WINDOW_WIDTH_RATIO = 0.88
 export const CASEMENTS = [
-  { hinge: 0.012, latch: 0.5 - 0.036 },
-  { hinge: 1 - 0.012, latch: 0.5 + 0.036 },
+  { hinge: 0.012, latch: 0.5 },
+  { hinge: 1 - 0.012, latch: 0.5 },
 ]
 
 export function weatherClosesWindow(weather) {

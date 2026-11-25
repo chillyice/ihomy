@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { drawWindowProjection, windowTransform } from './windowProjection'
-import { chooseWindowSash, weatherClosesWindow } from './windowSash'
+import { CASEMENTS, chooseWindowSash, weatherClosesWindow } from './windowSash'
 
 describe('window sash', () => {
   it.each([
@@ -24,7 +24,13 @@ describe('window sash', () => {
     expect(chooseWindowSash(() => 0.2)).toBeNull()
   })
 
-  it.each([0, 0.5, 0.999])('mirrors the open gap around the central mullion at sample %f', (sample) => {
+  it('lets the two meeting stiles own the whole centre seam', () => {
+    const [left, right] = CASEMENTS
+    expect(left.latch).toBe(right.latch)
+    expect(left.latch - left.hinge).toBeCloseTo(right.hinge - right.latch)
+  })
+
+  it.each([0, 0.5, 0.999])('mirrors the open gap around the meeting stiles at sample %f', (sample) => {
     const opening = (side) => chooseWindowSash(vi.fn().mockReturnValueOnce(0.8).mockReturnValueOnce(side).mockReturnValue(sample))
     const left = opening(0)
     const right = opening(1)
