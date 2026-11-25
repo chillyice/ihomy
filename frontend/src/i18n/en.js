@@ -3832,6 +3832,8 @@ export default {
     recordId: 'Record ID',
     recordUser: 'User ID',
     recordFamily: 'Family ID',
+    recordUserName: 'Username',
+    recordFamilyName: 'Family name',
     createdTime: 'Created at',
     resourceDetail: '{name} records',
     allRecords: 'All records',

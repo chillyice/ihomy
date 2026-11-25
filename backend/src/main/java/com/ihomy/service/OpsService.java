@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * - stats:   各资源表总数量（可按创建时间/用户/家庭过滤）
  * - server:  服务器/JVM 状态（内存、线程、磁盘用量）
  * - logs:    全系统操作日志检索（带过滤分页）
- * 资源统计与分页记录共用同一筛选口径，记录只返回编号、归属与创建时间。
+ * 资源统计与分页记录共用同一筛选口径，用户和家庭明细额外展示名称。
  */
 @Service
 @RequiredArgsConstructor
@@ -90,9 +90,9 @@ public class OpsService {
     private Map<String, Resource<?>> resources() {
         Map<String, Resource<?>> resources = new LinkedHashMap<>();
         resources.put("users", new Resource<>(sysUserMapper, SysUser::getId, SysUser::getCreatedAt,
-                null, null));
+                null, null, SysUser::getUsername));
         resources.put("families", new Resource<>(familyMapper, Family::getId, Family::getCreatedAt,
-                null, null));
+                null, null, Family::getName));
         resources.put("blogs", new Resource<>(blogMapper, Blog::getId, Blog::getCreatedAt,
                 Blog::getAuthorId, Blog::getFamilyId));
         resources.put("diaries", new Resource<>(diaryMapper, Diary::getId, Diary::getCreatedAt,
@@ -122,10 +122,15 @@ public class OpsService {
         return resources;
     }
 
-    public record ResourceRow(Long id, LocalDateTime createdAt, Long userId, Long familyId) {}
+    public record ResourceRow(Long id, LocalDateTime createdAt, Long userId, Long familyId, String name) {}
 
     private record Resource<T>(BaseMapper<T> mapper, SFunction<T, Long> id, SFunction<T, LocalDateTime> createdAt,
-                               SFunction<T, Long> user, SFunction<T, Long> family) {
+                               SFunction<T, Long> user, SFunction<T, Long> family, SFunction<T, String> name) {
+        Resource(BaseMapper<T> mapper, SFunction<T, Long> id, SFunction<T, LocalDateTime> createdAt,
+                 SFunction<T, Long> user, SFunction<T, Long> family) {
+            this(mapper, id, createdAt, user, family, null);
+        }
+
         LambdaQueryWrapper<T> filter(LocalDate start, LocalDate end, Long userId, Long familyId) {
             LambdaQueryWrapper<T> query = new LambdaQueryWrapper<>();
             if (start != null) query.ge(createdAt, start.atStartOfDay());
@@ -143,10 +148,12 @@ public class OpsService {
             List<SFunction<T, ?>> columns = new ArrayList<>(List.of(id, createdAt));
             if (user != null) columns.add(user);
             if (family != null) columns.add(family);
+            if (name != null) columns.add(name);
             var query = filter(start, end, userId, familyId).select(columns).orderByDesc(id);
             return mapper.selectPage(new Page<>(current, size), query).convert(row ->
                     new ResourceRow(id.apply(row), createdAt.apply(row),
-                            user == null ? null : user.apply(row), family == null ? null : family.apply(row)));
+                            user == null ? null : user.apply(row), family == null ? null : family.apply(row),
+                            name == null ? null : name.apply(row)));
         }
     }
 

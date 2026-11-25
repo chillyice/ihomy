@@ -59,7 +59,7 @@ public class OpsController {
         return Result.success(opsService.stats(startDate, endDate, userId, familyId));
     }
 
-    @Operation(summary = "查看资源记录的编号、归属与创建时间")
+    @Operation(summary = "查看资源记录的编号、归属、创建时间及用户或家庭名称")
     @RequirePermission("ops:view")
     @GetMapping("/stats/records")
     public Result<IPage<OpsService.ResourceRow>> resourceRows(

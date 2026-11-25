@@ -3794,6 +3794,8 @@ export default {
     recordId: '记录编号',
     recordUser: '用户编号',
     recordFamily: '家庭编号',
+    recordUserName: '用户名',
+    recordFamilyName: '家庭名称',
     createdTime: '创建时间',
     resourceDetail: '{name}明细',
     allRecords: '全部记录',

@@ -65,7 +65,18 @@
         {{ $t('common.loadFailed') }} <el-button @click="loadPage(page)">{{ $t('common.retry') }}</el-button>
       </p>
       <el-table v-else :data="records" max-height="55vh" stripe :empty-text="$t('ops.emptyRecords')">
-        <el-table-column prop="id" :label="$t('ops.recordId')" min-width="80">
+        <el-table-column
+          v-if="!hasOwner"
+          prop="name"
+          :label="selected === 'families' ? $t('ops.recordFamilyName') : $t('ops.recordUserName')"
+          min-width="110"
+        >
+          <template #default="{ row }">
+            {{ row.name || '—' }}
+            <small v-if="isMobile">{{ $t('ops.recordId') }} {{ row.id }}</small>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="hasOwner || !isMobile" prop="id" :label="$t('ops.recordId')" min-width="80">
           <template #default="{ row }">
             {{ row.id }}
             <template v-if="isMobile && hasOwner">
