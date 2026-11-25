@@ -27,7 +27,7 @@
             </el-select>
           </div>
         </el-form-item>
-        <el-button @click="desk.arrangement++">{{ $t('windowDesk.shuffle') }}</el-button>
+        <el-button @click="desk.rearrange({ manual: true })">{{ $t('windowDesk.shuffle') }}</el-button>
       </template>
     </el-form>
   </div>

@@ -42,6 +42,7 @@
       "
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
+      :plan="desk.plan"
     />
     <PawTrail v-if="routeReady && desk.enabled && route.name !== 'Wallpaper'" />
     <div v-if="route.name === 'Home' && appStore.loadFailed && !userStore.mustChangePassword" class="home-load-error" role="status">
@@ -83,6 +84,7 @@ import { useFloatsStore } from '@/stores/floats'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
+import { startSceneRotation } from '@/utils/sceneRotation'
 import { initPrefSync } from '@/utils/userPref'
 import { useDevice } from '@/composables/useDevice'
 import { isMobileGamePath } from '@/utils/mobileNav'
@@ -209,6 +211,14 @@ onBeforeUnmount(() => {
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight(() => !userStore.isPureOps)
+let stopRotation
+onMounted(() => {
+  stopRotation = startSceneRotation(() => {
+    sunLight.rearrangeScene()
+    if (desk.enabled) desk.rearrange()
+  }, sunLight.setWeatherVisible)
+})
+onBeforeUnmount(() => stopRotation?.())
 provide(SUN_LIGHT_KEY, sunLight)
 const { anyEffectEnabled, lightTestMode } = sunLight
 

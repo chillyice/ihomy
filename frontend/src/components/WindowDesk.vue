@@ -59,6 +59,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 const props = defineProps({
   destinations: { type: Object, default: () => ({}) },
   arrangement: { type: Number, default: 0 },
+  plan: { type: Array, required: true },
 })
 const { t } = useI18n()
 const artFiles = import.meta.glob('../assets/windowdesk/*.webp', { eager: true, import: 'default', query: '?url&no-inline' })
@@ -77,7 +78,7 @@ const hideMissingImage = (item) => {
 const arrangement = () => props.arrangement
 const { candidates } = useDeskObjects(true, () => props.destinations, arrangement)
 const drawable = computed(() => candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))))
-const { placements, modalOpen } = useDeskSpace(drawable, arrangement)
+const { placements, modalOpen } = useDeskSpace(drawable, () => props.plan)
 
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const deskLayer = ref(null)

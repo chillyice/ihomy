@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
+import { sampleDeskPlan } from '@/utils/deskSpace'
 
 // 设备的桌面偏好只存开关和入口，不保存家庭内容或物品快照。
 const STORAGE_KEY = 'ihomy:window-desk:v1'
@@ -16,6 +17,12 @@ export const useWindowDeskStore = defineStore('windowDesk', () => {
     saved?.destinations && typeof saved.destinations === 'object' && !Array.isArray(saved.destinations) ? saved.destinations : {},
   )
   const arrangement = ref(0)
+  const plan = shallowRef(sampleDeskPlan())
+
+  function rearrange({ manual = false } = {}) {
+    plan.value = sampleDeskPlan(Math.random, manual || !plan.value.length ? 1 : 0)
+    arrangement.value++
+  }
 
   function setDestination(kind, path) {
     const next = { ...destinations.value }
@@ -32,5 +39,5 @@ export const useWindowDeskStore = defineStore('windowDesk', () => {
     }
   })
 
-  return { enabled, destinations, arrangement, setDestination }
+  return { enabled, destinations, arrangement, plan, rearrange, setDestination }
 })

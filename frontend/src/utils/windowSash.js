@@ -17,8 +17,8 @@ export function weatherClosesWindow(weather) {
   return scales.some((scale) => Number(scale) >= 6) || Number.parseFloat(weather.nowFull?.windSpeed ?? weather.windSpeed) >= 39
 }
 
-export function chooseWindowSashes(random = Math.random) {
-  if (random() < 0.45) return CASEMENTS
+export function chooseWindowSashes(random = Math.random, previous) {
+  if (random() < 0.45 && previous !== CASEMENTS) return CASEMENTS
   const openings = ['left', 'right', 'both'][Math.floor(random() * 3)]
   return CASEMENTS.map((sash, index) => {
     const side = index === 0 ? 'left' : 'right'

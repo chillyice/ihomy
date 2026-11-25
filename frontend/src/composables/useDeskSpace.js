@@ -1,6 +1,6 @@
 import { onMounted, onBeforeUnmount, shallowRef, toValue, watch } from 'vue'
 import { useDevice } from './useDevice'
-import { DESK_FLOATS, deskLanes, placeDeskItems, sampleDeskPlan } from '@/utils/deskSpace'
+import { DESK_FLOATS, deskLanes, placeDeskItems } from '@/utils/deskSpace'
 
 const CENTER =
   '.gc-studio,.app-main > .page,.window-content :is(.mobile-tab-content,.mobile-sub-content) > .page,.elder-home,.login-card,.kada > .kwrap,.bp > .bpwrap'
@@ -24,7 +24,6 @@ const BUSY = [
 ].join(',')
 const EDITHOST = '.gc-home,.home-page,.gc-weatherbg'
 const LANDMARKS = [CENTER, NAV, BOARD, CARD, TABLET_PAGE, MODAL, BUSY, EDITHOST, DESK_FLOATS, '.gc-side'].join(',')
-let visitPlan
 
 function visibleRect(node) {
   const rect = node.getBoundingClientRect()
@@ -50,7 +49,7 @@ function samePlacements(left, right) {
 }
 
 // 只在整页结构发生变化时收集边界元素。滚动、尺寸和浮窗的拖动复用已收集的元素。
-export function useDeskSpace(items, arrangement) {
+export function useDeskSpace(items, plan) {
   const placements = shallowRef([])
   const { isTablet } = useDevice()
   const modalOpen = shallowRef(false)
@@ -61,7 +60,6 @@ export function useDeskSpace(items, arrangement) {
   let controlObserver
   let controls = new Set()
   const visibleControls = new Set()
-  visitPlan ??= sampleDeskPlan()
 
   function clearScene() {
     if (placements.value.length) placements.value = []
@@ -138,7 +136,7 @@ export function useDeskSpace(items, arrangement) {
     }
     // 自由画板没有固定正文列，按候选高度附近的卡片实测剩余空间。
     const objectLanes = board && !center ? deskLanes(width, height, navRight, null, width) : lanes
-    const next = placeDeskItems(toValue(items), visitPlan, objectLanes, objectObstacles, cards)
+    const next = placeDeskItems(toValue(items), toValue(plan), objectLanes, objectObstacles, cards)
     if (!samePlacements(placements.value, next)) placements.value = next
   }
   function schedule() {
@@ -207,14 +205,7 @@ export function useDeskSpace(items, arrangement) {
     clearScene()
     nodes = null
   }
-  watch(() => toValue(items), schedule, { flush: 'post' })
-  watch(
-    () => toValue(arrangement),
-    () => {
-      visitPlan = sampleDeskPlan(Math.random, 1)
-      schedule()
-    },
-  )
+  watch([() => toValue(items), () => toValue(plan)], schedule, { flush: 'post' })
   onMounted(start)
   onBeforeUnmount(stop)
   return { placements, modalOpen }

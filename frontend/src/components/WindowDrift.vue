@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { WINDOW_WIDTH_RATIO } from '@/utils/windowSash'
 
 const props = defineProps({
@@ -37,6 +37,7 @@ function nextPass() {
   pass.value++
   trajectory.value = chooseTrajectory()
 }
+watch(() => props.openSashes, nextPass)
 </script>
 
 <style scoped>

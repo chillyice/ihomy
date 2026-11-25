@@ -27,6 +27,8 @@ describe('window sash', () => {
 
   it('can keep both casements shut', () => {
     expect(chooseWindowSashes(() => 0.2)).toEqual(CASEMENTS)
+    const next = chooseWindowSashes(() => 0.2, CASEMENTS)
+    expect(next.some((sash) => sash.depth > 0)).toBe(true)
   })
 
   it('lets the two meeting stiles own the whole centre seam', () => {

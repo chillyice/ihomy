@@ -25,7 +25,7 @@ const DIFFUSE_SKY = {
 export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
-  const fairWeatherSashes = chooseWindowSashes()
+  const fairWeatherSashes = shallowRef(chooseWindowSashes())
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
@@ -129,7 +129,8 @@ export function useSunLight(canReadEnvironment = () => true) {
   const previewWeather = ref(null)
   const weatherOverride = computed(() => (lightTestMode.value ? previewWeather.value : null))
   const activeWeather = computed(() => weatherOverride.value ?? (weatherEffectEnabled.value ? weather.value : null))
-  const windowSashes = computed(() => (weatherClosesWindow(weatherOverride.value ?? weather.value) ? CASEMENTS : fairWeatherSashes))
+  const stormClosed = computed(() => weatherClosesWindow(weatherOverride.value ?? weather.value))
+  const windowSashes = computed(() => (stormClosed.value ? CASEMENTS : fairWeatherSashes.value))
   const weatherMode = computed(() => resolveMorningWeather(activeWeather.value))
   const setWeather = (condition, level = 0) => {
     previewWeather.value = { condition, precipLevel: level }
@@ -367,7 +368,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   })
 
   // 灰尘粒子:20 个
-  const dustParticles = ref(
+  const sampleDust = () =>
     Array.from({ length: 20 }, (_, i) => ({
       id: i,
       left: Math.random() * 100 + '%',
@@ -376,11 +377,11 @@ export function useSunLight(canReadEnvironment = () => true) {
       duration: 10 + Math.random() * 15,
       delay: Math.random() * 12,
       drift: 40 + Math.random() * 80,
-    })),
-  )
+    }))
+  const dustParticles = shallowRef(sampleDust())
 
   // 雪花粒子:数量=precipLevel×10,六瓣雪花字符,缓落+横向飘移+自转
-  const snowParticles = computed(() => {
+  function sampleSnow() {
     if (weatherMode.value !== 'snow' || precipLevel.value <= 0) return []
     const count = precipLevel.value * 10
     return Array.from({ length: count }, (_, i) => ({
@@ -392,10 +393,10 @@ export function useSunLight(canReadEnvironment = () => true) {
       drift: 30 + Math.random() * 80,
       opacity: 0.5 + Math.random() * 0.4,
     }))
-  })
+  }
 
   // 雨滴粒子:数量=precipLevel×10,快速下落
-  const rainParticles = computed(() => {
+  function sampleRain() {
     if ((weatherMode.value !== 'rain' && weatherMode.value !== 'thunder') || precipLevel.value <= 0) return []
     const count = precipLevel.value * 10
     return Array.from({ length: count }, (_, i) => ({
@@ -406,7 +407,21 @@ export function useSunLight(canReadEnvironment = () => true) {
       delay: Math.random() * 2,
       opacity: 0.3 + Math.random() * 0.4,
     }))
-  })
+  }
+  const snowParticles = shallowRef([])
+  const rainParticles = shallowRef([])
+  function refreshPrecipitation() {
+    snowParticles.value = sampleSnow()
+    rainParticles.value = sampleRain()
+  }
+  watch([weatherMode, precipLevel], refreshPrecipitation, { immediate: true })
+
+  function rearrangeScene() {
+    if (lightTestMode.value) return
+    if (!stormClosed.value) fairWeatherSashes.value = chooseWindowSashes(Math.random, fairWeatherSashes.value)
+    dustParticles.value = sampleDust()
+    refreshPrecipitation()
+  }
 
   // 同一束直射光决定窗投影和光路中浮尘的可见度。
   const lightLayerOpacity = computed(() => (shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0))
@@ -430,6 +445,9 @@ export function useSunLight(canReadEnvironment = () => true) {
   // 拉取太阳信息并启动时隙更新
   let slotTimer = null
   let weatherTimer = null
+  let weatherVisible = false
+  let nextWeatherAt = 0
+  let currentWeatherRun = null
 
   const loadSunInfo = async () => {
     if (!canReadEnvironment()) return
@@ -467,22 +485,35 @@ export function useSunLight(canReadEnvironment = () => true) {
     if (sunInfoAge() > SUN_INFO_TTL) loadSunInfo()
   }
 
-  // 拉取真实天气并同步到光影系统(非光照测试模式)
+  // Keep the last observation on failure. A manual city change supersedes any older request.
   const loadWeather = async () => {
     if (!canReadEnvironment()) return
-    loadWeatherDetail() // 详情(预警+今日高低温)与简版天气并行,供侧边栏迷你天气/首页天气卡片
-    try {
-      const data = await request.get('/public/weather')
-      if (data) weather.value = data
-    } catch (e) {}
+    clearTimeout(weatherTimer)
+    const run = Symbol()
+    currentWeatherRun = run
+    let refreshMinutes = 30
+    async function update(path, target) {
+      try {
+        const data = await request.get(path, { isBackgroundRead: () => true })
+        if (data && currentWeatherRun === run) target.value = data
+      } catch {
+        refreshMinutes = 5
+      }
+    }
+    await Promise.all([update('/public/weather', weather), update('/public/weather/detail', weatherDetail)])
+    if (currentWeatherRun !== run) return
+    currentWeatherRun = null
+    nextWeatherAt = Date.now() + refreshMinutes * 60_000
+    setWeatherVisible(weatherVisible)
   }
 
-  // 拉取天气详情(now/7d/24h/预警/空气/指数;后端 Redis 缓存 30 分钟,失败静默)
-  const loadWeatherDetail = async () => {
-    try {
-      const data = await request.get('/public/weather/detail')
-      if (data) weatherDetail.value = data
-    } catch (e) {}
+  function setWeatherVisible(visible) {
+    weatherVisible = visible
+    clearTimeout(weatherTimer)
+    if (!visible || !canReadEnvironment() || currentWeatherRun) return
+    const delay = nextWeatherAt - Date.now()
+    if (delay > 0) weatherTimer = setTimeout(() => setWeatherVisible(weatherVisible), delay)
+    else loadWeather()
   }
 
   const onVisibilityChange = () => {
@@ -498,15 +529,14 @@ export function useSunLight(canReadEnvironment = () => true) {
   }
 
   watch(canReadEnvironment, (allowed) => {
-    if (allowed) {
-      loadSunInfo()
-      loadWeather()
-    }
+    currentWeatherRun = null
+    nextWeatherAt = 0
+    if (allowed) loadSunInfo()
+    setWeatherVisible(weatherVisible)
   })
 
   onMounted(() => {
     loadSunInfo()
-    loadWeather()
     // 钟摆运动已改为 CSS @keyframes,无需 JS rAF;lampStrength 变化只决定元素是否渲染
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
     IDLE_EVENTS.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
@@ -526,8 +556,6 @@ export function useSunLight(canReadEnvironment = () => true) {
         refreshSunInfoIfStale()
       }
     }, 300000)
-    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气数据用于天气预报面板,始终获取
-    weatherTimer = setInterval(loadWeather, 1800000)
   })
 
   onUnmounted(() => {
@@ -537,7 +565,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     if (lampAutoTimer) clearTimeout(lampAutoTimer)
     if (fogTimer) clearTimeout(fogTimer)
     if (slotTimer) clearInterval(slotTimer)
-    if (weatherTimer) clearInterval(weatherTimer)
+    currentWeatherRun = null
+    clearTimeout(weatherTimer)
     if (testTimer) clearInterval(testTimer)
     IDLE_EVENTS.forEach((e) => window.removeEventListener(e, resetIdle))
     IDLE_EVENTS_THROTTLED.forEach((e) => window.removeEventListener(e, resetIdle))
@@ -600,6 +629,8 @@ export function useSunLight(canReadEnvironment = () => true) {
   return {
     deskCasters,
     windowSashes,
+    rearrangeScene,
+    setWeatherVisible,
     sunInfo,
     sunInfoAt,
     sunInfoAge,
