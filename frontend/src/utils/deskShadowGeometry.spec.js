@@ -24,6 +24,13 @@ describe('desk shadow geometry', () => {
     expect(vector.y).toBeCloseTo(dy * (28 / 1600), 8)
   })
 
+  it.each([0, 0.5, 1])('keeps cup and rail shadows parallel at projection weight %f', (weight) => {
+    const scene = sun(65, 125)
+    const vector = deskShadowVector(scene, 200, 'cup', weight)
+    const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, weight, 76)
+    expect(vector.x / vector.y).toBeCloseTo(dx / dy, 8)
+  })
+
   it('scales with the displayed sprite size and its registered material height', () => {
     const scene = sun(45, 180)
     const paper = deskShadowVector(scene, 200, 'bookmark')

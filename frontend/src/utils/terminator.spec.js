@@ -32,6 +32,12 @@ describe('由直射点推太阳高度角', () => {
     expect(solarAltitude(0, -90, 0, 0)).toBeCloseTo(0, 6)
   })
 
+  it('resolves an oblique bearing from the east and north components of the same solar vector', () => {
+    const sun = solarPosition(45, 45, { lat: 0, lng: 0 })
+    expect(sun.altitude).toBeCloseTo(30, 7)
+    expect(sun.azimuth).toBeCloseTo(234.73561, 5)
+  })
+
   it('跨 ±180 经度归一化后结果一致', () => {
     // 经度 200° 与 -160° 是同一条经线,取差值时必须等价
     expect(solarAltitude(30, 200, -5, -170)).toBeCloseTo(solarAltitude(30, -160, -5, -170), 6)

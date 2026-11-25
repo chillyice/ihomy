@@ -2,6 +2,8 @@
 // 仅用于光影实验台(/tools/light-lab)的客户端实时计算,时间统一按 Asia/Shanghai(UTC+8,无夏令时)。
 // 说明:NOAA 太阳高度角/方位角与海拔无关(后端同)。
 
+import { equatorialToHorizontal } from './terminator.js'
+
 const RAD = Math.PI / 180
 const DEG = 180 / Math.PI
 const TZ_OFFSET_HOURS = 8 // 中国标准时间 UTC+8
@@ -66,23 +68,6 @@ function eqOfTime(T) {
   const Etime = y * sin2l0 - 2 * e * sinm + 4 * e * y * sinm * cos2l0 - 0.5 * y * y * sin4l0 - 1.25 * e * e * sin2m
   return Etime * DEG * 4.0 // minutes
 }
-function sunAltAz(lat, dec, haDeg) {
-  const latR = lat * RAD
-  const decR = dec * RAD
-  const haR = haDeg * RAD
-  let sinAlt = Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(haR)
-  sinAlt = Math.max(-1, Math.min(1, sinAlt))
-  const alt = Math.asin(sinAlt)
-  const cosAlt = Math.cos(alt)
-  if (Math.abs(cosAlt) < 1e-10) {
-    return { altitude: alt * DEG, azimuth: 0 }
-  }
-  const y = -Math.sin(haR)
-  const x = (Math.sin(decR) - Math.sin(latR) * sinAlt) / (Math.cos(latR) * cosAlt)
-  let az = Math.atan2(y, x) * DEG
-  if (az < 0) az += 360
-  return { altitude: alt * DEG, azimuth: az }
-}
 
 /**
  * 计算指定日期、指定时刻(当地时间分钟)的太阳高度角与方位角。
@@ -111,13 +96,13 @@ export function sunPosition(lat, lng, dateStr, minutesOfDay) {
   while (ha > 180) ha -= 360
   while (ha < -180) ha += 360
 
-  const { altitude, azimuth } = sunAltAz(lat, dec, ha)
+  const { altitude, azimuth } = equatorialToHorizontal(lat, dec, ha)
 
   const hh = Math.floor(minutesOfDay / 60) % 24
   const mm = Math.floor(minutesOfDay % 60)
   return {
     time: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
-    altitude: Math.round(altitude * 10) / 10,
-    azimuth: Math.round(azimuth * 10) / 10,
+    altitude,
+    azimuth,
   }
 }
