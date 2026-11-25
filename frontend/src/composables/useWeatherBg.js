@@ -4,7 +4,7 @@
 import { ref } from 'vue'
 import { aiApi, albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { readWeatherBgConfig, weatherArtwork } from '@/utils/weatherBackground'
+import { readWeatherBgConfig, rememberAutoTheme, weatherArtwork } from '@/utils/weatherBackground'
 
 const FEATURE = 'WEATHER_IMAGE'
 const CACHE_KEY = 'ihomy:weather-bg:v1'
@@ -119,7 +119,7 @@ export function useWeatherBg() {
     return albumPromise
   }
 
-  const generate = async (w, cfg, prompt, key) => {
+  const generate = async (w, cfg, { prompt, key, autoTheme }) => {
     if (!aiStatusChecked) {
       aiImageAvail = !!(await aiApi.status())?.weatherImage?.available
       aiStatusChecked = true
@@ -129,11 +129,12 @@ export function useWeatherBg() {
     const first = res?.[0] || {}
     let url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
     if (!url) return ''
+    rememberAutoTheme(autoTheme)
     const albumId = await ensureAlbum()
     if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) {
       try {
         // 相册描述限 255 字；完整提示词只发给模型。
-        const description = [w.city, w.text, cfg.scene].filter(Boolean).join(' · ').slice(0, 255)
+        const description = [w.city, w.text, cfg.sceneTheme === 'custom' && cfg.scene].filter(Boolean).join(' · ').slice(0, 255)
         const photos = await photoApi.saveFromUrl(albumId, { url, name: weatherImageName(w.city), description })
         url = photos?.[0]?.url || url
       } catch {}
@@ -157,7 +158,8 @@ export function useWeatherBg() {
       }
       return
     }
-    const { key, prompt } = weatherArtwork(w, cfg)
+    const artwork = weatherArtwork(w, cfg)
+    const { key } = artwork
     const ttl = Math.max(1, cfg.refreshDays ?? 7) * 86400000
     // 当前天气状态有缓存且在保鲜期内:直接命中
     try {
@@ -184,7 +186,7 @@ export function useWeatherBg() {
       if (!pending.has(requestKey)) {
         pending.set(
           requestKey,
-          generate(w, cfg, prompt, key).finally(() => pending.delete(requestKey)),
+          generate(w, cfg, artwork).finally(() => pending.delete(requestKey)),
         )
       }
       const url = await pending.get(requestKey)

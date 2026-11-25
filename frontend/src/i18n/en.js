@@ -5725,6 +5725,18 @@ export default {
         'Choose a style for the weather window on this device. The next time the background loads, it reuses a matching image or generates one with your family’s image model.',
       weatherBgEnabled: 'Enable AI background',
       weatherBgStyle: 'Style',
+      weatherBgTheme: 'Setting',
+      weatherSceneThemes: {
+        auto: 'Rotate settings',
+        city: 'City streets',
+        coast: 'Coasts and harbors',
+        park: 'Parks and gardens',
+        plaza: 'Public squares',
+        cyber: 'Cyber-industrial',
+        countryside: 'Rural landscapes',
+        mountain: 'Mountains and canyons',
+        custom: 'Custom setting',
+      },
       weatherBgSettings: 'Weather window settings',
       weatherStyles: {
         photo: 'Realistic photography',
@@ -5738,8 +5750,7 @@ export default {
       weatherBgRefresh: 'Cache freshness (days)',
       weatherBgWatermark: 'Watermark',
       weatherBgScene: 'Custom scene',
-      weatherBgScenePlaceholder:
-        'What would you like to see outside? For example, stone steps by a river with willow branches on the right.',
+      weatherBgScenePlaceholder: 'For example, a mechanical harbor seen from a raised walkway. Leave blank to rotate settings.',
       weatherBgSave: 'Save',
       weatherBgSaved: 'Saved',
     },

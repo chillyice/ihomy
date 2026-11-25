@@ -276,6 +276,22 @@
               </el-select>
             </div>
             <div class="pg-field">
+              <span class="section-label">{{ $t('tools.aiPlayground.weatherBgTheme') }}</span>
+              <el-select
+                v-model="weatherCfg.sceneTheme"
+                :aria-label="$t('tools.aiPlayground.weatherBgTheme')"
+                size="small"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="id in weatherSceneThemes"
+                  :key="id"
+                  :label="$t('tools.aiPlayground.weatherSceneThemes.' + id)"
+                  :value="id"
+                />
+              </el-select>
+            </div>
+            <div class="pg-field">
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgSize') }}</span>
               <el-select v-model="weatherCfg.size" size="small" style="width: 100%">
                 <el-option v-for="s in weatherSizes" :key="s" :label="s" :value="s" />
@@ -289,7 +305,7 @@
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgWatermark') }}</span>
               <el-switch v-model="weatherCfg.watermark" />
             </div>
-            <div class="pg-field pg-field-wide">
+            <div v-if="weatherCfg.sceneTheme === 'custom'" class="pg-field pg-field-wide">
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgScene') }}</span>
               <el-input
                 v-model="weatherCfg.scene"
@@ -317,7 +333,7 @@ import { useRoute } from 'vue-router'
 import { aiApi, albumApi, photoApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { readWeatherBgConfig, saveWeatherBgConfig, weatherStyleIds } from '@/utils/weatherBackground'
+import { readWeatherBgConfig, saveWeatherBgConfig, weatherSceneThemes, weatherStyleIds } from '@/utils/weatherBackground'
 
 const { t } = useI18n()
 
