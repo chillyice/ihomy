@@ -3409,3 +3409,22 @@ CREATE TABLE `sys_ai_action` (
   KEY `idx_expire` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手确认卡与执行记录';
 
+-- ------------------------------------------------------------
+-- 88. game_bakery_idle_score 小面包房家庭榜(V15.14):
+--     一人一行,记录最近一次上报的「当前净资产」(金币 + 面团/面包库存折算);
+--     净值会因升级花费回落,故是覆盖更新而非取最大。
+--     进度本身仍在本机 localStorage,本表只放榜单口径的一个数字,不存产线细节。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `game_bakery_idle_score`;
+CREATE TABLE `game_bakery_idle_score` (
+  `id`         BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT   NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT   NOT NULL COMMENT '成员ID',
+  `score`      BIGINT   NOT NULL DEFAULT 0 COMMENT '当前净资产(金币 + 面团/面包库存折算)',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次上榜时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最近上报时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`),
+  KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';
+

@@ -420,6 +420,10 @@ export const gameApi = {
   baohuangReward: () => request.post('/game/baohuang/reward'),
   goujiReward: () => request.post('/game/gouji/reward'),
   mahjong3dReward: () => request.post('/game/mahjong3d/reward'),
+  bakeryReward: () => request.post('/game/bakery/reward'),
+  // 小面包房:进度在本机,家里只存「当前净资产」一个数字(覆盖更新);榜单只回本家庭前 20
+  bakeryScore: (score) => request.post('/game/bakery/score', { score }),
+  bakeryRanking: () => request.get('/game/bakery/ranking'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),

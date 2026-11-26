@@ -4019,3 +4019,16 @@ WHERE NOT EXISTS (SELECT 1 FROM `sys_backup_policy`);
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`)
 SELECT 'LatLongToTimezoneMaven', 'MAVEN', 'com.moodysalem:LatLongToTimezoneMaven', '1.2', 'MIT', 'https://github.com/moodysalem/LatLongToTimezoneMaven', '离线查询家庭地点时区', 'FULL'
 WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'com.moodysalem:LatLongToTimezoneMaven');
+
+-- V15.14 小面包房家庭榜(净资产,一人一行覆盖更新;进度仍在本机 localStorage)
+CREATE TABLE IF NOT EXISTS `game_bakery_idle_score` (
+  `id`         BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT   NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT   NOT NULL COMMENT '成员ID',
+  `score`      BIGINT   NOT NULL DEFAULT 0 COMMENT '当前净资产(金币 + 面团/面包库存折算)',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次上榜时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最近上报时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`),
+  KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';

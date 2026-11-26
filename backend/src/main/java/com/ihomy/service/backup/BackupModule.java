@@ -65,10 +65,10 @@ public enum BackupModule {
             "family_health_view_log", "family_health_share", "sys_health_token"
     )),
 
-    /** 游戏:游戏库、房间与对局 */
+    /** 游戏:游戏库、房间与对局、小面包房家庭榜 */
     GAME(Set.of(
             "game_info", "family_game_match", "family_game_room", "family_game_room_member",
-            "family_game_room_round"
+            "family_game_room_round", "game_bakery_idle_score"
     )),
 
     /** 统计报表 */

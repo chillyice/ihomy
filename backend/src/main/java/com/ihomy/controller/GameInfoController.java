@@ -266,4 +266,12 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.mahjong3dReward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏开分店奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "小面包房开分店奖励")
+    @PostMapping("/bakery/reward")
+    public Result<Map<String, Object>> bakeryReward() {
+        LoginUser user = current();
+        return Result.success(gameService.bakeryReward(user.getUserId(), user.getFamilyId()));
+    }
 }

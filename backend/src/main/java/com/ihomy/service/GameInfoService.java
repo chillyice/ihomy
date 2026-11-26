@@ -370,6 +370,14 @@ public class GameInfoService {
                 GameConst.H5_GAME_DAILY_LIMIT, "立体麻将获胜");
     }
 
+    /**
+     * 小面包房开分店奖励(每次声望重置开出一家分店上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> bakeryReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_BAKERY, "bakery",
+                GameConst.H5_GAME_DAILY_LIMIT, "小面包房开分店");
+    }
+
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();

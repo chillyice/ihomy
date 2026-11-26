@@ -326,6 +326,13 @@ const builtinGames = [
     category: 'SIMULATION',
   },
   {
+    key: 'bakery',
+    titleKey: 'games.bakery.title',
+    descKey: 'games.bakery.desc',
+    path: '/games/bakery',
+    category: 'SIMULATION',
+  },
+  {
     key: 'petlink',
     titleKey: 'games.petlink.title',
     descKey: 'games.petlink.desc',
