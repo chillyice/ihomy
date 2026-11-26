@@ -70,7 +70,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   const _shadowEnabled = ref(_saved.shadowEnabled ?? true)
   // 阴影深度 0~200，默认 70。70 即满深度（再乘当日直射强度），向右留出压深正午弱直射的余量。
   const projectionStandard = ref(_saved.projectionStandard === 'real' ? 'real' : 'corrected')
-  const shadowDepth = ref(_saved.shadowDepth ?? 70)
+  const shadowDepth = ref(_saved.shadowDepth ?? 130)
   const featherStrength = ref(Number.isFinite(_saved.featherStrength) ? Math.min(100, Math.max(0, _saved.featherStrength)) : 50)
   const _weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const _blobsEnabled = ref(_saved.blobsEnabled ?? true)

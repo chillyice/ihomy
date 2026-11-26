@@ -121,7 +121,8 @@ describe('window-plane projection', () => {
     expect(equinox[5] / height).toBeCloseTo(0.05, 8)
     expect((equinox[5] + equinox[3]) / height).toBeCloseTo(0.95, 8)
     expect(winter[5] / height).toBeCloseTo(0.09, 8)
-    expect(winter[3] / summer[3]).toBeCloseTo(1.15, 8)
+    expect(equinox[0] / width).toBeCloseTo(0.95, 8)
+    expect(winter[3] / summer[3]).toBeCloseTo(1.4, 8)
     expect((summer[3] + winter[3]) / (2 * height)).toBeCloseTo(0.9, 8)
   })
 
@@ -171,8 +172,8 @@ describe('window-plane projection', () => {
       const [, , , depth, , originY] = transform(scene, 0)
       return (originY + (bottom + frameHeight) * depth) / 800
     }
-    expect(farEdge(june)).toBeGreaterThan(0.86)
-    expect(farEdge(june)).toBeLessThan(0.92)
+    expect(farEdge(june)).toBeGreaterThan(0.78)
+    expect(farEdge(june)).toBeLessThan(0.84)
     expect(farEdge(november)).toBeGreaterThan(farEdge(june))
     const realLength = (scene) => {
       const [, , dx, dy] = transform(scene, 1)
