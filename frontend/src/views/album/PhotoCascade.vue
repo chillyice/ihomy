@@ -12,25 +12,27 @@
 
     <div ref="stage" class="cascade-stage">
       <div v-for="c in cards" :key="c.key" class="leaf-wrap" :class="{ fading: c.fading }" :style="cardStyle(c)">
-        <div
-          v-a11y-click
-          class="leaf-card"
-          :class="{ hovered: c.hovered }"
-          @mouseenter="pauseCard(c)"
-          @mouseleave="resumeCard(c)"
-          @touchstart="pauseCard(c)"
-          @touchend="resumeCard(c)"
-          @click.stop="openViewer(c)"
-        >
-          <AlbumThumbnail :url="c.photo.url" :alt="c.photo.description || ''" />
-          <div v-if="c.hovered" class="photo-info">
-            <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
-            <div class="info-meta">
-              <span v-if="c.photo.sharedFrom">{{
-                $t('audience.sharedFrom', { name: c.photo.sharedFrom.alias || c.photo.sharedFrom.familyName })
-              }}</span>
-              <span v-if="c.photo.uploaderName">{{ c.photo.uploaderName }}</span>
-              <span v-if="c.photo.takenAt">{{ formatDate(c.photo.takenAt) }}</span>
+        <div class="leaf-swing">
+          <div
+            v-a11y-click
+            class="leaf-card"
+            :class="{ hovered: c.hovered }"
+            @mouseenter="pauseCard(c)"
+            @mouseleave="resumeCard(c)"
+            @touchstart="pauseCard(c)"
+            @touchend="resumeCard(c)"
+            @click.stop="openViewer(c)"
+          >
+            <AlbumThumbnail :url="c.photo.url" :alt="c.photo.description || ''" />
+            <div v-if="c.hovered" class="photo-info">
+              <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
+              <div class="info-meta">
+                <span v-if="c.photo.sharedFrom">{{
+                  $t('audience.sharedFrom', { name: c.photo.sharedFrom.alias || c.photo.sharedFrom.familyName })
+                }}</span>
+                <span v-if="c.photo.uploaderName">{{ c.photo.uploaderName }}</span>
+                <span v-if="c.photo.takenAt">{{ formatDate(c.photo.takenAt) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -89,7 +91,9 @@ const spawnCard = () => {
     duration: 15 + Math.random() * 12,
     size: minSize + Math.random() * (maxSize - minSize),
     rot: (Math.random() - 0.5) * 30,
-    drift: (Math.random() - 0.5) * 120,
+    drift: (narrow ? 18 : 32) + Math.random() * (narrow ? 14 : 38),
+    swing: 4 + Math.random() * 3,
+    phase: -Math.random() * 7,
     hovered: false,
     fading: false,
   }
@@ -116,6 +120,8 @@ const cardStyle = (c) => ({
   left: c.x + '%',
   width: c.size + 'px',
   animationDuration: c.duration + 's',
+  '--swing-time': c.swing + 's',
+  '--swing-phase': c.phase + 's',
   '--leaf-rot': c.rot + 'deg',
   '--leaf-drift': c.drift + 'px',
   animationPlayState: c.hovered ? 'paused' : 'running',
@@ -241,6 +247,8 @@ html.warm-paper-page .pc-title {
 }
 
 .leaf-wrap {
+  --swing-time: 5s;
+  --swing-phase: 0s;
   position: absolute;
   top: -200px;
   animation: leaf-fall linear infinite;
@@ -278,25 +286,31 @@ html.warm-paper-page .pc-title {
 }
 
 @keyframes leaf-fall {
-  0% {
-    transform: translate3d(0, 0, 0) rotate(var(--leaf-rot));
-    opacity: 0;
+  from {
+    transform: translateY(0);
   }
-  10% {
-    opacity: 1;
+  to {
+    transform: translateY(calc(100vh + 260px));
   }
-  25% {
-    transform: translate3d(calc(var(--leaf-drift) * 0.3), 25vh, 0) rotate(calc(var(--leaf-rot) + 15deg));
-  }
-  50% {
-    transform: translate3d(calc(var(--leaf-drift) * -0.2), 50vh, 0) rotate(calc(var(--leaf-rot) - 10deg));
-  }
-  75% {
-    transform: translate3d(calc(var(--leaf-drift) * 0.4), 75vh, 0) rotate(calc(var(--leaf-rot) + 20deg));
-  }
+}
+.leaf-swing {
+  animation: leaf-swing var(--swing-time) ease-in-out var(--swing-phase) infinite;
+  animation-play-state: inherit;
+  transform-origin: 48% 35%;
+}
+@keyframes leaf-swing {
+  0%,
   100% {
-    transform: translate3d(var(--leaf-drift), 105vh, 0) rotate(calc(var(--leaf-rot) + 30deg));
-    opacity: 0.6;
+    transform: perspective(640px) translate3d(calc(-1 * var(--leaf-drift)), -12px, 0) rotateZ(calc(var(--leaf-rot) - 17deg)) rotateY(-26deg);
+  }
+  24% {
+    transform: perspective(640px) translate3d(0, 10px, 0) rotateZ(var(--leaf-rot)) rotateX(20deg);
+  }
+  53% {
+    transform: perspective(640px) translate3d(var(--leaf-drift), -18px, 0) rotateZ(calc(var(--leaf-rot) + 22deg)) rotateY(34deg);
+  }
+  78% {
+    transform: perspective(640px) translate3d(4px, 6px, 0) rotateZ(var(--leaf-rot)) rotateX(-13deg);
   }
 }
 
