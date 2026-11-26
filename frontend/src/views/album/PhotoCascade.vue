@@ -77,7 +77,8 @@ const clearTimers = () => {
   fadeTimers = []
 }
 
-const swingDistance = (limit) => limit * (0.45 + Math.random() * 0.55)
+// Leave room for the smaller drift that accompanies the photo's tilt.
+const swingDistance = (limit) => limit * (0.4 + Math.random() * 0.4)
 
 const turnCard = (card) => {
   // Alternate iterations meet at one edge. Change only the opposite destination.
@@ -101,15 +102,18 @@ const spawnCard = () => {
     key: ++cardSeq,
     photo,
     x: reach + Math.random() * (room - 2 * reach),
-    duration: 15 + Math.random() * 12,
+    duration: 20 + Math.random() * 12,
     size,
-    rot: (Math.random() - 0.5) * 30,
+    rot: (Math.random() - 0.5) * 14,
     reach,
     leftSwing: swingDistance(reach),
     rightSwing: swingDistance(reach),
     headingRight: true,
-    swing: 2 + Math.random() * 1.4,
+    swing: 3.2 + Math.random() * 1.8,
     phase: -Math.random() * 1.5,
+    breeze: reach * (Math.random() < 0.5 ? -0.2 : 0.2),
+    flutter: 6 + Math.random() * 4,
+    flutterPhase: -Math.random() * 6,
     hovered: false,
     fading: false,
   }
@@ -138,6 +142,9 @@ const cardStyle = (c) => ({
   animationDuration: c.duration + 's',
   '--swing-time': c.swing + 's',
   '--swing-phase': c.phase + 's',
+  '--breeze': c.breeze + 'px',
+  '--flutter-time': c.flutter + 's',
+  '--flutter-phase': c.flutterPhase + 's',
   '--leaf-rot': c.rot + 'deg',
   '--left-swing': -c.leftSwing + 'px',
   '--right-swing': c.rightSwing + 'px',
@@ -268,29 +275,27 @@ html.warm-paper-page .pc-title {
   --right-swing: 48px;
   --swing-time: 3s;
   --swing-phase: 0s;
+  --breeze: 10px;
+  --flutter-time: 8s;
+  --flutter-phase: 0s;
   position: absolute;
   top: -200px;
   animation: leaf-fall linear infinite;
   will-change: transform;
 }
-.leaf-wrap.fading .leaf-card {
-  animation: leaf-fade-out 1.5s ease forwards;
-}
-@keyframes leaf-fade-out {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+.leaf-wrap.fading .leaf-swing {
+  opacity: 0;
 }
 .leaf-card {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   cursor: pointer;
+  animation: leaf-flutter var(--flutter-time) ease-in-out var(--flutter-phase) infinite;
+  animation-play-state: inherit;
+  transform-origin: 48% 35%;
   transition:
-    transform 0.3s ease,
+    scale 0.3s ease,
     box-shadow 0.3s ease;
 }
 .leaf-card img {
@@ -300,7 +305,7 @@ html.warm-paper-page .pc-title {
   pointer-events: none;
 }
 .leaf-card.hovered {
-  transform: scale(1.15);
+  scale: 1.15;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -313,21 +318,30 @@ html.warm-paper-page .pc-title {
   }
 }
 .leaf-swing {
-  animation: leaf-swing var(--swing-time) ease-in-out var(--swing-phase) infinite alternate;
+  animation: leaf-swing var(--swing-time) cubic-bezier(0.5, 0, 0.5, 1) var(--swing-phase) infinite alternate;
   animation-play-state: inherit;
-  transform-origin: 48% 35%;
+  transition: opacity 1.5s ease;
 }
 @keyframes leaf-swing {
+  from {
+    transform: translateX(var(--left-swing)) rotate(-6deg);
+  }
+  to {
+    transform: translateX(var(--right-swing)) rotate(6deg);
+  }
+}
+/* The window leaf catches a breeze, folds slightly, then drifts back.
+   Give that motion its own rhythm so it carries through each turn. */
+@keyframes leaf-flutter {
   0%,
-  12% {
-    transform: perspective(640px) translate3d(var(--left-swing), -12px, 0) rotateZ(calc(var(--leaf-rot) - 17deg)) rotateY(-26deg);
-  }
-  50% {
-    transform: perspective(640px) translate3d(0, 10px, 0) rotateZ(var(--leaf-rot)) rotateX(20deg);
-  }
-  88%,
   100% {
-    transform: perspective(640px) translate3d(var(--right-swing), -18px, 0) rotateZ(calc(var(--leaf-rot) + 22deg)) rotateY(34deg);
+    transform: translate(0, 0) rotate(var(--leaf-rot)) scaleX(0.99);
+  }
+  24% {
+    transform: translate(var(--breeze), -7px) rotate(calc(var(--leaf-rot) + 7deg)) scaleX(0.93);
+  }
+  60% {
+    transform: translate(calc(var(--breeze) * 0.3), 5px) rotate(calc(var(--leaf-rot) - 5deg)) scaleX(1);
   }
 }
 
