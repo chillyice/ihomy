@@ -136,7 +136,7 @@
       /></label>
       <label class="lt-slider-row"
         ><span>{{ $t('lightTest.shadowDepth') }}</span
-        ><input type="range" min="0" max="100" v-model.number="light.shadowDepth.value" class="lt-slider"
+        ><input type="range" min="0" max="200" v-model.number="light.shadowDepth.value" class="lt-slider"
       /></label>
       <label class="lt-slider-row">
         <span>{{ $t('settings.featherStrength') }}</span>

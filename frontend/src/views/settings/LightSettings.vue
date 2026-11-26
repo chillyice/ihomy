@@ -70,7 +70,7 @@
             </el-radio-group>
           </el-form-item>
           <el-form-item v-if="shadowEnabled" :label="$t('settings.shadowDepth')">
-            <el-slider v-model.number="shadowDepth" :min="0" :max="100" show-input />
+            <el-slider v-model.number="shadowDepth" :min="0" :max="200" show-input />
           </el-form-item>
 
           <el-form-item v-if="shadowEnabled" :label="$t('settings.featherStrength')">
