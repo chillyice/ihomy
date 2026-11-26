@@ -114,6 +114,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { moonIcon, moonPhaseText } from '@/utils/dict'
+import { solarClock } from '@/utils/windowLight'
+import { solarSlotPosition } from '@/utils/solarSamples'
 import {
   MAP_H,
   MAP_LAT_MAX,
@@ -121,7 +123,6 @@ import {
   STAGE_ORDER,
   driftSubsolar,
   nextTwilightEvent,
-  nowLocalMinutes,
   projectToMap,
   solarPosition,
   twilightStage,
@@ -222,7 +223,8 @@ const fmtMD = (s) => {
 }
 // 当前时刻(本地分钟):地图、今日高度曲线与「下一阶段」共用,每分钟与回到前台时刷新
 // (computed 内不直接读 Date.now / new Date,否则长开后不会重算)
-const nowMin = ref(nowLocalMinutes())
+const currentTime = ref(Date.now())
+const nowMin = computed(() => solarClock(props.astro?.timezone, new Date(currentTime.value)).minutes)
 const nextEvent = computed(() => nextTwilightEvent(props.astro, nowMin.value))
 const nextInText = computed(() => {
   const e = nextEvent.value
@@ -248,14 +250,13 @@ const SUN_RAYS = Array.from({ length: 8 }, (_, i) => {
 })
 // 当前时刻与地图一起每分钟刷新(computed 内不直接读 Date.now)
 const curve = computed(() => {
-  const list = props.astro?.slots || []
+  const list = props.astro?.timeline ?? props.astro?.slots ?? []
   if (list.length < 2) return null
   // 上下各留 16 的余量:太阳图标(射线到 15)在正午最高点与半夜最低点都不会被 viewBox 裁掉
   const yOf = (a) => CURVE_H - 16 - ((Math.max(CURVE_LO, Math.min(CURVE_HI, a)) - CURVE_LO) / (CURVE_HI - CURVE_LO)) * (CURVE_H - 32)
   const pts = list.map((s, i) => ({ x: (i / (list.length - 1)) * CURVE_W, y: yOf(s.altitude) }))
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('')
-  // 太阳标记:按「今日已过分钟」在曲线索引上线性插值(与 288 × 5 分钟时隙一一对应)
-  const t = Math.min(1, Math.max(0, nowMin.value / 1440)) * (list.length - 1)
+  const t = Math.min(list.length - 1, solarSlotPosition(list, currentTime.value, nowMin.value / 5))
   const i0 = Math.min(list.length - 1, Math.floor(t))
   const i1 = Math.min(list.length - 1, i0 + 1)
   const alt = Number(list[i0].altitude) + (Number(list[i1].altitude) - Number(list[i0].altitude)) * (t - i0)
@@ -421,7 +422,7 @@ const rebase = () => {
 // 时钟与直射点一起推进:地图重画 + 曲线上「此刻太阳」与「下一阶段」的分钟数一起更新
 const syncClock = () => {
   elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
-  nowMin.value = nowLocalMinutes()
+  currentTime.value = Date.now()
   draw()
 }
 const onVisible = () => {

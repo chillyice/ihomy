@@ -4,8 +4,19 @@
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
-import { ambientShadowOpacity, getSkyTint, getSunScene, currentSlotIndex, solarClock } from '@/utils/windowLight'
+import {
+  AUTO_LAMP_ON_BELOW,
+  AUTO_LAMP_OFF_ABOVE,
+  lampFromDaylight,
+  ambientShadowOpacity,
+  skyLighting,
+  weatherOptics,
+  getSunScene,
+  currentSlotIndex,
+  solarClock,
+} from '@/utils/windowLight'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from '@/utils/windowSash'
+import { solarSlotForTime, solarSlotPosition, sampleSolarDirection } from '@/utils/solarSamples'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
 import { setSunContext } from '@/theme'
@@ -14,14 +25,6 @@ import request from '@/api/request'
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
 const SASH_SESSION_KEY = 'ihomy:window:last-pose'
-
-// 漫射天光从窗户上方铺开。积雪的反照最亮，雷云下只留少量灰蓝色天光。
-const DIFFUSE_SKY = {
-  rain: { color: 'rgb(169, 197, 217)', opacity: 0.13 },
-  snow: { color: 'rgb(235, 246, 255)', opacity: 0.21 },
-  thunder: { color: 'rgb(136, 155, 181)', opacity: 0.09 },
-  fog: { color: 'rgb(244, 241, 230)', opacity: 0.16 },
-}
 
 export function useSunLight(canReadEnvironment = () => true) {
   const themeStore = useThemeStore()
@@ -36,31 +39,24 @@ export function useSunLight(canReadEnvironment = () => true) {
   const sunInfo = ref(null)
   // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
   const sunInfoAt = ref(0)
-  const liveSlot = ref(currentSlotIndex())
+  const livePosition = ref(currentSlotIndex())
+  const liveSlot = computed(() => Math.min(Math.floor(livePosition.value), (sunInfo.value?.slots?.length || 288) - 1))
   const lightTestMode = ref(false)
   const lightTestPaused = ref(true)
   const previewDate = ref('')
   const previewLoadFailed = ref(false)
   const previewSunInfo = ref(null)
   const previewSlot = ref(null)
+  const previewSample = shallowRef(null)
   let previewRequest = null
   const activeSunInfo = computed(() => (lightTestMode.value ? previewSunInfo.value : sunInfo.value))
   const slotIdx = computed(() => (lightTestMode.value ? (previewSlot.value ?? liveSlot.value) : liveSlot.value))
-  const initialScene = {
-    source: { x: '50%', y: '-15%' },
-    rotation: 0,
-    palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' },
-    rays: [],
-    shadowIntensity: 0.7,
-    shadowColor: 'rgb(8,12,28)',
-    lightOpacity: 0,
-    lampOpacity: 1,
-    isNight: true,
-    dayProgress: 0,
-    windowAngle: 0,
-    hasDirectLight: false,
-  }
-  const sunScene = computed(() => (activeSunInfo.value ? getSunScene(activeSunInfo.value, slotIdx.value) : initialScene))
+  const initialScene = getSunScene(null, 0)
+  const sunScene = computed(() => {
+    if (!activeSunInfo.value) return initialScene
+    const sample = lightTestMode.value ? previewSample.value : sampleSolarDirection(sunInfo.value, livePosition.value)
+    return getSunScene(activeSunInfo.value, slotIdx.value, sample)
+  })
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
   let _suspended = null
@@ -166,15 +162,9 @@ export function useSunLight(canReadEnvironment = () => true) {
   })
   let testTimer = null
 
-  // 雾/阴(昏暗天气):雾层是「几秒的转瞬雾」——进入即浮现,约 4 秒后淡出消散,不常驻;
-  // 压光(weatherLightMul 0.15)与「进入 3 秒自动开灯补光」保持常驻(天气本身仍是昏暗,灯亮后页面照常可读);
-  // 雨/雪/雷粒子保持常驻但不压暗页面,晴/多云维持原有表现
   const DIM_MODES = ['fog', 'overcast']
-  const LAMP_AUTO_ON_MS = 3000
   const FOG_VISIBLE_MS = 4000
   const fogVisible = ref(false)
-  const lampAutoOn = ref(false)
-  let lampAutoTimer = null
   let fogTimer = null
   const playTransient = () => {
     fogVisible.value = true
@@ -184,24 +174,13 @@ export function useSunLight(canReadEnvironment = () => true) {
       fogVisible.value = false
       fogTimer = null
     }, FOG_VISIBLE_MS)
-    if (!lampAutoTimer) {
-      lampAutoTimer = setTimeout(() => {
-        lampAutoOn.value = true
-        lampAutoTimer = null
-      }, LAMP_AUTO_ON_MS)
-    }
   }
   const stopTransient = () => {
-    if (lampAutoTimer) {
-      clearTimeout(lampAutoTimer)
-      lampAutoTimer = null
-    }
     if (fogTimer) {
       clearTimeout(fogTimer)
       fogTimer = null
     }
     fogVisible.value = false
-    lampAutoOn.value = false
   }
 
   // 多云模式:云遮阳光的随机闪烁系数(0~1),由 GSAP 缓慢补间
@@ -237,18 +216,9 @@ export function useSunLight(canReadEnvironment = () => true) {
     else stopTransient()
   })
 
-  // 天气光照系数(实时响应 cloudFlicker):雨雪雷=0(雨天无光柱),雾/阴=0.15(昏暗压光,
-  // 由雾层/阴影+3 秒后自动开灯承担观感),多云=cloudFlicker,晴=1
-  const weatherLightMul = computed(() => {
-    if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 0
-    if (weatherMode.value === 'fog' || weatherMode.value === 'overcast') return 0.15
-    if (weatherMode.value === 'cloud') return cloudFlicker.value
-    return 1
-  })
-
-  // 阴影层不透明度:把时间曲线强度(夜间 0.7 → 正午 0.3)按个性化「阴影深度」等比缩放。
-  // 深度 70 = 乘数 1(与旧版观感一致);100 = 夜间压到近全黑;0 = 无阴影。上限 1 防止叠加过黑。
-  const shadowAlpha = computed(() => Math.max(0, Math.min(1, (shadowDepth.value / 70) * (sunScene.value.shadowIntensity ?? 0.7))))
+  const optics = computed(() => weatherOptics(weatherMode.value, activeWeather.value))
+  const skyLight = computed(() => skyLighting(sunScene.value, optics.value, cloudFlicker.value))
+  const shadowAlpha = computed(() => Math.min(1, Math.max(0, shadowDepth.value / 70) * sunScene.value.shadowIntensity))
 
   // 夜间超时关灯:X 分钟无操作自动关灯,有操作时立即开灯(仅 auto 模式 + 夜间生效)
   // mousemove 节流:避免高频触发(每 2 秒最多一次 resetIdle)
@@ -285,7 +255,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     testTimer = null
     if (!lightTestMode.value || lightTestPaused.value || !previewSunInfo.value) return
     testTimer = setInterval(() => {
-      previewSlot.value = (slotIdx.value + 1) % 288
+      previewSample.value = null
+      previewSlot.value = (slotIdx.value + 1) % previewSunInfo.value.slots.length
     }, 208 / testSpeed.value)
   }
   const startLightTest = () => {
@@ -294,6 +265,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     previewDate.value = sunInfo.value?.date ?? ''
     previewLoadFailed.value = false
     previewSlot.value = sunInfo.value ? liveSlot.value : null
+    previewSample.value = sampleSolarDirection(sunInfo.value, livePosition.value)
     lightTestPaused.value = true
     lightTestMode.value = true
   }
@@ -307,7 +279,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     scheduleTestPlayback()
   }
   const stepLightTest = (dir) => {
-    setSlot((slotIdx.value + dir + 288) % 288)
+    const count = activeSunInfo.value?.slots?.length || 288
+    setSlot((slotIdx.value + dir + count) % count)
   }
   const stopLightTest = () => {
     previewRequest = null
@@ -322,17 +295,26 @@ export function useSunLight(canReadEnvironment = () => true) {
   const setSlot = (idx) => {
     lightTestPaused.value = true
     scheduleTestPlayback()
-    previewSlot.value = Math.max(0, Math.min(287, idx))
+    previewSample.value = null
+    previewSlot.value = Math.max(0, Math.min((activeSunInfo.value?.slots?.length || 288) - 1, idx))
   }
 
+  // Meter before applying the lamp, independent of slider depth and cloud
+  // animation. Hysteresis prevents repeated switches near the threshold.
+  const autoLampOn = computed((previous) => {
+    const level = skyLight.value.metered
+    if (level <= AUTO_LAMP_ON_BELOW) return true
+    if (level >= AUTO_LAMP_OFF_ABOVE) return false
+    return previous ?? level < (AUTO_LAMP_ON_BELOW + AUTO_LAMP_OFF_ABOVE) / 2
+  })
   const lampStrength = computed(() => {
     if (lampMode.value === 'off') return 0
     if (lampMode.value === 'on') return 1
-    // auto 模式:空闲超时关灯优先(人走灯灭),其后昏暗天气(雾/阴)3 秒自动开灯补光,
-    // 其余按窗口阴影强度连续取灯光强度(白天 0 → 傍晚渐亮 → 夜间 1,阈值见 windowLight.lampFromShadow)
     if (isIdle.value) return 0
-    if (lampAutoOn.value) return 1
-    return sunScene.value.lampOpacity ?? 0
+    const level = skyLight.value.metered
+    // Scrubbing a frozen preview must not depend on the previously visited time.
+    if (!lightTestMode.value && !autoLampOn.value) return 0
+    return lampFromDaylight(level)
   })
 
   // mask-image 不支持 CSS transition,统一由 GSAP 补间驱动
@@ -435,30 +417,22 @@ export function useSunLight(canReadEnvironment = () => true) {
     refreshPrecipitation()
   }
 
-  // 同一束直射光决定窗投影和光路中浮尘的可见度。
-  const lightLayerOpacity = computed(() => (shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0))
-
-  const skyTint = computed(() => getSkyTint(sunScene.value, weatherMode.value))
-  const castShade = computed(() => {
-    const mode = weatherMode.value
-    // Diffuse weather has little or no directional shadow. Cloud passing in
-    // front of the sun changes the lit aperture, never the exposure in shade.
-    const weight = DIFFUSE_SKY[mode] ? weatherLightMul.value : 1
-    return shadowAlpha.value * skyTint.value.daylightShare * weight
-  })
+  const lightLayerOpacity = computed(() => (shadowEnabled.value ? skyLight.value.direct : 0))
+  const skyTint = computed(() => skyLight.value.tint)
+  // Reserve a small part of the daylight range for directional contrast.
+  // Keep the blocked surface continuous as the beam crosses the edge of the window.
+  const castShade = computed(() => shadowAlpha.value * sunScene.value.skyLevel * optics.value.direct * 0.43)
   const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))
   const diffuseSkyStyle = computed(() => {
-    const scene = sunScene.value
-    const sky = DIFFUSE_SKY[weatherMode.value]
-    if (!sky || scene.isNight) return null
+    const sky = skyLight.value
+    if (sky.diffuseOpacity <= 0) return null
     return {
-      background: `radial-gradient(ellipse 110% 100% at ${scene.source.x} 0%, ${sky.color} 0%, transparent 100%)`,
-      opacity: sky.opacity * Math.sin(scene.dayProgress * Math.PI),
+      background: `radial-gradient(ellipse 110% 100% at ${sunScene.value.source.x} 0%, ${sky.diffuseColor} 0%, transparent 100%)`,
+      opacity: sky.diffuseOpacity,
       mixBlendMode: 'screen',
     }
   })
 
-  // 拉取太阳信息并启动时隙更新
   let slotTimer = null
   let weatherTimer = null
   let weatherVisible = false
@@ -467,7 +441,11 @@ export function useSunLight(canReadEnvironment = () => true) {
   let liveRequest = null
   let retrySunAfter = 0
 
-  const loadSunInfo = async () => {
+  const loadSunInfo = async (changedLocation = false) => {
+    if (changedLocation) {
+      liveRequest = null
+      retrySunAfter = 0
+    }
     if (!canReadEnvironment() || liveRequest || Date.now() < retrySunAfter) return
     const run = Symbol()
     liveRequest = run
@@ -487,13 +465,18 @@ export function useSunLight(canReadEnvironment = () => true) {
     previewRequest = run
     previewDate.value = dateStr
     previewLoadFailed.value = false
+    const previousSlots = previewSunInfo.value?.slots
+    previewSample.value = null
     previewSunInfo.value = null
     scheduleTestPlayback()
     try {
       const data = await request.get('/public/sun-info', { params: { date: dateStr } })
       if (previewRequest !== run || data?.date !== dateStr) return false
-      previewSunInfo.value = data
-      previewSlot.value ??= currentSlotIndex(data.timezone)
+      previewSunInfo.value = data.timeline ? { ...data, slots: data.timeline } : data
+      const previousTime = previousSlots?.[previewSlot.value]?.time
+      const clockSlot = previewSlot.value ?? currentSlotIndex(data.timezone)
+      const minutes = previousTime ? Number(previousTime.slice(0, 2)) * 60 + Number(previousTime.slice(3)) : clockSlot * 5
+      previewSlot.value = solarSlotForTime(previewSunInfo.value.slots, minutes, clockSlot)
       return true
     } catch {
       return false
@@ -511,12 +494,12 @@ export function useSunLight(canReadEnvironment = () => true) {
   const applySunInfo = (data) => {
     if (!data) return
     if (Date.parse(data.generatedAt) < Date.parse(sunInfo.value?.generatedAt)) return
-    sunInfo.value = data
+    sunInfo.value = data.timeline ? { ...data, slots: data.timeline } : data
     sunInfoAt.value = Date.now()
-    liveSlot.value = currentSlotIndex(data.timezone)
+    livePosition.value = solarSlotPosition(sunInfo.value.slots, sunInfoAt.value, currentSlotIndex(data.timezone))
     if (lightTestMode.value && !previewDate.value) {
       previewDate.value = data.date
-      previewSunInfo.value = data
+      previewSunInfo.value = sunInfo.value
       previewSlot.value ??= liveSlot.value
       scheduleTestPlayback()
     }
@@ -529,7 +512,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   const SUN_INFO_TTL = 30 * 60 * 1000
   function syncLiveClock() {
     const { date, slot } = solarClock(sunInfo.value?.timezone)
-    liveSlot.value = slot
+    livePosition.value = solarSlotPosition(sunInfo.value?.slots, Date.now(), slot)
     if (sunInfo.value?.date !== date || sunInfoAge() >= SUN_INFO_TTL) loadSunInfo()
   }
 
@@ -586,12 +569,12 @@ export function useSunLight(canReadEnvironment = () => true) {
     IDLE_EVENTS_THROTTLED.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
     document.addEventListener('visibilitychange', onVisibilityChange)
     resetIdle()
-    // 在实际五分钟刻度推进；标签页后台节流后重新对齐。
-    const slotDuration = 5 * 60_000
+    // Sample the backend's five-minute directions between slots without polling the API.
+    const slotDuration = 15_000
     function scheduleSlot() {
       slotTimer = setTimeout(
         () => {
-          syncLiveClock()
+          if (!document.hidden) syncLiveClock()
           scheduleSlot()
         },
         slotDuration - (Date.now() % slotDuration),
@@ -604,7 +587,6 @@ export function useSunLight(canReadEnvironment = () => true) {
     lampTween?.kill()
     if (cloudTimer) clearInterval(cloudTimer)
     cloudTween?.kill()
-    if (lampAutoTimer) clearTimeout(lampAutoTimer)
     if (fogTimer) clearTimeout(fogTimer)
     if (slotTimer) clearTimeout(slotTimer)
     liveRequest = null
@@ -682,6 +664,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     sunInfoAt,
     sunInfoAge,
     applySunInfo,
+    loadSunInfo,
     slotIdx,
     sunScene,
     weather,
@@ -716,6 +699,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     roomShade,
     lightLayerOpacity,
     skyTint,
+    skyLight,
     diffuseSkyStyle,
     lightTestMode,
     lightTestPaused,

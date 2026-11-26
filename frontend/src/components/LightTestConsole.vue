@@ -193,13 +193,16 @@
       /></label>
     </div>
 
-    <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: (light.slotIdx.value / 288) * 100 + '%' }"></div></div>
+    <div class="lt-progress">
+      <div class="lt-progress-fill" :style="{ width: (light.slotIdx.value / (activeSunInfo?.slots.length || 288)) * 100 + '%' }"></div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { inject, computed } from 'vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { solarSlotForTime } from '@/utils/solarSamples'
 import { groundShadowPerHeight } from '@/utils/windowLight'
 import { useI18n } from 'vue-i18n'
 import { useDragResize } from '@/utils/useDragResize'
@@ -223,10 +226,20 @@ const PROJECTION_STANDARDS = [
 const initY = typeof window !== 'undefined' ? Math.max(42, window.innerHeight - 360) : 100
 const { pos, onDragStart } = useDragResize({ x: 240, y: initY, minY: 42 })
 
+const activeSunInfo = light.activeSunInfo
 const testPhase = computed(() => {
   if (!light) return ''
   const s = light.sunScene.value
-  if (s.isNight) return t('home.testPhase.night')
+  if (s.altitude <= -12) return t('home.testPhase.night')
+  if (s.altitude < 0) {
+    const info = activeSunInfo.value
+    const index = light.slotIdx.value
+    const next = info?.slots?.[index + 1] ?? info?.nextMidnight
+    const previous = info?.slots?.[Math.max(0, index - 1)]
+    const rising = next ? next.altitude >= s.altitude : s.altitude >= (previous?.altitude ?? s.altitude)
+    return t(rising ? 'home.testPhase.dawn' : 'home.testPhase.dusk')
+  }
+  if (!activeSunInfo.value?.sunrise || !activeSunInfo.value?.sunset) return t('home.testPhase.daytime')
   const p = s.dayProgress ?? 0
   if (p < 0.1) return t('home.testPhase.sunrise')
   if (p < 0.25) return t('home.testPhase.morning')
@@ -235,8 +248,9 @@ const testPhase = computed(() => {
   return t('home.testPhase.sunset')
 })
 
-const activeSunInfo = light.activeSunInfo
 const slotTime = computed(() => {
+  const sample = activeSunInfo.value?.slots?.[light.slotIdx.value]
+  if (sample) return sample.time
   const minutes = light.slotIdx.value * 5
   return [Math.floor(minutes / 60), minutes % 60].map((part) => String(part).padStart(2, '0')).join(':')
 })
@@ -248,7 +262,7 @@ const pauseForEdit = () => {
 const onTimeChange = ({ currentTarget: input }) => {
   if (input.value) {
     const [hour, minute] = input.value.split(':').map(Number)
-    light.setSlot(Math.floor((hour * 60 + minute) / 5))
+    light.setSlot(solarSlotForTime(activeSunInfo.value?.slots, hour * 60 + minute, light.slotIdx.value))
   }
   input.value = slotTime.value
 }

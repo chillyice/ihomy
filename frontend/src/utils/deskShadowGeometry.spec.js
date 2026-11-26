@@ -27,8 +27,9 @@ describe('desk shadow geometry', () => {
   it.each([0, 0.5, 1])('keeps cup and rail shadows parallel at projection weight %f', (weight) => {
     const scene = sun(65, 125)
     const vector = deskShadowVector(scene, 200, 'cup', weight)
-    const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, weight, 76)
+    const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, weight)
     expect(vector.x / vector.y).toBeCloseTo(dx / dy, 8)
+    expect(vector.y / dy).toBeCloseTo(28 / 1600, 8)
   })
 
   it('scales with the displayed sprite size and its registered material height', () => {
@@ -40,7 +41,7 @@ describe('desk shadow geometry', () => {
     expect(fruit.y).toBeCloseTo(21)
     expect(cup.y).toBeCloseTo(28)
     expect(deskShadowVector(scene, 100, 'cup').y).toBeCloseTo(cup.y / 2)
-    expect(cup.blur).toBeGreaterThan(paper.blur)
+    expect(cup.height).toBeGreaterThan(paper.height)
   })
 
   it('registers geometry for each selectable and data-driven desk object', () => {

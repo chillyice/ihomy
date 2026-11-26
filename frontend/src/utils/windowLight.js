@@ -3,14 +3,9 @@
 import { todayStr } from './date'
 
 // Screen axes for a south-facing window: +x to the right, +y into the room.
-export function floorShadowDirection(azimuth, realWeight = 1) {
+export function floorShadowDirection(azimuth) {
   const bearing = ((180 - azimuth) * Math.PI) / 180
-  const sideways = Math.sin(bearing)
-  const inward = Math.cos(bearing)
-  if (realWeight === 1 || inward <= Number.EPSILON) return { x: sideways, y: inward }
-  // Scale along the ray to the calibrated screen depth, preserving its bearing.
-  const depth = 1 - realWeight + realWeight * inward
-  return { x: (sideways / inward) * depth, y: depth }
+  return { x: Math.sin(bearing), y: Math.cos(bearing) }
 }
 
 // Horizontal ground projection of a unit-height vertical object in direct sunlight.
@@ -25,36 +20,111 @@ function parseTimeToMinutes(timeStr) {
   return parts[0] * 60 + parts[1]
 }
 
-// Each stop describes the multiply tint on the page, independent of the window's bearing.
-const nightTint = { at: 0, rgb: [8, 12, 28], opacity: 0.7 }
-const clearSky = [
-  nightTint,
-  { at: 0.1, rgb: [255, 200, 80], opacity: 0.7 },
-  { at: 0.3, rgb: [255, 250, 230], opacity: 0.1 },
-  { at: 0.5, rgb: [255, 250, 230], opacity: 0 },
-  { at: 0.7, rgb: [255, 250, 230], opacity: 0 },
-  { at: 0.9, rgb: [255, 140, 50], opacity: 0.7 },
-  { ...nightTint, at: 1 },
+const clamp = (x) => Math.max(0, Math.min(1, x))
+const mix = (a, b, t) => a + (b - a) * t
+const mixColor = (a, b, t) => a.map((channel, i) => mix(channel, b[i], t))
+const rgb = (color) => color.map(Math.round).join(',')
+
+// Display-referred daylight levels. The sky is still visible below the horizon;
+// the direct beam and its colour have their own altitude response.
+const skyStops = [
+  [-12, 0, [8, 12, 28]],
+  [-6, 0.1, [56, 76, 125]],
+  [0, 0.28, [174, 151, 156]],
+  [8, 0.54, [202, 205, 217]],
+  [30, 0.82, [214, 230, 248]],
+  [80, 1, [220, 237, 255]],
 ]
-const graySky = [nightTint, { ...nightTint, at: 0.1, opacity: 0 }, { ...nightTint, at: 0.9, opacity: 0 }, { ...nightTint, at: 1 }]
+const beamStops = [
+  [0, [255, 146, 77]],
+  [6, [255, 179, 108]],
+  [15, [255, 208, 153]],
+  [40, [255, 232, 198]],
+  [70, [255, 245, 224]],
+]
 
-function tintTransmission([r, g, b], opacity) {
-  return 1 - opacity * (1 - (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255)
-}
-const nightTransmission = tintTransmission(nightTint.rgb, nightTint.opacity)
-
-export function getSkyTint(scene, weather) {
-  const stops = weather === 'clear' ? clearSky : graySky
-  const progress = scene.isNight ? 0 : scene.dayProgress
-  const end = stops.findIndex((stop, i) => i > 0 && progress <= stop.at)
+function interpolateStops(stops, altitude, interpolate) {
+  const end = stops.findIndex(([angle]) => angle >= altitude)
+  if (end === -1) return interpolate(stops.at(-1), stops.at(-1), 0)
+  if (end === 0) return interpolate(stops[0], stops[0], 0)
   const from = stops[end - 1]
   const to = stops[end]
-  const t = (progress - from.at) / (to.at - from.at)
-  const rgb = from.rgb.map((channel, i) => channel + (to.rgb[i] - channel) * t)
-  const opacity = from.opacity + (to.opacity - from.opacity) * t
-  // Only daylight above the existing night tint can be blocked by the window.
-  const daylightShare = Math.max(0, 1 - nightTransmission / tintTransmission(rgb, opacity))
-  return { background: `rgb(${rgb.join(',')})`, opacity, daylightShare }
+  return interpolate(from, to, (altitude - from[0]) / (to[0] - from[0]))
+}
+
+// Transmission, diffuse daylight, source softness and sky colour in the
+// absence of measured cloud cover / visibility. These are unitless UI levels.
+const weatherProfiles = {
+  clear: { direct: 1, diffuse: 1, softness: 0, color: [217, 231, 248] },
+  cloud: { direct: 0.78, diffuse: 0.89, softness: 0.25, color: [215, 225, 238] },
+  overcast: { direct: 0.04, diffuse: 0.64, softness: 0.65, color: [194, 204, 218] },
+  fog: { direct: 0.1, diffuse: 0.67, softness: 0.85, color: [225, 224, 214] },
+  rain: { direct: 0, diffuse: 0.54, softness: 0.72, color: [169, 197, 217] },
+  snow: { direct: 0, diffuse: 0.84, softness: 0.72, color: [235, 246, 255] },
+  thunder: { direct: 0, diffuse: 0.35, softness: 1, color: [136, 155, 181] },
+}
+
+function measurement(value, max) {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 && n <= max ? n : null
+}
+
+export function weatherOptics(mode, weather) {
+  const profile = weatherProfiles[mode] ?? weatherProfiles.clear
+  const cover = measurement(weather?.nowFull?.cloud, 100)
+  const visibility = measurement(weather?.nowFull?.vis, Infinity)
+  const level = measurement(weather?.precipLevel, 6)
+  const wet = mode === 'rain' || mode === 'snow'
+  let { direct, diffuse, softness } = profile
+  if (cover !== null && mode !== 'thunder') {
+    const cloud = cover / 100
+    const clearFraction = 1 - cloud ** 2
+    // Broken cloud may leave a sunbreak in light rain. Dense rain/snow and
+    // a fully covered sky retain diffuse illumination only.
+    if (wet) direct = 0.38 * clearFraction * clamp(1 - (level ?? 2) / 3)
+    else if (mode === 'fog') direct *= clearFraction
+    else direct = clearFraction
+    diffuse = clamp(diffuse + 0.14 * (0.5 - cloud))
+    softness = clamp(softness + 0.45 * (cloud - 0.5))
+  }
+  if (mode === 'fog' && visibility !== null) {
+    const clarity = clamp(visibility / 8)
+    direct = 0.48 * clarity * (cover === null ? 1 : 1 - (cover / 100) ** 2)
+    diffuse = 0.48 + 0.32 * clarity
+    softness = 1 - 0.6 * clarity
+  }
+  if (wet && level !== null) diffuse *= 1 - 0.06 * level
+  return { direct, diffuse, softness, color: profile.color }
+}
+
+const roomReflectance = 0.14
+
+export function skyLighting(scene, optics, passingCloud = 1) {
+  const direct = optics.direct * passingCloud
+  // Local floor irradiance and total flux through the vertical window have
+  // different incidence factors. Only the latter supplies reflected room light.
+  const reflected = roomReflectance * scene.windowFlux * direct
+  const diffuse = scene.skyLevel * optics.diffuse
+  const natural = clamp(diffuse + reflected)
+  const color = mixColor(scene.skyColor, optics.color, optics.softness * scene.skyLevel)
+  const reflectedColor = mixColor(color, scene.beamColor, reflected)
+  // Fix luminance before applying sky chroma. In particular a cool storm tint
+  // must not darken a shaded surface as the morning becomes brighter.
+  const tint = reflectedColor.map((channel) => Math.round(channel * 0.5))
+  const tintLuma = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255
+  const roomTransmission = 0.33 + 0.67 * natural
+  return {
+    direct: scene.lightOpacity * direct,
+    natural,
+    // Use the mean weather transmission for metering. A passing cloud moves
+    // the beam without repeatedly waking the desk lamp.
+    metered: clamp(diffuse + roomReflectance * scene.windowFlux * optics.direct),
+    softness: optics.softness,
+    tint: { background: 'rgb(' + rgb(tint) + ')', opacity: clamp((1 - roomTransmission) / (1 - tintLuma)) },
+    diffuseColor: 'rgb(' + rgb(reflectedColor) + ')',
+    diffuseOpacity: diffuse * (0.04 + 0.1 * optics.softness) + reflected * 0.16,
+  }
 }
 
 // The canvas already shades blocked pixels by shade * direct. Supply the rest
@@ -63,133 +133,70 @@ export function ambientShadowOpacity(shade, direct) {
   return direct >= 1 ? 0 : (shade * (1 - direct)) / (1 - shade * direct)
 }
 
-// 台灯自动开关阈值(以窗口阴影强度为口径:正午 0.3 → 日出日落 0.7 → 夜间 0.7):
-// 阴影强度 ≥ LAMP_SHADOW_ON 认为「暗到该开灯」,≤ LAMP_SHADOW_OFF 认为「亮到该关灯」。
-// 两阈值之间做 smoothstep 过渡(而非 0/1 跳变),傍晚渐亮、清晨渐灭,避免视觉突跳;
-// 纯函数、不带历史状态,光照测试台按任意时隙跳着看也能得到同一条曲线。
-export const LAMP_SHADOW_ON = 0.64
-export const LAMP_SHADOW_OFF = 0.54
+export const AUTO_LAMP_ON_BELOW = 0.34
+export const AUTO_LAMP_OFF_ABOVE = 0.45
 
-export function lampFromShadow(shadowIntensity) {
-  const span = LAMP_SHADOW_ON - LAMP_SHADOW_OFF
-  const t = Math.max(0, Math.min(1, ((shadowIntensity ?? 0) - LAMP_SHADOW_OFF) / span))
+export function lampFromDaylight(level) {
+  const t = clamp((AUTO_LAMP_OFF_ABOVE - level) / 0.34)
   return t * t * (3 - 2 * t)
 }
 
-export function getSunScene(sunInfo, slotIndex) {
+export function getSunScene(sunInfo, slotIndex, sample) {
   const slots = sunInfo?.slots || []
-  const idx = Math.max(0, Math.min(287, slotIndex || 0))
-  const slot = slots[idx] || { altitude: -30, azimuth: 0, time: '12:00' }
-
+  const idx = Math.max(0, Math.min(slots.length - 1, slotIndex || 0))
+  const slot = sample ?? slots[idx] ?? { altitude: -30, azimuth: 0, time: '00:00' }
   const alt = slot.altitude
   const az = slot.azimuth
-  const time = slot.time
-
-  const sunriseMin = parseTimeToMinutes(sunInfo?.sunrise)
-  const sunsetMin = parseTimeToMinutes(sunInfo?.sunset)
-  const currentMin = parseTimeToMinutes(time)
-
-  // 日昼进度:0=日出,1=日落
-  // 夜间策略:日落后 hold 在日落位置(+90°),凌晨2点 reset 到日出位置(-90°)
-  // 2点没人看,跳变无感;日落后阴影停留在日落位置,像太阳冻在日落
-  const TWO_AM = 2 * 60
-  let dayProgress = 0.5
-  let isNight = true
-  if (sunriseMin != null && sunsetMin != null && currentMin != null && sunsetMin > sunriseMin) {
-    if (currentMin >= sunriseMin && currentMin <= sunsetMin) {
-      isNight = false
-      dayProgress = (currentMin - sunriseMin) / (sunsetMin - sunriseMin)
-    } else if (currentMin >= sunsetMin || currentMin < TWO_AM) {
-      isNight = true
-      dayProgress = 1
-    } else {
-      isNight = true
-      dayProgress = 0
-    }
+  // -0.833 degrees is the apparent sunrise/sunset threshold used by SolarUtil.
+  // The actual solar altitude also distinguishes polar day from polar night.
+  const isNight = alt < -0.833
+  const sunrise = parseTimeToMinutes(sunInfo?.sunrise)
+  const sunset = parseTimeToMinutes(sunInfo?.sunset)
+  const minute = parseTimeToMinutes(slot.time) ?? 0
+  let dayProgress = minute / 1440
+  if (sunrise != null && sunset != null && sunrise !== sunset) {
+    const end = sunset < sunrise ? sunset + 1440 : sunset
+    const clock = sunset < sunrise && minute <= sunset ? minute + 1440 : minute
+    dayProgress = clamp((clock - sunrise) / (end - sunrise))
   }
 
-  // 窗角:太阳直射窗户的角度(90°=正对窗户,0°=平行窗户无直射)
   const windowAngle = 90 - Math.abs(az - 180)
-  // 是否有直射光:白天 + 窗角>0 + 太阳在地平线上
-  const hasDirectLight = !isNight && windowAngle > 0 && alt > 0
-
-  // 旋转:基于方位角驱动,az=90°开始(-90°)→ az=180°正中(0°)→ az=270°结束(+90°)
-  // 窗角≤0(az<90 或 az>270)时 hold 在对应端点,无直射光不旋转
+  const hasDirectLight = alt > 0 && alt < 90 && windowAngle > 0
   const lightRotation = hasDirectLight ? az - 180 : az <= 90 ? -90 : 90
+  const sourceX = Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
+  const sky = interpolateStops(skyStops, alt, (a, b, t) => ({ level: mix(a[1], b[1], t), color: mixColor(a[2], b[2], t) }))
+  const beamColor = interpolateStops(beamStops, alt, (a, b, t) => mixColor(a[1], b[1], t))
+  const beam = rgb(beamColor)
+  const rgba = (alpha) => (hasDirectLight ? 'rgba(' + beam + ',' + alpha + ')' : 'transparent')
+  const palette = { bloom: rgba(0.7), core: rgba(0.94), mid: rgba(0.52), ambient: rgba(0.08) }
 
-  // 光源水平位置:由方位角驱动,夜间 hold 在日出位置(左侧 7.5%)
-  const sourceX = isNight ? 7.5 : Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
-
-  // 阴影强度:夜间 0.7,正午 0.3,日出日落 0.7(不超过 70%)
-  const shadowIntensity = isNight ? 0.7 : 0.7 - Math.sin(dayProgress * Math.PI) * 0.4
-  // 阴影颜色:夜间深蓝黑,日间纯黑
-  const shadowColor = isNight ? 'rgb(8,12,28)' : 'rgb(0,0,0)'
-
-  // 光柱颜色:夜间全透明(不发光),日间基于高度角
-  let palette, rayBaseOpacity
-  if (!hasDirectLight) {
-    palette = {
-      bloom: 'transparent',
-      core: 'transparent',
-      mid: 'transparent',
-      ambient: 'transparent',
-    }
-    rayBaseOpacity = 0
-  } else if (alt < 6) {
-    palette = {
-      bloom: 'rgba(255, 175, 90, 0.85)',
-      core: 'rgba(255, 160, 70, 0.95)',
-      mid: 'rgba(255, 130, 50, 0.6)',
-      ambient: 'rgba(255, 165, 80, 0.12)',
-    }
-    rayBaseOpacity = 1.3
-  } else if (alt < 15) {
-    palette = {
-      bloom: 'rgba(255, 200, 130, 0.78)',
-      core: 'rgba(255, 190, 110, 0.92)',
-      mid: 'rgba(255, 170, 85, 0.52)',
-      ambient: 'rgba(255, 195, 115, 0.09)',
-    }
-    rayBaseOpacity = 1.15
-  } else if (alt < 60) {
-    palette = {
-      bloom: 'rgba(255, 230, 180, 0.68)',
-      core: 'rgba(255, 222, 160, 0.9)',
-      mid: 'rgba(255, 210, 140, 0.48)',
-      ambient: 'rgba(255, 225, 170, 0.06)',
-    }
-    rayBaseOpacity = 1.05
-  } else {
-    palette = {
-      bloom: 'rgba(255, 242, 210, 0.62)',
-      core: 'rgba(255, 238, 195, 0.9)',
-      mid: 'rgba(255, 228, 170, 0.42)',
-      ambient: 'rgba(255, 240, 200, 0.05)',
-    }
-    rayBaseOpacity = 0.95
-  }
-
-  // 光柱不透明度:无直射光时 0,有直射光时正弦过渡(正午最强)
-  const rayOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * rayBaseOpacity : 0
-
-  // 低角度的长影仍需可辨；按当天太阳高度与南窗入射角渐显，地平线和窗侧都自然淡出。
-  const windowIncidence = Math.sin((Math.max(0, windowAngle) * Math.PI) / 180)
-  const lightOpacity = hasDirectLight ? Math.sqrt(Math.sin((alt * Math.PI) / 180) * windowIncidence) : 0
-
-  // 台灯:由阴影强度驱动(见 lampFromShadow),不再按方位角一刀切
-  const lampOpacity = lampFromShadow(shadowIntensity)
+  const rad = Math.PI / 180
+  const sine = Math.max(0, Math.sin(alt * rad))
+  // Approximate atmospheric extinction near the horizon. Tone-map the
+  // floor's local intensity for display; total window flux stays linear.
+  const transmission = sine / (0.12 + 0.88 * sine)
+  const incidence = hasDirectLight ? Math.cos(alt * rad) * Math.sin(windowAngle * rad) : 0
+  const windowFlux = transmission * incidence
+  // Fade a grazing beam over the last few degrees to avoid aliased slivers.
+  const lightOpacity = hasDirectLight ? Math.sqrt(transmission * sine) * clamp(incidence / 0.08) : 0
+  const shadowIntensity = 0.7 - 0.4 * sky.level
+  const lampOpacity = lampFromDaylight(clamp(sky.level + roomReflectance * windowFlux))
+  const shadowColor = 'rgb(0,0,0)'
 
   return {
     source: { x: sourceX + '%', y: '-15%' },
     rotation: lightRotation,
     palette,
-    rays: makeRays(rayOpacity),
+    rays: makeRays(hasDirectLight ? 1 : 0),
+    skyLevel: sky.level,
+    skyColor: sky.color,
+    beamColor,
+    windowFlux,
     shadowIntensity,
     shadowColor,
     lightOpacity,
     lampOpacity,
     altitude: alt,
-    noonAltitude: slots.reduce((peak, sample) => (sample?.altitude > peak ? sample.altitude : peak), alt),
     azimuth: az,
     isNight,
     dayProgress,
@@ -213,25 +220,33 @@ function makeRays(opacityScale) {
 }
 
 // The backend labels each five-minute slot in the sun-info location's time zone.
+const clockFormatters = new Map()
 export function solarClock(timezone, now = new Date()) {
   if (timezone) {
     try {
-      const parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-      }).formatToParts(now)
+      let formatter = clockFormatters.get(timezone)
+      if (!formatter) {
+        formatter = new Intl.DateTimeFormat('en-GB', {
+          timeZone: timezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        })
+        clockFormatters.set(timezone, formatter)
+      }
+      const parts = formatter.formatToParts(now)
       const { year, month, day, hour, minute } = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
-      return { date: `${year}-${month}-${day}`, slot: Math.floor((Number(hour) * 60 + Number(minute)) / 5) }
+      const minutes = Number(hour) * 60 + Number(minute)
+      return { date: `${year}-${month}-${day}`, minutes, slot: Math.floor(minutes / 5) }
     } catch (error) {
       if (!(error instanceof RangeError)) throw error
     }
   }
-  return { date: todayStr(now), slot: Math.floor((now.getHours() * 60 + now.getMinutes()) / 5) }
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  return { date: todayStr(now), minutes, slot: Math.floor(minutes / 5) }
 }
 
 export function currentSlotIndex(timezone) {

@@ -3,6 +3,7 @@ package com.ihomy.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.SolarUtil;
+import com.moodysalem.TimezoneMapper;
 import com.ihomy.common.ThirdPartyHttp;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,10 +16,11 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 太阳信息服务:IP 定位(lat/lng/timezone)→ NOAA/Meeus 算法计算 288 时隙太阳位置、日月与晨昏时刻。
+ * 太阳信息服务:地点与时区 → 五分钟太阳轨迹、日月与晨昏时刻。
  * Redis 缓存 6 小时(IP→位置) + 当日缓存(时隙表)。
  */
 @Slf4j
@@ -30,11 +32,12 @@ public class SunService {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final String LOC_PREFIX = "ihomy:sun:loc:";
-    private static final String SLOTS_PREFIX = "ihomy:sun:slots:v2:";
+    private static final Set<String> KNOWN_ZONES = ZoneId.getAvailableZoneIds();
+    private static final String SLOTS_PREFIX = "ihomy:sun:slots:v3:";
     /** 每日月相列表天数(天气页「日月与晨昏」卡片的月相条) */
     private static final int MOON_DAYS = 7;
 
-    /** 主入口:返回位置 + 日出日落/三档晨昏/月出月落月相 + 288 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
+    /** 主入口:位置、日月信息与地点当地日的太阳轨迹。date 为 null 时取当日。 */
     public Map<String, Object> getSunInfo(String ip, LocalDate date, String[] familyLocation) {
         String[] loc = resolveLocation(ip, familyLocation);
         double lat = Double.parseDouble(loc[0]);
@@ -48,6 +51,7 @@ public class SunService {
         data.put("lng", Math.round(lng * 100) / 100.0);
         data.put("timezone", tz.getId());
         data.put("date", today.toString());
+        data.put("nextMidnight", SolarUtil.solarSlot(lat, lng, today.plusDays(1).atStartOfDay(tz), 0));
         if (familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null) {
             data.put("city", familyLocation[2]);
         }
@@ -79,14 +83,28 @@ public class SunService {
         String cached = redis.opsForValue().get(slotsKey);
         if (cached != null) {
             try {
-                data.put("slots", mapper.readValue(cached, List.class));
+                data.putAll(mapper.readValue(cached, new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}));
                 return data;
             } catch (Exception ignored) {}
         }
         List<Map<String, Object>> slots = SolarUtil.buildSlots(lat, lng, today, tz);
-        data.put("slots", slots);
+        Map<String, Object> trajectory = new HashMap<>();
+        trajectory.put("slots", slots);
+        if (slots.size() != 288) {
+            trajectory.put("timeline", slots);
+            // Existing clients index wall times directly, including clock gaps and repeats.
+            List<Map<String, Object>> wallSlots = new ArrayList<>(288);
+            for (int i = 0; i < 288; i++) {
+                var wallTime = today.atStartOfDay().plusMinutes(i * 5L);
+                var sample = new HashMap<>(SolarUtil.solarSlot(lat, lng, wallTime.atZone(tz), i));
+                sample.put("time", wallTime.toLocalTime().toString());
+                wallSlots.add(sample);
+            }
+            trajectory.put("slots", wallSlots);
+        }
+        data.putAll(trajectory);
         try {
-            redis.opsForValue().set(slotsKey, mapper.writeValueAsString(slots), 12, TimeUnit.HOURS);
+            redis.opsForValue().set(slotsKey, mapper.writeValueAsString(trajectory), 12, TimeUnit.HOURS);
         } catch (Exception ignored) {}
 
         return data;
@@ -97,7 +115,12 @@ public class SunService {
         // 家庭设置的位置偏好优先
         if (familyLocation != null && familyLocation.length >= 2
                 && familyLocation[0] != null && familyLocation[1] != null) {
-            return new String[]{ familyLocation[0], familyLocation[1], "Asia/Shanghai" };
+            double lat = Double.parseDouble(familyLocation[0]);
+            double lng = Double.parseDouble(familyLocation[1]);
+            String zone = TimezoneMapper.tzNameAt(lat, lng);
+            // The Chinese city catalogue and its forecasts use civil Beijing time in Xinjiang.
+            if ("Asia/Urumqi".equals(zone)) zone = "Asia/Shanghai";
+            return new String[]{ familyLocation[0], familyLocation[1], zone != null && KNOWN_ZONES.contains(zone) ? zone : "UTC" };
         }
         if (ip != null && (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.startsWith("192.168."))) {
             ip = "";

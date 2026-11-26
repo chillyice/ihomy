@@ -204,6 +204,7 @@ const persistRegion = async (city, lat, lng) => {
     ElMessage.success(t('settings.weather.regionSaved'))
     // 立即按新地域重新拉取天气(首页天气卡片/侧边栏迷你天气/天气页共享同一 sunLight 实例)
     sunLight?.loadWeather?.()
+    sunLight?.loadSunInfo?.(true)
   } catch (e) {
     // 拦截器已提示
   } finally {

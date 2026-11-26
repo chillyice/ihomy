@@ -29,7 +29,7 @@ function paintBody(ctx, caster, scaleX, scaleY) {
 
 // Remove blocked sunlight from the existing transmission map. One final color/
 // alpha pass then shades the window frame, foliage and desk objects together.
-export function applyDeskShadowMask(light, work, casters, scene, width, height, realWeight) {
+export function applyDeskShadowMask(light, work, casters, scene, width, height, realWeight, sourceRadius) {
   if (!casters.length) return
   const canvas = light.canvas
   const w = canvas.width
@@ -70,13 +70,21 @@ export function applyDeskShadowMask(light, work, casters, scene, width, height, 
     const bh = Math.min(h, Math.ceil((caster.y + radius) * scaleY)) - top
     if (bw <= 0 || bh <= 0) continue
     cast.save()
-    cast.shadowColor = 'rgba(0, 0, 0, 0.45)'
-    cast.shadowBlur = Math.min(vector.blur, caster.size * 0.15) * scaleY
-    for (let i = 1; i <= steps; i++) {
+    // Draw only the blurred shadow onto the mask. Drawing the source on top
+    // would keep a hard second outline even at the far end of the cast.
+    const tipBlur = Math.min(
+      caster.size * 0.25,
+      (Math.hypot(vector.height, length) * sourceRadius) / Math.sin((scene.altitude * Math.PI) / 180),
+    )
+    const offscreen = w + Math.ceil(visible * scaleX) + bw + 2
+    cast.shadowColor = '#000'
+    cast.shadowOffsetX = offscreen
+    for (let i = 0; i <= steps; i++) {
       const fraction = (i / steps) * (visible / length)
+      cast.shadowBlur = tipBlur * fraction * scaleY
       const dx = vector.x * fraction * scaleX
       const dy = vector.y * fraction * scaleY
-      cast.drawImage(work.canvas, left, top, bw, bh, left + dx, top + dy, bw, bh)
+      cast.drawImage(work.canvas, left, top, bw, bh, left + dx - offscreen, top + dy, bw, bh)
     }
     cast.restore()
   }

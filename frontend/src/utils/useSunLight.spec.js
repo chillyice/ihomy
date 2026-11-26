@@ -71,6 +71,21 @@ it('applies the current daylight immediately when auto mode is selected again', 
   expect(request.get).toHaveBeenCalledTimes(1)
 })
 
+it('samples live between timestamped observations, freezes on entry and resumes from the actual instant', async () => {
+  const day = sunDay('2026-11-25')
+  const start = Date.parse('2026-11-24T16:00:00Z')
+  day.slots.forEach((slot, index) => (slot.epochMillis = start + index * 300_000))
+  day.slots[144].altitude = 40
+  day.slots[145].altitude = 41
+  await mountLight(day)
+  expect(light.sunScene.value.altitude).toBeCloseTo(40.4)
+  light.startLightTest()
+  await vi.advanceTimersByTimeAsync(60_000)
+  expect(light.sunScene.value.altitude).toBeCloseTo(40.4)
+  light.stopLightTest()
+  expect(light.sunScene.value.altitude).toBeCloseTo(40.6)
+})
+
 it.each([null, 8])('uses the first observation’s time zone when opened early, honoring a manual choice of %s', async (manualSlot) => {
   const pending = Promise.withResolvers()
   await mountLight(pending.promise)
@@ -218,7 +233,7 @@ it('shows the selected slot’s lamp and shadow mask immediately when seeking or
   light.setSlot(144)
   await nextTick()
   expect(light.lampDivOpacity.value).toBe(0)
-  light.setSlot(217)
+  light.setSlot(225)
   await nextTick()
   expect(light.lightLayerOpacity.value).toBe(0)
   expect(light.lampStrengthAnim.value).toBe(1)
@@ -226,12 +241,30 @@ it('shows the selected slot’s lamp and shadow mask immediately when seeking or
   light.setTestSpeed(8)
   light.pauseLightTest()
   await vi.advanceTimersByTimeAsync(260)
-  expect(light.slotIdx.value).toBe(227)
+  expect(light.slotIdx.value).toBe(235)
   expect(light.lampMask.value).toBe(nightMask)
   expect(light.lampDivOpacity.value).toBe(0.3)
   light.setSlot(144)
   await nextTick()
   expect(light.lampMask.value).toBe('none')
+})
+
+it('keeps auto lamp state within its metering band and gives manual overrides priority', async () => {
+  await mountLight(sunDay('2026-11-25'))
+  expect(light.lampStrength.value).toBe(0)
+  const rain = { condition: 'rain', precipLevel: 4 }
+  light.weather.value = rain
+  expect(light.skyLight.value.metered).toBeGreaterThan(0.34)
+  expect(light.skyLight.value.metered).toBeLessThan(0.45)
+  expect(light.lampStrength.value).toBe(0)
+  light.weather.value = { condition: 'thunder' }
+  expect(light.lampStrength.value).toBeGreaterThan(0)
+  light.weather.value = rain
+  expect(light.lampStrength.value).toBeGreaterThan(0)
+  light.lampMode.value = 'off'
+  expect(light.lampStrength.value).toBe(0)
+  light.lampMode.value = 'on'
+  expect(light.lampStrength.value).toBe(1)
 })
 
 it('uses the same weather gate and scene rotation and keeps simulated storms out of persisted window state', async () => {
@@ -327,8 +360,8 @@ it.each([
           const delta = (levels[i] - levels[i - 1]) * (slot <= noon ? 1 : -1)
           expect(delta, `${weather}, depth ${depth}, ${day.slots[slot].time}`).toBeGreaterThanOrEqual(-0.001)
         }
-        expect(levels.at(-1)).toBeCloseTo(levels[0], 8)
-        expect(levels.at(-1)).toBe(levels.at(-2))
+        // The last two samples are after sunset, but twilight still fades.
+        expect(levels.at(-1)).toBeLessThan(levels.at(-2))
         expect(Math.max(...levels)).toBeGreaterThan(levels[0])
       }
     }

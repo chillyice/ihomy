@@ -4014,3 +4014,8 @@ SELECT '每日全量备份',
        'DAILY', '03:30', NULL, 7, 1
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `sys_backup_policy`);
+
+-- V15.8 家庭地点时区映射依赖
+INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`)
+SELECT 'LatLongToTimezoneMaven', 'MAVEN', 'com.moodysalem:LatLongToTimezoneMaven', '1.2', 'MIT', 'https://github.com/moodysalem/LatLongToTimezoneMaven', '离线查询家庭地点时区', 'FULL'
+WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'com.moodysalem:LatLongToTimezoneMaven');

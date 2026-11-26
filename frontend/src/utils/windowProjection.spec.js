@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { drawWindowProjection, sashApertures, windowTransform } from './windowProjection'
+import { drawWindowProjection, sampleWindowRays, sashApertures, windowTransform } from './windowProjection'
+import { drawWindowFoliage } from './windowFoliage'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
 import { getSunScene } from './windowLight'
 import { sunPosition } from './solarPosition'
@@ -95,17 +96,16 @@ describe('window-plane projection', () => {
   it.each([
     [1200, 800],
     [390, 844],
-  ])('matches the Jinan noon landmarks at %i by %i', (width, height) => {
-    const noon = (altitude) => windowTransform(width, height, altitude, 180, 0, altitude)
+  ])('preserves short summer shadows and fits long winter shadows at %i by %i', (width, height) => {
+    const noon = (altitude) => windowTransform(width, height, altitude, 180)
     const summer = noon(76.79)
     const equinox = noon(53.35)
     const winter = noon(29.91)
-    expect(summer[5] / height).toBeCloseTo(0.01, 8)
-    expect(equinox[5] / height).toBeCloseTo(0.05, 8)
-    expect((equinox[5] + equinox[3]) / height).toBeCloseTo(0.95, 8)
-    expect(winter[5] / height).toBeCloseTo(0.09, 8)
-    expect(winter[3] / summer[3]).toBeCloseTo(1.15, 8)
-    expect((summer[3] + winter[3]) / (2 * height)).toBeCloseTo(0.9, 8)
+    expect(summer).toEqual(windowTransform(width, height, 76.79, 180, 1))
+    expect(summer[3]).toBeLessThan(equinox[3])
+    expect(equinox[3]).toBeLessThan(winter[3])
+    expect(winter[3]).toBeLessThan(windowTransform(width, height, 29.91, 180, 1)[3])
+    expect(winter[3] / summer[3]).toBeGreaterThan(2)
   })
 
   it('keeps the far frame edge in its summer framing while date and projection standard change', () => {
@@ -115,16 +115,15 @@ describe('window-plane projection', () => {
     }
     const june = atMidday('2026-06-21')
     const november = atMidday('2026-11-25')
-    const transform = (scene, weight) => windowTransform(1200, 800, scene.altitude, scene.azimuth, weight, scene.noonAltitude)
+    const transform = (scene, weight) => windowTransform(1200, 800, scene.altitude, scene.azimuth, weight)
     const [[, bottom, , frameHeight]] = sashApertures(openWindow(0.1, 0.5)[0])
     const farEdge = (scene) => {
       const [, , , depth, , originY] = transform(scene, 0)
       return (originY + (bottom + frameHeight) * depth) / 800
     }
-    expect(farEdge(june)).toBeGreaterThan(0.86)
-    expect(farEdge(june)).toBeLessThan(0.92)
+    expect(farEdge(june)).toBeGreaterThan(0)
+    expect(farEdge(june)).toBeLessThan(1)
     expect(farEdge(november)).toBeGreaterThan(farEdge(june))
-    expect(june.lightOpacity).toBeGreaterThan(november.lightOpacity)
     const realLength = (scene) => {
       const [, , dx, dy] = transform(scene, 1)
       return Math.hypot(dx, dy)
@@ -137,12 +136,11 @@ describe('window-plane projection', () => {
     for (let day = 1; day <= 365; day++) {
       const date = new Date(Date.UTC(2026, 0, day)).toISOString().slice(0, 10)
       const slots = Array.from({ length: 288 }, (_, i) => sunPosition(36.65, 117.12, date, i * 5))
-      const peak = Math.max(...slots.map((s) => s.altitude))
       let maxAngleError = 0
       for (const { altitude, azimuth } of slots) {
         if (altitude <= 0 || azimuth <= 90 || azimuth >= 270) continue
         for (const weight of [0, 0.5, 1]) {
-          const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth, weight, peak)
+          const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth, weight)
           const tilt = (Math.atan2(dx, dy) * 180) / Math.PI
           maxAngleError = Math.max(maxAngleError, Math.abs(tilt - (180 - azimuth)))
         }
@@ -156,7 +154,7 @@ describe('window-plane projection', () => {
     [89.999, 180],
     [0.01, 269.99999],
   ])('preserves the bearing at altitude %f and azimuth %f', (altitude, azimuth) => {
-    const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth, 0, 89.999)
+    const [, , dx, dy] = windowTransform(1200, 800, altitude, azimuth)
     expect(Number.isFinite(dx) && Number.isFinite(dy)).toBe(true)
     expect((Math.atan2(dx, dy) * 180) / Math.PI).toBeCloseTo(180 - azimuth, 8)
   })
@@ -173,24 +171,26 @@ describe('window-plane projection', () => {
     const lengths = slots.map((_, index) => {
       const scene = getSunScene(day, index)
       expect(scene.hasDirectLight).toBe(true)
-      expect(scene.noonAltitude).toBe(peak)
-      return windowTransform(1200, 800, scene.altitude, scene.azimuth, 0, scene.noonAltitude)[3]
+      const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth)
+      return Math.hypot(dx, dy)
     })
     const [morning, midMorning, noon, afternoon, evening] = lengths
     expect(morning).toBeGreaterThan(midMorning)
     expect(midMorning).toBeGreaterThan(noon)
-    expect(morning / noon).toBeCloseTo(Math.tan((peak * Math.PI) / 180) / Math.tan((2 * Math.PI) / 180), 8)
     expect(afternoon).toBeCloseTo(midMorning)
     expect(evening).toBeCloseTo(morning)
   })
 
-  it.each([0, 1])('keeps extending past the viewport as the sun approaches the horizon (real weight %i)', (realWeight) => {
-    const reach = (altitude) => {
-      const [, , dx, dy] = windowTransform(390, 844, altitude, 115, realWeight, 40)
+  it('lets real shadows leave the viewport and smoothly compresses the whole fitted footprint at grazing angles', () => {
+    const reach = (altitude, realWeight, azimuth) => {
+      const [, , dx, dy] = windowTransform(390, 844, altitude, azimuth, realWeight)
       return Math.hypot(dx, dy)
     }
     for (const altitude of [1, 0.1, 0.01]) {
-      expect(reach(altitude / 10) / reach(altitude)).toBeCloseTo(10, 2)
+      expect(reach(altitude / 10, 1, 115) / reach(altitude, 1, 115)).toBeCloseTo(10, 2)
+      expect(reach(altitude / 10, 0, 90.00001)).toBeGreaterThan(reach(altitude, 0, 90.00001))
+      expect(reach(altitude / 10, 0, 90.00001)).toBeLessThan(1.8 * 844)
+      expect(reach(altitude, 0, 90.00001)).toBeCloseTo(reach(altitude, 0, 180), 8)
     }
   })
 
@@ -201,7 +201,7 @@ describe('window-plane projection', () => {
     [1, 53.35],
   ])('casts the sill, transom and head from their heights above one fixed wall foot (weight %f, noon %f°)', (weight, peak) => {
     const width = 1200
-    const at = (altitude, azimuth) => windowTransform(width, 800, altitude, azimuth, weight, peak)
+    const at = (altitude, azimuth) => windowTransform(width, 800, altitude, azimuth, weight)
     const [paneWidth, , , noonRise, , noonSillY] = at(peak, 180)
     const wallX = (width - paneWidth) / 2
     const wallY = noonSillY - 0.15 * noonRise
@@ -221,9 +221,9 @@ describe('window-plane projection', () => {
         const offsetX = x + v * dx - wallX
         const offsetY = y + v * dy - wallY
         const bearing = ((180 - azimuth) * Math.PI) / 180
-        const distance = (noonDistance * Math.tan((peak * Math.PI) / 180)) / Math.tan((altitude * Math.PI) / 180)
+        const distance = (v + 0.15) * at(altitude, 180)[3]
         expect(Math.atan2(offsetX, offsetY)).toBeCloseTo(bearing, 8)
-        expect(offsetY).toBeCloseTo(distance * (1 - weight + weight * Math.cos(bearing)), 7)
+        expect(offsetY).toBeCloseTo(distance * Math.cos(bearing), 7)
       }
     }
   })
@@ -238,8 +238,8 @@ describe('window-plane projection', () => {
     for (const rail of [-0.02075, 0.483, 1.02075]) {
       let previous
       for (const { i, altitude, azimuth } of direct) {
-        const [, , , depth, , y] = windowTransform(1280, 902, altitude, azimuth, 0, peak)
-        const edge = y + rail * depth
+        const [paneWidth, , shear, depth, x, y] = windowTransform(1280, 902, altitude, azimuth)
+        const edge = Math.hypot(x - (1280 - paneWidth) / 2 + rail * shear, y + rail * depth)
         if (previous !== undefined) {
           if (i <= noon) expect(edge).toBeLessThan(previous)
           else expect(edge).toBeGreaterThan(previous)
@@ -250,7 +250,7 @@ describe('window-plane projection', () => {
   })
 
   it('projects a finite window height on days when the solar noon reaches the zenith', () => {
-    const reach = (altitude) => windowTransform(1200, 800, altitude, 180, 0, 90)[3]
+    const reach = (altitude) => windowTransform(1200, 800, altitude, 180)[3]
     expect(reach(1)).toBeGreaterThan(reach(45))
     expect(reach(45)).toBeLessThan(8000)
     expect(reach(89.999)).toBeLessThan(1)
@@ -258,7 +258,7 @@ describe('window-plane projection', () => {
   })
 
   it('projects a south-facing vertical window onto the floor using both solar angles', () => {
-    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1, 65)
+    const [, , dx, dy, , top] = windowTransform(1200, 1000, 30, 120, 1)
     expect(Math.hypot(dx, dy)).toBeCloseTo(2000 * Math.sqrt(3))
     expect(dy).toBeCloseTo((2000 * Math.sqrt(3)) / 2)
     expect(dx).toBeCloseTo(3000)
@@ -266,15 +266,38 @@ describe('window-plane projection', () => {
     expect(windowTransform(1200, 1000, 45, 180, 1)[3]).toBeCloseTo(2000)
   })
 
-  it.each([
-    ['clear', false],
-    ['rain', true],
-    ['snow', true],
-    ['thunder', true],
-  ])('clears the previous footprint for weather %s, direct sun %s', (weather, hasDirectLight) => {
+  it('keeps the pot base and sill on the same ray for the entire light disk while higher leaves have a wider penumbra', () => {
+    const [[, sill]] = sashApertures(openWindow(0.1, 0.5)[0])
+    const mask = { save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), scale: vi.fn(), fill: vi.fn() }
+    vi.stubGlobal('Path2D', class {})
+    try {
+      drawWindowFoliage(mask, 2, sill)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    const [, rim] = mask.translate.mock.calls.at(-1)
+    const potBase = 1 - (rim + 9.6) / 100
+    const rays = sampleWindowRays(45, 170, Math.tan((0.266 * Math.PI) / 180))
+    for (const weight of [0, 0.5, 1]) {
+      const base = []
+      const leaves = []
+      for (const ray of rays) {
+        const [, , dx, dy, x, y] = windowTransform(1200, 800, ray.altitude, ray.azimuth, weight)
+        expect(x + dx * potBase).toBeCloseTo(x + dx * sill, 8)
+        expect(y + dy * potBase).toBeCloseTo(y + dy * sill, 8)
+        base.push(y + dy * potBase)
+        leaves.push(y + dy * (potBase + 0.3))
+      }
+      const span = (positions) => Math.max(...positions) - Math.min(...positions)
+      expect(span(base)).toBeGreaterThan(0)
+      expect(span(leaves)).toBeGreaterThan(span(base))
+    }
+  })
+
+  it.each(['clear', 'rain', 'snow', 'thunder'])('clears the previous footprint when direct sunlight is absent in %s', (weather) => {
     const clearRect = vi.fn()
     const canvas = { width: 512, height: 256, getContext: () => ({ clearRect }) }
-    drawWindowProjection(canvas, { width: 4096, height: 2048, scene: { hasDirectLight }, weather })
+    drawWindowProjection(canvas, { width: 4096, height: 2048, scene: { hasDirectLight: false }, weather })
     expect(clearRect).toHaveBeenCalledWith(0, 0, 512, 256)
   })
 

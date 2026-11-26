@@ -250,9 +250,15 @@ public class QWeatherProvider implements WeatherProvider {
         n.put("humidity", (int) Math.round(c.path("humidity").asDouble() * 100));
         n.put("precip", round2(c.path("precipitation").path("amount").path("value").asDouble()));
         n.put("pressure", round1(c.path("pressure").path("value").asDouble()));
-        n.put("vis", round1(c.path("visibility").path("value").asDouble() / 1000));
+        JsonNode visibility = c.path("visibility").path("value");
+        if (visibility.isNumber() && visibility.asDouble() >= 0) {
+            n.put("vis", round1(visibility.asDouble() / 1000));
+        }
         n.put("dew", round1(c.path("dewPoint").path("value").asDouble()));
-        n.put("cloud", (int) Math.round(c.path("cloudCover").asDouble() * 100));
+        JsonNode cloudCover = c.path("cloudCover");
+        if (cloudCover.isNumber() && cloudCover.asDouble() >= 0 && cloudCover.asDouble() <= 1) {
+            n.put("cloud", (int) Math.round(cloudCover.asDouble() * 100));
+        }
         n.put("uvIndex", c.path("uvIndex").asText());
         return n;
     }

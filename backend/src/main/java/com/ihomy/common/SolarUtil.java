@@ -18,34 +18,22 @@ public class SolarUtil {
     private static final double RAD = Math.PI / 180;
     private static final double DEG = 180 / Math.PI;
 
-    /** 一天的 288 个 5 分钟时隙:太阳高度角 + 方位角 */
+    /** 地点当日的真实时间序列。夏令时切换日可以多于或少于 288 个时隙。 */
     public static List<Map<String, Object>> buildSlots(double lat, double lng, LocalDate date, ZoneId tz) {
         List<Map<String, Object>> slots = new ArrayList<>(288);
-        for (int i = 0; i < 288; i++) {
-            int totalMin = i * 5;
-            LocalTime t = LocalTime.of(totalMin / 60, totalMin % 60);
-            LocalDateTime localDt = LocalDateTime.of(date, t);
-            ZonedDateTime zoned = localDt.atZone(tz);
-            double jd = julianDay(zoned);
-            double T = julianCentury(jd);
-            double dec = sunDeclination(T);
-            double eot = eqOfTime(T);
-            double solarNoonMin = (720 - 4 * lng - eot); // UTC minutes
-            double utcMin = zoned.toInstant().atZone(ZoneOffset.UTC).getHour() * 60.0
-                    + zoned.toInstant().atZone(ZoneOffset.UTC).getMinute();
-            double ha = (utcMin - solarNoonMin) / 4.0; // degrees
-            // 归一化到 -180~180(凌晨时角 >180 需转负,否则方位角反着)
-            while (ha > 180) ha -= 360;
-            while (ha < -180) ha += 360;
-            double[] altAz = altAzFromEquatorial(lat, dec, ha);
-            slots.add(Map.of(
-                    "slot", i,
-                    "time", String.format("%02d:%02d", t.getHour(), t.getMinute()),
-                    "altitude", Math.round(altAz[0] * 100000) / 100000.0,
-                    "azimuth", Math.round(altAz[1] * 100000) / 100000.0
-            ));
-        }
+        ZonedDateTime end = date.plusDays(1).atStartOfDay(tz);
+        for (ZonedDateTime t = date.atStartOfDay(tz); t.isBefore(end); t = t.plusMinutes(5))
+            slots.add(solarSlot(lat, lng, t, slots.size()));
         return slots;
+    }
+
+    public static Map<String, Object> solarSlot(double lat, double lng, ZonedDateTime time, int index) {
+        Instant instant = time.toInstant();
+        double[] altAz = sunAltAz(lat, lng, instant);
+        return Map.of("slot", index, "epochMillis", instant.toEpochMilli(),
+                "time", String.format(java.util.Locale.ROOT, "%02d:%02d", time.getHour(), time.getMinute()),
+                "altitude", Math.round(altAz[0] * 100000) / 100000.0,
+                "azimuth", Math.round(altAz[1] * 100000) / 100000.0);
     }
 
     // ================= 太阳当前位置与直射点(供「晨昏地图」画地球晨昏线) =================
@@ -138,8 +126,8 @@ public class SolarUtil {
         m.put("astronomicalDusk", hm(crossing(sunAlt, dayStart, tz, SUN_H0_ASTRONOMICAL, false)));
         m.put("moonrise", hm(crossing(moonAlt, dayStart, tz, MOON_H0, true)));
         m.put("moonset", hm(crossing(moonAlt, dayStart, tz, MOON_H0, false)));
-        m.put("moonTransit", hm(extremum(moonAlt, dayStart, true)));
-        m.put("moonUnderfoot", hm(extremum(moonAlt, dayStart, false)));
+        m.put("moonTransit", hm(extremum(moonAlt, dayStart, tz, true)));
+        m.put("moonUnderfoot", hm(extremum(moonAlt, dayStart, tz, false)));
         return m;
     }
 
@@ -174,10 +162,11 @@ public class SolarUtil {
      */
     private static double crossing(ToDoubleFunction<Instant> alt, Instant dayStart, ZoneId tz, double h0, boolean rising) {
         final int step = 4;
+        int dayMinutes = dayMinutes(dayStart, tz);
         double prev = alt.applyAsDouble(dayStart);
         Instant prevT = dayStart;
-        for (int min = step; min <= 1440; min += step) {
-            Instant t = dayStart.plusSeconds(min * 60L);
+        for (int min = 0; min < dayMinutes; min += step) {
+            Instant t = dayStart.plusSeconds(Math.min(dayMinutes, min + step) * 60L);
             double cur = alt.applyAsDouble(t);
             if (rising ? (prev < h0 && cur >= h0) : (prev >= h0 && cur < h0)) {
                 Instant lo = prevT, hi = t;
@@ -197,24 +186,29 @@ public class SolarUtil {
     }
 
     /** 一天内高度角最高/最低时刻(月中天/月下中天),返回当地当日分钟数:5 分钟粗扫 + 极值邻域三分细化 */
-    private static double extremum(ToDoubleFunction<Instant> alt, Instant dayStart, boolean max) {
+    private static int dayMinutes(Instant start, ZoneId tz) {
+        return (int) Duration.between(start, start.atZone(tz).toLocalDate().plusDays(1).atStartOfDay(tz).toInstant()).toMinutes();
+    }
+
+    private static double extremum(ToDoubleFunction<Instant> alt, Instant dayStart, ZoneId tz, boolean max) {
+        int dayMinutes = dayMinutes(dayStart, tz);
         int bestMin = 0;
         double best = max ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-        for (int min = 0; min <= 1440; min += 5) {
+        for (int min = 0; min <= dayMinutes; min += 5) {
             double a = alt.applyAsDouble(dayStart.plusSeconds(min * 60L));
             if (max ? a > best : a < best) {
                 best = a;
                 bestMin = min;
             }
         }
-        double lo = Math.max(0, bestMin - 6), hi = Math.min(1440, bestMin + 6);
+        double lo = Math.max(0, bestMin - 6), hi = Math.min(dayMinutes, bestMin + 6);
         for (int k = 0; k < 40; k++) {
             double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
             double a1 = alt.applyAsDouble(dayStart.plusSeconds((long) (m1 * 60)));
             double a2 = alt.applyAsDouble(dayStart.plusSeconds((long) (m2 * 60)));
             if (max ? a1 < a2 : a1 > a2) lo = m1; else hi = m2;
         }
-        return lo + (hi - lo) / 2;
+        return localMinutes(dayStart.plusSeconds(Math.round((lo + hi) * 30)), tz);
     }
 
     /** 太阳高度角(度)。与 buildSlots 同一套 NOAA 公式,只是按任意时刻求值 */

@@ -15,6 +15,7 @@ const props = defineProps({
   scene: { type: Object, required: true },
   standard: { type: String, default: 'corrected' },
   weather: { type: String, required: true },
+  softness: Number,
   shadowAlpha: { type: Number, required: true },
   occluders: { type: Array, default: () => [] },
   deskCasters: { type: Array, default: () => [] },
@@ -96,7 +97,16 @@ onMounted(() => {
   observer.observe(surface.value)
 })
 watch(
-  () => [props.standard, props.scene, props.weather, props.shadowAlpha, props.sashes, props.deskCasters, ...props.occluders],
+  () => [
+    props.standard,
+    props.scene,
+    props.weather,
+    props.softness,
+    props.shadowAlpha,
+    props.sashes,
+    props.deskCasters,
+    ...props.occluders,
+  ],
   schedulePaint,
   {
     flush: 'post',

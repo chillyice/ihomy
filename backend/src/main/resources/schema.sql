@@ -2205,6 +2205,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
 -- Android 壳专用(不进后端 jar):Google Maven 分发,升级巡检按 androidx 发布说明人工核对
 ('Health Connect Client', 'MAVEN', 'androidx.health.connect:connect-client', '1.1.0', 'Apache-2.0', 'https://developer.android.com/jetpack/androidx/releases/health-connect', 'Android 手环健康数据读取', 'FULL'),
+('LatLongToTimezoneMaven', 'MAVEN', 'com.moodysalem:LatLongToTimezoneMaven', '1.2', 'MIT', 'https://github.com/moodysalem/LatLongToTimezoneMaven', '离线查询家庭地点时区', 'FULL'),
 ('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),

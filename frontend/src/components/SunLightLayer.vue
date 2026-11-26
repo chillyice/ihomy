@@ -16,8 +16,8 @@
     <!-- 晨暮环境色与台灯补光 -->
     <div
       v-if="shadowEnabled && skyTint.opacity > 0"
-      class="bright-spot"
-      :style="{ background: skyTint.background, opacity: skyTint.opacity, '--lamp-mask': lampMask }"
+      class="bright-spot sky-tint"
+      :style="{ background: skyTint.background, '--sky-opacity': skyTint.opacity, '--lamp-mask': lampMask }"
     ></div>
     <div v-if="shadowEnabled && diffuseSkyStyle" class="bright-spot" :style="{ ...diffuseSkyStyle, '--lamp-mask': lampMask }"></div>
     <div v-if="shadowEnabled && roomShade > 0" class="room-shade" :style="{ opacity: roomShade, '--lamp-mask': lampMask }"></div>
@@ -26,6 +26,7 @@
       :key="stormLight ? 'lightning' : 'sun'"
       :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
+      :softness="stormLight ? undefined : skyLight.softness"
       :standard="projectionStandard"
       :shadow-alpha="castShade"
       :occluders="occluders"
@@ -181,6 +182,7 @@ const {
   weatherEffectEnabled,
   precipLevel,
   skyTint,
+  skyLight,
   diffuseSkyStyle,
   fogVisible,
 } = light || {}
@@ -398,6 +400,14 @@ html.dark .blob-5 {
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
   transform: translateZ(0);
+}
+
+.sky-tint {
+  --sky-opacity: 0;
+  opacity: var(--sky-opacity);
+}
+html.dark .sky-tint {
+  opacity: calc(var(--sky-opacity) * 0.62);
 }
 
 /* 台灯光源:氛围层最高(盖在弹窗之上,像灯照在纸面) */
