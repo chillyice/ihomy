@@ -228,22 +228,6 @@ onBeforeUnmount(() => stopRotation?.())
 provide(SUN_LIGHT_KEY, sunLight)
 const { anyEffectEnabled, lightTestMode } = sunLight
 
-// 移动端首次使用(本设备无保存偏好)默认关闭所有光影特效(GPU/内存敏感);
-// 用户开启过则写入 ihomy:effects,刷新后尊重用户选择不再强制关闭
-watch(
-  isMobile,
-  (mobile) => {
-    if (mobile && !localStorage.getItem('ihomy:effects')) {
-      sunLight.shadowEnabled.value = false
-      sunLight.weatherEffectEnabled.value = false
-      sunLight.blobsEnabled.value = false
-      sunLight.lampMode.value = 'off'
-      sunLight.glassEnabled.value = false
-    }
-  },
-  { immediate: true },
-)
-
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
 function loadFamily() {

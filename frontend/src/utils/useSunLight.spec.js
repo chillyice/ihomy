@@ -61,6 +61,64 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+it('enables ordinary daylight on first use and restores an older all-off mobile preset only on request', async () => {
+  const day = sunDay('2026-11-25')
+  await mountLight(day)
+  expect(light.effectsEnabled.value).toBe(true)
+  expect(light.shadowEnabled.value).toBe(true)
+  app.unmount()
+  localStorage.getItem = () =>
+    JSON.stringify({
+      effectsEnabled: true,
+      shadowEnabled: false,
+      lampMode: 'off',
+      glassEnabled: false,
+      blobsEnabled: false,
+      weatherEffectEnabled: false,
+      featherStrength: 17,
+    })
+  await mountLight(day)
+  expect(light.effectsEnabled.value).toBe(false)
+  expect(light.anyEffectEnabled.value).toBe(false)
+  light.effectsEnabled.value = true
+  expect(light.shadowEnabled.value).toBe(true)
+  expect(light.weatherEffectEnabled.value).toBe(true)
+  expect(light.lampMode.value).toBe('auto')
+  expect(light.featherStrength.value).toBe(17)
+})
+
+it('preserves explicit choices across master toggle, suspension and reload', async () => {
+  const day = sunDay('2026-11-25')
+  let saved = JSON.stringify({
+    effectsEnabled: false,
+    shadowEnabled: true,
+    blobsEnabled: false,
+    lampMode: 'off',
+    glassEnabled: false,
+    weatherEffectEnabled: false,
+  })
+  localStorage.getItem = () => saved
+  localStorage.setItem.mockImplementation((_key, value) => (saved = value))
+  await mountLight(day)
+  expect(light.effectsEnabled.value).toBe(false)
+  light.suspendEffects()
+  await nextTick()
+  light.restoreEffects()
+  light.effectsEnabled.value = true
+  expect(light.shadowEnabled.value).toBe(true)
+  expect(light.lampMode.value).toBe('off')
+  expect(light.weatherEffectEnabled.value).toBe(false)
+  expect(light.glassEnabled.value).toBe(false)
+  light.effectsEnabled.value = false
+  await nextTick()
+  app.unmount()
+  await mountLight(day)
+  expect(light.effectsEnabled.value).toBe(false)
+  light.effectsEnabled.value = true
+  expect(light.shadowEnabled.value).toBe(true)
+  expect(light.blobsEnabled.value).toBe(false)
+})
+
 it('preserves feather strength independently of shadow depth, including a zero setting', async () => {
   const preferences = { shadowDepth: 63 }
   localStorage.getItem = () => JSON.stringify(preferences)

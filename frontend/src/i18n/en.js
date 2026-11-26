@@ -3438,7 +3438,7 @@ export default {
     colorTempHint: '0 = warm (amber), 100 = cool (blue-white)',
     brightness: 'Brightness',
     projectionStandard: 'Window projection',
-    correctedStandard: 'Adaptive',
+    correctedStandard: 'Corrected',
     featherStrength: 'Shadow edge softness',
     featherStrengthHint:
       'The default is 50. Move left for sharper edges or right for softer ones. At 0, shadows still have a naturally soft edge.',
@@ -7899,7 +7899,7 @@ export default {
     lampAuto: 'Auto',
     lampOn: 'On',
     lampOff: 'Off',
-    corrected: 'Adaptive',
+    corrected: 'Corrected',
     real: 'True',
   },
   lightLab: {

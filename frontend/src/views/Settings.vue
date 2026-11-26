@@ -46,8 +46,7 @@
             <div id="settings-warmbg">
               <WarmBackgroundSettings :show-objects="isTablet || (isWide && !isMobile)" />
             </div>
-            <!-- 光影:手机端优化前暂不开放(连开关一起收起),桌面端保留 -->
-            <div v-if="!isMobile" id="settings-light"><LightSettings /></div>
+            <div id="settings-light"><LightSettings :show-tools="!isMobile" /></div>
             <div id="settings-morning"><MorningSettings /></div>
             <div id="settings-screensaver"><ScreensaverSettings /></div>
             <div id="settings-display"><ModeSettings /></div>

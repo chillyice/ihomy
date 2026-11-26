@@ -3713,7 +3713,7 @@ export default {
     colorTempHint: '0=暖光(橙黄),100=冷光(蓝白)',
     brightness: '亮度',
     projectionStandard: '窗影标准',
-    correctedStandard: '自适应修正',
+    correctedStandard: '修正标准',
     featherStrength: '阴影羽化强度',
     featherStrengthHint: '默认 50。向左让轮廓更清晰，向右让边缘更柔和。调至 0 时仍保留自然软边。',
     lightBackground: '背景效果',
@@ -7774,7 +7774,7 @@ export default {
     lampAuto: '自动',
     lampOn: '常开',
     lampOff: '关灯',
-    corrected: '自适应修正',
+    corrected: '修正',
     real: '真实',
   },
   lightLab: {

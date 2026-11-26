@@ -25,6 +25,13 @@ function makeDay() {
   return { sunrise: '06:00', sunset: '18:00', slots }
 }
 
+it('uses the selected local day’s peak for the frame even between observations', () => {
+  const day = makeDay()
+  const morning = { ...day.slots[96], altitude: 24 }
+  expect(getSunScene(day, 96, morning)).toMatchObject({ altitude: 24, noonAltitude: 60 })
+  expect(getSunScene({ ...day, slots: day.slots.map((slot) => ({ ...slot, altitude: slot.altitude / 2 })) }, 144).noonAltitude).toBe(30)
+})
+
 it('ramps the lamp continuously from dark indoor conditions to useful daylight', () => {
   expect(lampFromDaylight(0)).toBe(1)
   expect(lampFromDaylight(0.28)).toBeCloseTo(0.5)

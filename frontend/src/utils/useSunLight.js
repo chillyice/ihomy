@@ -59,9 +59,9 @@ export function useSunLight(canReadEnvironment = () => true) {
   })
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
-  let _suspended = null
+  const suspended = ref(false)
   // 光影总开关:关闭时下方每项按「关」呈现,但各自的偏好仍留在存储里,重新打开即恢复
-  const effectsEnabled = ref(_saved.effectsEnabled ?? true)
+  const masterEnabled = ref(_saved.effectsEnabled ?? true)
   const _lampMode = ref(_saved.lampMode ?? 'auto')
   const lampTemp = ref(_saved.lampTemp ?? 30)
   const lampBrightness = ref(_saved.lampBrightness ?? 50)
@@ -73,30 +73,49 @@ export function useSunLight(canReadEnvironment = () => true) {
   const _weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const _blobsEnabled = ref(_saved.blobsEnabled ?? true)
   const _glassEnabled = ref(_saved.glassEnabled ?? true)
+  const hasEffectPreference = computed(
+    () => _shadowEnabled.value || _weatherEffectEnabled.value || _blobsEnabled.value || _glassEnabled.value || _lampMode.value !== 'off',
+  )
+  const effectsEnabled = computed({
+    get: () => masterEnabled.value && hasEffectPreference.value,
+    set: (enabled) => {
+      // Older phones persisted all effects off on first launch. Keep them off
+      // until the user actually enables the switch; partial preferences survive.
+      if (enabled && !hasEffectPreference.value) {
+        _shadowEnabled.value = true
+        _weatherEffectEnabled.value = true
+        _blobsEnabled.value = true
+        _glassEnabled.value = true
+        _lampMode.value = 'auto'
+      }
+      masterEnabled.value = enabled
+    },
+  })
+  const active = computed(() => masterEnabled.value && !suspended.value)
   // 对外的开关都经总开关过滤:组件与样式只看得到最终生效值,写回仍落到各自偏好
   const lampMode = computed({
-    get: () => (effectsEnabled.value ? _lampMode.value : 'off'),
+    get: () => (active.value ? _lampMode.value : 'off'),
     set: (v) => (_lampMode.value = v),
   })
   const shadowEnabled = computed({
-    get: () => effectsEnabled.value && _shadowEnabled.value,
+    get: () => active.value && _shadowEnabled.value,
     set: (v) => (_shadowEnabled.value = v),
   })
   const weatherEffectEnabled = computed({
-    get: () => effectsEnabled.value && _weatherEffectEnabled.value,
+    get: () => active.value && _weatherEffectEnabled.value,
     set: (v) => (_weatherEffectEnabled.value = v),
   })
   const blobsEnabled = computed({
-    get: () => effectsEnabled.value && _blobsEnabled.value,
+    get: () => active.value && _blobsEnabled.value,
     set: (v) => (_blobsEnabled.value = v),
   })
   const glassEnabled = computed({
-    get: () => effectsEnabled.value && _glassEnabled.value,
+    get: () => active.value && _glassEnabled.value,
     set: (v) => (_glassEnabled.value = v),
   })
   watch(
     [
-      effectsEnabled,
+      masterEnabled,
       _lampMode,
       lampTemp,
       lampBrightness,
@@ -109,13 +128,10 @@ export function useSunLight(canReadEnvironment = () => true) {
       _glassEnabled,
     ],
     () => {
-      // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
-      // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
-      if (_suspended) return
       localStorage.setItem(
         'ihomy:effects',
         JSON.stringify({
-          effectsEnabled: effectsEnabled.value,
+          effectsEnabled: masterEnabled.value,
           lampMode: _lampMode.value,
           lampTemp: lampTemp.value,
           lampBrightness: lampBrightness.value,
@@ -629,30 +645,13 @@ export function useSunLight(canReadEnvironment = () => true) {
     { immediate: true },
   )
 
-  // 播放器启动时暂停特效,关闭后恢复
+  // Playback only masks the effective values. Preferences stay intact even
+  // if the master was off before entering a game or reader.
   const suspendEffects = () => {
-    if (_suspended) return
-    _suspended = {
-      shadowEnabled: shadowEnabled.value,
-      weatherEffectEnabled: weatherEffectEnabled.value,
-      blobsEnabled: blobsEnabled.value,
-      glassEnabled: glassEnabled.value,
-      lampMode: lampMode.value,
-    }
-    shadowEnabled.value = false
-    weatherEffectEnabled.value = false
-    blobsEnabled.value = false
-    glassEnabled.value = false
-    lampMode.value = 'off'
+    suspended.value = true
   }
   const restoreEffects = () => {
-    if (!_suspended) return
-    shadowEnabled.value = _suspended.shadowEnabled
-    weatherEffectEnabled.value = _suspended.weatherEffectEnabled
-    blobsEnabled.value = _suspended.blobsEnabled
-    glassEnabled.value = _suspended.glassEnabled
-    lampMode.value = _suspended.lampMode
-    _suspended = null
+    suspended.value = false
   }
 
   return {

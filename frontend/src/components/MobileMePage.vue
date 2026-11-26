@@ -51,6 +51,12 @@
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
         <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
+      <div v-if="sunLight" class="me-row">
+        <SettingsIcon v-if="isWarm" name="appearance" class="me-row-icon" />
+        <span v-else class="me-row-icon" aria-hidden="true">✨</span>
+        <label for="me-light-effects" class="me-row-text">{{ $t('mobile.lightEffect') }}</label>
+        <el-switch id="me-light-effects" v-model="sunLight.effectsEnabled.value" size="small" />
+      </div>
       <div v-a11y-click class="me-row" @click="toggleLang">
         <SettingsIcon v-if="isWarm" name="language" class="me-row-icon" />
         <span v-else class="me-row-icon" aria-hidden="true">🌐</span>
@@ -97,7 +103,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Check } from '@element-plus/icons-vue'
@@ -108,11 +114,13 @@ import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { useMobileTabs } from '@/composables/useMobileTabs'
 import SettingsIcon from '@/views/settings/SettingsIcon.vue'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const { locale, t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const { openEditor } = useMobileTabs()
+const sunLight = inject(SUN_LIGHT_KEY)
 
 const userInfo = computed(() => userStore.userInfo)
 const themeStore = useThemeStore()

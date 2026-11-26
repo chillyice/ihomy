@@ -3,9 +3,14 @@
 import { todayStr } from './date'
 
 // Screen axes for a south-facing window: +x to the right, +y into the room.
-export function floorShadowDirection(azimuth) {
+export function floorShadowDirection(azimuth, realWeight = 1) {
   const bearing = ((180 - azimuth) * Math.PI) / 180
-  return { x: Math.sin(bearing), y: Math.cos(bearing) }
+  const sideways = Math.sin(bearing)
+  const inward = Math.cos(bearing)
+  if (realWeight === 1 || inward <= Number.EPSILON) return { x: sideways, y: inward }
+  // Scale along the ray to the calibrated screen depth, preserving its bearing.
+  const depth = 1 - realWeight + realWeight * inward
+  return { x: (sideways / inward) * depth, y: depth }
 }
 
 // Horizontal ground projection of a unit-height vertical object in direct sunlight.
@@ -197,6 +202,7 @@ export function getSunScene(sunInfo, slotIndex, sample) {
     lightOpacity,
     lampOpacity,
     altitude: alt,
+    noonAltitude: slots.length ? slots.reduce((peak, slot) => (slot?.altitude > peak ? slot.altitude : peak), -90) : alt,
     azimuth: az,
     isNight,
     dayProgress,

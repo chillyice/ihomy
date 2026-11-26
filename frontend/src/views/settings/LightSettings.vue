@@ -88,7 +88,7 @@
             <div class="share-tip">{{ $t('settings.weatherEffectHint') }}</div>
           </el-form-item>
         </div>
-        <fieldset class="light-group">
+        <fieldset v-if="showTools" class="light-group">
           <legend>{{ $t('settings.lightPreview') }}</legend>
           <!-- 光影测试:首页拉起全量光影控制台(开关/按钮/滑条);光影实验台:3D 太阳与真实阴影 -->
           <el-form-item>
@@ -109,6 +109,8 @@ import { inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+
+defineProps({ showTools: { type: Boolean, default: true } })
 
 const router = useRouter()
 const themeStore = useThemeStore()

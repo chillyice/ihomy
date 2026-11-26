@@ -1,7 +1,6 @@
 import { drawWindowFoliage } from './windowFoliage'
 import { applyDeskShadowMask } from './deskShadowMask'
-import { displayedReachPerHeight } from './deskShadowGeometry'
-import { floorShadowDirection } from './windowLight'
+import { floorShadowDirection, groundShadowPerHeight } from './windowLight'
 import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
 
 // Keep both pane heights when sizing the frame outwards from the glazing bar.
@@ -26,15 +25,30 @@ export const LIGHTNING_SOURCE = {
   palette: { core: 'rgba(230,242,255,0.64)', mid: 'rgba(214,231,255,0.48)', ambient: 'rgba(201,218,250,0.22)' },
 }
 
+const equinoxAltitude = 90 - 36.65
 const sillHeightRatio = 0.15
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0, aspect = width / height) {
-  const direction = floorShadowDirection(azimuth)
-  const reach = 2 * height * displayedReachPerHeight(altitude, realWeight, aspect)
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
+  const direction = floorShadowDirection(azimuth, realWeight)
+  // Infer one effective window height for the day from its calibrated noon footprint.
+  // Above the Jinan summer-solstice altitude, retain that height even at the zenith.
+  const calibrationAltitude = Math.min(noonAltitude, equinoxAltitude + 23.44)
+  const phase = (equinoxAltitude - calibrationAltitude) / 23.44
+  const winterSummerRatio = 1.15
+  const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
+  const referenceReach = height * 0.9 * (1 + amplitude * phase)
+  const correctedHeight = referenceReach * Math.tan((calibrationAltitude * Math.PI) / 180)
+  // A 1.5 m opening spans two viewport heights at real scale (0.75 m per viewport).
+  const windowHeight = correctedHeight * (1 - realWeight) + 2 * height * realWeight
+  const reach = windowHeight * groundShadowPerHeight(altitude)
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
-  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + sillHeightRatio * shear, sillHeightRatio * depth]
+  // The ground at the foot of the wall stays fixed all day. Frame the corrected view
+  // at noon, then project the raised sill along the very same rays as the rails above it.
+  const noonSillY = height * (0.05 + 0.04 * phase)
+  const wallY = (1 - realWeight) * (noonSillY - sillHeightRatio * referenceReach)
+  return [paneWidth, 0, shear, depth, (width - paneWidth) / 2 + sillHeightRatio * shear, wallY + sillHeightRatio * depth]
 }
 
 // Opposite pairs keep the light disk centred, even with a small sample budget.
@@ -98,14 +112,10 @@ export function sashApertures({ hinge, glassStart, glassEdge, latch, depth }) {
   ]
 }
 
-function castOpenSash(mask, { hinge, glassStart, glassEdge, latch, tipX, depth }, paneWidth, riseX, riseY, originX, originY) {
+export function castOpenSash(mask, { hinge, glassStart, glassEdge, latch, tipX, depth }, paneWidth, riseX, riseY, originX, originY) {
   const span = latch - hinge
   const glassU = (glassStart - hinge) / span
   const glassWidth = (glassEdge - glassStart) / span
-  const sashContours = [
-    [0, frameSill, 1, frameHeight],
-    [glassU, glassSill, glassWidth, glassLintel - glassSill],
-  ]
   const uX = paneWidth * (tipX - hinge)
   const uY = paneWidth * depth
   // The frame's thickness turns with it. When seen edge-on the reveals still block light.
@@ -113,24 +123,44 @@ function castOpenSash(mask, { hinge, glassStart, glassEdge, latch, tipX, depth }
   const thicknessY = (-uX * frameDepth) / span
   const hingeX = originX + paneWidth * hinge
 
-  mask.setTransform(uX, uY, riseX, riseY, hingeX, originY)
-  mask.beginPath()
-  for (const [u, v, width, height] of sashContours) mask.rect(u, v, width, height)
-  mask.fill('evenodd')
-  mask.fillRect(glassU, transomTop, glassWidth, transomHeight)
-
-  // Sweep the outer frame's two rims to the back face.
-  // Along a ray, any point beyond the front profile is reached through one of these sides.
-  for (const [u, v, width, height] of sashContours) {
-    for (const edgeV of [v, v + height]) {
-      mask.setTransform(uX, uY, thicknessX, thicknessY, hingeX + riseX * edgeV, originY + riseY * edgeV)
-      mask.fillRect(u, 0, width, 1)
+  // Front and side faces often cover the same antialiased edge pixel. Build
+  // their union and erase it once per ray, so a partially covered pixel is not
+  // darkened twice. All bars have the same winding in floor coordinates.
+  const winding = uX * riseY - uY * riseX >= 0 ? 1 : -1
+  const bar = (u, v, width, height) => {
+    const x = hingeX + u * uX + v * riseX
+    const y = originY + u * uY + v * riseY
+    const ux = uX * width
+    const uy = uY * width
+    const vx = riseX * height
+    const vy = riseY * height
+    const corners = [
+      [x, y],
+      [x + ux, y + uy],
+      [x + ux + vx, y + uy + vy],
+      [x + vx, y + vy],
+    ]
+    for (let i = 0; i < 4; i++) {
+      const [ax, ay] = corners[i]
+      const [bx, by] = corners[(i + 1) % 4]
+      // Pick the outside edge of each of the four side faces of this prism.
+      const back = ((bx - ax) * thicknessY - (by - ay) * thicknessX) * winding < 0
+      const dx = back ? thicknessX : 0
+      const dy = back ? thicknessY : 0
+      if (i === 0) mask.moveTo(ax + dx, ay + dy)
+      else mask.lineTo(ax + dx, ay + dy)
+      mask.lineTo(bx + dx, by + dy)
     }
-    for (const edgeU of [u, u + width]) {
-      mask.setTransform(riseX, riseY, thicknessX, thicknessY, hingeX + uX * edgeU, originY + uY * edgeU)
-      mask.fillRect(v, 0, height, 1)
-    }
+    mask.closePath()
   }
+  mask.resetTransform()
+  mask.beginPath()
+  bar(0, frameSill, glassU, frameHeight)
+  bar(glassU + glassWidth, frameSill, 1 - glassU - glassWidth, frameHeight)
+  bar(glassU, frameSill, glassWidth, railHeight)
+  bar(glassU, transomTop, glassWidth, transomHeight)
+  bar(glassU, glassLintel, glassWidth, railHeight)
+  mask.fill()
 }
 
 // Cache the planar silhouettes once per paint; only the out-of-plane open
@@ -201,13 +231,12 @@ export function drawWindowProjection(
 
   const openSashes = sashes.filter((sash) => sash.depth)
   const sourceRadius = shadowSourceRadius(softness, featherStrength)
-  const aspect = width / height
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
   ctx.globalAlpha = 1 / samples.length
   for (const ray of sampleWindowRays(scene.altitude, scene.azimuth, sourceRadius)) {
     if (ray.altitude <= 0 || ray.azimuth <= 90 || ray.azimuth >= 270) continue
-    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight, aspect)
+    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight, scene.noonAltitude)
     if (openSashes.length) {
       mask.clearRect(0, 0, w, h)
       mask.save()
@@ -225,7 +254,7 @@ export function drawWindowProjection(
   ctx.restore()
   applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height, realWeight, sourceRadius)
 
-  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, aspect)
+  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude)
   const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
   transmittedLight.addColorStop(0, scene.palette.core)
   transmittedLight.addColorStop(0.6, scene.palette.mid)
