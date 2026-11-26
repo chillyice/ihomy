@@ -138,6 +138,11 @@
         ><span>{{ $t('lightTest.shadowDepth') }}</span
         ><input type="range" min="0" max="100" v-model.number="light.shadowDepth.value" class="lt-slider"
       /></label>
+      <label class="lt-slider-row">
+        <span>{{ $t('settings.featherStrength') }}</span>
+        <input type="range" min="0" max="100" v-model.number="light.featherStrength.value" class="lt-slider" />
+        <output>{{ light.featherStrength.value }}%</output>
+      </label>
     </div>
 
     <!-- 光影控制:设置页里能调的开关/按钮/滑条都在这里,测试时不用来回跳页 -->
@@ -385,6 +390,11 @@ const onDateChange = ({ currentTarget: input }) => {
 }
 .lt-slider-row > span {
   min-width: 52px;
+}
+.lt-slider-row output {
+  min-width: 4ch;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 .lt-slider {
   flex: 1;

@@ -26,7 +26,7 @@ describe('desk shadow geometry', () => {
 
   it.each([0, 0.5, 1])('keeps cup and rail shadows parallel at projection weight %f', (weight) => {
     const scene = sun(65, 125)
-    const vector = deskShadowVector(scene, 200, 'cup', weight)
+    const vector = deskShadowVector(scene, 200, 'cup', weight, 1200 / 800)
     const [, , dx, dy] = windowTransform(1200, 800, scene.altitude, scene.azimuth, weight)
     expect(vector.x / vector.y).toBeCloseTo(dx / dy, 8)
     expect(vector.y / dy).toBeCloseTo(28 / 1600, 8)

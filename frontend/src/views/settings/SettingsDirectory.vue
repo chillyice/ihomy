@@ -1,7 +1,7 @@
 <template>
   <nav class="directory" :aria-label="$t('settings.allSettings')">
     <section v-for="group in orderedGroups" :key="group.key" :aria-label="$t(group.labelKey)">
-      <div v-if="group.key !== 'family'" class="directory-label" aria-hidden="true">{{ $t(group.labelKey) }}</div>
+      <div class="directory-label" aria-hidden="true">{{ $t(group.labelKey) }}</div>
       <div class="entries" :class="'entries-' + group.key">
         <button
           v-for="panel in group.items"
@@ -66,7 +66,7 @@ const summaries = computed(() => ({
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 20px;
+  gap: 24px;
 }
 .directory section {
   min-width: 0;
@@ -206,11 +206,7 @@ html.theme-warm .family-cover {
   justify-content: center;
   gap: 2px;
   padding: 8px 4px;
-  border-top: 1px solid var(--color-border);
   text-align: center;
-}
-.entries-family .entry:not(.family-cover) + .entry {
-  border-inline-start: 1px solid var(--color-border);
 }
 .entries-family .entry-icon {
   width: 28px;
@@ -222,12 +218,7 @@ html.theme-warm .family-cover {
 .entries-account {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  border: 0;
-  background: none;
-}
-html.theme-warm .entries-account {
-  background-image: none;
+  gap: 0;
 }
 .entries-account .entry {
   position: relative;
@@ -235,21 +226,10 @@ html.theme-warm .entries-account {
   align-items: flex-start;
   gap: 5px;
   padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background-color: var(--color-card);
-}
-html.theme-warm .entries-account .entry {
-  background-image: var(--caption-paper);
-  background-size: auto, var(--home-grain-size);
 }
 .entries-account .entry-arrow {
   position: absolute;
   inset: 15px 12px auto auto;
-}
-.entries-content .entry + .entry,
-.entries-device .entry + .entry {
-  border-top: 1px solid var(--color-border);
 }
 .entries-account .entry:active,
 .family-cover:active {

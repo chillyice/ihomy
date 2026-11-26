@@ -593,10 +593,6 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.privacy-row:last-of-type {
-  border-bottom: none;
 }
 .privacy-text {
   min-width: 0;

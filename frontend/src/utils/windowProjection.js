@@ -28,9 +28,9 @@ export const LIGHTNING_SOURCE = {
 
 const sillHeightRatio = 0.15
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0) {
+export function windowTransform(width, height, altitude, azimuth, realWeight = 0, aspect = width / height) {
   const direction = floorShadowDirection(azimuth)
-  const reach = 2 * height * displayedReachPerHeight(altitude, realWeight)
+  const reach = 2 * height * displayedReachPerHeight(altitude, realWeight, aspect)
   const paneWidth = width * WINDOW_WIDTH_RATIO
   const shear = direction.x * reach
   const depth = direction.y * reach
@@ -51,6 +51,14 @@ const samples = Array.from({ length: 8 }, (_, i) => {
 const radians = Math.PI / 180
 const weatherSoftness = { cloud: 0.25, overcast: 0.65, fog: 0.85, rain: 0.72, snow: 0.72 }
 const scratchBuffers = new WeakMap()
+
+// Keep the weather's relative softness at both ends of the user control.
+// The centre reproduces the unadjusted apparent radius of the light source.
+export function shadowSourceRadius(softness, featherStrength = 50) {
+  const strength = Number.isFinite(featherStrength) ? Math.min(100, Math.max(0, featherStrength)) : 50
+  const angularRadius = 0.266 + 2 * Math.max(0, Math.min(1, softness))
+  return Math.tan(angularRadius * 3 ** ((strength - 50) / 50) * radians)
+}
 
 // Project a two-dimensional light disk in the tangent plane of the central
 // ray. A point at the wall foot stays fixed for every ray; the spread increases
@@ -156,6 +164,7 @@ export function drawWindowProjection(
     scene,
     weather = 'clear',
     softness = weatherSoftness[weather] ?? 0,
+    featherStrength = 50,
     shadowAlpha = 0,
     realWeight = 0,
     foliageTime = 0,
@@ -191,13 +200,14 @@ export function drawWindowProjection(
   if (!mask || !paintWindowPlane(plane, sashes, occluders, foliageTime)) return
 
   const openSashes = sashes.filter((sash) => sash.depth)
-  const sourceRadius = Math.tan((0.266 + 2 * Math.max(0, Math.min(1, softness))) * radians)
+  const sourceRadius = shadowSourceRadius(softness, featherStrength)
+  const aspect = width / height
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'
   ctx.globalAlpha = 1 / samples.length
   for (const ray of sampleWindowRays(scene.altitude, scene.azimuth, sourceRadius)) {
     if (ray.altitude <= 0 || ray.azimuth <= 90 || ray.azimuth >= 270) continue
-    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight)
+    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight, aspect)
     if (openSashes.length) {
       mask.clearRect(0, 0, w, h)
       mask.save()
@@ -215,7 +225,7 @@ export function drawWindowProjection(
   ctx.restore()
   applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height, realWeight, sourceRadius)
 
-  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight)
+  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, aspect)
   const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
   transmittedLight.addColorStop(0, scene.palette.core)
   transmittedLight.addColorStop(0.6, scene.palette.mid)

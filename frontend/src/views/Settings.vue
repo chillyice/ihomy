@@ -197,9 +197,15 @@ const closePanel = () => router.push({ path: '/settings' })
   border-right: none;
   background: transparent;
 }
+.settings-menu :deep(.el-menu-item-group + .el-menu-item-group) {
+  margin-block-start: 8px;
+  padding-block-start: 6px;
+  border-block-start: 1px solid var(--color-border);
+}
 .settings-menu :deep(.el-menu-item-group__title) {
-  font-size: 12px;
-  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-text);
   padding: 8px 12px 4px;
   line-height: 1.4;
 }

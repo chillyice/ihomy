@@ -48,7 +48,7 @@ export function applyDeskShadowMask(light, work, casters, scene, width, height, 
   cast.clearRect(0, 0, w, h)
 
   for (const caster of casters) {
-    const vector = deskShadowVector(scene, caster.size, caster.kind, realWeight)
+    const vector = deskShadowVector(scene, caster.size, caster.kind, realWeight, width / height)
     if (!vector || !caster.image.naturalWidth) continue
     work.clearRect(0, 0, work.canvas.width, work.canvas.height)
     paintBody(work, caster, scaleX, scaleY)

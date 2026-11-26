@@ -27,6 +27,7 @@
       :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
       :softness="stormLight ? undefined : skyLight.softness"
+      :feather-strength="featherStrength"
       :standard="projectionStandard"
       :shadow-alpha="castShade"
       :occluders="occluders"
@@ -171,6 +172,7 @@ const {
   lampColor,
   shadowEnabled,
   projectionStandard,
+  featherStrength,
   castShade,
   roomShade,
   lightLayerOpacity,

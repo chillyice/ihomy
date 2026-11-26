@@ -132,9 +132,4 @@ html.dark .share-tip {
   margin-bottom: 16px;
   padding: 6px 0;
 }
-/* 组内分隔:相邻设置行之间一条淡虚线 */
-.settings-form .el-form-item + .el-form-item {
-  border-top: 1px dashed color-mix(in srgb, var(--color-border) 55%, var(--color-text-secondary));
-  padding-top: 14px;
-}
 </style>

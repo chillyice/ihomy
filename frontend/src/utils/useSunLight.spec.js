@@ -61,6 +61,21 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+it('preserves feather strength independently of shadow depth, including a zero setting', async () => {
+  const preferences = { shadowDepth: 63 }
+  localStorage.getItem = () => JSON.stringify(preferences)
+  localStorage.setItem.mockImplementation((key, value) => Object.assign(preferences, JSON.parse(value)))
+  const day = sunDay('2026-11-25')
+  await mountLight(day)
+  expect(light.featherStrength.value).toBe(50)
+  light.featherStrength.value = 0
+  await nextTick()
+  app.unmount()
+  await mountLight(day)
+  expect(light.featherStrength.value).toBe(0)
+  expect(light.shadowDepth.value).toBe(63)
+})
+
 it('applies the current daylight immediately when auto mode is selected again', async () => {
   themeStore.autoMode = false
   await mountLight(sunDay('2026-11-25'))

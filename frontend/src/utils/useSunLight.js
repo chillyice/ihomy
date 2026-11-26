@@ -69,6 +69,7 @@ export function useSunLight(canReadEnvironment = () => true) {
   // 阴影深度 0~100，默认 70。
   const projectionStandard = ref(_saved.projectionStandard === 'real' ? 'real' : 'corrected')
   const shadowDepth = ref(_saved.shadowDepth ?? 70)
+  const featherStrength = ref(Number.isFinite(_saved.featherStrength) ? Math.min(100, Math.max(0, _saved.featherStrength)) : 50)
   const _weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const _blobsEnabled = ref(_saved.blobsEnabled ?? true)
   const _glassEnabled = ref(_saved.glassEnabled ?? true)
@@ -101,6 +102,7 @@ export function useSunLight(canReadEnvironment = () => true) {
       lampBrightness,
       _shadowEnabled,
       shadowDepth,
+      featherStrength,
       projectionStandard,
       _weatherEffectEnabled,
       _blobsEnabled,
@@ -120,6 +122,7 @@ export function useSunLight(canReadEnvironment = () => true) {
           shadowEnabled: _shadowEnabled.value,
           projectionStandard: projectionStandard.value,
           shadowDepth: shadowDepth.value,
+          featherStrength: featherStrength.value,
           weatherEffectEnabled: _weatherEffectEnabled.value,
           blobsEnabled: _blobsEnabled.value,
           glassEnabled: _glassEnabled.value,
@@ -678,6 +681,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     shadowEnabled,
     projectionStandard,
     shadowDepth,
+    featherStrength,
     shadowAlpha,
     weatherEffectEnabled,
     blobsEnabled,

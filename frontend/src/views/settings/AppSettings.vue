@@ -806,9 +806,6 @@ onMounted(async () => {
   gap: 12px;
   padding: 12px 0;
 }
-.opt + .opt {
-  border-top: 1px solid var(--color-border);
-}
 .opt-main {
   flex: 1;
   min-width: 0;

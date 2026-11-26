@@ -98,11 +98,6 @@ async function selectIcon(id) {
   margin-bottom: 16px;
   padding: 6px 0;
 }
-/* 组内分隔:相邻设置行之间一条淡虚线 */
-.settings-form .el-form-item + .el-form-item {
-  border-top: 1px dashed color-mix(in srgb, var(--color-border) 55%, var(--color-text-secondary));
-  padding-top: 14px;
-}
 .settings-form .el-form-item .el-switch,
 .settings-form .el-form-item .el-radio-group {
   margin-bottom: 0;

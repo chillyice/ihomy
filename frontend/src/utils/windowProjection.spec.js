@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { drawWindowProjection, sampleWindowRays, sashApertures, windowTransform } from './windowProjection'
+import { drawWindowProjection, sampleWindowRays, sashApertures, shadowSourceRadius, windowTransform } from './windowProjection'
 import { drawWindowFoliage } from './windowFoliage'
 import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from './windowSash'
 import { getSunScene } from './windowLight'
@@ -101,11 +101,50 @@ describe('window-plane projection', () => {
     const summer = noon(76.79)
     const equinox = noon(53.35)
     const winter = noon(29.91)
-    expect(summer).toEqual(windowTransform(width, height, 76.79, 180, 1))
+    expect(noon(88)).toEqual(windowTransform(width, height, 88, 180, 1))
     expect(summer[3]).toBeLessThan(equinox[3])
     expect(equinox[3]).toBeLessThan(winter[3])
     expect(winter[3]).toBeLessThan(windowTransform(width, height, 29.91, 180, 1)[3])
-    expect(winter[3] / summer[3]).toBeGreaterThan(2)
+    expect(winter[3] / summer[3]).toBeLessThan(
+      windowTransform(width, height, 29.91, 180, 1)[3] / windowTransform(width, height, 76.79, 180, 1)[3],
+    )
+  })
+
+  it('uses the available space on a widescreen, a 4:3 desktop and a split desktop window', () => {
+    const height = 900
+    const length = (width, weight, azimuth) => {
+      const [, , dx, dy] = windowTransform(width, height, 12, azimuth, weight)
+      expect((Math.atan2(dx, dy) * 180) / Math.PI).toBeCloseTo(180 - azimuth)
+      return Math.hypot(dx, dy)
+    }
+    for (const azimuth of [105, 180, 255]) {
+      const excess = 1 / Math.tan((12 * Math.PI) / 180) - 0.4
+      expect(length(1600, 0, azimuth)).toBeCloseTo(2 * height * (0.4 + excess / (1 + 2 * excess)), 8)
+      expect(length(3440, 0, azimuth)).toBeGreaterThan(length(1600, 0, azimuth))
+      expect(length(3440, 0, azimuth)).toBeLessThan(2.25 * height)
+      expect(length(1600, 0, azimuth)).toBeGreaterThan(length(1200, 0, azimuth))
+      expect(length(1200, 0, azimuth)).toBeGreaterThan(length(600, 0, azimuth))
+      expect(length(600, 0, azimuth)).toBeLessThan(600)
+      expect(length(600, 1, azimuth)).toBeCloseTo(length(1600, 1, azimuth))
+      expect(length(1201, 0, azimuth) - length(1200, 0, azimuth)).toBeLessThan(1)
+    }
+  })
+
+  it('keeps the midpoint feathering, weather contrast and increasing edge width across the whole control', () => {
+    for (const softness of [0, 0.25, 0.72, 1]) {
+      const original = Math.tan(((0.266 + 2 * softness) * Math.PI) / 180)
+      const radius = (strength) => shadowSourceRadius(softness, strength)
+      expect(radius()).toBeCloseTo(original, 10)
+      expect(radius(50)).toBeCloseTo(original, 10)
+      expect(radius(NaN)).toBeCloseTo(original, 10)
+      expect(radius(-1)).toBe(radius(0))
+      expect(radius(101)).toBe(radius(100))
+      expect(radius(0)).toBeLessThan(radius(50))
+      expect(radius(100)).toBeGreaterThan(radius(50))
+    }
+    for (const strength of [0, 50, 100]) {
+      expect(shadowSourceRadius(1, strength)).toBeGreaterThan(shadowSourceRadius(0, strength))
+    }
   })
 
   it('keeps the far frame edge in its summer framing while date and projection standard change', () => {
