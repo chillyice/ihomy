@@ -12,7 +12,7 @@
 
     <div ref="stage" class="cascade-stage">
       <div v-for="c in cards" :key="c.key" class="leaf-wrap" :class="{ fading: c.fading }" :style="cardStyle(c)">
-        <div class="leaf-swing">
+        <div class="leaf-swing" @animationiteration.self="turnCard(c)">
           <div
             v-a11y-click
             class="leaf-card"
@@ -77,6 +77,15 @@ const clearTimers = () => {
   fadeTimers = []
 }
 
+const swingDistance = (limit) => limit * (0.45 + Math.random() * 0.55)
+
+const turnCard = (card) => {
+  // Alternate iterations meet at one edge. Change only the opposite destination.
+  if (card.headingRight) card.leftSwing = swingDistance(card.reach)
+  else card.rightSwing = swingDistance(card.reach)
+  card.headingRight = !card.headingRight
+}
+
 const spawnCard = () => {
   if (!photos.value.length) return
   const photo = photos.value[Math.floor(Math.random() * photos.value.length)]
@@ -84,16 +93,23 @@ const spawnCard = () => {
   const narrow = window.innerWidth < 768
   const maxSize = narrow ? 150 : 220
   const minSize = narrow ? 90 : 130
+  const size = minSize + Math.random() * (maxSize - minSize)
+  const width = stage.value?.clientWidth || window.innerWidth
+  const room = Math.max(0, width - size)
+  const reach = Math.min(room * 0.35, narrow ? 65 : 145)
   const card = {
     key: ++cardSeq,
     photo,
-    x: narrow ? 5 + Math.random() * 70 : 5 + Math.random() * 90,
+    x: reach + Math.random() * (room - 2 * reach),
     duration: 15 + Math.random() * 12,
-    size: minSize + Math.random() * (maxSize - minSize),
+    size,
     rot: (Math.random() - 0.5) * 30,
-    drift: (narrow ? 18 : 32) + Math.random() * (narrow ? 14 : 38),
-    swing: 4 + Math.random() * 3,
-    phase: -Math.random() * 7,
+    reach,
+    leftSwing: swingDistance(reach),
+    rightSwing: swingDistance(reach),
+    headingRight: true,
+    swing: 2 + Math.random() * 1.4,
+    phase: -Math.random() * 1.5,
     hovered: false,
     fading: false,
   }
@@ -117,13 +133,14 @@ const resumeCard = (c) => {
 }
 
 const cardStyle = (c) => ({
-  left: c.x + '%',
+  left: c.x + 'px',
   width: c.size + 'px',
   animationDuration: c.duration + 's',
   '--swing-time': c.swing + 's',
   '--swing-phase': c.phase + 's',
   '--leaf-rot': c.rot + 'deg',
-  '--leaf-drift': c.drift + 'px',
+  '--left-swing': -c.leftSwing + 'px',
+  '--right-swing': c.rightSwing + 'px',
   animationPlayState: c.hovered ? 'paused' : 'running',
 })
 
@@ -247,7 +264,9 @@ html.warm-paper-page .pc-title {
 }
 
 .leaf-wrap {
-  --swing-time: 5s;
+  --left-swing: -48px;
+  --right-swing: 48px;
+  --swing-time: 3s;
   --swing-phase: 0s;
   position: absolute;
   top: -200px;
@@ -294,23 +313,21 @@ html.warm-paper-page .pc-title {
   }
 }
 .leaf-swing {
-  animation: leaf-swing var(--swing-time) ease-in-out var(--swing-phase) infinite;
+  animation: leaf-swing var(--swing-time) ease-in-out var(--swing-phase) infinite alternate;
   animation-play-state: inherit;
   transform-origin: 48% 35%;
 }
 @keyframes leaf-swing {
   0%,
-  100% {
-    transform: perspective(640px) translate3d(calc(-1 * var(--leaf-drift)), -12px, 0) rotateZ(calc(var(--leaf-rot) - 17deg)) rotateY(-26deg);
+  12% {
+    transform: perspective(640px) translate3d(var(--left-swing), -12px, 0) rotateZ(calc(var(--leaf-rot) - 17deg)) rotateY(-26deg);
   }
-  24% {
+  50% {
     transform: perspective(640px) translate3d(0, 10px, 0) rotateZ(var(--leaf-rot)) rotateX(20deg);
   }
-  53% {
-    transform: perspective(640px) translate3d(var(--leaf-drift), -18px, 0) rotateZ(calc(var(--leaf-rot) + 22deg)) rotateY(34deg);
-  }
-  78% {
-    transform: perspective(640px) translate3d(4px, 6px, 0) rotateZ(var(--leaf-rot)) rotateX(-13deg);
+  88%,
+  100% {
+    transform: perspective(640px) translate3d(var(--right-swing), -18px, 0) rotateZ(calc(var(--leaf-rot) + 22deg)) rotateY(34deg);
   }
 }
 
