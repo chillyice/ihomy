@@ -3,7 +3,7 @@
     ref="shellEl"
     class="bk-shell"
     :title="$t('games.bakery.title')"
-    :rules-pages="[$t('games.bakery.rules.pagePlay'), $t('games.bakery.rules.pageNum')]"
+    :rules-pages="[$t('games.bakery.rules.pagePlay'), $t('games.bakery.rules.pageMenu'), $t('games.bakery.rules.pageNum')]"
     body-align="stretch"
     @back="goBack"
   >
@@ -27,6 +27,10 @@
     </template>
 
     <template #actions>
+      <el-button size="small" round :title="$t('games.bakery.achievements.title')" @click="achOpen = true">
+        <el-icon><Medal /></el-icon>
+        <span class="bk-action-label">{{ $t('games.bakery.achievements.title') }}</span>
+      </el-button>
       <el-button size="small" round :title="$t('games.bakery.ranking.title')" @click="openRanking">
         <el-icon><Trophy /></el-icon>
         <span class="bk-action-label">{{ $t('games.bakery.ranking.title') }}</span>
@@ -39,6 +43,12 @@
         <li>{{ $t('games.bakery.rules.play2') }}</li>
         <li>{{ $t('games.bakery.rules.play3') }}</li>
         <li>{{ $t('games.bakery.rules.play4') }}</li>
+      </ul>
+      <ul v-else-if="page === 1">
+        <li>{{ $t('games.bakery.rules.menu1') }}</li>
+        <li>{{ $t('games.bakery.rules.menu2') }}</li>
+        <li>{{ $t('games.bakery.rules.menu3') }}</li>
+        <li>{{ $t('games.bakery.rules.menu4') }}</li>
       </ul>
       <ul v-else>
         <li>{{ $t('games.bakery.rules.num1') }}</li>
@@ -68,6 +78,30 @@
         </template>
       </el-dialog>
 
+      <!-- 解锁新品种是一次性花费,先确认再扣钱 -->
+      <el-dialog
+        v-model="unlockOpen"
+        class="dialog-sm"
+        :append-to-body="!isFullscreen"
+        :title="$t('games.bakery.unlock.title')"
+        :lock-scroll="false"
+      >
+        <p v-if="pendingUnlock" class="bk-dialog-lead">
+          {{
+            $t('games.bakery.unlock.confirm', {
+              name: pendingUnlock.name,
+              cost: compact(pendingUnlock.cost),
+              price: compact(pendingUnlock.price),
+            })
+          }}
+        </p>
+        <p class="bk-dialog-note">{{ $t('games.bakery.unlock.note') }}</p>
+        <template #footer>
+          <el-button @click="unlockOpen = false">{{ $t('games.cancel') }}</el-button>
+          <el-button type="primary" :disabled="!pendingAfford" @click="onUnlock">{{ $t('games.bakery.unlock.action') }}</el-button>
+        </template>
+      </el-dialog>
+
       <!-- 开分店:重置是不可逆的,先把「失去什么、换到什么」写清楚再确认 -->
       <el-dialog
         v-model="prestigeOpen"
@@ -83,6 +117,29 @@
         <template #footer>
           <el-button @click="prestigeOpen = false">{{ $t('games.cancel') }}</el-button>
           <el-button type="primary" @click="onPrestige">{{ $t('games.bakery.prestige.action') }}</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog
+        v-model="achOpen"
+        class="dialog-md"
+        :append-to-body="!isFullscreen"
+        :title="$t('games.bakery.achievements.title')"
+        :lock-scroll="false"
+      >
+        <p class="bk-dialog-note">{{ $t('games.bakery.achievements.hint', { n: achievementBonusPercent }) }}</p>
+        <ul class="bk-ach-list">
+          <li v-for="a in achievements" :key="a.key" class="bk-ach" :class="{ 'is-done': a.unlocked }">
+            <span class="bk-ach-head">
+              <b>{{ a.name }}</b>
+              <span class="bk-ach-progress">{{ a.unlocked ? $t('games.bakery.achievements.done') : `${a.progress}/${a.target}` }}</span>
+            </span>
+            <span class="bk-ach-desc">{{ a.desc }}</span>
+            <i class="bk-ach-bar"><b :style="{ width: a.percent + '%' }"></b></i>
+          </li>
+        </ul>
+        <template #footer>
+          <el-button type="primary" @click="achOpen = false">{{ $t('games.rulesAck') }}</el-button>
         </template>
       </el-dialog>
 
@@ -116,35 +173,81 @@
       </el-dialog>
     </template>
 
-    <!-- 左(竖屏上)= 现烤现卖与后厨库存,右(竖屏下)= 六条产线 -->
+    <!-- 左(竖屏上)= 现烤现卖、顾客订单与后厨库存,右(竖屏下)= 菜单与六条产线 -->
     <div class="bk-layout">
       <section class="bk-shop">
         <button type="button" class="bk-tap" :aria-label="$t('games.bakery.tap')" @click="onTap">
-          <span class="bk-tap-art" aria-hidden="true">🍞</span>
+          <span class="bk-tap-art" aria-hidden="true">{{ currentDef.emoji }}</span>
           <span class="bk-tap-label">{{ $t('games.bakery.tap') }}</span>
           <Transition name="bk-pop" mode="out-in">
             <span v-if="popKey" :key="popKey" class="bk-tap-pop">+{{ tapGain }}</span>
           </Transition>
         </button>
+
+        <!-- 顾客订单:限时交付现货换高额金币;库存不够时按钮禁用,不用猜条件 -->
+        <div class="bk-order" :class="{ 'is-ready': order && order.canDeliver }">
+          <template v-if="order">
+            <div class="bk-order-head">
+              <span class="bk-order-title">{{ $t('games.bakery.order.title') }}</span>
+              <span class="bk-order-timer">{{ order.seconds }}s</span>
+            </div>
+            <div class="bk-order-body">{{ $t('games.bakery.order.body', { qty: order.qty, product: order.name }) }}</div>
+            <div class="bk-order-foot">
+              <span class="bk-order-reward">+{{ compact(order.reward) }} 🪙</span>
+              <span class="bk-order-stock">{{ $t('games.bakery.order.stock', { have: order.stock, need: order.qty }) }}</span>
+              <el-button size="small" type="primary" round :disabled="!order.canDeliver" @click="onDeliver">
+                {{ $t('games.bakery.order.deliver') }}
+              </el-button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="bk-order-head">
+              <span class="bk-order-title">{{ $t('games.bakery.order.title') }}</span>
+              <span class="bk-order-rep">{{ $t('games.bakery.order.reputation', { n: reputationPercent }) }}</span>
+            </div>
+            <div class="bk-order-body">{{ $t('games.bakery.order.waiting', { seconds: orderGapLeft }) }}</div>
+          </template>
+        </div>
+
         <div class="bk-stock">
           <span class="bk-stock-row">
             <span class="bk-stock-name">{{ $t('games.bakery.dough') }}</span>
             <b>{{ compact(state.dough) }}</b>
           </span>
           <span class="bk-stock-row">
-            <span class="bk-stock-name">{{ $t('games.bakery.bread') }}</span>
-            <b>{{ compact(state.bread) }}</b>
+            <span class="bk-stock-name">{{ currentName }}</span>
+            <b>{{ compact(currentStock) }}</b>
           </span>
-          <!-- 三段产线的实时吞吐:卡在哪一段一眼能看出该升哪条线 -->
+          <!-- 三段产线的有效吞吐:卡在哪一段一眼能看出该升哪条线 -->
           <p class="bk-rates">
-            <span>{{ $t('games.bakery.doughRate') }} {{ compact(doughRate) }}/s</span>
-            <span>{{ $t('games.bakery.bakeRate') }} {{ compact(bakeRate) }}/s</span>
-            <span>{{ $t('games.bakery.sellRate') }} {{ compact(sellRate) }}/s</span>
+            <span>{{ $t('games.bakery.doughRate') }} {{ compact(rates.dough) }}/s</span>
+            <span>{{ $t('games.bakery.bakeRate') }} {{ compact(rates.bake) }}/s</span>
+            <span>{{ $t('games.bakery.sellRate') }} {{ compact(rates.sell) }}/s</span>
           </p>
         </div>
       </section>
 
       <section class="bk-side">
+        <h2 class="section-label">{{ $t('games.bakery.menu') }}</h2>
+        <div class="bk-menu">
+          <button
+            v-for="p in products"
+            :key="p.key"
+            type="button"
+            class="bk-menu-item"
+            :class="{ 'is-current': p.current, 'is-locked': !p.unlocked, 'is-afford': !p.unlocked && p.afford }"
+            :title="p.detail"
+            @click="onProduct(p)"
+          >
+            <span class="bk-menu-emoji" aria-hidden="true">{{ p.emoji }}</span>
+            <span class="bk-menu-name">{{ p.name }}</span>
+            <span class="bk-menu-meta">
+              <template v-if="p.unlocked">{{ compact(p.price) }}</template>
+              <template v-else>{{ $t('games.bakery.unlock.short', { cost: compact(p.cost) }) }}</template>
+            </span>
+          </button>
+        </div>
+
         <h2 class="section-label">{{ $t('games.bakery.upgrades') }}</h2>
         <div class="bk-up-list">
           <button
@@ -190,39 +293,50 @@
 </template>
 
 <script setup>
-// 小面包房(放置挂机):面团 → 面包 → 金币 → 升级产线 → 开分店。
-// 数值与产线耦合全在 utils/games/bakeryIdle.js(纯函数,单测覆盖);本页只负责
-// 每秒推进、存档、离线弹窗、家庭榜上报。进度只在本机,云端只有一个净资产数字。
+// 小面包房(放置挂机):面团 → 面包 → 金币 → 升级产线 → 开分店,期间接顾客订单、攒成就。
+// 数值、品种、订单、成就全在 utils/games/bakeryIdle.js(纯函数,单测覆盖);本页只负责
+// 每秒推进、存档、离线弹窗、随机订单、家庭榜上报。进度只在本机,云端只有一个净资产数字。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Trophy } from '@element-plus/icons-vue'
+import { Medal, Trophy } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { gameApi } from '@/api'
 import {
+  ACHIEVEMENT_BONUS,
+  ACHIEVEMENT_DEFS,
   OFFLINE_POPUP_SECONDS,
   PRESTIGE_FACTOR,
+  PRODUCT_DEFS,
   STATE_KEY,
   STORE_BONUS,
   UPGRADE_DEFS,
-  bakePerSecond,
+  achievementProgress,
   buyUpgrade,
   canPrestige,
   catchUp,
   clickPower,
   coinsPerSecond,
   createState,
-  doughPerSecond,
   formatCompact,
+  fulfillOrder,
+  isUnlocked,
+  itemRates,
   levelOf,
   netWorth,
+  orderReputation,
   parseState,
   prestige,
   prestigeRequirement,
-  sellPerSecond,
+  priceOf,
+  productDef,
+  rollOrder,
+  selectProduct,
   serializeState,
+  stockOf,
   tapSell,
   tick,
+  unlockProduct,
   upgradeCost,
 } from '@/utils/games/bakeryIdle'
 
@@ -241,6 +355,9 @@ const isFullscreen = computed(() => !!shellEl.value?.isFullscreen)
 const offlineInfo = ref(null)
 const offlineOpen = ref(false)
 const prestigeOpen = ref(false)
+const unlockOpen = ref(false)
+const pendingUnlock = ref(null)
+const achOpen = ref(false)
 const rewardMsg = ref('')
 
 const rankOpen = ref(false)
@@ -256,9 +373,10 @@ const state = ref(bootstrap())
 const compact = (value) => formatCompact(value, locale.value)
 const worth = computed(() => netWorth(state.value))
 const perSecond = computed(() => coinsPerSecond(state.value))
-const doughRate = computed(() => doughPerSecond(state.value))
-const bakeRate = computed(() => bakePerSecond(state.value))
-const sellRate = computed(() => sellPerSecond(state.value))
+const rates = computed(() => itemRates(state.value))
+const currentDef = computed(() => productDef(state.value.product))
+const currentName = computed(() => t(`games.bakery.product.${currentDef.value.key}.name`))
+const currentStock = computed(() => stockOf(state.value, state.value.product))
 const tapGain = computed(() => compact(clickPower(state.value)))
 const requirement = computed(() => prestigeRequirement(state.value))
 const nextRequirement = computed(() => Math.floor(requirement.value * PRESTIGE_FACTOR))
@@ -266,6 +384,54 @@ const canPrestigeNow = computed(() => canPrestige(state.value))
 const bonusPercent = computed(() => Math.round(STORE_BONUS * 100))
 const prestigePercent = computed(() => Math.max(0, Math.min(100, Math.round((state.value.runCoins / requirement.value) * 100))))
 const offlineTime = computed(() => formatDuration(offlineInfo.value?.elapsed || 0))
+const orderGapLeft = computed(() => Math.max(0, Math.ceil(Number(state.value.orderGap) || 0)))
+const reputationPercent = computed(() => Math.round((orderReputation(state.value) - 1) * 100))
+const achievementBonusPercent = computed(() => Math.round(ACHIEVEMENT_BONUS * state.value.achievements.length * 100))
+const pendingAfford = computed(() => !!pendingUnlock.value && state.value.coins >= pendingUnlock.value.cost)
+
+const products = computed(() =>
+  PRODUCT_DEFS.map((def) => ({
+    key: def.key,
+    emoji: def.emoji,
+    name: t(`games.bakery.product.${def.key}.name`),
+    detail: t('games.bakery.productDetail', { dough: def.doughPer, seconds: def.bakeSeconds }),
+    price: priceOf(state.value, def.key),
+    cost: def.unlockCost,
+    unlocked: isUnlocked(state.value, def.key),
+    current: state.value.product === def.key,
+    afford: state.value.coins >= def.unlockCost,
+  })),
+)
+
+const order = computed(() => {
+  const current = state.value.order
+  if (!current) return null
+  const stock = stockOf(state.value, current.product)
+  return {
+    product: current.product,
+    name: t(`games.bakery.product.${current.product}.name`),
+    qty: current.qty,
+    reward: current.reward,
+    seconds: Math.max(0, Math.ceil(current.seconds)),
+    stock: Math.floor(stock),
+    canDeliver: stock >= current.qty,
+  }
+})
+
+const achievements = computed(() =>
+  ACHIEVEMENT_DEFS.map((def) => {
+    const progress = Math.min(def.target, Math.floor(achievementProgress(state.value, def)))
+    return {
+      key: def.key,
+      name: t(`games.bakery.ach.${def.key}.name`),
+      desc: t(`games.bakery.ach.${def.key}.desc`),
+      target: def.target,
+      progress,
+      percent: Math.min(100, Math.round((progress / def.target) * 100)),
+      unlocked: state.value.achievements.includes(def.key),
+    }
+  }),
+)
 
 const upgrades = computed(() =>
   UPGRADE_DEFS.map((def) => {
@@ -274,7 +440,7 @@ const upgrades = computed(() =>
       key: def.key,
       name: t(`games.bakery.upgrade.${def.key}.name`),
       effect: t(`games.bakery.upgrade.${def.key}.effect`, {
-        n: def.kind === 'MULT' ? Math.round(def.amount * 100) : def.amount,
+        n: def.kind === 'MULT' || def.kind === 'PRICE' ? Math.round(def.amount * 100) : def.amount,
       }),
       level: levelOf(state.value, def.key),
       cost,
@@ -308,6 +474,11 @@ function resumeOffline(base) {
   return result.state
 }
 
+/** 没订单且间隔到了就请下一位顾客(随机数只在这一层给,内核保持纯函数) */
+function nextCustomer(base) {
+  return !base.order && base.orderGap <= 0 ? rollOrder(base, Math.random(), Math.random()) : base
+}
+
 // ---------- 存档 ----------
 function bootstrap() {
   let loaded = null
@@ -316,7 +487,7 @@ function bootstrap() {
   } catch {
     // 隐私模式/坏档:按新档处理
   }
-  return resumeOffline(loaded || createState())
+  return nextCustomer(resumeOffline(loaded || createState()))
 }
 
 let saveTimer = null
@@ -334,6 +505,33 @@ const flushSave = () => {
 const scheduleSave = () => {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(flushSave, SAVE_DELAY_MS)
+}
+
+let rewardTimer = null
+const showReward = (text) => {
+  rewardMsg.value = text
+  if (rewardTimer) clearTimeout(rewardTimer)
+  rewardTimer = setTimeout(() => {
+    rewardMsg.value = ''
+  }, 8000)
+}
+
+/**
+ * 所有改动都走这里:先记下成就数量,解锁了就提示;再顺手补下一单顾客。
+ * 每帧 tick 不写存档(由 5 秒兜底与操作后的 300ms 节流负责),避免每秒落盘。
+ */
+const applyState = (next, { save = true } = {}) => {
+  const before = state.value.achievements.length
+  state.value = next
+  if (next.achievements.length > before) {
+    const names = next.achievements
+      .slice(before)
+      .map((key) => t(`games.bakery.ach.${key}.name`))
+      .join(t('games.bakery.listSep'))
+    showReward(t('games.bakery.achievements.unlocked', { name: names, n: achievementBonusPercent.value }))
+  }
+  state.value = nextCustomer(state.value)
+  if (save) scheduleSave()
 }
 
 // ---------- 家庭榜上报 ----------
@@ -360,7 +558,7 @@ const advanceVisible = () => {
   const now = Date.now()
   const elapsed = Math.floor((now - (Number(state.value.lastTick) || now)) / 1000)
   if (elapsed <= 0) return
-  state.value = { ...tick(state.value, elapsed), lastTick: now }
+  applyState({ ...tick(state.value, elapsed), lastTick: now }, { save: false })
   reportIfChanged()
 }
 const startTimer = () => {
@@ -379,17 +577,41 @@ const stopTimer = () => {
 
 // ---------- 操作 ----------
 const onTap = () => {
-  state.value = tapSell(state.value)
+  applyState(tapSell(state.value))
   popKey.value += 1
-  scheduleSave()
   reportIfChanged()
 }
 
 const onBuy = (key) => {
   const result = buyUpgrade(state.value, key)
   if (!result.bought) return
-  state.value = { ...result.state, lastTick: Date.now() }
-  scheduleSave()
+  applyState({ ...result.state, lastTick: Date.now() })
+}
+
+const onProduct = (product) => {
+  if (product.unlocked) {
+    applyState(selectProduct(state.value, product.key))
+    return
+  }
+  pendingUnlock.value = product
+  unlockOpen.value = true
+}
+
+const onUnlock = () => {
+  const product = pendingUnlock.value
+  unlockOpen.value = false
+  pendingUnlock.value = null
+  if (!product) return
+  const result = unlockProduct(state.value, product.key)
+  if (!result.ok) return
+  applyState(result.state)
+}
+
+const onDeliver = () => {
+  const result = fulfillOrder(state.value)
+  if (!result.ok) return
+  applyState(result.state)
+  showReward(t('games.bakery.order.done', { coins: compact(result.reward) }))
 }
 
 const openPrestige = () => {
@@ -401,7 +623,7 @@ const onPrestige = () => {
   const result = prestige(state.value, Date.now())
   prestigeOpen.value = false
   if (!result.ok) return
-  state.value = result.state
+  applyState(result.state)
   flushSave()
   submitScore()
   grantReward()
@@ -411,16 +633,14 @@ const grantReward = async () => {
   try {
     const res = await gameApi.bakeryReward()
     const percent = Math.round((Math.pow(1.15, state.value.stores) - 1) * 100)
-    rewardMsg.value =
+    showReward(
       res && res.awarded > 0
         ? `${t('games.bakery.prestige.done', { n: percent })} ${t('games.rewarded', { n: res.awarded })}`
-        : `${t('games.bakery.prestige.done', { n: percent })} ${t('games.rewardCapped')}`
+        : `${t('games.bakery.prestige.done', { n: percent })} ${t('games.rewardCapped')}`,
+    )
   } catch {
-    rewardMsg.value = t('games.rewardFailed')
+    showReward(t('games.rewardFailed'))
   }
-  setTimeout(() => {
-    rewardMsg.value = ''
-  }, 8000)
 }
 
 const openRanking = async () => {
@@ -452,7 +672,7 @@ const onVisibility = () => {
     stopTimer()
     return
   }
-  state.value = resumeOffline(state.value)
+  state.value = nextCustomer(resumeOffline(state.value))
   startTimer()
   reportIfChanged(true)
 }
@@ -473,14 +693,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 两栏只在游戏区够宽时成立(手机横屏右栏约 630px 刚好够);窄了退回上下排,
-   整块可滚动 —— 现烤现卖按钮始终在视线里,产线列表往下翻 */
+   整块可滚动 —— 现烤现卖按钮始终在视线里,菜单与产线列表往下翻 */
 .bk-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* 上下排时每段按内容取高,整块滚动;否则矮屏会把两段都压扁,菜单和产线都点不到 */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: var(--gs-gap);
   width: 100%;
   height: 100%;
+  /* 横屏矮屏时外壳高度按内容撑,这一栏要允许被压小,内部自己滚 */
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -488,8 +711,10 @@ onBeforeUnmount(() => {
 @container (min-width: 600px) {
   .bk-layout {
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    grid-auto-rows: auto;
     align-content: stretch;
-    overflow: hidden;
+    /* 横屏矮屏时两栏内容仍可能超出游戏区:留着滚动,别把产线列表裁掉 */
+    overflow-y: auto;
   }
 }
 
@@ -497,7 +722,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* safe:容器比内容矮时退回顶端对齐,否则居中会把「现烤现卖」上半截挤出滚动区 */
+  justify-content: safe center;
   gap: 10px;
   min-height: 0;
   min-width: 0;
@@ -511,7 +737,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  width: min(100%, 32cqh, 210px);
+  width: min(100%, 28cqh, 200px);
   aspect-ratio: 1;
   padding: 0;
   border: 0;
@@ -574,11 +800,90 @@ onBeforeUnmount(() => {
   }
 }
 
+/* 顾客订单:一张窄卡,交付条件(库存/倒计时)全写在同一行 */
+.bk-order {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: min(100%, 300px);
+  padding: 7px 10px;
+  border: 1px solid rgb(122 90 58 / 14%);
+  border-radius: 12px;
+  background: rgb(255 252 244 / 62%);
+  font-size: 12px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+html.dark .bk-order {
+  background: rgb(60 50 40 / 42%);
+  border-color: rgb(255 240 219 / 12%);
+}
+.bk-order.is-ready {
+  border-color: rgb(var(--color-brand-rgb) / 46%);
+  background: rgb(255 248 235 / 92%);
+}
+html.dark .bk-order.is-ready {
+  background: rgb(78 62 45 / 78%);
+}
+.bk-order-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.bk-order-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary, #7a6a58);
+}
+.bk-order-timer {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-brand-text, #b6664e);
+  font-variant-numeric: tabular-nums;
+}
+.bk-order-rep {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand-text, #b6664e);
+  font-variant-numeric: tabular-nums;
+}
+.bk-order-body {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bk-order-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.bk-order-reward {
+  flex: 0 0 auto;
+  font-weight: 650;
+  color: var(--color-brand-text, #b6664e);
+  font-variant-numeric: tabular-nums;
+}
+.bk-order-stock {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--color-text-secondary, #7a6a58);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .bk-stock {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  width: min(100%, 260px);
+  width: min(100%, 300px);
 }
 .bk-stock-row {
   display: flex;
@@ -613,15 +918,93 @@ onBeforeUnmount(() => {
   gap: 6px;
   min-height: 0;
   min-width: 0;
+  /* 两栏矮屏时右栏装不下菜单+产线:整栏可滚,产线列表至少露出一行 */
+  overflow-y: auto;
 }
 .bk-side .section-label {
   margin: 0;
 }
-.bk-up-list {
-  display: flex;
-  flex-direction: column;
+
+/* 菜单:两列小格,当前品种亮起;锁着显示解锁价,买得起用虚线框提示 */
+.bk-menu {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   min-height: 0;
+}
+.bk-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid rgb(122 90 58 / 14%);
+  border-radius: 10px;
+  background: rgb(255 252 244 / 62%);
+  color: var(--color-text-primary, #3d3127);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+html.dark .bk-menu-item {
+  background: rgb(60 50 40 / 42%);
+  border-color: rgb(255 240 219 / 12%);
+}
+.bk-menu-item.is-current {
+  border-color: rgb(var(--color-brand-rgb) / 52%);
+  background: rgb(255 248 235 / 92%);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-brand-rgb) / 22%);
+}
+html.dark .bk-menu-item.is-current {
+  background: rgb(78 62 45 / 78%);
+}
+.bk-menu-item.is-locked {
+  opacity: 0.72;
+}
+.bk-menu-item.is-locked.is-afford {
+  border-style: dashed;
+  opacity: 1;
+}
+.bk-menu-item.is-current:hover,
+.bk-menu-item.is-locked.is-afford:hover {
+  transform: translateY(-1px);
+}
+.bk-menu-emoji {
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+}
+.bk-menu-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bk-menu-meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--color-text-secondary, #7a6a58);
+  font-variant-numeric: tabular-nums;
+}
+.bk-menu-item.is-current .bk-menu-meta {
+  color: var(--color-brand-text, #b6664e);
+}
+
+.bk-up-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 72px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -762,7 +1145,7 @@ html.dark .bk-up.is-afford {
   }
 }
 
-/* 弹窗内的正文与榜单 */
+/* 弹窗内的正文、成就列表与榜单 */
 .bk-dialog-lead {
   margin: 0 0 8px;
   font-size: 13.5px;
@@ -776,6 +1159,64 @@ html.dark .bk-up.is-afford {
 }
 .bk-dialog-note.is-error {
   color: var(--color-danger, #c45656);
+}
+.bk-ach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(56vh, 480px);
+  margin: 10px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.bk-ach {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgb(122 90 58 / 6%);
+}
+.bk-ach.is-done {
+  background: rgb(var(--color-brand-rgb) / 12%);
+}
+.bk-ach-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.bk-ach-head b {
+  font-weight: 600;
+}
+.bk-ach-progress {
+  font-size: 11px;
+  color: var(--color-text-secondary, #7a6a58);
+  font-variant-numeric: tabular-nums;
+}
+.bk-ach.is-done .bk-ach-progress {
+  font-weight: 600;
+  color: var(--color-brand-text, #b6664e);
+}
+.bk-ach-desc {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, #7a6a58);
+}
+.bk-ach-bar {
+  display: block;
+  overflow: hidden;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: rgb(122 90 58 / 14%);
+}
+.bk-ach-bar b {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-brand, #c98a5c);
 }
 .bk-rank-loading {
   padding: 8px 0;

@@ -1490,6 +1490,52 @@ export default {
       doughRate: 'Knead',
       bakeRate: 'Bake',
       sellRate: 'Sell',
+      menu: 'Menu',
+      productDetail: '{dough} dough per loaf · {seconds}s per bake',
+      product: {
+        white: { name: 'White loaf' },
+        croissant: { name: 'Croissant' },
+        toast: { name: 'Toast' },
+        cake: { name: 'Cake' },
+        wedding: { name: 'Wedding cake' },
+      },
+      unlock: {
+        title: 'Unlock a new bread',
+        short: '🔒 {cost}',
+        confirm: 'Spend {cost} coins to unlock “{name}”? It sells for {price} coins each.',
+        note: 'It switches production right away. Your menu and unlocked breads survive opening a branch.',
+        action: 'Unlock',
+      },
+      order: {
+        title: 'Customer order',
+        waiting: 'Next customer in about {seconds}s',
+        body: '{qty} × {product}',
+        stock: 'In stock {have}/{need}',
+        deliver: 'Deliver',
+        done: 'Order delivered, +{coins} coins',
+        reputation: 'Reputation +{n}%',
+      },
+      achievements: {
+        title: 'Achievements',
+        hint: 'Each achievement permanently boosts every line by {n}%. Opening a branch never clears them.',
+        done: 'Done',
+        unlocked: 'Achievement unlocked: {name} — every line +{n}%',
+      },
+      ach: {
+        first_bake: { name: 'First batch', desc: 'Bake 1 loaf in total' },
+        baker_100: { name: 'Skilled baker', desc: 'Bake 100 loaves in total' },
+        baker_1000: { name: 'Bread workshop', desc: 'Bake 1,000 loaves in total' },
+        baker_10000: { name: 'Baking legend', desc: 'Bake 10,000 loaves in total' },
+        tap_100: { name: 'Quick hands', desc: 'Sell 100 fresh loaves by hand' },
+        tap_1000: { name: 'Iron hands', desc: 'Sell 1,000 fresh loaves by hand' },
+        coins_10k: { name: 'First fortune', desc: 'Sell 10,000 coins in total' },
+        coins_1m: { name: 'Million turnover', desc: 'Sell 1,000,000 coins in total' },
+        store_1: { name: 'Second shop', desc: 'Open your first branch' },
+        store_3: { name: 'Chain business', desc: 'Open 3 branches' },
+        orders_10: { name: 'Regulars', desc: 'Complete 10 customer orders' },
+        menu_full: { name: 'Full spread', desc: 'Unlock all 5 breads' },
+      },
+      listSep: ', ',
       upgrades: 'Production lines',
       level: 'Lv.{n}',
       upgrade: {
@@ -1497,7 +1543,7 @@ export default {
         mixer: { name: 'Mixer', effect: '+{n} dough per second' },
         oven: { name: 'Oven', effect: '+{n} loaves baked per second' },
         clerk: { name: 'Clerk', effect: '+{n} loaves sold per second' },
-        recipe: { name: 'Recipe', effect: '+{n} coins per loaf' },
+        recipe: { name: 'Recipe', effect: '+{n}% price per loaf' },
         fame: { name: 'Reputation', effect: '+{n}% to every line' },
       },
       prestige: {
@@ -1507,7 +1553,7 @@ export default {
         action: 'Open branch',
         bonus: 'Each branch permanently boosts every line by {n}%.',
         confirm:
-          'Opening a branch clears this run’s stock, coins and upgrades in exchange for a permanent bonus. The next target rises to {next}.',
+          'Opening a branch clears this run’s stock, coins and upgrades in exchange for a permanent bonus. Your menu, achievements and lifetime records stay. The next target rises to {next}.',
         done: 'New branch open — every line +{n}% forever',
       },
       offline: {
@@ -1532,17 +1578,27 @@ export default {
       },
       rules: {
         pagePlay: 'How to play',
+        pageMenu: 'Menu & orders',
         pageNum: 'Numbers',
-        play1: 'Tap “Sell a fresh loaf” for instant coins — that is your only income at the start.',
-        play2: 'The mixer makes dough, the oven bakes it into bread, the clerk sells it. Whichever step lags becomes the bottleneck.',
+        play1: 'Tap “Sell a fresh loaf” for instant coins. You start with white loaves only, so this is how you afford the first machine.',
+        play2:
+          'The mixer makes dough, the oven bakes it into the current bread, the clerk sells it. Whichever step lags becomes the bottleneck.',
         play3:
           'Coins buy upgrades, and each line gets pricier. The shop keeps running while the page is closed, so you collect a night shift on return.',
         play4:
-          'Once this run’s revenue is high enough you can open a branch: reset the run for a permanent bonus. The family board ranks current net worth.',
+          'Once this run’s revenue is high enough you can open a branch: reset stock, coins and upgrades for a permanent bonus. Menu, achievements and lifetime records stay.',
+        menu1:
+          'Five breads sit on the menu and unlock for a one-off coin cost. Only the selected bread is baked; switching away keeps the old stock.',
+        menu2:
+          'Higher tiers need more dough and bake longer, but sell for much more — the bottleneck moves between kneading, baking and selling.',
+        menu3:
+          'A customer drops by roughly every half minute asking for one bread in stock. Deliver within 45s for about 2.2× its price; missing it costs nothing.',
+        menu4:
+          'Completed orders build reputation, up to double order rewards. Customers pause while you are away, and your current order waits for you.',
         num1: 'Away under two minutes is paid in full; longer is settled at half efficiency, capped at 8 hours.',
-        num2: 'Net worth = coins + half-price dough + bread at its current price, so buying upgrades lowers your rank for a while.',
+        num2: 'Net worth = coins + half-price dough + every bread in stock at its own price, so upgrades and unlocks lower your rank for a while.',
         num3: 'Each branch target is 4× the last, and every open branch permanently boosts all lines.',
-        num4: 'Progress lives on this device only; the family board number lives in the cloud.',
+        num4: 'Achievements unlock from lifetime records and give +2% to every line forever. Progress lives on this device; the family board lives in the cloud.',
       },
     },
     petlink: {
