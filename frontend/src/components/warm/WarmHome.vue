@@ -474,6 +474,7 @@ const MODULE_META = {
   kitchen: { titleKey: 'warm.module.kitchen', path: '/kitchen', icon: '🍳' },
   anniversary: { titleKey: 'warm.module.anniversary', path: '/plan?tab=anniversary', icon: '🎂' },
   points: { titleKey: 'warm.module.points', path: '/points', icon: '🏆' },
+  achievement: { titleKey: 'warm.module.achievement', path: '/achievements', icon: '🥇' },
   task: { titleKey: 'warm.module.task', path: '/task', icon: '🎯' },
   reminder: { titleKey: 'warm.module.reminder', path: '/plan?tab=today', icon: '🔔' },
   plan: { titleKey: 'warm.module.plan', path: '/plan', icon: '📋' },

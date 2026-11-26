@@ -3,6 +3,7 @@ package com.ihomy.service;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ihomy.common.AchievementCatalog;
 import com.ihomy.common.BizException;
 import com.ihomy.common.GameConst;
 import com.ihomy.common.PointsRuleConst;
@@ -52,6 +53,7 @@ public class GameRoomService {
     private final PointsService pointsService;
     private final StringRedisTemplate redis;
     private final tools.jackson.databind.ObjectMapper objectMapper;
+    private final AchievementService achievementService;
 
     /** 创建房间:发起人即房主,并自动准备;房间容量固定 8 人,玩家席位按游戏能力分配 */
     public Map<String, Object> create(Long userId, Long familyId, String gameCode, String mode, Integer maxPlayers) {
@@ -753,6 +755,10 @@ public class GameRoomService {
                 row.setIsWinner(m.getUserId() != null && m.getUserId().equals(room.getWinnerId()) ? 1 : 0);
                 row.setCreatedAt(LocalDateTime.now());
                 roundMapper.insert(row);
+                // 成就留痕:房间局每个参战成员一条(胜者 WIN,其余 LOSE),与房间榜同口径
+                achievementService.recordGame(m.getUserId(), room.getFamilyId(), room.getGameCode(),
+                        AchievementCatalog.SOURCE_ROOM, Integer.valueOf(1).equals(row.getIsWinner())
+                                ? AchievementCatalog.RESULT_WIN : AchievementCatalog.RESULT_LOSE);
             }
         } catch (Exception e) {
             log.warn("房间排行榜记录失败 roomId={}", room.getId(), e);

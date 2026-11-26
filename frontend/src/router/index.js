@@ -30,6 +30,8 @@ const routes = [
   { path: '/music', name: 'Music', component: () => import('@/views/music/Music.vue'), meta: { public: true } },
   { path: '/member', name: 'Member', component: () => import('@/views/Member.vue'), meta: { requiresAuth: true } },
   { path: '/points', name: 'Points', component: () => import('@/views/points/Points.vue'), meta: { public: true } },
+  // 成就墙:游客看登录引导(页面内判登录态),与积分页同口径
+  { path: '/achievements', name: 'Achievements', component: () => import('@/views/achievements/Achievements.vue'), meta: { public: true } },
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue'), meta: { public: true } },
   { path: '/reminder', redirect: { path: '/plan', query: { tab: 'today' } } },
   { path: '/plan', name: 'Plan', component: () => import('@/views/schedule/Schedule.vue'), meta: { public: true } },

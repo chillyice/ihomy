@@ -26,7 +26,7 @@ class GameRoomServiceTest {
     private final GameRoomMemberMapper members = mock(GameRoomMemberMapper.class);
     private final GameRoomService service = new GameRoomService(rooms, members, mock(GameRoomRoundMapper.class),
             mock(SysUserMapper.class), mock(PointsService.class), mock(StringRedisTemplate.class, RETURNS_DEEP_STUBS),
-            mock(tools.jackson.databind.ObjectMapper.class));
+            mock(tools.jackson.databind.ObjectMapper.class), mock(AchievementService.class));
     private final GameRoom room = new GameRoom();
     private final GameRoomMember host = member(11L, GameConst.ROOM_ROLE_HOST);
     private final GameRoomMember guest = member(22L, GameConst.ROOM_ROLE_PLAYER);

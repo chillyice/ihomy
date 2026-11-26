@@ -23,6 +23,7 @@ export const COMMANDS = [
   { id: 'nav-music', group: 'nav', labelKey: 'command.nav.music', path: NAV_PATHS.music },
   { id: 'nav-cinema', group: 'nav', labelKey: 'command.nav.cinema', path: NAV_PATHS.cinema },
   { id: 'nav-tools', group: 'nav', labelKey: 'command.nav.tools', path: NAV_PATHS.tools },
+  { id: 'nav-achievements', group: 'nav', labelKey: 'command.nav.achievements', path: NAV_PATHS.achievement, hidden: authOnly },
   { id: 'nav-settings', group: 'nav', labelKey: 'command.nav.settings', path: NAV_PATHS.settings, hidden: authOnly },
   // 动作命令只放「无需一次性 query 语义」的:切主题、聚焦本页搜索。
   // 「新建提醒 / 记一笔」属于下一批 S3(?new=1),本批不加。

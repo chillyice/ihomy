@@ -8,6 +8,7 @@ import com.ihomy.entity.PointsOrder;
 import com.ihomy.entity.PointsProduct;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AchievementService;
 import com.ihomy.service.PointsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class PointsController {
 
     private final PointsService pointsService;
+    private final AchievementService achievementService;
     private final SecurityHelper securityHelper;
 
     private LoginUser current() {
@@ -46,7 +48,11 @@ public class PointsController {
     @PostMapping("/checkin")
     public Result<Map<String, Object>> checkin() {
         LoginUser user = current();
-        return Result.success(pointsService.checkin(user.getUserId(), user.getFamilyId()));
+        Map<String, Object> result = pointsService.checkin(user.getUserId(), user.getFamilyId());
+        // 签到是成就最直观的触发点:当场结算一次,把本次新解锁带给页面提示(已签过在上面已抛 ALREADY_CHECKIN)
+        Map<String, Object> overview = achievementService.evaluate(user.getUserId(), user.getFamilyId());
+        result.put("achievements", overview.get("newlyUnlocked"));
+        return Result.success(result);
     }
 
     @Operation(summary = "本家庭商品列表(附我的已兑次数)")

@@ -3,6 +3,7 @@ package com.ihomy.service;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ihomy.common.AchievementCatalog;
 import com.ihomy.common.BizException;
 import com.ihomy.common.GameConst;
 import com.ihomy.common.PointsRuleConst;
@@ -39,6 +40,18 @@ public class GameMatchService {
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
     private final StringRedisTemplate redis;
+    private final AchievementService achievementService;
+
+    /** 成就留痕:对战终局给一方记一条;winnerId 为空表示平局 */
+    private void recordMatchResult(GameMatch m, Long memberId, Long winnerId) {
+        if (memberId == null) {
+            return;
+        }
+        String result = winnerId == null ? AchievementCatalog.RESULT_FINISH
+                : (winnerId.equals(memberId) ? AchievementCatalog.RESULT_WIN : AchievementCatalog.RESULT_LOSE);
+        achievementService.recordGame(memberId, m.getFamilyId(), m.getGameCode(),
+                AchievementCatalog.SOURCE_MATCH, result);
+    }
 
     /** 创建对战(发起人即 host):同种子赛/实时对战统一由服务端生成随机种子 */
     public Map<String, Object> create(Long userId, Long familyId, String gameCode, String mode) {
@@ -147,8 +160,13 @@ public class GameMatchService {
                     .eq(GameMatch::getStatus, GameConst.MATCH_PLAYING)
                     .set(GameMatch::getStatus, GameConst.MATCH_FINISHED)
                     .set(GameMatch::getWinnerId, winner)) > 0;
-            if (finishedNow && winner != null) {
-                awarded = awardWinner(after, winner);
+            if (finishedNow) {
+                // 成就留痕:终局双方各一条(平局记 FINISH),与胜者积分解耦
+                recordMatchResult(after, after.getHostId(), winner);
+                recordMatchResult(after, after.getGuestId(), winner);
+                if (winner != null) {
+                    awarded = awardWinner(after, winner);
+                }
             }
         }
         Map<String, Object> r = new LinkedHashMap<>();

@@ -3428,3 +3428,57 @@ CREATE TABLE `game_bakery_idle_score` (
   KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';
 
+-- ------------------------------------------------------------
+-- 89. family_achievement 成就解锁记录(V15.17):
+--     成就目录内置在 common/AchievementCatalog(不入库),本表只落「已解锁」行;
+--     未解锁进度每次读取成就页时按指标实时聚合,不落进度列。
+--     UNIQUE(user_id, code) 兼作并发兜底;score 是解锁时的成就分快照,防目录调整影响家庭榜。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_achievement`;
+CREATE TABLE `family_achievement` (
+  `id`          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`     BIGINT      NOT NULL COMMENT '解锁用户ID',
+  `family_id`   BIGINT      NOT NULL COMMENT '解锁时所处家庭ID(展示用)',
+  `code`        VARCHAR(40) NOT NULL COMMENT '成就编码(见 AchievementCatalog)',
+  `score`       INT         NOT NULL DEFAULT 0 COMMENT '解锁时的成就分快照',
+  `unlocked_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '解锁时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_code` (`user_id`, `code`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_family` (`family_id`, `unlocked_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成就解锁记录';
+
+-- ------------------------------------------------------------
+-- 90. family_game_record 游戏完成记录(V15.17):
+--     成就指标的唯一游戏口径——单人小游戏 reward、一起玩房间结算、家庭对战终局各落一行;
+--     只记「完成/胜负」这一层,不存分数与过程(分数在 game_bakery_idle_score / room_round)。
+--     source: SOLO单人 / ROOM一起玩 / MATCH家庭对战;result: FINISH完成 / WIN胜 / LOSE负。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_game_record`;
+CREATE TABLE `family_game_record` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `family_id`  BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `game_code`  VARCHAR(20) NOT NULL COMMENT '游戏编码(petlink/sudoku/mahjong...)',
+  `source`     VARCHAR(10) NOT NULL DEFAULT 'SOLO' COMMENT '来源: SOLO单人/ROOM一起玩/MATCH家庭对战',
+  `result`     VARCHAR(10) NOT NULL DEFAULT 'FINISH' COMMENT '结果: FINISH完成/WIN胜/LOSE负',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_result` (`user_id`, `result`, `game_code`),
+  KEY `idx_family_created` (`family_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏完成记录(成就指标)';
+
+-- ------------------------------------------------------------
+-- 91. 成就相关种子:字典 + 首页模块入口
+--     首页/侧栏/移动端导航同源于 sys_home_module,新功能必须插一条;NAV_PATHS 需有同名映射。
+-- ------------------------------------------------------------
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('ACHIEVEMENT_CATEGORY', 'CHECKIN', '签到'),
+('ACHIEVEMENT_CATEGORY', 'POINTS',  '积分'),
+('ACHIEVEMENT_CATEGORY', 'CONTENT', '内容发布'),
+('ACHIEVEMENT_CATEGORY', 'GAME',    '游戏'),
+('ACHIEVEMENT_CATEGORY', 'TASK',    '任务');
+
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
+('achievement', '成就', 'icon-achievement', '/achievements', 'life', 'left', 13, 1);
+

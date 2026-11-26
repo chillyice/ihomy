@@ -339,6 +339,11 @@ export const pointsApi = {
   saveRules: (data) => request.put('/points/rules', data),
 }
 
+// 成就墙(读取即结算:返回目录/概览/家庭榜/本次新解锁)
+export const achievementsApi = {
+  overview: () => request.get('/achievements'),
+}
+
 // 任务悬赏(发布/领取/完成/确认结算)
 export const taskApi = {
   list: () => request.get('/task/list'),

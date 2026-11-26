@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.AchievementCatalog;
 import com.ihomy.common.GameCategory;
 import com.ihomy.common.GameConst;
 import com.ihomy.common.GameLinkUrl;
@@ -35,6 +36,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与模拟器 ROM(机种码见 GameSystem)、添加外部网页游戏(LINK)、
@@ -55,6 +57,15 @@ public class GameInfoService {
     private final ContentAccessService contentAccess;
     private final AudienceService audienceService;
     private final ViewerScopeResolver viewerScopeResolver;
+    private final AchievementService achievementService;
+
+    /**
+     * 以「获胜」为完成条件的单人小游戏:麻将系与四款牌局(其余为通关/达标型,记 FINISH)。
+     * 只用于成就留痕的胜负标记,不影响积分发放。
+     */
+    private static final Set<String> SOLO_WIN_FEATURES = Set.of(
+            PointsRuleConst.GAME_MAHJONG, PointsRuleConst.GAME_DOUDIZHU, PointsRuleConst.GAME_GUANDAN,
+            PointsRuleConst.GAME_BAOHUANG, PointsRuleConst.GAME_GOUJI, PointsRuleConst.GAME_MAHJONG3D);
 
     /** 列表:自家游戏按可见性过滤,并混入分享给我家的圈内游戏(禁 N+1) */
     public List<GameInfo> list(ViewerScope viewer) {
@@ -381,6 +392,9 @@ public class GameInfoService {
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();
+        // 成就留痕:先记再判积分规则,家庭关闭该游戏积分不影响成就;每日上限只约束积分,记录照落
+        achievementService.recordGame(userId, familyId, counterKey, AchievementCatalog.SOURCE_SOLO,
+                SOLO_WIN_FEATURES.contains(featureCode) ? AchievementCatalog.RESULT_WIN : AchievementCatalog.RESULT_FINISH);
         if (!pointsService.ruleEnabled(familyId, featureCode)) {
             map.put("awarded", 0);
             map.put("balance", pointsService.balance(userId));

@@ -186,12 +186,15 @@ const loadOrders = async () => {
   }
 }
 
-// 签到:成功后刷新概览与流水
+// 签到:成功后刷新概览与流水;后端当场结算成就,新解锁逐条提示
 const onCheckin = async () => {
   checkingIn.value = true
   try {
     const r = await pointsApi.checkin()
     ElMessage.success(t('points.checkinSuccess', { points: r.points, streak: r.streak }))
+    ;(r.achievements || []).forEach((a) =>
+      ElMessage.success(t('achievements.unlockedToast', { name: t(`achievements.catalog.${a.code}.name`) })),
+    )
     await loadStats()
   } finally {
     checkingIn.value = false

@@ -31,7 +31,7 @@ public enum BackupModule {
             "family_furniture", "family_item", "family_recipe", "family_vault_item",
             "family_announcement", "family_file", "family_checkin",
             "family_points_record", "family_points_product", "family_points_order", "family_points_rule",
-            "family_notification"
+            "family_notification", "family_achievement"
     )),
 
     /** 日程与计划:计划、提醒、纪念日 */
@@ -68,7 +68,7 @@ public enum BackupModule {
     /** 游戏:游戏库、房间与对局、小面包房家庭榜 */
     GAME(Set.of(
             "game_info", "family_game_match", "family_game_room", "family_game_room_member",
-            "family_game_room_round", "game_bakery_idle_score"
+            "family_game_room_round", "game_bakery_idle_score", "family_game_record"
     )),
 
     /** 统计报表 */

@@ -70,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`。**业务运行用 `ihomy` 账号**(仅 DML on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序 踩坑速查 §2.7。
-- **115 张表**:`sys_` 35、`report_` 5、`family_` 51、`content_` 22、`game_` 2(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
+- **117 张表**:`sys_` 35、`report_` 5、`family_` 53、`content_` 22、`game_` 2(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量 `common/DictConst.java`,前端 `utils/dict.js`;**禁止 0/1/2 判断**。
 - **可见范围四档** `PUBLIC > CIRCLE > FAMILY > PRIVATE`(顺序即界面顺序):`content_blog/diary/photo/video/wish/book`、`content_photo_album`、`game_info`、`family_item` 四档;`family_vault_item`、`sys_iot_device` 只两档(PRIVATE/FAMILY)。清单 需求 §6.4。
@@ -129,6 +129,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **健康数据**:本人独占——读接口传别人 `userId` 一律 404,要给别人看只能本人 `POST /health/share` 生成 7 天只读快照(读链接只回冻结 payload,不查业务表,到期/手动删即物理删);报表锚**最新数据日** `asOf`,卡片目录 `common/HealthReportCard` + `views/health/reportCards.js` 同口径,告警口径 `common/HealthAlerts`(参考区间 WARN + 个人基线 ±2σ INFO),卡片偏好 `health.report.v1`;敏感指标入快照要本人同意且本次勾选(需求 §4.20)。
 - **独立产品页**:`/kada`、`/bit-pouch`、`/wallpaper` 必须 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色接管 `html`);**回站内页要补初始化**,否则首页全空(§3.32/§3.8)。
 - **产品统计**:落 `report_product_stat` 日表(落地页打点 + `/public/product/download` 计数后 302),**禁止按 access 日志统计下载**;下载文件名必须纯文件名(`uploads/kada/` 平铺)。
+- **成就**:目录内置代码单源 `common/AchievementCatalog`(分类/指标/阈值/成就分,前端 `utils/achievements.js` 同口径,**不入库、不许家长自定义**);`family_achievement` **只落已解锁行**(`uk_user_code`),未解锁进度实时聚合,**惰性结算**=进成就页 + 签到后各一次,游戏/内容不挂判定;游戏留痕 `family_game_record`(`game_code` 统一去 `game_` 前缀,单人/房间/对战三来源);**成就分只换 6 档等级,不发可消费积分**;成就属用户全局、家庭榜只取当前家庭成员。需求 §4.5.11。
 - **运维管理**:11 个入口分「运行监控 / 日志与预警 / 服务用量 / 维护管理」四组,导航按面板保留筛选状态;资源总览 15 类可点开分页明细 `GET /ops/stats/records`(ops:view,复用 `OpsService` 资源目录,**用户/家庭记录返回 `name` 且名称在首列**);运维路由套暖居纸面,纯 OPS 用专用外壳。
 - **计划提醒单向托管**:时间只存 `family_reminder`(`plan_id`),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务;重复判定共用 `RepeatSchedule.dueToday`。
 - **模拟器与存档**:`game_info.type` 存机种码(扩展名唯一源 `common/GameSystem`,前端 `utils/games/emulatorSystems.js` 同口径);**新增机种=三处同步**(GameSystem、前端注册表、`copy-emulatorjs.mjs`)。存档唯一源 `uploads/games/{游戏名}/saves/u{成员id}/`(**按成员隔离**),ROM 加载前预置最新档,30s/切后台/离开回写;浏览器 IndexedDB 不持久化。**离开/重开 ROM 必须先 `pause()`+`toggleMainLoop(0)` 再拆 DOM**(踩坑速查 §3.52);**禁止存档另存 DB**。细节 需求 §4.13.2。

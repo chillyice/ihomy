@@ -57,6 +57,7 @@ const PAGE_TITLE_KEYS = {
   '/music': 'music.title',
   '/member': 'member.title',
   '/points': 'points.title',
+  '/achievements': 'achievements.title',
   '/task': 'task.title',
   '/reminder': 'reminder.title',
   '/plan': 'schedule.title',

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyAchievementMapper">
+
+    <!--
+      成就指标聚合:一次取回 15 个指标。
+      - 签到:总次数 / 最长连续(历史峰值,不因断签回落)
+      - 积分:累计获得(change>0 之和,单调不减),不用余额避免消费后成就倒退
+      - 内容:本人已发布且未进回收站的行;愿望表无 deleted 列
+      - 任务:本人领取且已完成
+      - 游戏:family_game_record 的完成/胜场/一起玩胜场/麻将系胜场
+      每个子查询都落在对应表的 user/author 索引上;家庭规模小,一次调用成本可忽略。
+    -->
+    <select id="loadMetrics" resultType="java.util.Map">
+        SELECT
+            (SELECT COUNT(*) FROM `family_checkin` WHERE `user_id` = #{userId}) AS `checkinTotal`,
+            (SELECT COALESCE(MAX(`streak`), 0) FROM `family_checkin` WHERE `user_id` = #{userId}) AS `checkinMaxStreak`,
+            (SELECT COALESCE(SUM(`change`), 0) FROM `family_points_record`
+                WHERE `user_id` = #{userId} AND `change` &gt; 0) AS `pointsEarned`,
+            (SELECT COUNT(*) FROM `content_blog`
+                WHERE `author_id` = #{userId} AND `deleted` = 0 AND `status` = 'PUBLISHED') AS `blogCount`,
+            (SELECT COUNT(*) FROM `content_diary` WHERE `author_id` = #{userId} AND `deleted` = 0) AS `diaryCount`,
+            (SELECT COUNT(*) FROM `content_photo` WHERE `author_id` = #{userId} AND `deleted` = 0) AS `photoCount`,
+            (SELECT COUNT(*) FROM `content_video` WHERE `uploader_id` = #{userId} AND `deleted` = 0) AS `videoCount`,
+            (SELECT COUNT(*) FROM `content_book`
+                WHERE `uploader_id` = #{userId} AND `deleted` = 0 AND `status` = 'PUBLISHED') AS `bookCount`,
+            (SELECT COUNT(*) FROM `content_wish` WHERE `requester_id` = #{userId}) AS `wishCount`,
+            (SELECT COUNT(*) FROM `family_task`
+                WHERE `assignee_id` = #{userId} AND `status` = 'DONE') AS `taskDoneCount`,
+            (SELECT COUNT(*) FROM `family_game_record` WHERE `user_id` = #{userId}) AS `gameTotal`,
+            (SELECT COUNT(DISTINCT `game_code`) FROM `family_game_record` WHERE `user_id` = #{userId}) AS `gameDistinct`,
+            (SELECT COUNT(*) FROM `family_game_record`
+                WHERE `user_id` = #{userId} AND `result` = 'WIN') AS `gameWin`,
+            (SELECT COUNT(*) FROM `family_game_record`
+                WHERE `user_id` = #{userId} AND `source` = 'ROOM' AND `result` = 'WIN') AS `gameRoomWin`,
+            (SELECT COUNT(*) FROM `family_game_record`
+                WHERE `user_id` = #{userId} AND `result` = 'WIN'
+                  AND `game_code` IN ('mahjong', 'mahjong3d')) AS `gameMahjongWin`
+    </select>
+
+    <!-- 解锁写入:UNIQUE(user_id, code) 冲突即忽略,返回 1 才代表本次新解锁 -->
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO `family_achievement` (`user_id`, `family_id`, `code`, `score`)
+        VALUES (#{userId}, #{familyId}, #{code}, #{score})
+    </insert>
+
+    <!--
+      家庭成就榜:以 (SELECT DISTINCT user_id) 为成员口径——同一用户在本家庭可能有多条角色,
+      直接 JOIN sys_user_role 会把成就数按角色条数翻倍;成就本身是 user 全局,不按解锁时家庭过滤。
+    -->
+    <select id="selectRanking" resultType="java.util.Map">
+        SELECT m.`user_id` AS `userId`,
+               COALESCE(NULLIF(u.`nickname`, ''), u.`username`) AS `name`,
+               u.`avatar` AS `avatar`,
+               COUNT(a.`id`) AS `unlocked`,
+               COALESCE(SUM(a.`score`), 0) AS `score`
+        FROM (SELECT DISTINCT `user_id` FROM `sys_user_role` WHERE `family_id` = #{familyId}) m
+        JOIN `sys_user` u ON u.`id` = m.`user_id` AND u.`deleted` = 0
+        LEFT JOIN `family_achievement` a ON a.`user_id` = m.`user_id`
+        GROUP BY m.`user_id`, u.`nickname`, u.`username`, u.`avatar`
+        ORDER BY `score` DESC, `unlocked` DESC, m.`user_id`
+        LIMIT #{limit}
+    </select>
+
+</mapper>

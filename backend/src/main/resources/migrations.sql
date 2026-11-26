@@ -4032,3 +4032,44 @@ CREATE TABLE IF NOT EXISTS `game_bakery_idle_score` (
   UNIQUE KEY `uk_family_user` (`family_id`, `user_id`),
   KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';
+
+-- 2026-11-26: 成就系统(V15.17):解锁记录 + 游戏完成记录 + 字典 + 导航入口
+CREATE TABLE IF NOT EXISTS `family_achievement` (
+  `id`          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`     BIGINT      NOT NULL COMMENT '解锁用户ID',
+  `family_id`   BIGINT      NOT NULL COMMENT '解锁时所处家庭ID(展示用)',
+  `code`        VARCHAR(40) NOT NULL COMMENT '成就编码(见 AchievementCatalog)',
+  `score`       INT         NOT NULL DEFAULT 0 COMMENT '解锁时的成就分快照',
+  `unlocked_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '解锁时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_code` (`user_id`, `code`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_family` (`family_id`, `unlocked_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成就解锁记录';
+
+CREATE TABLE IF NOT EXISTS `family_game_record` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `family_id`  BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `game_code`  VARCHAR(20) NOT NULL COMMENT '游戏编码(petlink/sudoku/mahjong...)',
+  `source`     VARCHAR(10) NOT NULL DEFAULT 'SOLO' COMMENT '来源: SOLO单人/ROOM一起玩/MATCH家庭对战',
+  `result`     VARCHAR(10) NOT NULL DEFAULT 'FINISH' COMMENT '结果: FINISH完成/WIN胜/LOSE负',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_result` (`user_id`, `result`, `game_code`),
+  KEY `idx_family_created` (`family_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏完成记录(成就指标)';
+
+-- dict 表有 uk_group_value,IGNORE 即幂等
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('ACHIEVEMENT_CATEGORY', 'CHECKIN', '签到'),
+('ACHIEVEMENT_CATEGORY', 'POINTS',  '积分'),
+('ACHIEVEMENT_CATEGORY', 'CONTENT', '内容发布'),
+('ACHIEVEMENT_CATEGORY', 'GAME',    '游戏'),
+('ACHIEVEMENT_CATEGORY', 'TASK',    '任务');
+
+-- sys_home_module 的 uk_code_family 对 NULL 不去重,用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'achievement', '成就', 'icon-achievement', '/achievements', 'life', 'left', 13, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'achievement' AND `family_id` IS NULL);
