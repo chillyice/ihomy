@@ -634,8 +634,8 @@ export function useSunLight(canReadEnvironment = () => true) {
 
   // 把太阳方位角/高度角写入 theme 模块,供晨暮切换扫光的方向计算
   watch(
-    sunScene,
-    (s) => {
+    [sunScene, () => themeStore.autoMode],
+    ([s]) => {
       if (s && s.azimuth != null) {
         setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
         themeStore.applyAuto(s.isNight, { sweep: !lightTestMode.value })

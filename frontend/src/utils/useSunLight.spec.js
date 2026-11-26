@@ -1,13 +1,14 @@
-import { createRenderer, nextTick } from 'vue'
+import { createRenderer, nextTick, reactive } from 'vue'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import request from '@/api/request'
 import { useSunLight } from './useSunLight'
 import { getSunScene } from './windowLight'
 import { CASEMENTS } from './windowSash'
 
-const { applyAuto } = vi.hoisted(() => ({ applyAuto: vi.fn() }))
+const applyAuto = vi.fn()
+const themeStore = reactive({ applyAuto, autoMode: true })
 vi.mock('@/api/request', () => ({ default: { get: vi.fn() } }))
-vi.mock('@/stores/theme', () => ({ useThemeStore: () => ({ applyAuto }) }))
+vi.mock('@/stores/theme', () => ({ useThemeStore: () => themeStore }))
 vi.mock('@/theme', () => ({ setSunContext: vi.fn() }))
 vi.mock('gsap', () => ({ gsap: { to: () => ({ kill() {} }) } }))
 
@@ -47,6 +48,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-25T04:02:00Z'))
   request.get.mockReset()
   applyAuto.mockClear()
+  themeStore.autoMode = true
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn() })
   vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: vi.fn() })
   vi.stubGlobal('window', new EventTarget())
@@ -57,6 +59,16 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()
+})
+
+it('applies the current daylight immediately when auto mode is selected again', async () => {
+  themeStore.autoMode = false
+  await mountLight(sunDay('2026-11-25'))
+  applyAuto.mockClear()
+  themeStore.autoMode = true
+  await nextTick()
+  expect(applyAuto).toHaveBeenCalledWith(false, { sweep: true })
+  expect(request.get).toHaveBeenCalledTimes(1)
 })
 
 it.each([null, 8])('uses the first observation’s time zone when opened early, honoring a manual choice of %s', async (manualSlot) => {

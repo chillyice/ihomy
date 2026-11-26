@@ -198,6 +198,7 @@ export function applyTheme(state, { persist = true, sweep = true } = {}) {
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)
+  root.classList.toggle('theme-auto-mode', t.autoMode)
   root.classList.toggle('dark', nextDusk)
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', THEMES[t.theme].meta[t.mode])

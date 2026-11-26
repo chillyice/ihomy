@@ -1,12 +1,5 @@
 <template>
-  <button
-    type="button"
-    class="warm-mode-toggle"
-    role="switch"
-    :aria-label="$t('theme.duskMode')"
-    :aria-checked="themeStore.isDusk"
-    @click="themeStore.toggleMode()"
-  >
+  <button type="button" class="warm-mode-toggle" :aria-label="label" :title="label" @click="cycleMode">
     <span class="warm-mode-face warm-mode-dawn" aria-hidden="true">
       <el-icon><Sunny /></el-icon>
       <span class="warm-mode-label">{{ $t('theme.dawn') }}</span>
@@ -15,14 +8,27 @@
       <el-icon><Moon /></el-icon>
       <span class="warm-mode-label">{{ $t('theme.dusk') }}</span>
     </span>
+    <span class="warm-mode-face warm-mode-auto" aria-hidden="true">
+      <el-icon><Refresh /></el-icon>
+      <span class="warm-mode-label">{{ $t('theme.auto') }}</span>
+    </span>
   </button>
 </template>
 
 <script setup>
-import { Moon, Sunny } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { Moon, Refresh, Sunny } from '@element-plus/icons-vue'
 import { useThemeStore } from '@/stores/theme'
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+const label = computed(() => t('theme.cycleMode', { mode: t(themeStore.autoMode ? 'theme.auto' : `theme.${themeStore.mode}`) }))
+function cycleMode() {
+  if (themeStore.autoMode) themeStore.setMode('dawn')
+  else if (themeStore.isDusk) themeStore.setAutoMode(true)
+  else themeStore.setMode('dusk')
+}
 </script>
 
 <style>
@@ -83,6 +89,15 @@ const themeStore = useThemeStore()
   transform: translateY(3px) rotate(var(--mode-turn)) scale(0.72);
   transition: transform 300ms var(--ease-soft);
 }
+.warm-mode-auto {
+  display: none;
+  --mode-paper: var(--color-card);
+  --mode-rim: var(--color-border);
+  --mode-ink: var(--color-text);
+}
+html.theme-auto-mode .warm-mode-auto {
+  display: flex;
+}
 .warm-mode-label {
   opacity: 0;
   transform: translateY(4px);
@@ -91,15 +106,15 @@ const themeStore = useThemeStore()
     transform 240ms var(--ease-soft);
 }
 /* 根节点的晨暮状态也驱动扫光幕布里的按钮副本，切换时两处同时翻到正面。 */
-html:not(.dark) .warm-mode-dawn,
-html.dark .warm-mode-dusk {
+html:not(.theme-auto-mode, .dark) .warm-mode-dawn,
+html.dark:not(.theme-auto-mode) .warm-mode-dusk,
+html.theme-auto-mode .warm-mode-auto {
   z-index: 1;
   transform: none;
 }
-html:not(.dark) .warm-mode-dawn .el-icon,
-html.dark .warm-mode-dusk .el-icon,
-html:not(.dark) .warm-mode-dawn .warm-mode-label,
-html.dark .warm-mode-dusk .warm-mode-label {
+html:not(.theme-auto-mode, .dark) .warm-mode-dawn :is(.el-icon, .warm-mode-label),
+html.dark:not(.theme-auto-mode) .warm-mode-dusk :is(.el-icon, .warm-mode-label),
+html.theme-auto-mode .warm-mode-auto :is(.el-icon, .warm-mode-label) {
   transform: none;
   opacity: 1;
 }

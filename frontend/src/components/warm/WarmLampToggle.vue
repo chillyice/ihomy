@@ -2,30 +2,29 @@
   <button
     type="button"
     class="warm-lamp"
-    :class="lit ? 'is-on' : 'is-off'"
-    role="switch"
-    :aria-checked="lit"
-    :aria-label="$t('theme.lamp')"
-    :title="lit ? $t('theme.lampOff') : $t('theme.lampOn')"
-    @click="toggle"
+    :class="{ 'is-on': lit, 'is-auto': lampMode === 'auto' }"
+    :aria-label="label"
+    :title="label"
+    @click="toggleLamp"
   >
-    <span class="rocker" aria-hidden="true"><i></i><b></b></span>
+    <span class="rocker" aria-hidden="true">
+      <i></i>
+      <span v-if="lampMode === 'auto'" class="auto-label">{{ $t('sidebar.lampAuto') }}</span>
+      <b v-else></b>
+    </span>
   </button>
 </template>
 
 <script setup>
 import { computed, inject } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
-const sunLight = inject(SUN_LIGHT_KEY, null)
-
-// 判定口径取「灯实际有多亮」而不是 lampMode:auto 模式白天本就该是灭的,按模式摆姿态会自相矛盾
-const lit = computed(() => Number(sunLight?.lampStrength?.value ?? 0) > 0.05)
-
-const toggle = () => {
-  if (!sunLight?.lampMode) return
-  sunLight.lampMode.value = lit.value ? 'off' : 'on'
-}
+const { lampMode, lampStrength, toggleLamp } = inject(SUN_LIGHT_KEY)
+const { t } = useI18n()
+const modeLabels = { auto: 'sidebar.lampAuto', on: 'sidebar.lampOn', off: 'sidebar.lampOff' }
+const label = computed(() => t('theme.cycleLamp', { mode: t(modeLabels[lampMode.value]) }))
+const lit = computed(() => lampStrength.value > 0.05)
 </script>
 
 <style scoped>
@@ -76,6 +75,17 @@ const toggle = () => {
   background: #d78a29;
   box-shadow: 0 0 5px #efb75c;
   opacity: 1;
+}
+.is-auto .rocker {
+  width: 30px;
+  box-shadow:
+    inset 0 -1px 1px rgb(65 48 30 / 18%),
+    0 1px 3px rgb(0 0 0 / 22%);
+}
+.auto-label {
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
 }
 .warm-lamp:focus-visible {
   outline: 2px solid var(--color-brand);
