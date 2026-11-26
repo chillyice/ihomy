@@ -3502,6 +3502,7 @@ export default {
       weather: '天气',
       client: '手机客户端',
       appearance: '外观与显示',
+      features: '功能开关',
       display: '显示模式',
       backup: '数据导出',
       health: '健康数据',
@@ -8172,6 +8173,38 @@ export default {
     resetPin: '重设退出密码',
     setPinFor: '为 {name} 设置 4–8 位数字退出密码,只有输对才能退出未成年模式。',
     note: '退出密码只挡在这台设备上,不改变账号权限。',
+  },
+  // 功能开关:每个功能三态(启用/禁用/仅成年人),按账号存本机
+  featureGates: {
+    title: '功能开关',
+    lead: '逐个决定这台设备上显示哪些功能,记录跟着账号保存在本机。',
+    targetUser: '为谁设置',
+    targetHint: '家长可以为家庭里任一成员设置,普通成员只能给自己设置。',
+    state: {
+      on: '启用',
+      off: '禁用',
+      adult: '仅成年人',
+    },
+    stateDesc: {
+      on: '导航、首页与直达链接都正常显示。',
+      off: '这台设备上收起入口,内容与账号权限都不受影响。',
+      adult: '只在未成年模式下隐藏,默认与老人模式正常显示。',
+    },
+    group: {
+      content: '内容',
+      life: '生活',
+      family: '家庭',
+      system: '系统',
+    },
+    gamesLabel: '单个小游戏',
+    gamesTuned: '已调整 {n} 款',
+    gamesExpand: '展开设置',
+    gamesCollapse: '收起',
+    gamesHint: '「游戏」总开关关掉时,单个小游戏跟着一起隐藏;想分开控制就让总开关保持启用。',
+    reset: '全部恢复默认',
+    resetDone: '已恢复默认',
+    tunedCount: '已调整 {n} 项',
+    note: '开关只改这台设备上的入口,不改变账号权限,也不会删除任何内容。',
   },
   // 老人模式首页:大字入口 + 今日安排
   elderHome: {

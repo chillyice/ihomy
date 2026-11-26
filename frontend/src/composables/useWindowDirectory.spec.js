@@ -6,7 +6,7 @@ const shared = vi.hoisted(() => ({ user: null, app: null, all: vi.fn(), save: vi
 vi.mock('@/api', () => ({ userPrefApi: { all: shared.all, save: shared.save } }))
 vi.mock('@/stores/user', () => ({ useUserStore: () => shared.user }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => shared.app }))
-vi.mock('./useDisplayMode', () => ({ useDisplayMode: () => ({ isChild: ref(false) }) }))
+vi.mock('./useDisplayMode', () => ({ useDisplayMode: () => ({ isChild: ref(false) }), getDisplayMode: () => 'normal' }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ resolve: () => ({ meta: {} }) }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (k) => k, te: () => false, locale: ref('zh-CN') }) }))
 

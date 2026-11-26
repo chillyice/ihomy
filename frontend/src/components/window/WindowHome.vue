@@ -105,6 +105,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { dayEventPath, homeFeedModule, remainingDayEvents, storyPath, storyImage } from '@/utils/windowHome'
 import { isChildAllowedPath } from '@/utils/displayMode'
 import { NAV_PATHS } from '@/utils/navModules'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import { isNativeApp } from '@/utils/platform'
 const app = useAppStore()
 const user = useUserStore()
@@ -142,7 +143,9 @@ onDeactivated(() => {
 })
 const moduleCodes = computed(() => new Set(app.modules.filter((m) => m.enabled !== 0).map((m) => m.code)))
 const enabled = (code) =>
-  (code === 'weather' || moduleCodes.value.has(code)) && (!isChild.value || isChildAllowedPath(NAV_PATHS[code] || '/weather'))
+  (code === 'weather' || moduleCodes.value.has(code)) &&
+  isFeatureVisibleNow(code) &&
+  (!isChild.value || isChildAllowedPath(NAV_PATHS[code] || '/weather'))
 const ownFamily = computed(
   () => !!user.isLoggedIn && !route.query.hid && !route.query.home_id && !isChild.value && !user.mustChangePassword,
 )

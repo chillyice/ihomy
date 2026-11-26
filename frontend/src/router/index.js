@@ -2,6 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getDisplayMode } from '@/composables/useDisplayMode'
+import { isPathHiddenNow } from '@/composables/useFeatureGates'
 import { isChildAllowedPath } from '@/utils/displayMode'
 
 const routes = [
@@ -320,6 +321,11 @@ router.beforeEach((to) => {
   // 儿童模式:只放行内容消费白名单(首页/相册/图书馆…),设置、记账、保险箱等一律回首页。
   // 这是本机 UX 门槛,不改变账号权限;家长点右下角入口输密码即可退出。
   if (getDisplayMode() === 'child' && !isChildAllowedPath(to.fullPath)) {
+    return { name: 'Home' }
+  }
+  // 功能开关:被关掉(或「仅成年人」而当前是未成年模式)的功能,直达链接也回首页。
+  // 与导航过滤同一口径(utils/featureGates.js),不含设置页与运维页——否则会把自己锁在外面。
+  if (isPathHiddenNow(to.fullPath)) {
     return { name: 'Home' }
   }
 })

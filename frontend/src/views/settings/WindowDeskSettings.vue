@@ -36,6 +36,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useDisplayMode } from '@/composables/useDisplayMode'
+import { isPathHiddenNow } from '@/composables/useFeatureGates'
 import { useAppStore } from '@/stores/app'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { DESK_DEFAULT_PATHS, DESK_DESTINATIONS, deskPathAllowed } from '@/utils/deskObjects'
@@ -44,7 +45,7 @@ defineProps({ showObjects: Boolean, embedded: Boolean })
 const desk = useWindowDeskStore()
 const app = useAppStore()
 const { isChild } = useDisplayMode()
-const available = computed(() => DESK_DESTINATIONS.filter(({ path }) => deskPathAllowed(path, app.modules, isChild.value)))
+const available = computed(() => DESK_DESTINATIONS.filter(({ path }) => deskPathAllowed(path, app.modules, isChild.value, isPathHiddenNow)))
 const kind = ref('cup')
 const target = computed(() => {
   const paths = available.value.map((entry) => entry.path)

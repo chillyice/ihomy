@@ -266,7 +266,8 @@ import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { DESKTOP_TYPE, desktopAccept, isDesktopPackage, isDesktopType } from '@/utils/games/desktopGames'
-import { EMBEDDED_GAMES } from '@/utils/games/embeddedGames'
+import { GAME_ENTRIES, gameFeatureId } from '@/utils/games/gameEntries'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 import { lastRoomGame, rememberRoomGame } from '@/utils/gameRoom'
 
@@ -308,165 +309,9 @@ watch(activeCategory, (v) => {
 const activeSeries = ref('')
 const autoSeriesLoading = ref(false)
 
-const embeddedEntries = EMBEDDED_GAMES.map((g) => ({
-  key: g.slug,
-  titleKey: g.titleKey,
-  descKey: g.descKey,
-  path: `/games/embed/${g.slug}`,
-  category: g.category,
-}))
-
-/** 固定入口的 key 同时对应暖居图标文件名。 */
-const builtinGames = [
-  {
-    key: 'garden',
-    titleKey: 'games.garden.title',
-    descKey: 'games.garden.desc',
-    path: '/tools/plant',
-    category: 'SIMULATION',
-  },
-  {
-    key: 'bakery',
-    titleKey: 'games.bakery.title',
-    descKey: 'games.bakery.desc',
-    path: '/games/bakery',
-    category: 'SIMULATION',
-  },
-  {
-    key: 'petlink',
-    titleKey: 'games.petlink.title',
-    descKey: 'games.petlink.desc',
-    path: '/games/petlink',
-    category: 'PUZZLE',
-  },
-  {
-    key: 'sudoku',
-    titleKey: 'games.sudoku.title',
-    descKey: 'games.sudoku.desc',
-    path: '/games/sudoku',
-    category: 'PUZZLE',
-  },
-  {
-    key: '2048',
-    titleKey: 'games.g2048.title',
-    descKey: 'games.g2048.desc',
-    path: '/games/2048',
-    category: 'PUZZLE',
-  },
-  {
-    key: 'minesweeper',
-    titleKey: 'games.minesweeper.title',
-    descKey: 'games.minesweeper.desc',
-    path: '/games/minesweeper',
-    category: 'PUZZLE',
-  },
-  {
-    key: 'solitaire',
-    titleKey: 'games.solitaire.title',
-    descKey: 'games.solitaire.desc',
-    path: '/games/cards/klondike',
-    category: 'CARD',
-  },
-  {
-    key: 'spider',
-    titleKey: 'games.spider.title',
-    descKey: 'games.spider.desc',
-    path: '/games/cards/spider',
-    category: 'CARD',
-  },
-  {
-    key: 'freecell',
-    titleKey: 'games.freecell.title',
-    descKey: 'games.freecell.desc',
-    path: '/games/cards/freecell',
-    category: 'CARD',
-  },
-  {
-    key: 'tetris',
-    titleKey: 'games.tetris.title',
-    descKey: 'games.tetris.desc',
-    path: '/games/tetris',
-    category: 'ARCADE',
-  },
-  {
-    key: 'snake',
-    titleKey: 'games.snake.title',
-    descKey: 'games.snake.desc',
-    path: '/games/snake',
-    category: 'ARCADE',
-  },
-  {
-    key: 'chinese-checkers',
-    titleKey: 'games.chineseCheckers.title',
-    descKey: 'games.chineseCheckers.desc',
-    path: '/games/chinese-checkers',
-    category: 'BOARD',
-  },
-  {
-    key: 'gomoku',
-    titleKey: 'games.gomoku.title',
-    descKey: 'games.gomoku.desc',
-    path: '/games/gomoku',
-    category: 'BOARD',
-  },
-  {
-    key: 'eight_ball',
-    titleKey: 'games.eightBall.title',
-    descKey: 'games.eightBall.desc',
-    path: '/games/eight-ball',
-    category: 'CASUAL',
-  },
-  {
-    key: 'mahjong',
-    titleKey: 'games.mahjong.title',
-    descKey: 'games.mahjong.desc',
-    path: '/games/mahjong',
-    category: 'CASUAL',
-  },
-  {
-    key: 'ludo',
-    titleKey: 'games.ludo.title',
-    descKey: 'games.ludo.desc',
-    path: '/games/ludo',
-    category: 'CASUAL',
-  },
-  {
-    key: 'doudizhu',
-    titleKey: 'games.doudizhu.title',
-    descKey: 'games.doudizhu.desc',
-    path: '/games/doudizhu',
-    category: 'CARD',
-  },
-  {
-    key: 'mahjong3d',
-    titleKey: 'games.mahjong3d.title',
-    descKey: 'games.mahjong3d.desc',
-    path: '/games/mahjong3d',
-    category: 'CASUAL',
-  },
-  {
-    key: 'guandan',
-    titleKey: 'games.guandan.title',
-    descKey: 'games.guandan.desc',
-    path: '/games/guandan',
-    category: 'CARD',
-  },
-  {
-    key: 'baohuang',
-    titleKey: 'games.baohuang.title',
-    descKey: 'games.baohuang.desc',
-    path: '/games/baohuang',
-    category: 'CARD',
-  },
-  {
-    key: 'gouji',
-    titleKey: 'games.gouji.title',
-    descKey: 'games.gouji.desc',
-    path: '/games/gouji',
-    category: 'CARD',
-  },
-  ...embeddedEntries,
-]
+// 固定入口与站内开源小游戏清单在 utils/games/gameEntries.js(功能开关与本页共用)。
+// 这里只按当前账号的功能开关过滤:父级「游戏」或单个小游戏被关掉,卡片一并消失。
+const builtinGames = computed(() => GAME_ENTRIES.filter((g) => isFeatureVisibleNow(gameFeatureId(g.key))))
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))
 
@@ -475,7 +320,7 @@ const unsortedCount = computed(() => games.value.filter((g) => !normalizeGameSer
 
 /** 分类计数跟随当前系列筛选(系列为空时含固定入口),避免出现「计数有、点进去空白」的组合 */
 const categoryPool = computed(() =>
-  activeSeries.value ? games.value.filter((g) => inGameSeries(g, activeSeries.value)) : [...builtinGames, ...games.value],
+  activeSeries.value ? games.value.filter((g) => inGameSeries(g, activeSeries.value)) : [...builtinGames.value, ...games.value],
 )
 const categoryCounts = computed(() => countGameCategories(categoryPool.value))
 
@@ -493,7 +338,9 @@ const categoryTiles = computed(() =>
 )
 
 /** 选了系列时只看系列内的导入游戏(固定入口不属于任何系列) */
-const visibleBuiltins = computed(() => (activeSeries.value ? [] : builtinGames.filter((b) => inGameCategory(b, activeCategory.value))))
+const visibleBuiltins = computed(() =>
+  activeSeries.value ? [] : builtinGames.value.filter((b) => inGameCategory(b, activeCategory.value)),
+)
 const visibleGames = computed(() =>
   games.value.filter((g) => inGameCategory(g, activeCategory.value) && inGameSeries(g, activeSeries.value)),
 )

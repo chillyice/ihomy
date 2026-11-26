@@ -11,6 +11,7 @@ import { buildDoingPath, useLastDoing, visibleDoing } from '@/utils/lastDoing'
 import { materialSeed } from '@/utils/warmMaterials'
 import { NEED_FILE_ORIGIN, SERVER_ORIGIN } from '@/utils/assetUrl'
 import { useDisplayMode } from './useDisplayMode'
+import { isPathHiddenNow } from './useFeatureGates'
 
 const REFRESH_MS = 3 * 60 * 1000
 
@@ -90,7 +91,8 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0, resu
       ? [info.id, info.familyId, app.generation].join('/')
       : ''
   })
-  const scopeFor = (path) => computed(() => (deskPathAllowed(path, app.modules, isChild.value) ? ownFamily.value : ''))
+  const allowedPath = (path) => deskPathAllowed(path, app.modules, isChild.value, isPathHiddenNow)
+  const scopeFor = (path) => computed(() => (allowedPath(path) ? ownFamily.value : ''))
   const agenda = useSummary(scopeFor('/plan'), awake, now, () => activityRevision.agenda, planApi.today)
   const unread = useSummary(scopeFor('/notification'), awake, now, () => activityRevision.notifications, notificationApi.unreadCount)
 
@@ -100,7 +102,7 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0, resu
   watch(
     [awake, now, () => app.generation, () => activityRevision.photos, () => app.loading, () => app.familyLoaded, () => app.photosUpdated],
     ([active, clock, generation, revision], previous, onCleanup) => {
-      if (!active || !app.familyLoaded || app.loading || !deskPathAllowed('/album', app.modules, isChild.value)) return
+      if (!active || !app.familyLoaded || app.loading || !allowedPath('/album')) return
       if (app.photosRevision === revision && clock.getTime() - app.photosUpdated < 30 * 60_000) return
       const key = generation + '/' + revision
       if (photoAttempt.key === key && clock.getTime() - photoAttempt.time < REFRESH_MS) return
@@ -116,9 +118,7 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0, resu
   const candidates = computed(() => {
     if (!app.familyLoaded || user.isPureOps || user.mustChangePassword) return []
     const entry =
-      toValue(resume) &&
-      ownFamily.value &&
-      visibleDoing(recent.value, now.value.getTime()).find((row) => deskPathAllowed(buildDoingPath(row), app.modules, isChild.value))
+      toValue(resume) && ownFamily.value && visibleDoing(recent.value, now.value.getTime()).find((row) => allowedPath(buildDoingPath(row)))
     const bookmark = entry
       ? [
           {
@@ -140,6 +140,7 @@ export function useDeskObjects(enabled, destinations = {}, arrangement = 0, resu
       familyId: app.family?.id,
       modules: app.modules,
       child: isChild.value,
+      hidden: isPathHiddenNow,
       agenda: ownFamily.value ? agenda.value : null,
       notices: ownFamily.value ? Number(unread.value) : 0,
       messages: ownFamily.value ? chat.totalUnread : 0,

@@ -3696,6 +3696,7 @@ export default {
       weather: 'Weather',
       client: 'Phone app',
       appearance: 'Look & display',
+      features: 'Feature switches',
       display: 'Display mode',
       backup: 'Data export',
       health: 'Health data',
@@ -8305,6 +8306,38 @@ export default {
     resetPin: 'Reset exit password',
     setPinFor: 'Set a 4–8 digit exit password for {name}. It is required to leave minor mode.',
     note: 'The exit password only guards this device; it does not change account permissions.',
+  },
+  // Feature switches: each feature has three states (on / off / adults only), stored per account on this device
+  featureGates: {
+    title: 'Feature switches',
+    lead: 'Choose which features this device shows. The choices follow the account and stay on this device.',
+    targetUser: 'Apply to',
+    targetHint: 'A parent can set this for any family member; everyone else can only set it for themselves.',
+    state: {
+      on: 'On',
+      off: 'Off',
+      adult: 'Adults only',
+    },
+    stateDesc: {
+      on: 'Shown in the navigation, on the home page and for direct links.',
+      off: 'Hidden on this device; content and account permissions are untouched.',
+      adult: 'Hidden in minor mode only; still shown in default and elder mode.',
+    },
+    group: {
+      content: 'Content',
+      life: 'Life',
+      family: 'Family',
+      system: 'System',
+    },
+    gamesLabel: 'Individual games',
+    gamesTuned: '{n} adjusted',
+    gamesExpand: 'Expand',
+    gamesCollapse: 'Collapse',
+    gamesHint: 'Turning the Games switch off hides every game as well. Keep it on if you want to control games one by one.',
+    reset: 'Reset all',
+    resetDone: 'All features are back to default',
+    tunedCount: '{n} adjusted',
+    note: 'Switches only change entries on this device; account permissions are untouched and no content is deleted.',
   },
   // Elder-mode home: large entries + today's plans
   elderHome: {

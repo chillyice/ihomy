@@ -424,6 +424,7 @@ import { showCoverBanner } from '@/utils/shareLanding'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
 import { recentMonthRows } from '@/utils/bookTrend'
 import { MODULE_DEFAULT_WIDGET, WIDGETS as WIDGET_DEFS, WIDGET_MODULE, siblingsOf, widgetById } from './widgets/registry'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import WeatherWindow from './widgets/WeatherWindow.vue'
 
 const router = useRouter()
@@ -746,6 +747,12 @@ const dropPreview = ref(null) // { code, label, icon, index }
 // 愿望单不在此列——它已对游客开放(见 onMounted 的 wishApi.list 与后端 /wish/list 游客分支)。
 // 先把落点应用到完整布局，再过滤当前成员不可见的卡片。
 const GUEST_HIDDEN_WIDGETS = ['finance', 'item', 'task', 'reminder']
+// 功能开关:所属功能被关掉(或「仅成年人」而当前未成年)的卡片不再渲染。
+// 布局照旧留在缓存里,把开关改回「启用」就原样回来。
+const gatedOut = (w) => {
+  const code = w.kind === 'link' ? w.code : w.module
+  return !!code && !isFeatureVisibleNow(code)
+}
 const displayWidgets = computed(() => {
   const rp = reorderPreview.value
   const dp = dropPreview.value
@@ -771,7 +778,9 @@ const displayWidgets = computed(() => {
     })
   }
   const guest = !userStore.isLoggedIn
-  return list.filter((w) => (userStore.canReadBook || baseOf(w) !== 'finance') && !(guest && GUEST_HIDDEN_WIDGETS.includes(baseOf(w))))
+  return list.filter(
+    (w) => (userStore.canReadBook || baseOf(w) !== 'finance') && !(guest && GUEST_HIDDEN_WIDGETS.includes(baseOf(w))) && !gatedOut(w),
+  )
 })
 const previewMeta = (code) => {
   const def = widgetById(MODULE_DEFAULT_WIDGET[code])

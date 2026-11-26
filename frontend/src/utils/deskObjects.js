@@ -23,7 +23,8 @@ export const DESK_DEFAULT_PATHS = {
   recipe: '/kitchen',
 }
 
-export function deskPathAllowed(path, modules, child) {
+export function deskPathAllowed(path, modules, child, hidden) {
+  if (hidden && hidden(path)) return false
   if (child && !isChildAllowedPath(path)) return false
   const code = path.split(/[/?]/)[1]
   return code === 'weather' || code === 'notification' || modules.some((m) => m.code === code && m.enabled !== 0)
@@ -113,12 +114,13 @@ export function buildDeskObjects({
   photos = [],
   modules = [],
   child = false,
+  hidden,
   agenda,
   notices = 0,
   messages = 0,
   destinations = {},
 }) {
-  const allowed = (path) => deskPathAllowed(path, modules, child)
+  const allowed = (path) => deskPathAllowed(path, modules, child, hidden)
   const hour = now.getHours()
   const season = ['winter', 'spring', 'summer', 'autumn'][Math.floor(((now.getMonth() + 1) % 12) / 3)]
   const art = {

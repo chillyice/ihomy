@@ -14,9 +14,9 @@ const aliases = {
   anniversaryView: ['纪念日', '生日', 'anniversary', 'birthdays'],
 }
 
-export function windowEntries(modules, { hasOps, child, loggedIn, allows, label }) {
+export function windowEntries(modules, { hasOps, child, loggedIn, allows, label, isVisible }) {
   const entries = []
-  for (const original of buildNavItems(modules, { hasOps, child })) {
+  for (const original of buildNavItems(modules, { hasOps, child, isVisible })) {
     if (!allows(original)) continue
     const item = { ...original, label: label(original.code, original.title) }
     if (item.code === 'item') item.path = '/item?focus=search'

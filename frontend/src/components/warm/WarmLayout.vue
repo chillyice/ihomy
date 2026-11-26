@@ -174,6 +174,7 @@ import { nextScrolled } from '@/utils/warmToolbar'
 import { parentPathOf } from '@/utils/navParent'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 import { useDisplayMode } from '@/composables/useDisplayMode'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import { useDevice } from '@/composables/useDevice'
 import { lastDoingMode } from '@/utils/lastDoing'
 import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
@@ -248,6 +249,7 @@ const navGroups = computed(() => {
   const items = buildNavItems(appStore.modules, {
     hasOps: userStore.isOps || userStore.isOwner,
     child: isChild.value,
+    isVisible: isFeatureVisibleNow,
   }).map((m) => {
     const draggable = m.code !== 'settings' && m.code !== 'ops'
     return { ...m, draggable, added: draggable ? addedCodes.value.has(m.code) : false }

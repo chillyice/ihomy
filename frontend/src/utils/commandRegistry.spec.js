@@ -68,6 +68,15 @@ describe('visibleCommands(守卫)', () => {
     expect(ids(visibleCommands({ theme: 'guangchen' }))).not.toContain('action-theme-guangchen')
   })
 
+  it('功能开关关掉的页面,命令面板里也不再给跳转', () => {
+    const hidden = new Set(['/cinema'])
+    const list = ids(visibleCommands({ isPathHidden: (p) => hidden.has(p) }))
+    expect(list).not.toContain('nav-cinema')
+    expect(list).toContain('nav-album')
+    // 没传上下文时照常全部给
+    expect(ids(visibleCommands({}))).toContain('nav-cinema')
+  })
+
   it('命令数据本身不重复 id,且跳转路径指向站内', () => {
     expect(new Set(ids(COMMANDS)).size).toBe(COMMANDS.length)
     for (const c of COMMANDS) {

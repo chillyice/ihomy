@@ -111,6 +111,7 @@ import { useUserStore } from '@/stores/user'
 import { renderMarkdown } from '@/utils/markdown'
 import { assistantPath } from '@/utils/assistantNavigation'
 import { getDisplayMode } from '@/composables/useDisplayMode'
+import { isPathHiddenNow } from '@/composables/useFeatureGates'
 import AssistantActionCard from './AssistantActionCard.vue'
 
 const assistant = useAssistantStore()
@@ -137,7 +138,7 @@ const listKeys = [
   'accounts',
   'todayRecommend',
 ]
-const safePath = (path) => assistantPath(path, getDisplayMode() === 'child')
+const safePath = (path) => assistantPath(path, getDisplayMode() === 'child', isPathHiddenNow)
 const toolLabel = (name) => {
   const key = 'chat.assistant.tools.' + name
   return t(key) === key ? name : t(key)

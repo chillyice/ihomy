@@ -81,6 +81,7 @@ import ThemeSettings from './settings/ThemeSettings.vue'
 import WallpaperSettings from './settings/WallpaperSettings.vue'
 import WarmBackgroundSettings from './settings/WarmBackgroundSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
+import FeatureSettings from './settings/FeatureSettings.vue'
 import MorningSettings from './settings/MorningSettings.vue'
 import ScreensaverSettings from './settings/ScreensaverSettings.vue'
 import AppSettings from './settings/AppSettings.vue'
@@ -107,6 +108,7 @@ const PANELS = [
   { id: 'media', labelKey: 'settings.cat.media', component: MediaSettings },
   { id: 'storage', labelKey: 'settings.cat.storage', component: StorageView },
   { id: 'appearance', labelKey: 'settings.cat.appearance' },
+  { id: 'features', labelKey: 'settings.cat.features', component: FeatureSettings },
   { id: 'client', labelKey: 'settings.cat.client', nativeOnly: true, component: AppSettings },
 ]
 
@@ -115,7 +117,7 @@ const GROUPS = [
   { key: 'account', labelKey: 'settings.group.account', ids: ['profile', 'health'] },
   { key: 'family', labelKey: 'settings.group.family', ids: ['family', 'pointsRule', 'ai', 'backup'] },
   { key: 'content', labelKey: 'settings.group.content', ids: ['content', 'media', 'storage'] },
-  { key: 'device', labelKey: 'settings.group.device', ids: ['appearance', 'client'] },
+  { key: 'device', labelKey: 'settings.group.device', ids: ['appearance', 'features', 'client'] },
 ]
 
 // 旧 ?tab= 别名:合并后落地到新大类,旧链接(放映厅/相册/日程等页面跳转)不失效

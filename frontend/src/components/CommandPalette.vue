@@ -63,6 +63,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useHotkeys, focusPageSearch } from '@/composables/useHotkeys'
 import { SEARCH_MIN_LENGTH, SEARCH_VISIBLE_LIMIT, normalizeQuery, useGlobalSearch } from '@/composables/useGlobalSearch'
 import { filterCommands, visibleCommands } from '@/utils/commandRegistry'
+import { isPathHiddenNow } from '@/composables/useFeatureGates'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -91,6 +92,7 @@ const ctx = computed(() => ({
   theme: themeStore.theme,
   setTheme: (id) => themeStore.setTheme(id),
   focusSearch: focusPageSearch,
+  isPathHidden: isPathHiddenNow,
 }))
 
 const staticCommands = computed(() => {

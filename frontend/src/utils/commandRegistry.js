@@ -49,9 +49,12 @@ export const COMMANDS = [
   },
 ]
 
-/** 按运行时上下文过滤掉不可用命令(游客看不到文件/成员/设置) */
+/** 按运行时上下文过滤掉不可用命令(游客看不到文件/成员/设置;功能开关关掉的页面也不出现) */
 export function visibleCommands(ctx = {}) {
-  return COMMANDS.filter((c) => !(typeof c.hidden === 'function' && c.hidden(ctx)))
+  return COMMANDS.filter(
+    (c) =>
+      !(typeof c.hidden === 'function' && c.hidden(ctx)) && !(c.path && typeof ctx.isPathHidden === 'function' && ctx.isPathHidden(c.path)),
+  )
 }
 
 // 子序列匹配:输入「blg」也能命中「Blog」(路径/英文名快速跳转)

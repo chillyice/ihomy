@@ -122,8 +122,8 @@ export const categoryLabel = (cat) => CATEGORY_LABELS[cat] || '功能'
 const normalizeCategory = (cat) => (cat === 'album' ? 'content' : cat === 'social' ? 'family' : cat || 'life')
 
 // 原始模块 → 扁平导航项:过滤无路径映射/停用模块,追加「设置」+「运维管理」虚拟入口,按 sortOrder 升序。
-// hasOps:是否展示运维管理(拥有 ops:view 权限)。child:儿童模式下只留白名单入口(与路由守卫同一口径)。
-export function buildNavItems(modules, { hasOps = false, child = false } = {}) {
+// 不做儿童模式与功能开关过滤——那两个是「给谁看」的策略,留给 buildNavItems / buildFeatureCatalog。
+function rawNavItems(modules, { hasOps = false } = {}) {
   const list = (modules || [])
     .filter((m) => NAV_PATHS[m.code] && m.enabled !== 0)
     .map((m) => ({
@@ -141,8 +141,20 @@ export function buildNavItems(modules, { hasOps = false, child = false } = {}) {
   // health(V12.89)模块行同为 15 且先入列表,实际顺序为 保险箱 → 健康 → 天气 → 聊天室。
   list.push({ code: 'weather', title: '天气', path: '/weather', category: 'life', sortOrder: 15 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
-  const sorted = list.sort((a, b) => a.sortOrder - b.sortOrder)
-  return child ? sorted.filter((m) => isChildAllowedPath(m.path)) : sorted
+  return list.sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+// 导航项:过滤无路径映射/停用模块,追加虚拟入口,再按「给谁看」过滤。
+// hasOps:是否展示运维管理(拥有 ops:view 权限)。child:儿童模式下只留白名单入口(与路由守卫同一口径)。
+// isVisible(code):功能开关判定(见 composables/useFeatureGates),不传=全部可见。
+export function buildNavItems(modules, { hasOps = false, child = false, isVisible = null } = {}) {
+  return rawNavItems(modules, { hasOps }).filter((m) => (!child || isChildAllowedPath(m.path)) && (!isVisible || isVisible(m.code)))
+}
+
+// 设置页「功能开关」的完整功能清单:与导航同源,不看当前可见性(关掉的功能也要能改回来)。
+// 不含「设置」自身与运维入口(运维属角色权限,不该被本机开关影响)。
+export function buildFeatureCatalog(modules, { hasOps = false } = {}) {
+  return rawNavItems(modules, { hasOps }).filter((m) => m.code !== 'settings' && m.code !== 'ops')
 }
 
 // 扁平导航项 → 按 category 分组(顺序 NAV_GROUP_ORDER),每组 { category, label, items }

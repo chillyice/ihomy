@@ -21,7 +21,7 @@ vi.mock('@/stores/chat', () => ({ useChatStore: () => chat }))
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }))
 vi.mock('@/api', () => ({ planApi: { today: vi.fn() }, notificationApi: { unreadCount: vi.fn() } }))
-vi.mock('./useDisplayMode', () => ({ useDisplayMode: () => ({ isChild: ref(false) }) }))
+vi.mock('./useDisplayMode', () => ({ useDisplayMode: () => ({ isChild: ref(false) }), getDisplayMode: () => 'normal' }))
 vi.mock('@/utils/assetUrl', () => ({ NEED_FILE_ORIGIN: false, SERVER_ORIGIN: '' }))
 
 it('drops delayed results for old families, withdraws read and completed objects and skips requests for visitors', async () => {

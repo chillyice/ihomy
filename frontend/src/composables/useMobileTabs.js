@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useDisplayMode } from '@/composables/useDisplayMode'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import {
   DEFAULT_MOBILE_TABS,
   MOBILE_TABS_LOCAL_KEY,
@@ -34,6 +35,7 @@ export function useMobileTabs() {
     buildMobileTabCandidates(appStore.modules, {
       hasOps: userStore.isOps || userStore.isOwner,
       child: isChild.value,
+      isVisible: isFeatureVisibleNow,
     }),
   )
 

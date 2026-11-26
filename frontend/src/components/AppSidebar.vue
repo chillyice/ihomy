@@ -230,6 +230,7 @@ import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
 import { notificationTypeKey } from '@/utils/notificationType'
 import { useDisplayMode } from '@/composables/useDisplayMode'
+import { isFeatureVisibleNow } from '@/composables/useFeatureGates'
 import { useDevice } from '@/composables/useDevice'
 import { lastDoingMode } from '@/utils/lastDoing'
 import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
@@ -302,7 +303,11 @@ const userInfo = computed(() => userStore.userInfo)
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),此处只做渲染
 const groupedModules = computed(() =>
-  buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner, child: isChild.value }),
+  buildNavGroups(appStore.modules, {
+    hasOps: userStore.isOps || userStore.isOwner,
+    child: isChild.value,
+    isVisible: isFeatureVisibleNow,
+  }),
 )
 
 const navigate = (path) => {

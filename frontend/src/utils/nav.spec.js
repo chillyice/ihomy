@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildNavItems, buildNavGroups } from './navModules'
+import { buildFeatureCatalog, buildNavItems, buildNavGroups } from './navModules'
 
 // 导航虚拟入口(设置/帮助/运维)不进 sys_home_module,靠 buildNavItems 无条件追加
 describe('buildNavItems 虚拟入口', () => {
@@ -75,5 +75,38 @@ describe('buildNavGroups 家庭组', () => {
     const groups = buildNavGroups([{ code: 'member', title: '家庭成员', path: '/member', category: 'social', sortOrder: 1, enabled: 1 }])
     expect(groups.map((g) => g.category)).toEqual(['life', 'family', 'system'])
     expect(groups.find((g) => g.category === 'family').items.map((i) => i.code)).toEqual(['member'])
+  })
+})
+
+// 功能开关(settings → 功能开关):三端导航与设置页清单共用同一份原始导航项
+describe('功能开关过滤', () => {
+  const modules = [
+    { code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 1 },
+    { code: 'games', title: '游戏', path: '/games', category: 'content', sortOrder: 2, enabled: 1 },
+  ]
+
+  it('被关掉的功能从导航里消失,其余与虚拟入口不受影响', () => {
+    const codes = buildNavItems(modules, { isVisible: (code) => code !== 'blog' }).map((i) => i.code)
+    expect(codes).not.toContain('blog')
+    expect(codes).toContain('games')
+    expect(codes).toContain('settings')
+    expect(codes).toContain('weather')
+  })
+
+  it('不传 isVisible 时全部照旧(不改变旧调用方行为)', () => {
+    expect(buildNavItems(modules).map((i) => i.code)).toEqual(expect.arrayContaining(['blog', 'games']))
+  })
+
+  it('设置页清单不看可见性:关掉的功能也要能改回来', () => {
+    const catalog = buildFeatureCatalog(modules).map((i) => i.code)
+    expect(catalog).toEqual(expect.arrayContaining(['blog', 'games', 'weather', 'help']))
+    // 设置自身与运维入口不进清单(运维属角色权限,设置要留作退路)
+    expect(catalog).not.toContain('settings')
+    expect(buildFeatureCatalog(modules, { hasOps: true }).map((i) => i.code)).not.toContain('ops')
+  })
+
+  it('清单与 DB 停用口径一致:enabled=0 的模块不出现', () => {
+    const catalog = buildFeatureCatalog([{ code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 0 }])
+    expect(catalog.map((i) => i.code)).not.toContain('blog')
   })
 })

@@ -5,6 +5,7 @@ import { userPrefApi } from '@/api'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useDisplayMode } from './useDisplayMode'
+import { isFeatureVisibleNow } from './useFeatureGates'
 import { readPref } from '@/utils/userPref'
 import { parseWindowFavorites, WINDOW_PREF, windowEntries } from '@/utils/windowDirectory'
 
@@ -19,6 +20,7 @@ export function useWindowDirectory() {
       hasOps: user.isOps || user.isOwner,
       loggedIn: user.isLoggedIn,
       child: isChild.value,
+      isVisible: isFeatureVisibleNow,
       allows(item) {
         if (item.code === 'book' && (!user.isLoggedIn || !user.canReadBook)) return false
         if (item.code === 'vault' && !(user.isOwner || user.hasPerm('vault:view'))) return false

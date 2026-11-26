@@ -109,6 +109,7 @@ const ChangePasswordDialog = defineAsyncComponent(() => import('@/components/Cha
 import ChildLock from '@/components/ChildLock.vue'
 import WebUpdateBanner from '@/components/WebUpdateBanner.vue'
 import { initDisplayMode, useDisplayMode } from '@/composables/useDisplayMode'
+import { initFeatureGates, isPathHiddenNow } from '@/composables/useFeatureGates'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 const LastDoingFloat = defineAsyncComponent(() => import('@/components/lastdoing/LastDoingFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
@@ -137,7 +138,14 @@ const router = useRouter()
 const { isChild, isElder } = useDisplayMode()
 watch(
   () => userStore.userInfo?.id,
-  (id) => initDisplayMode(id ?? null),
+  (id) => {
+    initDisplayMode(id ?? null)
+    // 功能开关与显示模式同一套「按账号存本机」口径,跟着账号一起绑定
+    initFeatureGates(id ?? null)
+    // 刷新/深链时开关表是空的,落地页可能正好是这个人关掉的功能:贴回记录后补判一次
+    const current = router.currentRoute.value
+    if (current.name && current.name !== 'Home' && isPathHiddenNow(current.fullPath)) router.replace({ name: 'Home' })
+  },
   { immediate: true },
 )
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏

@@ -32,13 +32,14 @@
 import { computed, ref } from 'vue'
 import { useAssistantStore } from '@/stores/assistant'
 import { getDisplayMode } from '@/composables/useDisplayMode'
+import { isPathHiddenNow } from '@/composables/useFeatureGates'
 import { assistantPath } from '@/utils/assistantNavigation'
 const props = defineProps({ action: { type: Object, required: true } })
 const assistant = useAssistantStore()
 const diary = computed(() => props.action.toolName === 'create_diary')
 const visibility = ref(props.action.visibility === 'FAMILY' ? 'FAMILY' : 'PRIVATE')
 const disabled = computed(() => assistant.busy || !assistant.status?.enabled)
-const path = computed(() => assistantPath(props.action.result?.path, getDisplayMode() === 'child'))
+const path = computed(() => assistantPath(props.action.result?.path, getDisplayMode() === 'child', isPathHiddenNow))
 </script>
 
 <style scoped>

@@ -75,6 +75,14 @@
       <circle cx="22" cy="12.8" r="2" fill="var(--icon-sage)" />
       <circle cx="12" cy="21" r="1.5" />
     </g>
+    <g v-else-if="name === 'features'" transform="rotate(-3 16 16)">
+      <rect x="4" y="5" width="24" height="22" rx="3" fill="var(--icon-paper)" />
+      <rect x="7.5" y="9" width="17" height="5" rx="2.5" fill="var(--icon-sage)" />
+      <circle cx="21.5" cy="11.5" r="1.8" fill="var(--icon-paper)" />
+      <rect x="7.5" y="17" width="17" height="5" rx="2.5" fill="var(--icon-clay)" />
+      <circle cx="10.5" cy="19.5" r="1.8" fill="var(--icon-paper)" />
+      <path d="M7.5 24.6h4m3 0h4" stroke-width="1.8" />
+    </g>
     <g v-else-if="name === 'client'" transform="rotate(5 16 16)">
       <rect x="7.5" y="2.8" width="17" height="26.4" rx="3.2" fill="var(--icon-clay)" />
       <rect x="9.7" y="6" width="12.6" height="17.5" rx="1.3" fill="var(--icon-paper)" />

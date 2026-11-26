@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDeskObjects, DESK_DESTINATIONS, DESK_DEFAULT_PATHS } from './deskObjects'
+import { buildDeskObjects, deskPathAllowed, DESK_DESTINATIONS, DESK_DEFAULT_PATHS } from './deskObjects'
 import { shareId } from './shareId'
 import { cardPaper, journalArt } from './warmMaterials'
 
@@ -109,5 +109,15 @@ describe('window desk objects', () => {
     expect(kind(desk({ notices: 8 }), 'envelope').labelParams).toEqual({ count: 8 })
     expect(kind(desk({ messages: 4 }), 'phone').labelParams).toEqual({ count: 4 })
     expect(kind(desk({ notices: 0 }), 'envelope')).toBeUndefined()
+  })
+
+  it('功能开关关掉的页面,桌沿物件也不再指向它', () => {
+    expect(deskPathAllowed('/plan', modules, false, null)).toBe(true)
+    expect(deskPathAllowed('/plan', modules, false, (p) => p === '/plan')).toBe(false)
+    // 关掉计划后,叶子(任务)与便签都无处可指,只剩不依赖页面的杯子
+    const hidden = desk({ hidden: (p) => p.startsWith('/plan'), agenda: { plans: [{ id: 8, overdueDays: 2 }] } })
+    expect(kind(hidden, 'leaf')).toBeUndefined()
+    expect(kind(hidden, 'note')).toBeUndefined()
+    expect(kind(hidden, 'cup')).toBeDefined()
   })
 })
