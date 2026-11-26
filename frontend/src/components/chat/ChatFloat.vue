@@ -119,7 +119,7 @@
       class="chat-float-ball"
       :class="{ pinned: pinnedRoom }"
       :style="ballStyle"
-      :aria-label="$t('chat.title')"
+      :aria-label="ballBadge ? $t('windowDesk.phone', { count: ballBadge }) : $t('chat.title')"
       :title="assistant.eligible ? $t('chat.assistant.holdHint') : $t('chat.title')"
       @contextmenu.prevent
       @pointerdown="onBallDown"
@@ -127,7 +127,8 @@
       @click="onBallClick"
     >
       <el-badge :value="ballBadge" :hidden="!ballBadge" :max="99" class="ball-badge">
-        <el-icon :size="22"><ChatDotRound /></el-icon>
+        <span v-if="theme.theme === 'warm'" class="paper-replies" aria-hidden="true"></span>
+        <el-icon v-else :size="22"><ChatDotRound /></el-icon>
       </el-badge>
     </button>
 
@@ -729,6 +730,64 @@ onBeforeUnmount(() => {
 }
 .ball-badge :deep(.el-badge__content) {
   z-index: 1;
+}
+
+/* 两张带话尾的纸签叠在书布上，右上角留给消息数。 */
+html.theme-warm .chat-float-ball {
+  --chat-cloth: color-mix(in srgb, var(--color-green) 75%, #514d37);
+  padding: 0;
+  border: 1px solid rgb(67 65 47 / 35%);
+  border-radius: 13px;
+  background: var(--chat-cloth) var(--album-cloth-texture) center / 96px;
+  background-blend-mode: soft-light;
+  box-shadow:
+    inset 0 1px 1px rgb(255 246 216 / 50%),
+    inset 0 -2px 1px rgb(44 43 29 / 30%),
+    var(--shadow);
+}
+html.theme-warm.dark .chat-float-ball {
+  --chat-cloth: color-mix(in srgb, var(--color-green) 52%, #33392e);
+}
+html.theme-warm .chat-float-ball:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+.paper-replies {
+  display: block;
+  position: relative;
+  width: 35px;
+  height: 32px;
+  filter: drop-shadow(0 1px 1px rgb(43 39 27 / 45%));
+  pointer-events: none;
+}
+.paper-replies::before,
+.paper-replies::after {
+  content: '';
+  position: absolute;
+  width: 25px;
+  height: 21px;
+  border-radius: 5px;
+  clip-path: polygon(0 0, 100% 0, 100% 78%, 44% 78%, 19% 100%, 19% 78%, 0 78%);
+}
+.paper-replies::before {
+  top: 2px;
+  right: 0;
+  transform: scaleX(-1) rotate(-8deg);
+  background: #d3b88f;
+}
+.paper-replies::after {
+  bottom: 1px;
+  left: 0;
+  transform: rotate(-6deg);
+  background:
+    radial-gradient(circle at 29% 41%, #625643 1.4px, transparent 1.8px),
+    radial-gradient(circle at 50% 41%, #625643 1.4px, transparent 1.8px),
+    radial-gradient(circle at 71% 41%, #625643 1.4px, transparent 1.8px), #fbefd4;
+}
+html.theme-warm .ball-badge :deep(.el-badge__content.is-fixed) {
+  top: -4px;
+  right: -5px;
+  transform: none;
 }
 
 /* 没有座位头像的游戏里,房间最新一句挂在浮球正下方:右缘与球对齐、限宽不越界 */

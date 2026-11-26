@@ -10,8 +10,15 @@
   >
     <FloatDeleteDock :active="dockActive" :over="dockOver" />
     <!-- 黑胶可视化 + 展开切换:整个黑胶区就是拖拽手柄,鼠标与触屏都从这里拖 -->
-    <div v-a11y-click class="player-left" @pointerdown="onDragStart" @click.stop="onVinylClick">
-      <div class="vinyl" :class="{ playing }">
+    <div
+      v-a11y-click
+      class="player-left"
+      :aria-label="t('windowTools.player')"
+      :aria-expanded="expanded"
+      @pointerdown="onDragStart"
+      @click.stop="onVinylClick"
+    >
+      <div class="vinyl" :class="{ playing }" aria-hidden="true">
         <div class="vinyl-disc">
           <div class="vinyl-groove"></div>
           <div class="vinyl-label"></div>
@@ -523,6 +530,92 @@ html.dark .music-player {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* 暖居唱机：木壳就是拖动手柄，唱臂停在盘外或落到唱纹上。 */
+html.theme-warm .music-player {
+  border-radius: 12px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow);
+}
+html.theme-warm .player-left {
+  --wood-light: #bf946a;
+  --wood-dark: #866042;
+  align-self: center;
+  padding: 6px;
+  border-radius: 11px;
+  background:
+    repeating-linear-gradient(3deg, transparent 0 3px, rgb(86 53 31 / 12%) 4px, transparent 5px 8px),
+    linear-gradient(150deg, var(--wood-light), var(--wood-dark));
+  box-shadow:
+    inset 0 1px 1px #e6c6a2,
+    inset 0 -3px 1px rgb(61 37 22 / 40%);
+}
+html.theme-warm.dark .player-left {
+  --wood-light: #967350;
+  --wood-dark: #654830;
+}
+html.theme-warm .player-left:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: -3px;
+}
+html.theme-warm .vinyl {
+  width: 48px;
+  height: 36px;
+  transform: none;
+}
+html.theme-warm .vinyl-disc {
+  inset: 0 auto 0 0;
+  width: 36px;
+  border-color: #3a3028;
+  background: conic-gradient(from 25deg, #262320, #50473c 18%, #24211f 33% 55%, #50473c 72%, #262320 90%);
+  box-shadow: 0 1px 2px #4e3727;
+}
+html.theme-warm .vinyl-groove {
+  inset: 2px;
+  background: repeating-radial-gradient(circle, transparent 0 2px, rgb(245 231 204 / 14%) 2px 3px);
+}
+html.theme-warm .vinyl-label {
+  inset: 50% auto auto 50%;
+  margin: -6px 0 0 -6px;
+  width: 12px;
+  height: 12px;
+  border-color: #b77459;
+  background: radial-gradient(circle, #44392e 0 1px, #dca07c 1.5px 100%);
+}
+html.theme-warm .vinyl-arm {
+  top: 4px;
+  right: 4px;
+  height: 22px;
+  background: linear-gradient(90deg, #806743, #f8dfa8 65%, #b69360);
+  box-shadow: 1px 1px 1px #634b34;
+  transform: rotate(4deg);
+}
+html.theme-warm .vinyl-arm::before {
+  content: '';
+  position: absolute;
+  inset: -2px auto auto -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #71583c 0 1px, #dfc28f 2px, #ad8b59);
+}
+html.theme-warm .vinyl-arm::after {
+  width: 5px;
+  height: 7px;
+  border-radius: 2px;
+}
+html.theme-warm .vinyl.playing .vinyl-arm {
+  transform: rotate(32deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-warm .vinyl.playing .vinyl-disc {
+    animation: none;
+  }
+  html.theme-warm .vinyl-arm {
+    transition: none;
   }
 }
 
