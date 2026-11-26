@@ -71,6 +71,15 @@ describe('window sash', () => {
 })
 
 describe('window-plane projection', () => {
+  it('applies console calibration to centered width and corrected noon depth', () => {
+    const calibration = { winterSummerRatio: 1.4, equinoxDepth: 75, windowWidth: 60 }
+    const noon = (altitude) => windowTransform(1000, 800, altitude, 180, 0, altitude, calibration)
+    const equinox = 90 - 36.65
+    expect(noon(equinox)[0]).toBeCloseTo(600)
+    expect(noon(equinox)[4]).toBeCloseTo(200)
+    expect(noon(equinox)[3]).toBeCloseTo(600)
+    expect(noon(equinox - 23.44)[3] / noon(equinox + 23.44)[3]).toBeCloseTo(1.4)
+  })
   it.each([0, 1])('releases both rail strips and the stiles on open side %i while keeping the other panes intact', (side) => {
     const shut = CASEMENTS.map(sashApertures)
     const open = openWindow(side === 0 ? 0.1 : 0.5, 0.65).map(sashApertures)

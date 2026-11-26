@@ -2,6 +2,7 @@ import { resolveMorningWeather } from './morningWeather'
 
 // Measure from the meeting line outwards, keeping the clear pane width fixed.
 export const WINDOW_WIDTH_RATIO = 0.88
+export const WINDOW_CALIBRATION = Object.freeze({ winterSummerRatio: 1.15, equinoxDepth: 90, windowWidth: WINDOW_WIDTH_RATIO * 100 })
 const paneWidth = 0.452
 const meetingStile = 0.04
 const hingeStile = 0.03

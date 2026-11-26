@@ -15,7 +15,7 @@ import {
   currentSlotIndex,
   solarClock,
 } from '@/utils/windowLight'
-import { CASEMENTS, chooseWindowSashes, weatherClosesWindow } from '@/utils/windowSash'
+import { CASEMENTS, WINDOW_CALIBRATION, chooseWindowSashes, weatherClosesWindow } from '@/utils/windowSash'
 import { solarSlotForTime, solarSlotPosition, sampleSolarDirection } from '@/utils/solarSamples'
 import { resolveMorningWeather } from '@/utils/morningWeather'
 import { useThemeStore } from '@/stores/theme'
@@ -42,6 +42,8 @@ export function useSunLight(canReadEnvironment = () => true) {
   const livePosition = ref(currentSlotIndex())
   const liveSlot = computed(() => Math.min(Math.floor(livePosition.value), (sunInfo.value?.slots?.length || 288) - 1))
   const lightTestMode = ref(false)
+  const previewCalibration = reactive({ ...WINDOW_CALIBRATION })
+  const windowCalibration = computed(() => (lightTestMode.value ? previewCalibration : WINDOW_CALIBRATION))
   const lightTestPaused = ref(true)
   const previewDate = ref('')
   const previewLoadFailed = ref(false)
@@ -705,6 +707,8 @@ export function useSunLight(canReadEnvironment = () => true) {
     skyLight,
     diffuseSkyStyle,
     lightTestMode,
+    previewCalibration,
+    windowCalibration,
     lightTestPaused,
     testSpeed,
     setTestSpeed,

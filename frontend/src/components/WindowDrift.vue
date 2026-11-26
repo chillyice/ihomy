@@ -9,6 +9,7 @@ import { ref, watch } from 'vue'
 import { WINDOW_WIDTH_RATIO } from '@/utils/windowSash'
 
 const props = defineProps({
+  windowWidth: { type: Number, default: WINDOW_WIDTH_RATIO },
   openSashes: { type: Array, required: true },
   kind: { type: String, required: true },
 })
@@ -18,7 +19,7 @@ const between = (min, max) => min + Math.random() * (max - min)
 function chooseTrajectory() {
   const { hinge, tipX, latch } = props.openSashes[Math.floor(Math.random() * props.openSashes.length)]
   const throughGap = tipX + (latch - tipX) * between(0.1, 0.9)
-  const x = (1 - WINDOW_WIDTH_RATIO) / 2 + throughGap * WINDOW_WIDTH_RATIO
+  const x = (1 - props.windowWidth) / 2 + throughGap * props.windowWidth
   const rain = props.kind === 'rain'
   const leaf = props.kind === 'leaf'
   const drift = (hinge < 0.5 ? 1 : -1) * (rain ? between(1, 3) : between(4, 10))

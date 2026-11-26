@@ -7746,6 +7746,9 @@ export default {
     },
   },
   lightTest: {
+    winterSummerRatio: '冬至 / 夏至正午纵深比',
+    equinoxDepth: '春秋分正午纵深',
+    windowWidth: '窗户宽度',
     groundShadow: '室外 1 米立杆影长 {length} 米',
     title: '光影测试',
     drag: '拖动',

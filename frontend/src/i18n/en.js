@@ -7871,6 +7871,9 @@ export default {
     },
   },
   lightTest: {
+    winterSummerRatio: 'Winter / summer noon depth',
+    equinoxDepth: 'Equinox noon depth',
+    windowWidth: 'Window width',
     groundShadow: 'Outdoor shadow of a 1 m pole: {length} m',
     title: 'Light effects test',
     drag: 'Drag',

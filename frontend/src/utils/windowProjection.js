@@ -1,7 +1,7 @@
 import { drawWindowFoliage } from './windowFoliage'
 import { applyDeskShadowMask } from './deskShadowMask'
 import { floorShadowDirection, groundShadowPerHeight } from './windowLight'
-import { CASEMENTS, WINDOW_WIDTH_RATIO } from './windowSash'
+import { CASEMENTS, WINDOW_CALIBRATION } from './windowSash'
 
 // Keep both pane heights when sizing the frame outwards from the glazing bar.
 const lowerPaneHeight = 0.44175
@@ -28,20 +28,28 @@ export const LIGHTNING_SOURCE = {
 const equinoxAltitude = 90 - 36.65
 const sillHeightRatio = 0.15
 
-export function windowTransform(width, height, altitude, azimuth, realWeight = 0, noonAltitude = equinoxAltitude) {
+export function windowTransform(
+  width,
+  height,
+  altitude,
+  azimuth,
+  realWeight = 0,
+  noonAltitude = equinoxAltitude,
+  calibration = WINDOW_CALIBRATION,
+) {
   const direction = floorShadowDirection(azimuth, realWeight)
   // Infer one effective window height for the day from its calibrated noon footprint.
   // Above the Jinan summer-solstice altitude, retain that height even at the zenith.
   const calibrationAltitude = Math.min(noonAltitude, equinoxAltitude + 23.44)
   const phase = (equinoxAltitude - calibrationAltitude) / 23.44
-  const winterSummerRatio = 1.15
+  const { winterSummerRatio, equinoxDepth, windowWidth } = calibration
   const amplitude = (winterSummerRatio - 1) / (winterSummerRatio + 1)
-  const referenceReach = height * 0.9 * (1 + amplitude * phase)
+  const referenceReach = height * (equinoxDepth / 100) * (1 + amplitude * phase)
   const correctedHeight = referenceReach * Math.tan((calibrationAltitude * Math.PI) / 180)
   // A 1.5 m opening spans two viewport heights at real scale (0.75 m per viewport).
   const windowHeight = correctedHeight * (1 - realWeight) + 2 * height * realWeight
   const reach = windowHeight * groundShadowPerHeight(altitude)
-  const paneWidth = width * WINDOW_WIDTH_RATIO
+  const paneWidth = width * (windowWidth / 100)
   const shear = direction.x * reach
   const depth = direction.y * reach
   // The ground at the foot of the wall stays fixed all day. Frame the corrected view
@@ -197,6 +205,7 @@ export function drawWindowProjection(
     featherStrength = 50,
     shadowAlpha = 0,
     realWeight = 0,
+    calibration = WINDOW_CALIBRATION,
     foliageTime = 0,
     occluders = [],
     deskCasters = [],
@@ -236,7 +245,7 @@ export function drawWindowProjection(
   ctx.globalAlpha = 1 / samples.length
   for (const ray of sampleWindowRays(scene.altitude, scene.azimuth, sourceRadius)) {
     if (ray.altitude <= 0 || ray.azimuth <= 90 || ray.azimuth >= 270) continue
-    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight, scene.noonAltitude)
+    const [a, b, c, d, x, y] = windowTransform(w, h, ray.altitude, ray.azimuth, realWeight, scene.noonAltitude, calibration)
     if (openSashes.length) {
       mask.clearRect(0, 0, w, h)
       mask.save()
@@ -254,7 +263,7 @@ export function drawWindowProjection(
   ctx.restore()
   applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height, realWeight, sourceRadius)
 
-  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude)
+  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude, calibration)
   const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
   transmittedLight.addColorStop(0, scene.palette.core)
   transmittedLight.addColorStop(0.6, scene.palette.mid)

@@ -192,6 +192,22 @@
         </button>
       </div>
 
+      <label v-if="light.projectionStandard.value === 'corrected'" class="lt-slider-row">
+        <span>{{ $t('lightTest.winterSummerRatio') }}</span>
+        <input type="range" min="1" max="2" step="0.01" v-model.number="light.previewCalibration.winterSummerRatio" class="lt-slider" />
+        <output>{{ light.previewCalibration.winterSummerRatio }}×</output>
+      </label>
+      <label v-if="light.projectionStandard.value === 'corrected'" class="lt-slider-row">
+        <span>{{ $t('lightTest.equinoxDepth') }}</span>
+        <input type="range" min="40" max="150" step="1" v-model.number="light.previewCalibration.equinoxDepth" class="lt-slider" />
+        <output>{{ light.previewCalibration.equinoxDepth }}%</output>
+      </label>
+      <label class="lt-slider-row">
+        <span>{{ $t('lightTest.windowWidth') }}</span>
+        <input type="range" min="30" max="100" step="1" v-model.number="light.previewCalibration.windowWidth" class="lt-slider" />
+        <output>{{ light.previewCalibration.windowWidth }}%</output>
+      </label>
+
       <label class="lt-slider-row"
         ><span>{{ $t('settings.idleLabel') }}</span
         ><input type="number" min="1" max="120" step="1" v-model.number="light.idleMinutes.value" class="lt-num"

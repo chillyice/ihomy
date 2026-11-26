@@ -12,6 +12,7 @@ import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { drawWindowProjection } from '@/utils/windowProjection'
 
 const props = defineProps({
+  calibration: Object,
   scene: { type: Object, required: true },
   standard: { type: String, default: 'corrected' },
   weather: { type: String, required: true },
@@ -104,6 +105,9 @@ watch(
     props.weather,
     props.softness,
     props.featherStrength,
+    props.calibration?.windowWidth,
+    props.calibration?.equinoxDepth,
+    props.calibration?.winterSummerRatio,
     props.shadowAlpha,
     props.sashes,
     props.deskCasters,

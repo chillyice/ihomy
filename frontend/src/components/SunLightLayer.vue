@@ -27,6 +27,7 @@
       :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
       :weather="weatherMode"
       :softness="stormLight ? undefined : skyLight.softness"
+      :calibration="windowCalibration"
       :feather-strength="featherStrength"
       :standard="projectionStandard"
       :shadow-alpha="castShade"
@@ -36,6 +37,7 @@
       :style="stormLight ? undefined : { opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
     />
     <WindowDrift
+      :window-width="windowCalibration.windowWidth / 100"
       v-if="openSashes.length && shadowEnabled && weatherEffectEnabled && driftKind"
       :key="driftKind"
       :kind="driftKind"
@@ -171,6 +173,7 @@ const {
   lampRadius,
   lampColor,
   shadowEnabled,
+  windowCalibration,
   projectionStandard,
   featherStrength,
   castShade,
