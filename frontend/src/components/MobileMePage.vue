@@ -51,7 +51,7 @@
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
         <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
-      <div v-if="sunLight" class="me-row">
+      <div v-if="lightAvailable && sunLight" class="me-row">
         <SettingsIcon v-if="isWarm" name="appearance" class="me-row-icon" />
         <span v-else class="me-row-icon" aria-hidden="true">✨</span>
         <label for="me-light-effects" class="me-row-text">{{ $t('mobile.lightEffect') }}</label>
@@ -114,12 +114,14 @@ import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { useMobileTabs } from '@/composables/useMobileTabs'
 import SettingsIcon from '@/views/settings/SettingsIcon.vue'
+import { useDevice } from '@/composables/useDevice'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const { locale, t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const { openEditor } = useMobileTabs()
+const { lightAvailable } = useDevice()
 const sunLight = inject(SUN_LIGHT_KEY)
 
 const userInfo = computed(() => userStore.userInfo)

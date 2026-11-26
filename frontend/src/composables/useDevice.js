@@ -12,7 +12,7 @@
 // - isWide:窗口 ≥900 且屏幕短边 ≥600dp(手机横屏短边不足,不算宽屏)→ 页面可切双栏;
 // - isLandscape:窗口宽 > 高,纯派生,不落 localStorage;
 // - hasPointer:有精细指针(鼠标 / 触控板,不是触屏)→ hover / 右键等桌面交互用。
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { classifyViewport, isWideViewport, NARROW_MAX_WIDTH } from '@/utils/platform'
 
 const isMobile = ref(false)
@@ -72,6 +72,9 @@ function init() {
 
 init()
 
+const mobileLightTesting = import.meta.env.DEV || ['test', 'staging'].includes(import.meta.env.MODE)
+const lightAvailable = computed(() => !isMobile.value || mobileLightTesting)
+
 export function useDevice() {
-  return { isMobile, isPhone, isTablet, isWide, isLandscape, hasPointer }
+  return { lightAvailable, isMobile, isPhone, isTablet, isWide, isLandscape, hasPointer }
 }

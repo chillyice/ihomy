@@ -46,7 +46,7 @@
             <div id="settings-warmbg">
               <WarmBackgroundSettings :show-objects="isTablet || (isWide && !isMobile)" />
             </div>
-            <div id="settings-light"><LightSettings :show-tools="!isMobile" /></div>
+            <div v-if="lightAvailable" id="settings-light"><LightSettings /></div>
             <div id="settings-morning"><MorningSettings /></div>
             <div id="settings-screensaver"><ScreensaverSettings /></div>
             <div id="settings-display"><ModeSettings /></div>
@@ -91,7 +91,7 @@ import { isNativeApp } from '@/utils/platform'
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const { isMobile, isTablet, isWide } = useDevice()
+const { lightAvailable, isMobile, isTablet, isWide } = useDevice()
 
 // 大类清单:移动端列表与桌面侧栏共用这一份;perm/nativeOnly 决定可见性
 // perm 与后端 @RequirePermission 同码:面板对无权角色隐藏,挂载也一并跳过(防隐形面板发请求吃 403)

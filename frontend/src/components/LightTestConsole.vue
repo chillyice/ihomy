@@ -244,8 +244,8 @@ const PROJECTION_STANDARDS = [
   { value: 'real', labelKey: 'lightTest.real' },
 ]
 
-const initY = typeof window !== 'undefined' ? Math.max(42, window.innerHeight - 360) : 100
-const { pos, onDragStart } = useDragResize({ x: 240, y: initY, minY: 42 })
+const initY = window.innerWidth <= 768 ? 42 : Math.max(42, window.innerHeight - 360)
+const { pos, onDragStart } = useDragResize({ x: Math.min(240, Math.max(0, window.innerWidth - 340)), y: initY, minY: 42 })
 
 const activeSunInfo = light.activeSunInfo
 const testPhase = computed(() => {
@@ -306,8 +306,11 @@ const onDateChange = ({ currentTarget: input }) => {
   padding: 14px 18px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   color: #fff;
-  min-width: 280px;
+  min-width: min(280px, 100vw);
+  max-width: 100vw;
+  box-sizing: border-box;
   max-height: calc(100vh - 60px);
+  max-height: calc(100dvh - 60px);
   overflow-y: auto;
 }
 /* Keep the live controls visible while the old page snapshot sweeps across the screen. */

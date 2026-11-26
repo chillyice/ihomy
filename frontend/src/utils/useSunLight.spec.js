@@ -30,11 +30,11 @@ const renderer = createRenderer({
 })
 let app
 let light
-async function mountLight(day) {
+async function mountLight(day, canUseLight) {
   request.get.mockResolvedValueOnce(day)
   app = renderer.createApp({
     setup() {
-      light = useSunLight()
+      light = useSunLight(undefined, canUseLight)
       return () => null
     },
   })
@@ -59,6 +59,15 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()
+})
+
+it('blocks rendering and test playback when mobile lighting is unavailable', async () => {
+  await mountLight(sunDay('2026-11-25'), () => false)
+  light.effectsEnabled.value = true
+  light.startLightTest()
+  expect(light.effectsEnabled.value).toBe(false)
+  expect(light.anyEffectEnabled.value).toBe(false)
+  expect(light.lightTestMode.value).toBe(false)
 })
 
 it('enables ordinary daylight on first use and restores an older all-off mobile preset only on request', async () => {

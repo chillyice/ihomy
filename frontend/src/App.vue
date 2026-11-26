@@ -25,7 +25,7 @@
       </template>
       <WindowMusicPlayer v-if="windowShell && userStore.isLoggedIn" />
       <MusicPlayer v-if="!userStore.isPureOps && !isWindow && (isMobile || !immersive) && floatsStore.music" />
-      <Teleport v-if="!isMobile && lightTestMode" to="body"><LightTestConsole /></Teleport>
+      <Teleport v-if="lightAvailable && lightTestMode" to="body"><LightTestConsole /></Teleport>
       <SiteFooter v-if="!isMobile && !immersive" />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
     </template>
@@ -124,7 +124,7 @@ const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdat
 // 壳内判定(静态读一次,不随运行期变化)
 const isNative = isNativeApp()
 
-const { isMobile, isWide, isTablet } = useDevice()
+const { lightAvailable, isMobile, isWide, isTablet } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
@@ -216,7 +216,10 @@ onBeforeUnmount(() => {
 })
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
-const sunLight = useSunLight(() => !userStore.isPureOps)
+const sunLight = useSunLight(
+  () => !userStore.isPureOps,
+  () => lightAvailable.value,
+)
 let stopRotation
 onMounted(() => {
   stopRotation = startSceneRotation(() => {

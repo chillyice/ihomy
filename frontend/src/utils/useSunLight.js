@@ -26,7 +26,7 @@ import request from '@/api/request'
 export const SUN_LIGHT_KEY = Symbol('sunLight')
 const SASH_SESSION_KEY = 'ihomy:window:last-pose'
 
-export function useSunLight(canReadEnvironment = () => true) {
+export function useSunLight(canReadEnvironment = () => true, canUseLight = () => true) {
   const themeStore = useThemeStore()
   const deskCasters = shallowRef([])
   let lastPoseWasOpen = false
@@ -79,7 +79,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     () => _shadowEnabled.value || _weatherEffectEnabled.value || _blobsEnabled.value || _glassEnabled.value || _lampMode.value !== 'off',
   )
   const effectsEnabled = computed({
-    get: () => masterEnabled.value && hasEffectPreference.value,
+    get: () => canUseLight() && masterEnabled.value && hasEffectPreference.value,
     set: (enabled) => {
       // Older phones persisted all effects off on first launch. Keep them off
       // until the user actually enables the switch; partial preferences survive.
@@ -93,7 +93,7 @@ export function useSunLight(canReadEnvironment = () => true) {
       masterEnabled.value = enabled
     },
   })
-  const active = computed(() => masterEnabled.value && !suspended.value)
+  const active = computed(() => canUseLight() && masterEnabled.value && !suspended.value)
   // 对外的开关都经总开关过滤:组件与样式只看得到最终生效值,写回仍落到各自偏好
   const lampMode = computed({
     get: () => (active.value ? _lampMode.value : 'off'),
@@ -281,7 +281,7 @@ export function useSunLight(canReadEnvironment = () => true) {
     }, 208 / testSpeed.value)
   }
   const startLightTest = () => {
-    if (lightTestMode.value) return
+    if (!canUseLight() || lightTestMode.value) return
     previewSunInfo.value = sunInfo.value
     previewDate.value = sunInfo.value?.date ?? ''
     previewLoadFailed.value = false
