@@ -343,6 +343,19 @@ it('shows the selected slot’s lamp and shadow mask immediately when seeking or
   expect(light.lampMask.value).toBe('none')
 })
 
+it('adds fill when deep shadows cover the page despite a bright sky', async () => {
+  await mountLight(sunDay('2026-11-25'))
+  light.shadowDepth.value = 200
+  light.litFraction.value = 0.12
+  expect(light.skyLight.value.metered).toBeGreaterThan(0.45)
+  expect(light.lampStrength.value).toBeGreaterThan(0)
+  light.litFraction.value = 0.85
+  expect(light.lampStrength.value).toBe(0)
+  light.litFraction.value = 0.12
+  light.shadowDepth.value = 0
+  expect(light.lampStrength.value).toBe(0)
+})
+
 it('keeps auto lamp state within its metering band and gives manual overrides priority', async () => {
   await mountLight(sunDay('2026-11-25'))
   expect(light.lampStrength.value).toBe(0)
@@ -438,7 +451,7 @@ it.each([
     light.lampMode.value = 'off'
     for (const weather of ['clear', 'cloud', 'overcast', 'fog', 'rain', 'snow', 'thunder']) {
       light.setWeather(weather)
-      for (const depth of [0, 70, 100]) {
+      for (const depth of [0, 70, 100, 130, 200]) {
         light.shadowDepth.value = depth
         const levels = observations.map(([slot]) => {
           light.setSlot(slot)

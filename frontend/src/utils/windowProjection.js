@@ -204,6 +204,8 @@ export function drawWindowProjection(
     softness = weatherSoftness[weather] ?? 0,
     featherStrength = 50,
     shadowAlpha = 0,
+    highlight,
+    onMeasure,
     realWeight = 0,
     calibration = WINDOW_CALIBRATION,
     foliageTime = 0,
@@ -219,6 +221,11 @@ export function drawWindowProjection(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, w, h)
+  const sun = highlight?.getContext('2d')
+  if (sun) {
+    resize(highlight, w, h)
+    sun.clearRect(0, 0, w, h)
+  }
   if (
     !scene?.hasDirectLight ||
     !(scene.altitude > 0 && scene.altitude < 90 && scene.azimuth > 90 && scene.azimuth < 270) ||
@@ -263,11 +270,28 @@ export function drawWindowProjection(
   ctx.restore()
   applyDeskShadowMask(ctx, mask, deskCasters, scene, width, height, realWeight, sourceRadius)
 
+  // Meter the uncoloured aperture, including rails, foliage and desk objects.
+  // The caller requests a reading on geometry changes, never on a breeze tick.
+  if (onMeasure) {
+    if (!buffers.meter) {
+      buffers.meter = canvas.ownerDocument.createElement('canvas')
+      resize(buffers.meter, 24, 24)
+    }
+    const meter = buffers.meter.getContext('2d', { willReadFrequently: true })
+    meter.globalCompositeOperation = 'copy'
+    meter.imageSmoothingQuality = 'medium'
+    meter.drawImage(canvas, 0, 0, 24, 24)
+    const pixels = meter.getImageData(0, 0, 24, 24).data
+    let total = 0
+    for (let i = 3; i < pixels.length; i += 4) total += pixels[i]
+    onMeasure(total / (255 * 24 * 24))
+  }
+
   const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude, calibration)
   const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
   transmittedLight.addColorStop(0, scene.palette.core)
   transmittedLight.addColorStop(0.6, scene.palette.mid)
-  transmittedLight.addColorStop(1, scene.palette.ambient)
+  transmittedLight.addColorStop(1, scene.kind === 'lightning' ? scene.palette.ambient : scene.palette.mid)
   if (scene.kind === 'lightning') {
     ctx.save()
     ctx.globalCompositeOperation = 'source-in'
@@ -277,23 +301,20 @@ export function drawWindowProjection(
     return true
   }
 
-  mask.clearRect(0, 0, scratch.width, scratch.height)
-  mask.drawImage(canvas, 0, 0)
-  mask.save()
-  mask.globalCompositeOperation = 'source-in'
-  mask.fillStyle = transmittedLight
-  mask.globalAlpha = 0.22
-  mask.fillRect(0, 0, w, h)
-  mask.restore()
+  if (sun) {
+    sun.drawImage(canvas, 0, 0)
+    sun.save()
+    sun.globalCompositeOperation = 'source-in'
+    sun.fillStyle = transmittedLight
+    sun.fillRect(0, 0, w, h)
+    sun.restore()
+  }
 
   ctx.save()
   ctx.globalCompositeOperation = 'source-out'
   ctx.fillStyle = scene.shadowColor
   ctx.globalAlpha = Math.min(1, Math.max(0, shadowAlpha))
   ctx.fillRect(0, 0, w, h)
-  ctx.globalAlpha = 1
-  ctx.globalCompositeOperation = 'lighter'
-  ctx.drawImage(scratch, 0, 0)
   ctx.restore()
   return true
 }

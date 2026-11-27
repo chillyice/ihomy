@@ -241,6 +241,23 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   const optics = computed(() => weatherOptics(weatherMode.value, activeWeather.value))
   const skyLight = computed(() => skyLighting(sunScene.value, optics.value, cloudFlicker.value))
   const shadowAlpha = computed(() => Math.min(1, Math.max(0, shadowDepth.value / 70) * sunScene.value.shadowIntensity))
+  const castShade = computed(() => {
+    // Reserve the extra contrast for the upper end of the depth control.
+    const extra = Math.max(0, Math.min(1, (shadowDepth.value - 130) / 70))
+    // Above the 30° daylight stop the sky keeps brightening, without pushing
+    // the blocked surface darker as the sun climbs towards noon.
+    const daylight = Math.min(0.82, sunScene.value.skyLevel)
+    return shadowAlpha.value * daylight * optics.value.direct * (0.43 + 0.1 * extra)
+  })
+  const litFraction = ref(1)
+  const lampLevel = computed(() => {
+    const daylight = skyLight.value.metered
+    if (!shadowEnabled.value) return daylight
+    const coverage = sunScene.value.hasDirectLight ? 1 - litFraction.value : 1
+    // A broad, deep shadow can need fill even when the sky meter sees sun.
+    // Measure before lamp fill and ignore passing-cloud and foliage animation.
+    return Math.max(0, Math.min(daylight, 0.65 - 1.8 * castShade.value * coverage))
+  })
 
   // 夜间超时关灯:X 分钟无操作自动关灯,有操作时立即开灯(仅 auto 模式 + 夜间生效)
   // mousemove 节流:避免高频触发(每 2 秒最多一次 resetIdle)
@@ -321,10 +338,9 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     previewSlot.value = Math.max(0, Math.min((activeSunInfo.value?.slots?.length || 288) - 1, idx))
   }
 
-  // Meter before applying the lamp, independent of slider depth and cloud
-  // animation. Hysteresis prevents repeated switches near the threshold.
+  // Hysteresis prevents repeated switches near the threshold.
   const autoLampOn = computed((previous) => {
-    const level = skyLight.value.metered
+    const level = lampLevel.value
     if (level <= AUTO_LAMP_ON_BELOW) return true
     if (level >= AUTO_LAMP_OFF_ABOVE) return false
     return previous ?? level < (AUTO_LAMP_ON_BELOW + AUTO_LAMP_OFF_ABOVE) / 2
@@ -333,7 +349,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     if (lampMode.value === 'off') return 0
     if (lampMode.value === 'on') return 1
     if (isIdle.value) return 0
-    const level = skyLight.value.metered
+    const level = lampLevel.value
     // Scrubbing a frozen preview must not depend on the previously visited time.
     if (!lightTestMode.value && !autoLampOn.value) return 0
     return lampFromDaylight(level)
@@ -371,7 +387,9 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     const r = lampRadius.value
     const tr = lampMaskAlpha.value * r * s
     const te = r + 30
-    return `radial-gradient(circle at 38.2% 38.2%, transparent 0%, transparent ${tr}vw, rgba(0,0,0,0.15) ${tr + (te - tr) * 0.3}vw, rgba(0,0,0,0.4) ${tr + (te - tr) * 0.55}vw, rgba(0,0,0,0.7) ${tr + (te - tr) * 0.8}vw, black ${te}vw)`
+    // At low power lift only a fraction of the shadow, even at the centre.
+    const stop = (radius, fill) => `rgba(0,0,0,${1 - s * fill}) ${radius}vw`
+    return `radial-gradient(circle at 38.2% 38.2%, ${stop(tr, 1)}, ${stop(tr + (te - tr) * 0.3, 0.85)}, ${stop(tr + (te - tr) * 0.55, 0.6)}, ${stop(tr + (te - tr) * 0.8, 0.3)}, black ${te}vw)`
   })
 
   // 台灯色温插值:lampTemp 0 → 暖橙(255,180,100),100 → 冷白(220,230,255),
@@ -441,9 +459,6 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
 
   const lightLayerOpacity = computed(() => (shadowEnabled.value ? skyLight.value.direct : 0))
   const skyTint = computed(() => skyLight.value.tint)
-  // Reserve a small part of the daylight range for directional contrast.
-  // Keep the blocked surface continuous as the beam crosses the edge of the window.
-  const castShade = computed(() => shadowAlpha.value * sunScene.value.skyLevel * optics.value.direct * 0.43)
   // roomShade 是「环境暗度」的亮度口径(曝光模型与用例都按它算),
   // roomShadeLayer 换成暖褐乘色并把不透明度按色值亮度回推,观感偏暖而明暗不变。
   const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))
@@ -709,6 +724,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     snowParticles,
     rainParticles,
     castShade,
+    litFraction,
     roomShade,
     roomShadeLayer,
     lightLayerOpacity,

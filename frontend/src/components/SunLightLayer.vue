@@ -31,6 +31,7 @@
       :feather-strength="featherStrength"
       :standard="projectionStandard"
       :shadow-alpha="castShade"
+      @measure="litFraction = $event"
       :occluders="occluders"
       :desk-casters="deskCasters"
       :sashes="windowSashes"
@@ -177,6 +178,7 @@ const {
   projectionStandard,
   featherStrength,
   castShade,
+  litFraction,
   roomShadeLayer,
   lightLayerOpacity,
   blobsEnabled,
