@@ -57,8 +57,13 @@
         :key="c.value"
         type="button"
         class="game-cat-card card paper-surface"
+        :data-category="c.value"
         @click="activeCategory = c.value"
       >
+        <span v-if="theme.theme === 'warm'" class="game-cat-art" aria-hidden="true">
+          <GameIcon v-for="key in c.previewKeys" :key="key" :code="key" :size="44" />
+          <el-icon v-if="!c.previewKeys.length" :size="32"><Collection /></el-icon>
+        </span>
         <span class="game-cat-name">{{ c.label }}</span>
         <span class="game-cat-meta">{{ $t('games.categoryGamesCount', { n: c.count }) }}</span>
         <span class="game-cat-samples">{{ c.samples.join(' / ') }}</span>
@@ -263,6 +268,7 @@ import { dictText } from '@/utils/dict'
 import { visibilityOptions as buildVisibilityOptions, visibilityLabel, needsAudience } from '@/utils/visibility'
 import { useAudience } from '@/composables/useAudience'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { DESKTOP_TYPE, desktopAccept, isDesktopPackage, isDesktopType } from '@/utils/games/desktopGames'
@@ -274,6 +280,7 @@ import { lastRoomGame, rememberRoomGame } from '@/utils/gameRoom'
 const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
+const theme = useThemeStore()
 
 /** 导入文件选择器接受的格式:.swf + 全部模拟器 ROM(与后端 GameSystem 同口径) */
 const importFileAccept = importAccept()
@@ -332,6 +339,10 @@ const categoryTiles = computed(() =>
       value: c,
       label: categoryText(c),
       count: items.length,
+      previewKeys: items
+        .filter((it) => it.titleKey)
+        .slice(0, 2)
+        .map((it) => it.key),
       samples: items.slice(0, 3).map((it) => (it.titleKey ? t(it.titleKey) : it.name)),
     }
   }),
@@ -855,5 +866,95 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   z-index: 10;
+}
+
+/* 分类盒面只取当前可见的游戏封面。 */
+html.theme-warm .game-cat-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 174px), 1fr));
+  gap: 16px;
+}
+html.theme-warm .game-cat-card {
+  --box-spine: var(--color-brand);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'art count' 'name name' 'samples samples';
+  align-items: start;
+  gap: 6px;
+  padding: 16px 14px 14px 17px;
+  border: 1px solid var(--mat-edge);
+  border-inline-start: 5px solid var(--box-spine);
+  border-radius: 4px 10px 10px 4px;
+  box-shadow:
+    0 3px var(--color-card-2),
+    0 4px var(--mat-edge);
+}
+html.theme-warm .game-cat-card:is([data-category='BOARD'], [data-category='SIMULATION']) {
+  --box-spine: var(--color-green);
+}
+html.theme-warm .game-cat-card:is([data-category='CARD'], [data-category='ACTION'], [data-category='ARCADE']) {
+  --box-spine: var(--color-accent);
+}
+.game-cat-art {
+  grid-area: art;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--color-brand);
+}
+.game-cat-art > :nth-child(2) {
+  margin-inline-start: -16px;
+  transform: rotate(9deg);
+  box-shadow: 0 0 0 2px var(--color-card);
+}
+html.theme-warm .game-cat-name {
+  grid-area: name;
+  font-size: 18px;
+  font-weight: 700;
+}
+html.theme-warm .game-cat-card .game-cat-meta {
+  grid-area: count;
+  justify-self: end;
+  border-bottom: 1px solid var(--mat-edge);
+  padding-block: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-brand);
+  opacity: 1;
+}
+html.theme-warm .game-cat-samples {
+  grid-area: samples;
+  margin: 0;
+  opacity: 1;
+}
+html.theme-warm .tool-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: start;
+  column-gap: 14px;
+  border-color: var(--mat-edge);
+  border-radius: 6px 12px 12px 6px;
+}
+html.theme-warm .tool-card :is(.builtin-icon, .tool-icon) {
+  grid-row: span 2;
+  margin: 0;
+}
+html.theme-warm .tool-meta {
+  grid-column: 1 / -1;
+  border-top: 1px dashed var(--mat-edge);
+  padding-top: 8px;
+}
+html.theme-warm :is(.game-cat-card, .tool-card):is(:hover, :focus-visible) {
+  border-color: var(--color-brand);
+  box-shadow: var(--shadow);
+}
+@media (max-width: 600px) {
+  html.theme-warm .game-cat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 142px), 1fr));
+    gap: 10px;
+  }
+  html.theme-warm .game-cat-card {
+    padding: 10px;
+  }
 }
 </style>

@@ -371,11 +371,14 @@ html .window-shell:has(.wh, .elder-home) {
 html.theme-warm {
   --album-paper: var(--color-bg);
   --album-cloth-texture: url('@/assets/materials/album-bookcloth.webp?no-inline');
+  --album-cloth-cover: #505842 var(--album-cloth-texture) center / 128px;
+  --album-cloth-ink: #fff6e5;
   --album-page-wash: rgba(var(--color-card-rgb), 0.78);
   --album-fold: color-mix(in srgb, var(--color-text) 16%, transparent);
 }
 html.theme-warm.dark {
   --album-page-wash: rgba(var(--color-card-rgb), 0.91);
+  --album-cloth-cover: #373e31 var(--album-cloth-texture) center / 128px;
   --album-fold: color-mix(in srgb, var(--color-bg) 82%, transparent);
 }
 html.warm-paper-page:not(.fp-edit-focus) {
@@ -832,7 +835,7 @@ html.game-wide .page.game-page {
   --gs-control-h: 32px;
   --gs-radius: 10px;
   --gs-accent: var(--color-brand);
-  --gs-bg: transparent;
+  --gs-bg: var(--gs-page-ground, transparent);
   max-width: none;
   padding: var(--gs-pad);
   padding-bottom: var(--gs-pad-b);
@@ -841,8 +844,18 @@ html.game-wide .page.game-page {
 /* 暖居主题把内容页的上/左右内边距清零(留白交给 gc-main 一层),游戏外壳必须保留自己四周的一圈,
    否则头部与棋盘会贴到容器边缘;这里显式压过 `html.theme-warm .page`,任何主题档 --gs-pad 都生效 */
 html.theme-warm .page.game-shell {
+  --gs-page-ground:
+    linear-gradient(var(--album-page-wash), var(--album-page-wash)), var(--home-grain) center / var(--home-grain-size) var(--color-bg);
   padding: var(--gs-pad);
   padding-bottom: var(--gs-pad-b);
+}
+html.theme-warm .game-shell .gs-title {
+  padding: 2px 8px;
+  border-radius: 3px 6px 6px 3px;
+  color: var(--album-cloth-ink);
+  background: var(--album-cloth-cover);
+  background-blend-mode: soft-light;
+  box-shadow: inset 3px 0 rgb(255 246 229 / 28%);
 }
 /* 信息栏 = 头 + 规则面板 + 控件行 + 房间条。竖屏时它就是页面顶部的一摞(段间距由各段自己的 padding 给),
    横屏时整块挪到左列,游戏区独占右侧(见下面的横屏档) */

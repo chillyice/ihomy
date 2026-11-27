@@ -764,6 +764,21 @@ watch(roomId, () => {
   font-size: 22px;
   font-weight: 700;
 }
+html.theme-warm .room-page .room-hero {
+  border-inline-start: 5px solid var(--color-green);
+  border-radius: 4px 12px 12px 4px;
+}
+html.theme-warm .room-page .room-member:not(.empty, .bot) {
+  border-radius: 5px 12px 12px 5px;
+  box-shadow:
+    0 2px var(--color-card-2),
+    0 3px var(--mat-edge);
+}
+html.theme-warm .room-member.host .room-badge:not(.me) {
+  color: var(--album-cloth-ink);
+  background: var(--album-cloth-cover);
+  background-blend-mode: soft-light;
+}
 .room-game-picker {
   display: flex;
   align-items: center;

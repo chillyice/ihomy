@@ -3,7 +3,12 @@
 <template>
   <div class="page chat-page">
     <Breadcrumb v-if="theme.theme !== 'window'" :items="[{ label: $t('chat.title') }]" />
-    <div ref="chatBox" class="chat-box card" :class="{ 'keyboard-open': !!keyboardFrame }" :style="keyboardFrame">
+    <div
+      ref="chatBox"
+      class="chat-box card"
+      :class="{ 'keyboard-open': !!keyboardFrame, 'has-chat-float': chatFloatOn }"
+      :style="keyboardFrame"
+    >
       <header v-if="theme.theme === 'window'" class="room-heading">
         <div>
           <small>{{ user.userInfo?.nickname }}</small>
@@ -223,6 +228,107 @@ onBeforeUnmount(() => {
   }
   .online-hint {
     display: none;
+  }
+}
+
+/* 通信簿的布封、索引签和信纸只属于整页聊天室；浮窗也会复用里面的组件。 */
+html.theme-warm .chat-box {
+  --chat-inset: clamp(8px, 1.4vw, 18px);
+  padding: 0;
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  background-size: auto, var(--home-grain-size);
+  border-color: var(--mat-edge);
+  border-radius: 12px;
+}
+html.theme-warm .chat-box:hover {
+  transform: none;
+  box-shadow: var(--shadow);
+}
+html.theme-warm .chat-title {
+  margin: 0;
+  padding: 8px var(--chat-inset);
+  min-height: 48px;
+  flex: none;
+  border-radius: 11px 11px 0 0;
+  background: var(--album-cloth-cover);
+  background-blend-mode: soft-light;
+  color: var(--album-cloth-ink);
+  box-shadow: inset 0 -3px rgb(34 38 26 / 24%);
+}
+html.theme-warm .chat-title-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+html.theme-warm .chat-title-text::before {
+  content: '';
+  width: 52px;
+  height: 36px;
+  flex: none;
+  background: url('@/assets/windowdesk/envelope.webp') center / contain no-repeat;
+}
+html.theme-warm .chat-title :is(.online-hint, .float-toggle) {
+  color: inherit;
+}
+html.theme-warm .chat-page :deep(.chat-rail) {
+  padding-top: 8px;
+  background-color: var(--color-card-2);
+  border-radius: 0 0 0 11px;
+}
+html.theme-warm .chat-page :deep(.rail-item.active) {
+  color: var(--color-text);
+  background-color: var(--color-card);
+  background-image: var(--caption-paper);
+  box-shadow: inset 3px 0 var(--color-accent);
+  border-radius: 0 8px 8px 0;
+}
+html.theme-warm .chat-page :deep(.chat-main-head),
+html.theme-warm .chat-page :deep(.chat-composer),
+html.theme-warm .chat-page :deep(.assistant-compose) {
+  padding: 8px var(--chat-inset);
+}
+html.theme-warm .chat-page :deep(.chat-composer) {
+  border-top: 1px solid var(--mat-edge);
+}
+html.theme-warm .chat-page :deep(.msg-list),
+html.theme-warm .chat-page :deep(.assistant-stream) {
+  padding: 12px var(--chat-inset);
+  background: repeating-linear-gradient(transparent 0 27px, var(--color-line) 27px 28px);
+}
+html.theme-warm .chat-page :deep(.msg-bubble:not(.is-card)),
+html.theme-warm .chat-page :deep(.assistant-bubble) {
+  border: 1px solid var(--mat-edge);
+  border-radius: 2px 12px 12px;
+  background: var(--color-card);
+}
+html.theme-warm .chat-page :deep(.mine .msg-bubble:not(.is-card)),
+html.theme-warm .chat-page :deep(.assistant-bubble.mine) {
+  border-radius: 12px 2px 12px 12px;
+  background: var(--color-card-2);
+}
+@media (max-width: 768px) {
+  /* 在会话和联系人下方留一整行写信，展开或拖宽联系人时也能点到每个工具。 */
+  html.theme-warm .chat-page :deep(.chat-panel-body:has(.chat-composer)) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  html.theme-warm .chat-page :deep(.chat-main:has(.chat-composer)) {
+    display: contents;
+  }
+  html.theme-warm .chat-page :deep(.chat-panel-body:has(.chat-composer) .rail-slot) {
+    grid-row: 1 / 3;
+  }
+  html.theme-warm .chat-page :deep(.chat-composer) {
+    grid-column: 1 / -1;
+  }
+  html.theme-warm .chat-page :deep(.composer-toolbar) {
+    flex-wrap: wrap;
+  }
+  html.theme-warm .has-chat-float :deep(.msg-input) {
+    padding-inline-end: 60px;
   }
 }
 </style>
