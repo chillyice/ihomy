@@ -4867,6 +4867,13 @@ export default {
     pickHouse: '请选择房子',
     allHouses: '全部房子',
     deleteHouseConfirm: '确定删除该房子吗？房子下的房间会阻止删除',
+    shareHouse: '共享给其他家庭',
+    shareHouseTip:
+      '把「{house}」共享给选中的家庭后，对方家庭成员可以一起维护这座房子：' +
+      '增删改房间、家具与物品，编辑户型图。房子本身仍归你家，删除与调整共享只归你家家长；' +
+      '对方录入的私密物品只有他自己能看到。',
+    shareHouseNoCandidate: '你还没有加入其他家庭，暂时没有可共享的对象',
+    sharedFrom: '共享自 {family}',
     addRoom: '添加房间',
     editRoom: '编辑房间',
     roomName: '房间',

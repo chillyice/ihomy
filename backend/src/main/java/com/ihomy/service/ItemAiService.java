@@ -79,41 +79,47 @@ public class ItemAiService {
     private final FurnitureMapper furnitureMapper;
     private final ItemMapper itemMapper;
     private final ContentAccessService contentAccess;
+    private final HouseShareService houseShareService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ---------- 找物 ----------
 
     public Map<String, Object> find(ViewerScope viewer, String query) {
-        return find(contentAccess.visibleFilter(viewer), query);
+        // 协作共享的房子也参与找物:否则「我爱我家」的成员问「和岳府的钥匙在哪」会空手而归
+        List<Long> sharedHouseIds = viewer.familyId() == null
+                ? List.of() : houseShareService.sharedHouseIds(viewer.familyId());
+        return find(contentAccess.visibleFilter(viewer), query, sharedHouseIds);
     }
 
     /** 助手的找物工具只搜本家庭，在数据库检索与匹配排序前就排除其他家庭分享的物品。 */
     public Map<String, Object> findWithinFamily(ViewerScope viewer, String query) {
         VisibleFilter filter = contentAccess.visibleFilter(viewer);
-        return find(new VisibleFilter(filter.getFamilyId(), filter.getAuthorId(), filter.getVisibilities(), filter.isAll()), query);
+        return find(new VisibleFilter(filter.getFamilyId(), filter.getAuthorId(), filter.getVisibilities(), filter.isAll()),
+                query, List.of());
     }
 
-    private Map<String, Object> find(VisibleFilter filter, String query) {
+    private Map<String, Object> find(VisibleFilter filter, String query, List<Long> sharedHouseIds) {
         Long familyId = filter.getFamilyId();
         String q = requireText(query, "请描述要找的物品");
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ITEM_FIND);
-        Map<String, Object> result = findWith(filter, q, chain.primary());
+        Map<String, Object> result = findWith(filter, q, chain.primary(), sharedHouseIds);
         if (hasMatches(result) || !chain.hasFallback()) return result;
         log.info("[AI找物] 主模型无命中,回退兜底模型 family={}", familyId);
-        return findWith(filter, q, chain.fallback());
+        return findWith(filter, q, chain.fallback(), sharedHouseIds);
     }
 
     /** 按单个模型配置找物:LOCAL/未配置 → 纯本地;LLM → 本地优先,无命中才 LLM */
-    private Map<String, Object> findWith(VisibleFilter filter, String q, FamilyAiConfigService.AiConfig cfg) {
+    private Map<String, Object> findWith(VisibleFilter filter, String q, FamilyAiConfigService.AiConfig cfg,
+                                         List<Long> sharedHouseIds) {
         boolean localOnly = cfg == null || cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
         if (localOnly) {
-            return findResult(q, itemLocalParser.findLocal(filter, q), true);
+            return findResult(q, itemLocalParser.findLocal(filter, q, sharedHouseIds), true);
         }
-        List<Map<String, Object>> localMatches = itemLocalParser.findLocal(filter, q);
+        List<Map<String, Object>> localMatches = itemLocalParser.findLocal(filter, q, sharedHouseIds);
         if (!localMatches.isEmpty()) {
             return findResult(q, localMatches, true);
         }
-        return llmFind(filter, q, cfg);
+        return llmFind(filter, q, cfg, sharedHouseIds);
     }
 
     private boolean hasMatches(Map<String, Object> result) {
@@ -122,7 +128,8 @@ public class ItemAiService {
     }
 
     /** LLM 找物兜底:提取关键词+类型 → 内存打分;模型不可用/异常回退原文关键词 */
-    private Map<String, Object> llmFind(VisibleFilter filter, String q, FamilyAiConfigService.AiConfig cfg) {
+    private Map<String, Object> llmFind(VisibleFilter filter, String q, FamilyAiConfigService.AiConfig cfg,
+                                        List<Long> sharedHouseIds) {
         Long familyId = filter.getFamilyId();
         boolean aiParsed = true;
         JsonNode plan = null;
@@ -137,7 +144,7 @@ public class ItemAiService {
         List<String> keywords = parsed.isEmpty() ? List.of(q.trim()) : parsed; // AI 拆解失败回退原文
 
         List<Map<String, Object>> matches = itemMapper.selectItemByFamily(familyId, null, null, null, null,
-                        filter, null)
+                        filter, sharedHouseIds, null)
                 .stream()
                 .filter(row -> type == null || type.equals(str(row.get("type"))))
                 .map(row -> Map.entry(score(row, keywords), row))
@@ -411,7 +418,7 @@ public class ItemAiService {
                 })
                 .toList());
         ctx.put("items", itemMapper.selectItemByFamily(familyId, null, null, null, null,
-                        contentAccess.visibleFilter(viewer), CONTEXT_LIMIT).stream()
+                        contentAccess.visibleFilter(viewer), null, CONTEXT_LIMIT).stream()
                 .map(row -> {
                     // 紧凑"名称(别名1/别名2)"文本:省 id(AI 无需回传物品 id,后端按名称/别名匹配)与 JSON 键名 token
                     String name = str(row.get("name"));

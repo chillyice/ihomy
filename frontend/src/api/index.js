@@ -706,6 +706,10 @@ export const itemApi = {
   addHouse: (data) => request.post('/item/house', data),
   updateHouse: (id, data) => request.put(`/item/house/${id}`, data),
   removeHouse: (id) => request.delete(`/item/house/${id}`),
+  // 房子协作共享:把房子授权给自己所属的另一个家庭共同维护
+  houseShares: (id) => request.get(`/item/house/${id}/shares`),
+  saveHouseShares: (id, familyIds) => request.put(`/item/house/${id}/shares`, { familyIds }),
+  revokeHouseShare: (id, familyId) => request.delete(`/item/house/${id}/shares/${familyId}`),
   rooms: (houseId) => request.get('/item/room/list', { params: { houseId } }),
   addRoom: (data) => request.post('/item/room', data),
   updateRoom: (id, data) => request.put(`/item/room/${id}`, data),

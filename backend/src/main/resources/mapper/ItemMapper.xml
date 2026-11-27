@@ -4,7 +4,8 @@
 
     <!-- 物品可见性条件(单点判定在 ContentAccessService.visibleFilter,这里只机械套用):
          all=true(家长)=本家庭全部;否则 家庭 + (本人创建的 OR 可见档位);
-         shared=true 时并上「别人家分享给我家」的物品(亲友圈档)。 -->
+         shared=true 时并上「别人家分享给我家」的物品(亲友圈档);
+         sharedHouseIds 非空时再并上「共享给我家的房子」里的物品(协作共享,别人录的 PRIVATE 不可见)。 -->
     <sql id="itemVisible">
         AND (
             i.family_id = #{visible.familyId}
@@ -20,6 +21,11 @@
                 OR EXISTS (SELECT 1 FROM content_audience ca
                             WHERE ca.content_type = 'item' AND ca.content_id = i.id
                               AND ca.target_type = 'FAMILY' AND ca.target_id = #{visible.familyId})
+            </if>
+            <if test="sharedHouseIds != null and sharedHouseIds.size() > 0">
+                OR (COALESCE(r.house_id, ir.house_id) IN
+                    <foreach item="hid" collection="sharedHouseIds" open="(" separator="," close=")">#{hid}</foreach>
+                    AND (i.created_by = #{visible.authorId} OR i.visibility &lt;&gt; 'PRIVATE'))
             </if>
         )
     </sql>

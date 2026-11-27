@@ -14,6 +14,7 @@ public interface ItemMapper extends BaseMapper<Item> {
      * 家庭物品列表:JOIN 房间/家具,支持关键词与层级过滤。
      * 关键词匹配:物品名/别名/位置/家具名/房间名(3期 AI 拆解出的名称与别名走同一条查询)。
      * visible 为空=只取本家庭全部(AI 语义内部使用);非空=按观看者可见性过滤(列表/搜索)。
+     * sharedHouseIds 非空=并上「共享给我家的房子」里的物品(协作共享,PRIVATE 仍只作者本人可见)。
      */
     List<Map<String, Object>> selectItemByFamily(@Param("familyId") Long familyId,
                                                  @Param("keyword") String keyword,
@@ -21,6 +22,7 @@ public interface ItemMapper extends BaseMapper<Item> {
                                                  @Param("furnitureId") Long furnitureId,
                                                  @Param("type") String type,
                                                  @Param("visible") ContentAccessService.VisibleFilter visible,
+                                                 @Param("sharedHouseIds") List<Long> sharedHouseIds,
                                                  @Param("limit") Integer limit);
 
     /**

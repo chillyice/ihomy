@@ -499,7 +499,7 @@ class AssistantWrites {
                 dto.setRoomId(id(saved, "roomId"));
                 dto.setFurnitureId(id(saved, "furnitureId"));
                 dto.setVisibility(DictConst.VIS_FAMILY);
-                yield result(items.itemCreate(uid, family, dto).getId(), "/item");
+                yield result(items.itemCreate(viewer(user), dto).getId(), "/item");
             }
             case "create_plan" -> {
                 PlanDTO dto = new PlanDTO();
@@ -602,7 +602,7 @@ class AssistantWrites {
                 Map<String, Object> row = item(user, (String) a.get("name"));
                 if (!itemId.equals(row.get("id"))) throw new BizException(ResultCode.CONFLICT, "物品已变更，请重新确认");
                 BigDecimal amount = (BigDecimal) a.get("amount");
-                items.takeItem(itemId, family, amount, viewer(user));
+                items.takeItem(itemId, amount, viewer(user));
                 yield Map.of("name", a.get("name"), "amount", amount, "path", "/item");
             }
             default -> throw AssistantToolSpec.invalid();

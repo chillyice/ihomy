@@ -62,11 +62,20 @@ public class ItemLocalParser {
     }
 
     List<Map<String, Object>> findLocal(ContentAccessService.VisibleFilter filter, String query) {
+        return findLocal(filter, query, null);
+    }
+
+    /**
+     * 带协作房子的找物:sharedHouseIds 非空时把共享房子里的物品也纳入候选
+     * (共享房里别人录的 PRIVATE 仍按 SQL 片段过滤,只有作者本人可见)。
+     */
+    List<Map<String, Object>> findLocal(ContentAccessService.VisibleFilter filter, String query, List<Long> sharedHouseIds) {
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) return List.of();
         // 同义词变体:原文 + 把 query 中命中的别名替换为组内其它成员,任一叫法都能命中同一条
         List<String> variants = synonymService.expand(q);
-        return itemMapper.selectItemByFamily(filter.getFamilyId(), null, null, null, null, filter, null).stream()
+        return itemMapper.selectItemByFamily(filter.getFamilyId(), null, null, null, null, filter, sharedHouseIds, null)
+                .stream()
                 .map(row -> Map.entry(maxScore(row, variants), row))
                 .filter(e -> e.getKey() > 0)
                 .sorted((a, b) -> b.getKey() - a.getKey())

@@ -4073,3 +4073,18 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 SELECT 'achievement', '成就', 'icon-achievement', '/achievements', 'life', 'left', 13, 1
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'achievement' AND `family_id` IS NULL);
+
+-- ------------------------------------------------------------
+-- V15.33 房子协作共享(物品定位):把一所房子授权给另一个家庭共同维护。
+-- 幂等:表不存在才建;已有行不动。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_house_share` (
+  `id`                BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `house_id`          BIGINT   NOT NULL COMMENT '被共享的房子ID(family_house.id)',
+  `grantee_family_id` BIGINT   NOT NULL COMMENT '被共享家庭ID(sys_family_info.id)',
+  `created_by`        BIGINT   DEFAULT NULL COMMENT '授权人ID',
+  `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '授权时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_house_grantee` (`house_id`, `grantee_family_id`),
+  KEY `idx_grantee` (`grantee_family_id`, `house_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';

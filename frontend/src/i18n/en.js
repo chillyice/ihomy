@@ -4925,6 +4925,13 @@ export default {
     pickHouse: 'Pick a house',
     allHouses: 'All houses',
     deleteHouseConfirm: 'Delete this house? Deleting is blocked while it still has rooms',
+    shareHouse: 'Share with other families',
+    shareHouseTip:
+      'Once "{house}" is shared with the families you pick, their members can maintain it together: ' +
+      'add, edit and remove rooms, furniture and items, and edit the floor plan. The house still belongs to your family — ' +
+      'only the family owner can delete it or change sharing; private items entered by the other family stay visible to their author only.',
+    shareHouseNoCandidate: 'You have not joined any other family yet, so there is no one to share with',
+    sharedFrom: 'Shared from {family}',
     addRoom: 'Add room',
     editRoom: 'Edit room',
     roomName: 'Room',

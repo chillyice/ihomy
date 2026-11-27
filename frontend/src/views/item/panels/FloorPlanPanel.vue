@@ -3,7 +3,7 @@
     <h2>{{ $t(focusedSearch && !mapOpen ? 'windowTools.find' : 'windowTools.houseMap') }}</h2>
     <div v-if="focusedSearch && !mapOpen && houses.length" class="finder-houses">
       <button v-for="house in houses" :key="house.id" @click="browseHouse(house.id)">
-        {{ house.name }} <span aria-hidden="true">↗</span>
+        {{ houseLabel(house) }} <span aria-hidden="true">↗</span>
       </button>
     </div>
     <router-link v-else-if="!focusedSearch" to="/item?focus=search">{{ $t('windowTools.find') }}</router-link>
@@ -17,7 +17,7 @@
       class="fp-house"
       @change="onHouseChange"
     >
-      <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
+      <el-option v-for="h in houses" :key="h.id" :label="houseLabel(h)" :value="h.id" />
     </el-select>
     <el-input
       ref="searchInput"
@@ -746,6 +746,9 @@ const onSaveImageTransform = async (img) => {
 }
 
 // ---- 数据加载 ----
+/** 房子显示名:协作共享来的房子追一句「共享自 X」,免得和自家房子同名混在一起 */
+const houseLabel = (house) =>
+  house?.shared ? `${house.name} · ${t('item.sharedFrom', { family: house.ownerFamilyName || '-' })}` : house?.name || ''
 const loadHouses = async () => {
   // 物品定位是私有内容:游客不打注定 401 的请求,直接走空态
   if (!userStore.isLoggedIn) return
@@ -1793,6 +1796,8 @@ const openHouse = (row) => {
   houseDialogRef.value?.open(row ? { id: row.id, name: row.name, address: row.address } : { name: '', address: '' })
 }
 const removeHouse = async (row) => {
+  // 共享来的房子属于对方家庭,只能由房主家庭删;列表里也不给入口,直接调也不走
+  if (row?.shared) return
   await ElMessageBox.confirm(t('item.deleteHouseConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeHouse(row.id)
   ElMessage.success(t('common.success'))

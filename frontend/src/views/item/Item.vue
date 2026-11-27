@@ -15,7 +15,14 @@
     <div v-if="listMode" class="fp-list">
       <el-tabs v-model="tab">
         <el-tab-pane :label="$t('item.houses')" name="houses">
-          <HousesTab :houses="houses" @add="openHouse()" @edit="openHouse" @remove="removeHouse" />
+          <HousesTab
+            :houses="houses"
+            :can-share="user.isOwner"
+            @add="openHouse()"
+            @edit="openHouse"
+            @remove="removeHouse"
+            @share="openHouseShare"
+          />
         </el-tab-pane>
         <el-tab-pane :label="$t('item.rooms')" name="rooms">
           <RoomsTab
@@ -57,6 +64,9 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- 房子协作共享(仅房主家长可调整) -->
+    <HouseShareDialog ref="shareDialogRef" @saved="onShareSaved" />
   </div>
 </template>
 
@@ -68,10 +78,12 @@ import RoomsTab from './tabs/RoomsTab.vue'
 import FurnituresTab from './tabs/FurnituresTab.vue'
 import ItemsTab from './tabs/ItemsTab.vue'
 import FloorPlanPanel from './panels/FloorPlanPanel.vue'
+import HouseShareDialog from './dialogs/HouseShareDialog.vue'
 
 // 户型图面板常驻并持有共享数据/CRUD,列表模式经模板 ref + defineExpose 取其数据/方法
 const user = useUserStore()
 const panelRef = ref(null)
+const shareDialogRef = ref(null)
 const listMode = ref(false)
 const tab = ref('houses')
 const keyword = ref('')
@@ -100,6 +112,8 @@ const removeFurniture = (row) => panelRef.value?.removeFurniture(row)
 const removeItem = (row) => panelRef.value?.removeItem(row)
 const toggleSelect = () => panelRef.value?.toggleSelect()
 const togglePick = (it) => panelRef.value?.togglePick(it)
+const openHouseShare = (row) => shareDialogRef.value?.open(row)
+const onShareSaved = () => panelRef.value?.loadHouses()
 </script>
 
 <style scoped>

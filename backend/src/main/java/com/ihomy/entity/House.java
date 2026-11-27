@@ -27,4 +27,12 @@ public class House {
     private LocalDateTime createdAt;
     @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
+
+    /** 以下为展示用瞬时字段(不入库):共享给我家的房子带房主家庭信息 */
+    @TableField(exist = false)
+    private Boolean shared;
+    @TableField(exist = false)
+    private Long ownerFamilyId;
+    @TableField(exist = false)
+    private String ownerFamilyName;
 }

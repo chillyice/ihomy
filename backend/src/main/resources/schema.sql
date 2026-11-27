@@ -3482,3 +3482,21 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
 ('achievement', '成就', 'icon-achievement', '/achievements', 'life', 'left', 13, 1);
 
+-- ------------------------------------------------------------
+-- 92. family_house_share 房子协作共享(V15.33):
+--     物品定位的房子可授权给另一个家庭共同维护(房间/家具/物品增删改查)。
+--     房子与子数据仍归房主家庭(family_house.family_id),协作方操作的 created_by 记实际操作人;
+--     一行 = 一条授权,撤销即物理删除;删房子与调整共享只归房主家庭家长。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_house_share`;
+CREATE TABLE `family_house_share` (
+  `id`                BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `house_id`          BIGINT   NOT NULL COMMENT '被共享的房子ID(family_house.id)',
+  `grantee_family_id` BIGINT   NOT NULL COMMENT '被共享家庭ID(sys_family_info.id)',
+  `created_by`        BIGINT   DEFAULT NULL COMMENT '授权人ID',
+  `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '授权时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_house_grantee` (`house_id`, `grantee_family_id`),
+  KEY `idx_grantee` (`grantee_family_id`, `house_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';
+
