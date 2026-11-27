@@ -171,11 +171,13 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useCallStore } from '@/stores/call'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { isActiveStatus } from '@/utils/callMesh'
 import { useDragResize } from '@/utils/useDragResize'
 
 const userStore = useUserStore()
 const call = useCallStore()
+usePlaybackLighting(() => call.inCall && call.isVideo)
 const { t } = useI18n()
 
 // 最小化小窗位置(通话间记忆:挂断再打回到上次放的地方;键登记 LightSettings 清理清单)

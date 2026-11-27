@@ -2,7 +2,7 @@
 // 从 Home.vue 提取,供 SunLightLayer.vue 和全局使用
 // 用法:App.vue 调用 useSunLight() 并 provide(SUN_LIGHT_KEY, state)
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
-import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { inject, ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import {
   AUTO_LAMP_ON_BELOW,
@@ -25,6 +25,21 @@ import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
+
+// Each viewer releases only its own pause, including when it unmounts while open.
+export function usePlaybackLighting(isOpen) {
+  const light = inject(SUN_LIGHT_KEY, null)
+  const viewer = Symbol()
+  watch(
+    isOpen,
+    (open, _, onCleanup) => {
+      if (!open || !light) return
+      light.suspendEffects(viewer)
+      onCleanup(() => light.restoreEffects(viewer))
+    },
+    { immediate: true, flush: 'sync' },
+  )
+}
 const SASH_SESSION_KEY = 'ihomy:window:last-pose'
 
 export function useSunLight(canReadEnvironment = () => true, canUseLight = () => true) {
@@ -62,7 +77,8 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   })
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
-  const suspended = ref(false)
+  const playbackOwners = reactive(new Set())
+  const suspended = computed(() => playbackOwners.size > 0)
   // 光影总开关:关闭时下方每项按「关」呈现,但各自的偏好仍留在存储里,重新打开即恢复
   const masterEnabled = ref(_saved.effectsEnabled ?? true)
   const _lampMode = ref(_saved.lampMode ?? 'auto')
@@ -94,11 +110,14 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
       masterEnabled.value = enabled
     },
   })
-  const active = computed(() => canUseLight() && masterEnabled.value && !suspended.value)
+  const controlsLocked = computed(() => !canUseLight() || suspended.value)
+  const active = computed(() => masterEnabled.value && !controlsLocked.value)
   // 对外的开关都经总开关过滤:组件与样式只看得到最终生效值,写回仍落到各自偏好
   const lampMode = computed({
     get: () => (active.value ? _lampMode.value : 'off'),
-    set: (v) => (_lampMode.value = v),
+    set: (v) => {
+      if (!controlsLocked.value) _lampMode.value = v
+    },
   })
   const shadowEnabled = computed({
     get: () => active.value && _shadowEnabled.value,
@@ -263,12 +282,16 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   // mousemove 节流:避免高频触发(每 2 秒最多一次 resetIdle)
   const idleMinutes = ref(5)
   const isIdle = ref(false)
+  const seatLighting = ref(false)
+  const saverPhase = ref(null)
+  const saverCoversScene = computed(() => saverPhase.value === 'black' || saverPhase.value === 'cards')
   let idleTimer = null
   let lastIdleReset = 0
   const IDLE_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll']
   const IDLE_EVENTS_THROTTLED = ['mousemove']
 
   const resetIdle = () => {
+    if (seatLighting.value) return
     const now = Date.now()
     if (now - lastIdleReset < 2000) return // 节流:2秒内只处理一次
     lastIdleReset = now
@@ -283,10 +306,17 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   }
 
   const toggleLamp = () => {
+    if (!active.value) return
     const modes = ['auto', 'on', 'off']
     const i = modes.indexOf(lampMode.value)
     lampMode.value = modes[(i + 1) % 3]
   }
+  watch(seatLighting, (enabled) => {
+    clearTimeout(idleTimer)
+    isIdle.value = false
+    lastIdleReset = 0
+    if (!enabled) resetIdle()
+  })
 
   // 光照测试:开启后每 208ms 推进一个时隙(5 分钟),288 个时隙=1 天循环
   const scheduleTestPlayback = () => {
@@ -346,9 +376,9 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     return previous ?? level < (AUTO_LAMP_ON_BELOW + AUTO_LAMP_OFF_ABOVE) / 2
   })
   const lampStrength = computed(() => {
-    if (lampMode.value === 'off') return 0
+    if (lampMode.value === 'off' || saverPhase.value) return 0
     if (lampMode.value === 'on') return 1
-    if (isIdle.value) return 0
+    if (!seatLighting.value && isIdle.value) return 0
     const level = lampLevel.value
     // Scrubbing a frozen preview must not depend on the previously visited time.
     if (!lightTestMode.value && !autoLampOn.value) return 0
@@ -672,11 +702,11 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
 
   // Playback only masks the effective values. Preferences stay intact even
   // if the master was off before entering a game or reader.
-  const suspendEffects = () => {
-    suspended.value = true
+  const suspendEffects = (owner = 'playback') => {
+    playbackOwners.add(owner)
   }
-  const restoreEffects = () => {
-    suspended.value = false
+  const restoreEffects = (owner = 'playback') => {
+    playbackOwners.delete(owner)
   }
 
   return {
@@ -715,6 +745,12 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     idleMinutes,
     isIdle,
     lampStrength,
+    seatLighting,
+    suspended,
+    lampAvailable: active,
+    controlsLocked,
+    saverPhase,
+    saverCoversScene,
     lampStrengthAnim,
     lampDivOpacity,
     lampRadius,

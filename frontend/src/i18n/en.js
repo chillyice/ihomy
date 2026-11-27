@@ -3622,6 +3622,7 @@ export default {
     alertPushHint: 'Local weather alerts go to every family member (may lag by around half an hour)',
     lampMode: 'Lamp mode',
     lampAuto: 'Auto (fill dim light or widespread deep shadows)',
+    lampSeat: 'Auto (off in standby, fill dim light when awake)',
     lampOn: 'Always on',
     lampOff: 'Off',
     colorTemp: 'Color temperature',
@@ -8172,6 +8173,9 @@ export default {
     minutes: 'min',
     background: 'Background',
     bgBlack: 'Pure black',
+    bgDefault: 'Default',
+    bgDefaultHint:
+      'The lamp dims while the weather continues. After 30 minutes, cards appear over a weather scene. The screen stays black from 10 PM to 7 AM and gradually brightens when you wake it.',
     bgBlackHint: 'Only black fills the screen: the easiest on power and the display. Chosen cards still show.',
     bgWeather: 'Weather image',
     bgWeatherHint: 'Fills the screen with today’s AI weather image; shows black until one is ready.',

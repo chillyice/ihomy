@@ -198,10 +198,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { shareId } from '@/utils/shareId'
 import { useUserStore } from '@/stores/user'
 import { shareToChat } from '@/utils/chatShare'
@@ -221,7 +221,7 @@ const emit = defineEmits(['update:visible', 'close', 'delete'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const sunLight = inject(SUN_LIGHT_KEY, null)
+usePlaybackLighting(() => props.visible)
 
 const index = ref(0)
 const playing = ref(false)
@@ -430,12 +430,10 @@ watch(
       index.value = props.initialIndex
       scrollThumbIntoView()
       document.body.style.overflow = 'hidden'
-      sunLight?.suspendEffects()
     } else {
       document.body.style.overflow = ''
       stopPlay()
       livePlaying.value = false
-      sunLight?.restoreEffects()
     }
   },
 )
@@ -457,7 +455,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
   stopPlay()
   document.body.style.overflow = ''
-  sunLight?.restoreEffects()
 })
 </script>
 

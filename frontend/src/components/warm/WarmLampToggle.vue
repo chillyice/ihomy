@@ -2,6 +2,7 @@
   <button
     type="button"
     class="warm-lamp"
+    :disabled="!lampAvailable"
     :class="{ 'is-on': lit, 'is-auto': lampMode === 'auto' }"
     :aria-label="label"
     :title="label"
@@ -20,7 +21,7 @@ import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
-const { lampMode, lampStrength, toggleLamp } = inject(SUN_LIGHT_KEY)
+const { lampMode, lampStrength, lampAvailable, toggleLamp } = inject(SUN_LIGHT_KEY)
 const { t } = useI18n()
 const modeLabels = { auto: 'sidebar.lampAuto', on: 'sidebar.lampOn', off: 'sidebar.lampOff' }
 const label = computed(() => t('theme.cycleLamp', { mode: t(modeLabels[lampMode.value]) }))

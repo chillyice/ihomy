@@ -1,5 +1,5 @@
 <!-- 统一屏保:长期不动后盖一层全屏页。
-     背景三选(纯黑 / 天气图 / 我的图片),卡片可勾选(时间天气 / 今日待办 / 未来日程 / 纪念日 / 家庭照片);
+     默认随闲置时间和昼夜切换，也可固定纯黑、天气图或我的图片。
      原先的手机屏保、暖居背景待机浮现与窗边常亮看板合并到这里(见 utils/screensaver.js)。
      交互口径:轻点/移动/按键任意一种都只做唤醒——根节点吞掉 click/pointerdown,
        背后页面的按钮与链接收不到这次事件(不穿透);滚动/右键/长按菜单同样拦下。
@@ -9,6 +9,8 @@
     <div
       v-if="visible"
       class="ss"
+      :style="{ '--ss-x': shift.x + 'px', '--ss-y': shift.y + 'px' }"
+      :class="{ 'ss-dim': phase === 'dim', 'ss-cover': phase === 'black' || phase === 'cards', 'ss-waking': waking }"
       ref="overlay"
       tabindex="-1"
       role="dialog"
@@ -21,15 +23,31 @@
       @touchmove.stop.prevent
       @contextmenu.prevent
     >
+      <MorningScene
+        v-if="phase === 'cards'"
+        class="ss-weather-art"
+        :condition="resolveMorningWeather(weather)"
+        :night="sceneNight"
+        :sun-scene="sunScene"
+        :wind-scale="weather?.nowFull?.windScale ?? weather?.windScale"
+        :wind-deg="weather?.nowFull?.wind360"
+        :wind-dir="weather?.nowFull?.windDir"
+        :precip-level="weather?.precipLevel"
+      />
       <div
-        v-if="bg.kind === 'image'"
+        v-if="phase === 'classic' && bg.kind === 'image'"
         class="ss-bg"
         aria-hidden="true"
         :style="{ backgroundImage: bg.image, backgroundSize: bg.size, opacity: bg.opacity }"
       ></div>
-      <div v-if="bg.kind === 'image' && hasContent" class="ss-scrim" :class="{ 'ss-scrim-photo': bg.photo }" aria-hidden="true"></div>
+      <div
+        v-if="showCards && (phase === 'cards' || bg.kind === 'image') && hasContent"
+        class="ss-scrim"
+        :class="{ 'ss-scrim-photo': phase === 'classic' && bg.photo }"
+        aria-hidden="true"
+      ></div>
 
-      <div class="ss-stage" :style="stageStyle">
+      <div v-if="showCards" class="ss-stage">
         <header v-if="cards.clock" class="ss-head">
           <div class="ss-clock">{{ clock.time }}</div>
           <div class="ss-meta">
@@ -90,13 +108,13 @@
         </div>
       </div>
 
-      <div class="ss-hint">{{ $t('screensaver.exitHint') }}</div>
+      <div v-if="showCards" class="ss-hint">{{ $t('screensaver.exitHint') }}</div>
     </div>
   </Teleport>
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
@@ -106,10 +124,12 @@ import { useIdle } from '@/composables/useIdle'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { isVoiceCaptureActive } from '@/composables/useVoiceRecorder'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { resolveMorningWeather } from '@/utils/morningWeather'
 import { publicApi, scheduleApi } from '@/api'
 import {
   BG,
   activeStandbyTask,
+  defaultScreensaverStage,
   isBusyScreen,
   loadPrefs,
   prefsTick,
@@ -120,6 +140,7 @@ import {
 } from '@/utils/screensaver'
 
 const { t } = useI18n()
+const MorningScene = defineAsyncComponent(() => import('@/components/morning/MorningScene.vue'))
 const route = useRoute()
 const userStore = useUserStore()
 const callStore = useCallStore()
@@ -141,12 +162,26 @@ const SHIFT_INTERVAL_MS = 60000
 
 const prefs = reactive(loadPrefs())
 const visible = ref(false)
+const phase = ref('classic')
+const waking = ref(false)
+const showCards = computed(() => phase.value === 'classic' || phase.value === 'cards')
+let phaseTimer
+let wakeTimer
+watch(
+  () => prefs.enabled && prefs.bg === BG.DEFAULT && !isChild.value && !userStore.isPureOps && !userStore.mustChangePassword,
+  (enabled) => {
+    if (sunLight) sunLight.seatLighting.value = enabled
+  },
+  { immediate: true },
+)
 const overlay = ref(null)
 let previousFocus = null
 let keyToRelease = null
 let shownAt = 0
 let loadSequence = 0
 const clock = ref({ time: '', date: '', week: '' })
+const sunScene = computed(() => (sunLight?.activeSunInfo.value?.slots?.length ? sunLight.sunScene.value : null))
+const sceneNight = computed(() => sunScene.value?.isNight ?? clock.value.time >= '19:00')
 const todayStr = ref('')
 const familyName = ref('')
 const photos = ref([])
@@ -154,13 +189,12 @@ const photoIndex = ref(0)
 const events = ref([])
 const scheduleItems = ref([])
 const shift = ref({ x: 0, y: 0 })
-let shiftFlip = false
+let shiftStep = 0
 
 const cards = computed(() => prefs.cards)
 // 天气图按需取(不选天气图时不触发生图);暖居外壳/首页也共用同一份缓存
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
 const bg = computed(() => screensaverBgLayer(prefs, { weatherUrl: weatherBg.value, isLoggedIn: userStore.isLoggedIn }))
-const stageStyle = computed(() => ({ transform: `translate(${shift.value.x}px, ${shift.value.y}px)` }))
 
 // 取数缓存:屏保反复进出不重复打接口(5 分钟内拿缓存)
 const cache = { at: 0, photos: [], familyName: '', events: [], schedule: [] }
@@ -275,8 +309,8 @@ const stopShift = () => {
 const startShift = () => {
   stopShift()
   shiftTimer = setInterval(() => {
-    shiftFlip = !shiftFlip
-    shift.value = shiftFlip ? { x: -8, y: -6 } : { x: 8, y: 6 }
+    shiftStep++
+    shift.value = { x: ((shiftStep * 7) % 17) - 8, y: ((shiftStep * 5) % 13) - 6 }
   }, SHIFT_INTERVAL_MS)
 }
 
@@ -297,13 +331,17 @@ const syncPhotoTimer = () => {
   else stopPhoto()
 }
 
-// 进入屏保:时钟/位移/照片轮播/数据刷新一起起来,退出时统一 stopTimers
-const enter = () => {
+const displayPhase = () => {
+  clearTimeout(phaseTimer)
   stopTimers()
-  visible.value = true
-  shownAt = Date.now()
-  previousFocus = document.activeElement
-  nextTick(() => overlay.value?.focus({ preventScroll: true }))
+  loadSequence++
+  if (prefs.bg === BG.DEFAULT) {
+    const stage = defaultScreensaverStage(shownAt)
+    phase.value = stage.phase
+    phaseTimer = setTimeout(displayPhase, Math.max(1, stage.nextAt - Date.now()))
+  } else phase.value = 'classic'
+  if (sunLight) sunLight.saverPhase.value = prefs.bg === BG.DEFAULT ? phase.value : null
+  if (!showCards.value) return
   syncClock()
   clockTimer = setInterval(syncClock, 1000)
   startShift()
@@ -311,6 +349,14 @@ const enter = () => {
   if (bg.value.kind === 'image' && prefs.bg === BG.WEATHER && !weatherBg.value) loadWeatherBg(weather.value)
   loadData()
   refreshTimer = setInterval(() => loadData(true), REFRESH_MS)
+}
+
+const enter = () => {
+  visible.value = true
+  shownAt = Date.now()
+  previousFocus = document.activeElement
+  nextTick(() => overlay.value?.focus({ preventScroll: true }))
+  displayPhase()
 }
 
 const show = () => {
@@ -321,6 +367,10 @@ const show = () => {
 
 const hide = () => {
   if (!visible.value) return
+  clearTimeout(phaseTimer)
+  clearTimeout(wakeTimer)
+  waking.value = false
+  if (sunLight) sunLight.saverPhase.value = null
   visible.value = false
   loadSequence++
   stopTimers()
@@ -330,7 +380,18 @@ const hide = () => {
 
 // 轻点任意处唤醒:该次 click 已被根节点吞下,背后页面收不到
 const wake = () => {
-  if (!visible.value) return
+  if (!visible.value || waking.value) return
+  if (prefs.bg === BG.DEFAULT) {
+    waking.value = true
+    clearTimeout(phaseTimer)
+    if (sunLight) sunLight.saverPhase.value = null
+    // Keep the input shield and its current picture while the room brightens.
+    wakeTimer = setTimeout(() => {
+      hide()
+      poke()
+    }, 2400)
+    return
+  }
   hide()
   poke()
 }
@@ -347,6 +408,7 @@ const context = () => ({
   inCall: callStore.inCall,
   routeMeta: route.meta,
   busy:
+    sunLight?.suspended.value ||
     isBusyScreen() ||
     isVoiceCaptureActive() ||
     protectedStandbyRoute(route.path) ||
@@ -368,17 +430,18 @@ watch(isIdle, (idle) => {
 // 设置页「预览」:立即展示(会照常吞点击,点一下即退出)
 watch(previewTick, () => {
   syncPrefs()
+  if (sunLight?.suspended.value || protectedStandbyRoute(route.path) || route.meta.immersive) return
   if (!visible.value && !callStore.inCall && !isChild.value && !userStore.mustChangePassword && !userStore.isPureOps) enter()
 })
 
 // 照片是异步取回来的:进屏保时先起来的那份可能还是空数组,数据到货后补上轮播
 watch(photos, () => {
-  if (visible.value) syncPhotoTimer()
+  if (visible.value && showCards.value) syncPhotoTimer()
 })
 watch(
   () => prefs.cards.photos,
   () => {
-    if (visible.value) syncPhotoTimer()
+    if (visible.value && showCards.value) syncPhotoTimer()
   },
 )
 
@@ -420,6 +483,12 @@ watch(
 watch(isChild, (v) => {
   if (v) hide()
 })
+watch(
+  () => sunLight?.suspended.value,
+  (paused) => {
+    if (paused) hide()
+  },
+)
 
 // 天气到货后补取天气图(只在「天气图」背景时)
 watch(
@@ -434,6 +503,13 @@ watch(
 const onVisibility = () => {
   if (document.visibilityState === 'visible') {
     syncPrefs()
+    if (visible.value && prefs.bg === BG.DEFAULT && !waking.value) displayPhase()
+    return
+  }
+  if (visible.value && prefs.bg === BG.DEFAULT && !waking.value) {
+    clearTimeout(phaseTimer)
+    loadSequence++
+    stopTimers()
     return
   }
   hide()
@@ -456,6 +532,8 @@ if (typeof document !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  hide()
+  if (sunLight) sunLight.seatLighting.value = false
   stopTimers()
   if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
   window.removeEventListener('keydown', onWakeKey, true)
@@ -465,6 +543,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .ss {
+  --ss-x: 0px;
+  --ss-y: 0px;
   position: fixed;
   /* 构建目标 safari14 不支持 inset 简写 */
   top: 0;
@@ -484,13 +564,37 @@ onBeforeUnmount(() => {
 }
 
 /* 背景图:自身浓度由用户设置(天气图固定满浓度),压暗层只负责文字可读性 */
+.ss-dim {
+  /* Cover stationary navigation and text while the original window and weather remain above. */
+  background: linear-gradient(rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.36)), var(--color-bg);
+}
+.ss-cover {
+  z-index: var(--z-topmost);
+}
+.ss-cover:focus {
+  outline: none;
+}
+.ss-waking {
+  opacity: 0;
+  transition: opacity 2.4s ease-in-out;
+}
 .ss-bg {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
   background-position: center;
+}
+.ss-bg,
+.ss .ss-weather-art {
+  top: -10px;
+  right: -10px;
+  bottom: -10px;
+  left: -10px;
+}
+.ss-stage,
+.ss-hint,
+.ss-bg,
+.ss-weather-art {
+  transform: translate(var(--ss-x), var(--ss-y));
+  transition: transform 2s ease;
 }
 .ss-scrim {
   position: absolute;
@@ -516,7 +620,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: clamp(12px, 2vh, 26px);
   padding: clamp(20px, 4vw, 56px);
-  transition: transform 2s ease;
 }
 
 .ss-head {
@@ -717,7 +820,14 @@ onBeforeUnmount(() => {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* Keep the luminance ramp even when movement is disabled. */
+  .ss-waking {
+    transition-duration: 2.4s !important;
+  }
   .ss-stage,
+  .ss-hint,
+  .ss-bg,
+  .ss-weather-art,
   .ss-fade-enter-active,
   .ss-fade-leave-active {
     transition: none;

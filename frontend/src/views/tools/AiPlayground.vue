@@ -202,7 +202,15 @@
           <div v-if="imageLoading" v-loading="imageLoading" class="pg-img-loading" />
           <div v-else-if="imageResults.length" class="pg-img-grid">
             <div v-for="(img, i) in imageResults" :key="i" class="pg-img-item">
-              <el-image :src="img.url" :preview-src-list="[img.url]" fit="cover" loading="lazy" hide-on-click-modal />
+              <el-image
+                :src="img.url"
+                :preview-src-list="[img.url]"
+                fit="cover"
+                loading="lazy"
+                hide-on-click-modal
+                @show="previewOpen = true"
+                @close="previewOpen = false"
+              />
               <el-button size="small" text @click="copyUrl(img.url)">{{ $t('tools.aiPlayground.copyUrl') }}</el-button>
             </div>
           </div>
@@ -333,12 +341,15 @@ import { useRoute } from 'vue-router'
 import { aiApi, albumApi, photoApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { readWeatherBgConfig, saveWeatherBgConfig, weatherSceneThemes, weatherStyleIds } from '@/utils/weatherBackground'
 
 const { t } = useI18n()
 
 // ---- 能力状态(external.yml 配置驱动,未配置能力禁用并提示) ----
 const capability = ref('chat')
+const previewOpen = ref(false)
+usePlaybackLighting(previewOpen)
 const statusMap = ref({})
 const statusLoaded = ref(false)
 const currentStatus = computed(() => statusMap.value[capability.value] || { available: false, model: '' })

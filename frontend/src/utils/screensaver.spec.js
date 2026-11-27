@@ -7,6 +7,7 @@ import {
   IDLE_MIN,
   SS_KEY,
   activeStandbyTask,
+  defaultScreensaverStage,
   loadPrefs,
   normalizePrefs,
   protectedStandbyRoute,
@@ -41,7 +42,8 @@ describe('normalizePrefs', () => {
     expect(normalizePrefs({ idleMinutes: 'abc' }).idleMinutes).toBe(DEFAULT_PREFS.idleMinutes)
   })
 
-  it('背景只认三档,未知值回退天气图', () => {
+  it('默认启用分时屏保，显式背景选择继续生效', () => {
+    expect(loadPrefs()).toMatchObject({ enabled: true, bg: BG.DEFAULT })
     expect(normalizePrefs({ bg: BG.BLACK }).bg).toBe(BG.BLACK)
     expect(normalizePrefs({ bg: BG.IMAGE }).bg).toBe(BG.IMAGE)
     expect(normalizePrefs({ bg: BG.WEATHER }).bg).toBe(BG.WEATHER)
@@ -124,6 +126,17 @@ describe('loadPrefs / savePrefs', () => {
 })
 
 describe('screensaverBgLayer', () => {
+  it('按进入时间展示卡片，跨午夜保留闲置时长', () => {
+    const start = new Date(2026, 10, 27, 21, 20).getTime()
+    const phaseAt = (day, hour, minute) => defaultScreensaverStage(start, new Date(2026, 10, day, hour, minute))
+    expect(phaseAt(27, 21, 49)).toEqual({ phase: 'dim', nextAt: start + 1800000 })
+    expect(phaseAt(27, 21, 50).phase).toBe('cards')
+    const morning = new Date(2026, 10, 28, 7).getTime()
+    expect(phaseAt(27, 22, 0)).toEqual({ phase: 'black', nextAt: morning })
+    expect(phaseAt(28, 6, 59)).toEqual({ phase: 'black', nextAt: morning })
+    expect(phaseAt(28, 7, 0).phase).toBe('cards')
+    expect(defaultScreensaverStage(morning - 60000, new Date(morning)).phase).toBe('dim')
+  })
   it('纯黑不画图', () => {
     expect(screensaverBgLayer({ ...DEFAULT_PREFS, bg: BG.BLACK }, { weatherUrl: 'x.jpg' })).toEqual({ kind: 'black' })
   })
@@ -200,7 +213,9 @@ describe('protectedStandbyRoute', () => {
     expect(protectedStandbyRoute('/blog/new')).toBe(true)
     expect(protectedStandbyRoute('/cinema/1')).toBe(true)
     expect(protectedStandbyRoute('/home')).toBe(false)
-    expect(protectedStandbyRoute('/blog/12')).toBe(false)
+    expect(protectedStandbyRoute('/blog/12')).toBe(true)
+    expect(protectedStandbyRoute('/diary/book/7')).toBe(true)
+    expect(protectedStandbyRoute('/blog')).toBe(false)
   })
 })
 

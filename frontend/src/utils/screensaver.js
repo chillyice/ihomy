@@ -1,12 +1,12 @@
 // 统一屏保:长时间不动后盖一层全屏页。
-// 背景(纯黑 / 天气图 / 我的图片)与卡片(时间天气 / 今日待办 / 未来日程 / 纪念日 / 家庭照片)
+// 背景(默认 / 纯黑 / 天气图 / 我的图片)与卡片(时间天气 / 今日待办 / 未来日程 / 纪念日 / 家庭照片)
 // 分开配置;原先的手机屏保、暖居背景待机浮现、窗边常亮看板合并到这里,一处口径。
 // 偏好只存本机(设备相关:多久不动、这台设备显示什么),归一化与能否触发都收在纯函数里。
 import { ref } from 'vue'
 import { parseWarmBg, presetById, warmBgLayer } from '@/utils/warmBackground'
 
 export const SS_KEY = 'ihomy:screensaver:v1'
-export const BG = { BLACK: 'BLACK', WEATHER: 'WEATHER', IMAGE: 'IMAGE' }
+export const BG = { DEFAULT: 'DEFAULT', BLACK: 'BLACK', WEATHER: 'WEATHER', IMAGE: 'IMAGE' }
 export const CARDS = ['clock', 'todo', 'schedule', 'anni', 'photos']
 export const IDLE_MIN = 1
 export const IDLE_MAX = 30
@@ -16,7 +16,7 @@ export const IMAGE_DEFAULTS = { pick: 'preset', preset: 'amber', url: '', opacit
 export const DEFAULT_PREFS = {
   enabled: true,
   idleMinutes: 5,
-  bg: BG.WEATHER,
+  bg: BG.DEFAULT,
   image: { ...IMAGE_DEFAULTS },
   cards: { clock: true, todo: true, schedule: true, anni: true, photos: true },
 }
@@ -32,7 +32,7 @@ function normalizeImage(raw) {
 
 /**
  * 归一化偏好:
- * - 未知背景回退天气图;空闲时长夹到 1–30 分钟;卡片只留白名单键
+ * - 未知背景回退默认模式;空闲时长夹到 1–30 分钟;卡片只留白名单键
  * - 兼容旧版 {mode: PHOTO|BOARD, board:{...}}(屏保与看板合并前的存法):按「我的图片 + 原卡片勾选」迁移
  */
 export function normalizePrefs(raw) {
@@ -48,7 +48,7 @@ export function normalizePrefs(raw) {
   })
   const legacy = typeof src.mode === 'string' && !src.bg
   let bg = DEFAULT_PREFS.bg
-  if (src.bg === BG.BLACK || src.bg === BG.IMAGE) bg = src.bg
+  if (Object.values(BG).includes(src.bg)) bg = src.bg
   else if (legacy) bg = BG.IMAGE
   return {
     enabled: typeof src.enabled === 'boolean' ? src.enabled : DEFAULT_PREFS.enabled,
@@ -123,8 +123,15 @@ export function isBusyScreen() {
 }
 
 // 编辑/阅读/游戏/播放这类「人在忙」的页面与状态:即便长时间不动也不该盖屏保
+export function quietContentRoute(path) {
+  return (
+    /^\/(?:games|cinema|diary\/book)\/|^\/tools\/gba(?:\/|$)/.test(path) ||
+    /^\/(?:blog|kitchen\/recipe)\/(?!edit(?:\/|$)|new(?:\/|$))[^/]+\/?$/.test(path)
+  )
+}
+
 export function protectedStandbyRoute(path) {
-  return /^\/games\/|^\/tools\/gba(?:\/|$)|^\/tools\/mindmap\/|\/(?:edit|new)(?:\/|$)|^\/cinema\//.test(path)
+  return quietContentRoute(path) || /^\/tools\/mindmap\/|\/(?:edit|new)(?:\/|$)/.test(path)
 }
 
 export function activeStandbyTask(doc) {
@@ -159,6 +166,7 @@ const PHOTO_MIN_BRIGHTNESS = 0.8
  */
 export function screensaverBgLayer(pref, { weatherUrl = '', isLoggedIn = false } = {}) {
   const p = pref || DEFAULT_PREFS
+  if (p.bg === BG.DEFAULT) return { kind: 'scene' }
   if (p.bg === BG.BLACK) return { kind: 'black' }
   if (p.bg === BG.WEATHER) {
     return weatherUrl ? { kind: 'image', image: urlCss(weatherUrl), size: 'cover', opacity: 1 } : { kind: 'black' }
@@ -178,6 +186,18 @@ export function screensaverBgLayer(pref, { weatherUrl = '', isLoggedIn = false }
 
 // 设置页「预览」:自增一次即请求屏保立即展示(避免为一次预览引入全局 store)
 export const previewTick = ref(0)
+
+// Schedule the next change by local wall time so an overnight session resumes by itself.
+export function defaultScreensaverStage(startedAt, now = new Date()) {
+  const hour = now.getHours()
+  const night = hour < 7 || hour >= 22
+  const boundary = new Date(now)
+  boundary.setHours(night ? 7 : 22, 0, 0, 0)
+  if (hour >= 22) boundary.setDate(boundary.getDate() + 1)
+  const cardsAt = startedAt + 30 * 60000
+  if (!night && now.getTime() < cardsAt) return { phase: 'dim', nextAt: Math.min(cardsAt, boundary.getTime()) }
+  return { phase: night ? 'black' : 'cards', nextAt: boundary.getTime() }
+}
 export function requestPreview() {
   previewTick.value += 1
 }

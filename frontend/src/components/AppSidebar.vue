@@ -79,6 +79,7 @@
           class="foot-btn"
           v-a11y-click
           :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }"
+          :aria-disabled="!sunLight?.lampAvailable.value"
           :title="
             t('sidebar.lamp') +
             ': ' +
@@ -93,6 +94,7 @@
           class="foot-btn"
           v-a11y-click
           :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }"
+          :aria-disabled="sunLight?.controlsLocked.value"
           :title="sunLight?.shadowEnabled?.value ? t('sidebar.lightEffectOn') : t('sidebar.lightEffectOff')"
           @click="toggleLightEffect"
         >
@@ -284,7 +286,7 @@ const topWarningBadge = computed(() => topWarning(sidebarWarnings.value))
 // 光影总开关:全量切换 5 项特效(对齐 MobileMePage 同款开关语义),
 // 只切 shadowEnabled 会导致"关闭所有特效"后 blobs/毛玻璃/台灯/天气仍运行(频闪排查踩坑)
 const toggleLightEffect = () => {
-  if (!sunLight?.shadowEnabled) return
+  if (!sunLight || sunLight.controlsLocked.value) return
   const on = !sunLight.shadowEnabled.value
   sunLight.shadowEnabled.value = on
   sunLight.blobsEnabled.value = on

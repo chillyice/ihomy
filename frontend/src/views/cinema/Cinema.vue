@@ -524,7 +524,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, inject } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Edit, Delete, Share } from '@element-plus/icons-vue'
@@ -542,13 +542,12 @@ import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 import SyncDialog from '@/components/SyncDialog.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
-import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
 const router = useRouter()
-const sunLight = inject(SUN_LIGHT_KEY, null)
 // 默认落在媒体库页签(家里的片子在媒体服务器上);未登录时退回本地视频库
 const tab = ref(userStore.isLoggedIn ? 'media' : 'library')
 const syncVisible = ref(false)
@@ -783,12 +782,7 @@ const editor = reactive({ visible: false, form: emptyForm() })
 const visibilityOptions = computed(() => buildVisibilityOptions(t))
 const wishDialog = reactive({ visible: false, form: { title: '', genres: [], reason: '' } })
 const player = reactive({ visible: false, video: null })
-watch(
-  () => player.visible,
-  (v) => {
-    v ? sunLight?.suspendEffects() : sunLight?.restoreEffects()
-  },
-)
+usePlaybackLighting(() => player.visible)
 
 // 拉取视频库(筛选在前端做,全量拉取)
 const load = async () => {

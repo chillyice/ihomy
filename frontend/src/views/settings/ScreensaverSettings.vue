@@ -1,4 +1,4 @@
-<!-- 屏保设置:开关、多久不动进入、背景三选(纯黑 / 天气图 / 我的图片)、卡片勾选、预览。
+<!-- 屏保设置:开关、多久不动进入、背景、卡片勾选、预览。
      手机、暖居桌面、窗边大屏共用这一套(原先的屏保 / 暖居待机浮现 / 看板模式已合并)。
      偏好只存本机 localStorage(utils/screensaver.js),改动即落盘,没有保存按钮。 -->
 <template>
@@ -32,6 +32,7 @@
 
       <el-form-item :label="$t('screensaver.background')">
         <el-radio-group v-model="prefs.bg" :disabled="!prefs.enabled" @change="persist">
+          <el-radio-button :value="BG.DEFAULT">{{ $t('screensaver.bgDefault') }}</el-radio-button>
           <el-radio-button :value="BG.BLACK">{{ $t('screensaver.bgBlack') }}</el-radio-button>
           <el-radio-button :value="BG.WEATHER">{{ $t('screensaver.bgWeather') }}</el-radio-button>
           <el-radio-button :value="BG.IMAGE">{{ $t('screensaver.bgImage') }}</el-radio-button>
@@ -72,6 +73,7 @@ const CARD_LABELS = {
 }
 
 const BG_HINTS = {
+  [BG.DEFAULT]: 'screensaver.bgDefaultHint',
   [BG.BLACK]: 'screensaver.bgBlackHint',
   [BG.WEATHER]: 'screensaver.bgWeatherHint',
   [BG.IMAGE]: 'screensaver.bgImageHint',

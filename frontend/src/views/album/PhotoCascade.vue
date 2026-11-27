@@ -52,9 +52,11 @@ import { ref, watch, onBeforeUnmount } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { photoApi } from '@/api'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import AlbumThumbnail from '@/components/AlbumThumbnail.vue'
 
 const props = defineProps({ visible: { type: Boolean, default: false } })
+usePlaybackLighting(() => props.visible)
 const emit = defineEmits(['update:visible'])
 
 const stage = ref(null)

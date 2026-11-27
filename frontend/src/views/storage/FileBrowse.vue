@@ -244,6 +244,7 @@ import { shareFiles } from '@/native/shareOut'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import FilePreviewPane from './FilePreviewPane.vue'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -299,6 +300,9 @@ const isSelected = (row) => selectedPaths.value.includes(entryPath(row))
 // 宽屏右侧预览栏:多选是纯选择场景,右栏收起、表格整宽;窄屏不加 .wide-cols。
 // 设备列表是异步来的,拿到设备后容器才渲染 —— 一并纳入 enabled,让 composable 那时再量一次列高。
 const previewWide = computed(() => viewWide.value && !selectMode.value && customDevices.value.length > 0)
+usePlaybackLighting(
+  () => (previewDialog.value || previewWide.value) && !!previewSrc.value && (previewIsImage.value || previewIsVideo.value),
+)
 const { wideEl, colStyle } = useWideCols(previewWide)
 
 function clearPreview() {

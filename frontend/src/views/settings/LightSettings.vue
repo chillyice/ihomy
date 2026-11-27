@@ -33,7 +33,7 @@
           <legend>{{ $t('settings.lightLamp') }}</legend>
           <el-form-item :label="$t('settings.lampMode')">
             <el-radio-group :model-value="lampMode" @change="(v) => (lampMode = v)">
-              <el-radio value="auto">{{ $t('settings.lampAuto') }}</el-radio>
+              <el-radio value="auto">{{ $t(seatLighting ? 'settings.lampSeat' : 'settings.lampAuto') }}</el-radio>
               <el-radio value="on">{{ $t('settings.lampOn') }}</el-radio>
               <el-radio value="off">{{ $t('settings.lampOff') }}</el-radio>
             </el-radio-group>
@@ -47,7 +47,7 @@
           </el-form-item>
 
           <!-- 夜间超时关灯也是台灯行为,跟台灯模式/色温/亮度放在一档 -->
-          <el-form-item :label="$t('settings.idleLabel')">
+          <el-form-item v-if="!seatLighting" :label="$t('settings.idleLabel')">
             <div class="setting-row">
               <el-input-number v-model.number="idleMinutes" :min="1" :max="120" :step="1" />
             </div>
@@ -130,6 +130,7 @@ const {
   blobsEnabled,
   glassEnabled,
   idleMinutes,
+  seatLighting,
   isIdle,
 } = sunLight || {}
 

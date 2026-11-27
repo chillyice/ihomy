@@ -217,13 +217,13 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useAppBack } from '@/composables/useAppBack'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { recordDoing } from '@/utils/lastDoing'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -232,7 +232,7 @@ const emit = defineEmits(['close', 'statusChanged'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const sunLight = inject(SUN_LIGHT_KEY, null)
+usePlaybackLighting(() => true)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const isFullscreen = ref(false)
 const showToc = ref(false)
@@ -299,7 +299,6 @@ const formatSize = (bytes) => {
 
 // === Init ===
 onMounted(async () => {
-  sunLight?.suspendEffects()
   if (props.book?.fileFormat === 'EPUB') {
     await nextTick()
     await initEpub()
@@ -350,7 +349,6 @@ onMounted(async () => {
 let darkObserver = null
 onBeforeUnmount(() => {
   saveProgress()
-  sunLight?.restoreEffects()
   if (epubRendition) epubRendition.destroy()
   if (darkObserver) darkObserver.disconnect()
   if (pdfObserver) pdfObserver.disconnect()

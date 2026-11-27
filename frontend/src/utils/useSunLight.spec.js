@@ -345,15 +345,34 @@ it('shows the selected slot’s lamp and shadow mask immediately when seeking or
 
 it('adds fill when deep shadows cover the page despite a bright sky', async () => {
   await mountLight(sunDay('2026-11-25'))
+  light.seatLighting.value = true
   light.shadowDepth.value = 200
   light.litFraction.value = 0.12
   expect(light.skyLight.value.metered).toBeGreaterThan(0.45)
+  expect(light.lampStrength.value).toBeGreaterThan(0)
+  light.saverPhase.value = 'dim'
+  expect(light.lampStrength.value).toBe(0)
+  light.saverPhase.value = null
   expect(light.lampStrength.value).toBeGreaterThan(0)
   light.litFraction.value = 0.85
   expect(light.lampStrength.value).toBe(0)
   light.litFraction.value = 0.12
   light.shadowDepth.value = 0
   expect(light.lampStrength.value).toBe(0)
+})
+
+it('keeps light and its switch disabled until the last viewer closes', async () => {
+  await mountLight(sunDay('2026-11-25'))
+  light.lampMode.value = 'on'
+  light.suspendEffects('reader')
+  light.suspendEffects('photo')
+  light.restoreEffects('photo')
+  light.toggleLamp()
+  light.lampMode.value = 'auto'
+  expect(light.lampStrength.value).toBe(0)
+  expect(light.anyEffectEnabled.value).toBe(false)
+  light.restoreEffects('reader')
+  expect(light.lampMode.value).toBe('on')
 })
 
 it('keeps auto lamp state within its metering band and gives manual overrides priority', async () => {

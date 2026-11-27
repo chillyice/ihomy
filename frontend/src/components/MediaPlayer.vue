@@ -70,11 +70,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, inject, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mediaApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { usePlaybackLighting } from '@/utils/useSunLight'
 import { recordDoing } from '@/utils/lastDoing'
 
 const props = defineProps({
@@ -87,7 +87,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'played'])
 
 const { t } = useI18n()
-const sunLight = inject(SUN_LIGHT_KEY, null)
+usePlaybackLighting(() => props.modelValue)
 
 const TICKS_PER_SECOND = 10000000
 /** 进度上报节流:15 秒一次,不每帧打接口 */
@@ -174,7 +174,6 @@ watch(
   () => props.modelValue,
   async (open) => {
     if (open) {
-      sunLight?.suspendEffects()
       checkPip()
       await load()
     } else {
@@ -423,7 +422,6 @@ const onClosed = () => {
   recordResume()
   reset()
   syncPip(false)
-  sunLight?.restoreEffects()
 }
 
 onBeforeUnmount(() => {
@@ -431,7 +429,6 @@ onBeforeUnmount(() => {
   reportProgress()
   destroyHls()
   syncPip(false)
-  sunLight?.restoreEffects()
 })
 </script>
 

@@ -5,7 +5,7 @@
       <component :is="Component" :key="route.path" />
     </router-view>
     <template v-else-if="routeReady">
-      <SunLightLayer v-if="anyEffectEnabled && !immersive && !userStore.isPureOps" />
+      <SunLightLayer v-if="anyEffectEnabled && !saverCoversScene && !immersive && !userStore.isPureOps" />
       <WindowShell v-if="windowShell" />
       <MobileLayout v-else-if="isMobile && !userStore.isPureOps" />
       <WarmLayout v-else-if="isWarm" />
@@ -85,6 +85,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useFloatsStore } from '@/stores/floats'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { quietContentRoute } from '@/utils/screensaver'
 import { isNativeApp } from '@/utils/platform'
 import { startSceneRotation } from '@/utils/sceneRotation'
 import { initPrefSync } from '@/utils/userPref'
@@ -226,7 +227,7 @@ onBeforeUnmount(() => {
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight(
   () => !userStore.isPureOps,
-  () => lightAvailable.value,
+  () => lightAvailable.value && !quietContentRoute(route.path) && !immersive.value,
 )
 let stopRotation
 onMounted(() => {
@@ -237,7 +238,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => stopRotation?.())
 provide(SUN_LIGHT_KEY, sunLight)
-const { anyEffectEnabled, lightTestMode } = sunLight
+const { anyEffectEnabled, lightTestMode, saverCoversScene } = sunLight
 
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
