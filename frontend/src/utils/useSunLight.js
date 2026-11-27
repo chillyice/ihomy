@@ -443,7 +443,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   const skyTint = computed(() => skyLight.value.tint)
   // Reserve a small part of the daylight range for directional contrast.
   // Keep the blocked surface continuous as the beam crosses the edge of the window.
-  const castShade = computed(() => shadowAlpha.value * sunScene.value.skyLevel * optics.value.direct * 0.24)
+  const castShade = computed(() => shadowAlpha.value * sunScene.value.skyLevel * optics.value.direct * 0.43)
   // roomShade 是「环境暗度」的亮度口径(曝光模型与用例都按它算),
   // roomShadeLayer 换成暖褐乘色并把不透明度按色值亮度回推,观感偏暖而明暗不变。
   const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))

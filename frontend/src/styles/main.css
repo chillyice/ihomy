@@ -242,12 +242,12 @@ html.theme-warm {
   --color-danger: #b4544c;
   --color-danger-rgb: 180, 84, 76;
   --color-warning: #96681a;
-  --color-bg: #fff1d9;
-  --color-bg-2: #f3dbb7;
-  --color-card: #fff9eb;
-  --color-card-2: #f7e6cb;
-  --color-card-rgb: 255, 249, 235;
-  --color-green: #657f51;
+  --color-bg: #f1e7d6;
+  --color-bg-2: #e4d5bf;
+  --color-card: #fbf3e4;
+  --color-card-2: #ebdcc6;
+  --color-card-rgb: 251, 243, 228;
+  --color-green: #7c8b6c;
   --color-line: rgba(138, 106, 78, 0.1);
   --color-text-tertiary: #8a7a64;
   --glow-warm: rgba(201, 128, 122, 0.55);
@@ -264,13 +264,13 @@ html.theme-warm {
   --color-brand-text: #fbf3e4;
   --color-brand-rgb: 134, 100, 72;
   /* 光影层 token(暖居晨):羊皮覆盖 + 暖白浮尘 */
-  --light-glass-bg: rgba(255, 246, 220, 0.12);
+  --light-glass-bg: rgba(251, 243, 228, 0.25);
   --light-dust: rgba(255, 239, 207, 0.85);
   --light-dust-glow: rgba(255, 236, 196, 0.8);
   /* 背景色块(暖居晨):陶土/琥珀/鼠尾草绿/暖米,去蓝绿 */
-  --blob-1: 217, 115, 91;
-  --blob-2: 227, 159, 65;
-  --blob-3: 115, 150, 88;
+  --blob-1: 201, 128, 122;
+  --blob-2: 201, 161, 110;
+  --blob-3: 124, 139, 108;
   --blob-4: 228, 213, 191;
   --blob-5: 176, 140, 110;
 }
