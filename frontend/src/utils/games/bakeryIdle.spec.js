@@ -237,6 +237,28 @@ describe('bakeryIdle 产线结算', () => {
     expect(next.dough).toBeCloseTo(100 - baked * 3, 6)
   })
 
+  it('刚出炉的面包下一拍才上架,库存不会恒为 0', () => {
+    // 开局烘烤与售卖速度相同:同一拍先烤后卖会把面包瞬间清空,数字看着像没在生产
+    const state = createState(0)
+    const first = tick(state, 1)
+    expect(first.stock.white).toBeGreaterThan(0)
+    expect(first.coins).toBe(0)
+    const second = tick(first, 1)
+    expect(second.stock.white).toBeGreaterThan(0)
+    expect(second.coins).toBeGreaterThan(0)
+  })
+
+  it('有同品种未交付订单时预留现货,攒够订单量即可交付', () => {
+    const state = rollOrder(createState(0), 0.2, 0.9)
+    const mid = tick(state, 10)
+    expect(mid.stock.white).toBeGreaterThan(1)
+    expect(mid.stock.white).toBeLessThan(state.order.qty)
+
+    const full = tick(state, ORDER_SECONDS - 2)
+    expect(full.stock.white).toBeGreaterThanOrEqual(state.order.qty)
+    expect(fulfillOrder(full).ok).toBe(true)
+  })
+
   it('稳态每秒金币取产线最窄的一环', () => {
     const state = withLevels({ mixer: 1, oven: 5, clerk: 5 })
     expect(coinsPerSecond(state)).toBeCloseTo(itemRates(state).items * priceOf(state), 6)

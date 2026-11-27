@@ -4,6 +4,10 @@
  * 自动产线按固定顺序推进:先产面团,再用面团烤当前品种的面包,最后把面包按单价卖掉。
  * 任一段库存不足,该段就按库存封顶 —— 所以离线补算必须按小步长模拟,不能按「秒产出 × 秒数」直接加。
  *
+ * 卖的是「货架上这一拍之前烤好的」,刚出炉的下一拍才上架:开局烘烤与售卖速度相同,
+ * 若同一拍里先烤后卖,面包会被瞬间卖空,库存永远显示 0(看起来像根本没在生产)。
+ * 同时有同品种未交付订单时只卖超出订单量的部分,否则现货永远凑不够交付。
+ *
  * 手动操作是「现烤现卖」:玩家亲手出货比批量卖给批发商贵,直接得金币(基础 1 金币/次)。
  * 这样点击在「卖不动」的早期也能立即换到钱,不至于囤一堆面团却买不起第一台机器。
  *
@@ -345,19 +349,23 @@ export function tick(state, seconds, { orderClock = true } = {}) {
 
     working.dough = clampAmount(working.dough + doughRate * dt)
 
-    // 烘烤同时受炉子与面团库存限制(每份耗 doughPer 份面团)
-    const baked = Math.min(bakeRate * dt, working.dough / def.doughPer)
-    working.dough = clampAmount(working.dough - baked * def.doughPer)
-    working.stock[def.key] = clampAmount(working.stock[def.key] + baked)
-    working.counters.baked = clampAmount(working.counters.baked + baked)
-
-    // 只卖当前品种;其它品种的库存留给切换回来或顾客订单
-    const sold = Math.min(sellRate * dt, working.stock[def.key])
-    working.stock[def.key] = clampAmount(working.stock[def.key] - sold)
+    // 先卖掉货架上已有的库存(上一拍出炉的):同一拍里刚烤好的不参与售卖,
+    // 否则开局「烤 0.5 份/秒 + 卖 0.5 份/秒」会把面包瞬间卖光,库存恒为 0。
+    // 有同品种未交付订单时把订单量留在货架上,不然现货永远凑不够交付。
+    const shelved = clampAmount(working.stock[def.key])
+    const reserved = order && order.product === def.key ? num(order.qty) : 0
+    const sold = Math.min(sellRate * dt, Math.max(0, shelved - reserved))
+    working.stock[def.key] = clampAmount(shelved - sold)
     const earned = sold * price
     working.coins = clampAmount(working.coins + earned)
     working.runCoins = clampAmount(working.runCoins + earned)
     working.counters.coinsEarned = clampAmount(working.counters.coinsEarned + earned)
+
+    // 烘烤同时受炉子与面团库存限制(每份耗 doughPer 份面团),烤好的下一拍上架
+    const baked = Math.min(bakeRate * dt, working.dough / def.doughPer)
+    working.dough = clampAmount(working.dough - baked * def.doughPer)
+    working.stock[def.key] = clampAmount(working.stock[def.key] + baked)
+    working.counters.baked = clampAmount(working.counters.baked + baked)
 
     if (orderClock) {
       if (order) {
