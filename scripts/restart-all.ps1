@@ -218,10 +218,6 @@ Write-Step '启动后端 (Spring Boot)'
 $jar = Join-Path $Backend 'target\ihomy-backend.jar'
 if (-not (Test-Path $jar)) { Die "未找到后端 jar：$jar（先去掉 -SkipBuild 构建一次）" }
 
-$dbUp = docker ps --filter 'name=ihomy-mysql' --filter 'status=running' --format '{{.Names}}' 2>$null
-if ("$dbUp" -eq 'ihomy-mysql') { Write-Ok '数据库容器 ihomy-mysql 运行中' }
-else { Write-Warn 'ihomy-mysql 未运行，先执行 .\scripts\start-db.ps1 再重启' }
-
 # 用完整路径启动，避免 javapath launcher 与 JDK 双实例分流 8080 请求(偶发 401/404/500)
 $javaExe = if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
   Join-Path $env:JAVA_HOME 'bin\java.exe'
@@ -244,6 +240,15 @@ for ($i = 0; $i -lt 90; $i++) {
 }
 if (-not $ready) { Die "后端 $BackendPort 端口 90 秒内未就绪，请看后端窗口/日志(日志目录见 external.yml 的 logging.file.path)" }
 Write-Ok "后端端口就绪(约 $i 秒)"
+
+# 按外挂配置实际连接的 MySQL / Redis 判定就绪，远端服务和本机容器走同一路径。
+try {
+  $health = Invoke-RestMethod -Uri "http://127.0.0.1:$BackendPort/api/public/health" -TimeoutSec 10
+  if ($health.data.status -ne 'UP') { throw "状态 $($health.data.status)" }
+  Write-Ok '后端健康检查通过，MySQL 和 Redis 均已就绪'
+} catch {
+  Die "后端进程已启动，但健康检查未通过：$($_.Exception.Message)。请核对外挂配置指向的 MySQL 和 Redis；使用本机容器时，请启动 Docker Desktop 并运行 .\scripts\start-db.ps1。依赖恢复后可用 -SkipBuild 重试。"
+}
 
 try {
   $smoke = Invoke-WebRequest -Uri "http://localhost:$BackendPort/api/auth/captcha" -UseBasicParsing -TimeoutSec 5

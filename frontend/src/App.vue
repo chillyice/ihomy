@@ -29,7 +29,7 @@
       <SiteFooter v-if="!isMobile && !immersive" />
       <GardenEntry
         v-if="
-          gardenPreview &&
+          (devGardenReview || (localGardenReview && route.query.gardenPreview === '1')) &&
           route.name === 'Home' &&
           !route.query.hid &&
           !route.query.home_id &&
@@ -112,9 +112,7 @@ const AppSidebar = defineAsyncComponent(() => import('@/components/AppSidebar.vu
 const WarmLayout = defineAsyncComponent(() => import('@/components/warm/WarmLayout.vue'))
 const WindowShell = defineAsyncComponent(() => import('@/components/window/WindowShell.vue'))
 const WindowDesk = defineAsyncComponent(() => import('@/components/WindowDesk.vue'))
-// 美术评审入口。正式开放时，由家庭首页返回的可用状态决定是否挂载。
-const gardenPreview = import.meta.env.DEV
-const GardenEntry = gardenPreview ? defineAsyncComponent(() => import('@/components/garden/GardenEntry.vue')) : null
+const GardenEntry = defineAsyncComponent(() => import('@/components/garden/GardenEntry.vue'))
 const PawTrail = defineAsyncComponent(() => import('@/components/PawTrail.vue'))
 const WindowMusicPlayer = defineAsyncComponent(() => import('@/components/WindowMusicPlayer.vue'))
 import BackToTop from '@/components/BackToTop.vue'
@@ -141,6 +139,9 @@ const MorningOverlay = defineAsyncComponent(() => import('@/components/morning/M
 const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdateDialog.vue'))
 // 壳内判定(静态读一次,不随运行期变化)
 const isNative = isNativeApp()
+// 本机 nginx 托管的 dist 也能用显式评审链接验收，正式站点仍由后续入口配置开放。
+const localGardenReview = !isNative && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
+const devGardenReview = import.meta.env.DEV
 
 const { lightAvailable, isMobile, isWide, isTablet } = useDevice()
 const appStore = useAppStore()

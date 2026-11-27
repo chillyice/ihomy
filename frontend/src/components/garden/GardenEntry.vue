@@ -25,24 +25,26 @@
         @keydown.esc.stop.prevent="goBack"
         @keydown.tab="cycleFocus"
       >
-        <div class="garden-view" aria-hidden="true"></div>
         <button ref="back" class="garden-back" @click="leave">
           <el-icon><Back /></el-icon>{{ t('gardenEntry.back') }}
         </button>
+        <div class="garden-frame">
+          <div class="garden-view" aria-hidden="true"></div>
+          <button
+            v-if="!reading"
+            ref="envelope"
+            class="garden-envelope"
+            :aria-label="t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope')"
+            @click="openLetter"
+          >
+            <img :src="envelopeArt" alt="" />
+            <span>{{ t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope') }}</span>
+          </button>
+        </div>
         <div class="garden-title">
           <h1 id="garden-name">{{ t('gardenEntry.name') }}</h1>
           <p>{{ t('gardenEntry.preview') }}</p>
         </div>
-        <button
-          v-if="!reading"
-          ref="envelope"
-          class="garden-envelope"
-          :aria-label="t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope')"
-          @click="openLetter"
-        >
-          <img :src="envelopeArt" alt="" />
-          <span>{{ t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope') }}</span>
-        </button>
         <Transition name="garden-unfold">
           <article v-if="reading" class="garden-letter" aria-labelledby="garden-letter-title">
             <h2 id="garden-letter-title">{{ t('gardenEntry.salutation') }}</h2>
@@ -205,16 +207,24 @@ onBeforeUnmount(() => releaseHome?.())
   inset: 0;
   z-index: var(--z-immersive);
   isolation: isolate;
+  container-type: size;
   overflow: hidden;
-  background: #d7c4a0;
+  background: #e6d5b8;
   color: #433b2d;
+}
+.garden-frame {
+  position: absolute;
+  left: 50%;
+  top: 74%;
+  translate: -50% -74%;
+  width: max(100cqw, 150cqh);
+  aspect-ratio: 3 / 2;
+  transform-origin: 50% 77%;
 }
 .garden-view {
   position: absolute;
   inset: 0;
-  z-index: -1;
   background: #d7c4a0 url('@/assets/garden/windowsill.webp') center / cover no-repeat;
-  transform-origin: 50% 78%;
 }
 .garden-room button {
   font-family: inherit;
@@ -235,6 +245,7 @@ onBeforeUnmount(() => releaseHome?.())
 }
 .garden-back {
   position: absolute;
+  z-index: 1;
   top: max(56px, calc(env(safe-area-inset-top) + 10px));
   left: max(18px, env(safe-area-inset-left));
   box-shadow: 0 2px 6px #45382024;
@@ -268,23 +279,31 @@ onBeforeUnmount(() => releaseHome?.())
   display: grid;
   justify-items: center;
   position: absolute;
-  right: max(13%, env(safe-area-inset-right));
-  bottom: max(6%, calc(env(safe-area-inset-bottom) + 10px));
-  width: clamp(110px, 12vw, 166px);
+  left: min(77%, calc(50% + 50cqw - 56px - env(safe-area-inset-right, 0px)));
+  bottom: 23%;
+  translate: -50% 0;
+  width: clamp(82px, 9cqw, 135px);
+  min-height: 44px;
   padding: 0;
   border: 0;
   background: transparent;
 }
 .garden-envelope img {
   width: 100%;
-  transform: rotate(-6deg);
+  display: block;
+  transform: scaleY(0.66) rotate(-5deg);
+  transform-origin: center bottom;
   filter: drop-shadow(2px 4px 3px #31251460);
 }
 .garden-envelope:hover img,
 .garden-envelope:focus-visible img {
-  transform: translateY(-4px) rotate(-4deg);
+  transform: translateY(-2px) scaleY(0.68) rotate(-3deg);
 }
 .garden-envelope span {
+  position: absolute;
+  top: 100%;
+  width: max-content;
+  max-width: 108px;
   padding: 3px 9px;
   border-radius: 2px;
   background: #f9f0d7;
@@ -319,23 +338,28 @@ onBeforeUnmount(() => releaseHome?.())
   outline-offset: 3px;
 }
 .garden-visit-enter-active {
-  transition: opacity 1.8s ease;
+  transition: background-color 1.8s ease;
 }
 .garden-visit-leave-active {
-  transition: opacity 1.4s ease;
+  transition: background-color 1.4s ease;
 }
-.garden-visit-enter-active .garden-view {
-  transition: transform 1.8s cubic-bezier(0.16, 0.68, 0.2, 1);
+.garden-visit-enter-active .garden-frame {
+  transition:
+    transform 1.8s cubic-bezier(0.16, 0.68, 0.2, 1),
+    opacity 0.55s ease;
 }
-.garden-visit-leave-active .garden-view {
-  transition: transform 1.4s ease-in;
+.garden-visit-leave-active .garden-frame {
+  transition:
+    transform 1.4s ease-in,
+    opacity 0.5s 0.9s ease;
 }
 .garden-visit-enter-from,
 .garden-visit-leave-to {
-  opacity: 0;
+  background-color: #dfc9a6;
 }
-.garden-visit-enter-from .garden-view,
-.garden-visit-leave-to .garden-view {
+.garden-visit-enter-from .garden-frame,
+.garden-visit-leave-to .garden-frame {
+  opacity: 0;
   transform: perspective(900px) rotateX(12deg) translateY(-9%) scale(1.38);
 }
 .garden-unfold-enter-active,
@@ -354,22 +378,29 @@ onBeforeUnmount(() => releaseHome?.())
     width: 62px;
     min-height: 62px;
   }
-  .garden-envelope {
-    right: 6%;
-  }
 }
 @media (orientation: portrait) {
+  .garden-frame {
+    width: max(100cqw, calc(100cqh * 2 / 3));
+    aspect-ratio: 2 / 3;
+  }
   .garden-view {
     background-image: url('@/assets/garden/windowsill-portrait.webp');
+  }
+  .garden-envelope {
+    bottom: 29%;
   }
 }
 @media (orientation: portrait), (prefers-reduced-motion: reduce) {
   .garden-visit-enter-active,
   .garden-visit-leave-active {
-    transition: opacity 0.3s;
+    transition: background-color 0.3s;
   }
-  .garden-visit-enter-active .garden-view,
-  .garden-visit-leave-active .garden-view,
+  .garden-visit-enter-active .garden-frame,
+  .garden-visit-leave-active .garden-frame {
+    transition: opacity 0.3s;
+    transform: none;
+  }
   .garden-unfold-enter-active,
   .garden-unfold-leave-active {
     transition: none;
