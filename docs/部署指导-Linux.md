@@ -596,6 +596,14 @@ server {
     # 视频大文件上传（放映厅 500MB）
     client_max_body_size 500m;
 
+    # index.html 是入口清单:每次必须重新校验。缺这一行时浏览器按 Last-Modified 做启发式缓存,
+    # 部署后可能仍拿旧 HTML,里面的哈希 chunk 已被删除 → 路由整页空白(2026-11-27 壁纸页事故)。
+    # 本 location 有 add_header,不再继承 server 级 HSTS,显式重复一行。
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
     # 前端单页应用路由回退
     location / {
         try_files $uri $uri/ /index.html;

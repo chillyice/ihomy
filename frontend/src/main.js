@@ -17,6 +17,7 @@ import { a11yClick } from './utils/a11y'
 import { isNativeApp } from './utils/platform'
 import { setBootTokens } from './stores/user'
 import { useAppIconStore } from './stores/appIcon'
+import { watchServiceWorkerUpdates } from './utils/chunkHeal'
 
 // 天气图标字体仅在天气面板/光照测试台用,异步加载不阻塞首屏
 import('qweather-icons/font/qweather-icons.css')
@@ -58,7 +59,12 @@ async function boot() {
 
   // 英文文案是懒加载 chunk:首屏语言为英文时先补齐再挂载,避免闪一下中文/键名
   // (同样加超时兜底:chunk 取不下来也要能挂载,回落中文文案)
-  const mount = () => app.mount('#app')
+  const mount = () => {
+    app.mount('#app')
+    // 常开页面(壁纸大屏/桌面壁纸)不会自己发现部署:SW 就绪后、回到前台、每半小时各要一次新清单,
+    // 否则预缓存里的旧 index.html 会一直指向已删除的 chunk(自愈见 utils/chunkHeal.js)
+    watchServiceWorkerUpdates({ sw: navigator.serviceWorker, doc: document })
+  }
   if (i18n.global.locale.value === 'en') {
     const timeout = new Promise((resolve) => setTimeout(resolve, 1500))
     Promise.race([ensureLocale('en').catch(() => {}), timeout]).then(mount)

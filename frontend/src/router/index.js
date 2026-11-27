@@ -4,6 +4,7 @@ import { useUserStore } from '@/stores/user'
 import { getDisplayMode } from '@/composables/useDisplayMode'
 import { isPathHiddenNow } from '@/composables/useFeatureGates'
 import { isChildAllowedPath } from '@/utils/displayMode'
+import { isChunkLoadError, nextHealStep, purgeOfflineCaches } from '@/utils/chunkHeal'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
@@ -330,17 +331,41 @@ router.beforeEach((to) => {
   }
 })
 
-// 懒加载 chunk 失败自愈:重新构建后旧标签页仍引用旧哈希文件(404),
-// 整页刷新一次拿到新构建;同一路由 30 秒内只刷一次,真实网络故障时不至于无限刷新
+// 懒加载 chunk 失败自愈(两级):重新构建后哈希文件名全变,旧标签页/旧预缓存仍引用已删除的文件(404)。
+// PWA 的 Service Worker 会用预缓存的旧 index.html 把刷新顶回旧构建,所以第一级刷新前先让它要一次新清单;
+// 仍然失败 → 注销 SW + 清 Cache Storage 再刷新(壁纸大屏/桌面壁纸没有 Ctrl+Shift+R 的机会)。
+// 同一轮故障只走这两级,断网直接放弃(刷新只会更糟)。判定见 utils/chunkHeal.js。
+const HEAL_KEY = 'ihomy:chunk-heal'
+
+function readHealState() {
+  try {
+    return JSON.parse(sessionStorage.getItem(HEAL_KEY) || 'null')
+  } catch (e) {
+    return null
+  }
+}
+
 router.onError((error, to) => {
-  const msg = (error?.message || '').toLowerCase()
-  const chunkFailed =
-    msg.includes('dynamically imported module') || msg.includes('importing a module script') || msg.includes('loading chunk')
-  if (!chunkFailed || !to) return
-  const key = `ihomy:chunk-reload:${to.fullPath}`
-  if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 30_000) return
-  sessionStorage.setItem(key, String(Date.now()))
-  window.location.href = to.fullPath
+  if (!to || !isChunkLoadError(error) || !navigator.onLine) return
+  const step = nextHealStep(readHealState())
+  if (!step) return
+  try {
+    sessionStorage.setItem(HEAL_KEY, JSON.stringify({ at: Date.now(), stage: step }))
+  } catch (e) {
+    // 无痕模式禁用 storage:照样刷新一次
+  }
+  const target = to.fullPath || window.location.pathname
+  if (step === 1) {
+    navigator.serviceWorker
+      ?.getRegistration?.()
+      .then((reg) => reg?.update?.())
+      .catch(() => {})
+    window.location.href = target
+    return
+  }
+  purgeOfflineCaches({ sw: navigator.serviceWorker, cacheStorage: window.caches }).finally(() => {
+    window.location.href = target
+  })
 })
 
 export default router
