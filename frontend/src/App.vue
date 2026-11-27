@@ -27,6 +27,19 @@
       <MusicPlayer v-if="!userStore.isPureOps && !isWindow && (isMobile || !immersive) && floatsStore.music" />
       <Teleport v-if="lightAvailable && lightTestMode" to="body"><LightTestConsole /></Teleport>
       <SiteFooter v-if="!isMobile && !immersive" />
+      <GardenEntry
+        v-if="
+          gardenPreview &&
+          route.name === 'Home' &&
+          !route.query.hid &&
+          !route.query.home_id &&
+          !userStore.isPureOps &&
+          !userStore.mustChangePassword &&
+          !appStore.homeEditMode &&
+          (userStore.isLoggedIn || route.query.gardenPreview === '1')
+        "
+        :key="String(userStore.userInfo?.id) + ':' + String(userStore.userInfo?.familyId)"
+      />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
     </template>
     <WindowDesk
@@ -99,6 +112,9 @@ const AppSidebar = defineAsyncComponent(() => import('@/components/AppSidebar.vu
 const WarmLayout = defineAsyncComponent(() => import('@/components/warm/WarmLayout.vue'))
 const WindowShell = defineAsyncComponent(() => import('@/components/window/WindowShell.vue'))
 const WindowDesk = defineAsyncComponent(() => import('@/components/WindowDesk.vue'))
+// 美术评审入口。正式开放时，由家庭首页返回的可用状态决定是否挂载。
+const gardenPreview = import.meta.env.DEV
+const GardenEntry = gardenPreview ? defineAsyncComponent(() => import('@/components/garden/GardenEntry.vue')) : null
 const PawTrail = defineAsyncComponent(() => import('@/components/PawTrail.vue'))
 const WindowMusicPlayer = defineAsyncComponent(() => import('@/components/WindowMusicPlayer.vue'))
 import BackToTop from '@/components/BackToTop.vue'

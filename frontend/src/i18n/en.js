@@ -5,6 +5,19 @@ import windowTools from './windowTools/en'
 import windowDisplay from './windowDisplay/en'
 
 export default {
+  gardenEntry: {
+    name: 'Home Garden Moments',
+    note: 'By the window',
+    visit: 'Visit Home Garden Moments',
+    back: 'Back home',
+    preview: 'Windowsill art preview',
+    envelope: 'Open the letter',
+    reread: 'Read the letter again',
+    salutation: 'A little place for you',
+    letter: 'I saved you a spot by the window. Once you pick your first packet of seeds, we can fill this clay pot with soil.',
+    signature: 'From the family',
+    fold: 'Fold the letter',
+  },
   windowHome,
   windowTools,
   windowDisplay,

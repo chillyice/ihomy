@@ -8,6 +8,19 @@ import windowTools from './windowTools/zh-CN'
 import windowDisplay from './windowDisplay/zh-CN'
 
 export default {
+  gardenEntry: {
+    name: '家圃时光',
+    note: '去窗边看看',
+    visit: '进入家圃时光',
+    back: '回到家里',
+    preview: '窗台美术预览',
+    envelope: '拆开窗台上的信',
+    reread: '再读一遍信',
+    salutation: '给搬到窗边的你',
+    letter: '我把靠窗的地方给你留出来了。等你挑好第一包种子，我们就把这只陶盆装满土。',
+    signature: '家里人留',
+    fold: '折好信纸',
+  },
   windowHome,
   windowTools,
   windowDisplay,
