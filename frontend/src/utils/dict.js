@@ -66,18 +66,17 @@ export const indexCatTone = (category) => {
   return ''
 }
 
-// 月相(和风 v1 astro.moonPhase 代码)→ emoji 图标;名称走 i18n weatherPage.moon.<code>
-export const MOON_PHASE_ICON = {
-  'new-moon': '🌑',
-  'waxing-crescent': '🌒',
-  'first-quarter': '🌓',
-  'waxing-gibbous': '🌔',
-  'full-moon': '🌕',
-  'waning-gibbous': '🌖',
-  'last-quarter': '🌗',
-  'waning-crescent': '🌘',
-}
-export const moonIcon = (code) => MOON_PHASE_ICON[code] || '🌙'
+// 按朔望周期排列，与 SolarUtil.MOON_CODES 同序。
+export const MOON_PHASE_CODES = [
+  'new-moon',
+  'waxing-crescent',
+  'first-quarter',
+  'waxing-gibbous',
+  'full-moon',
+  'waning-gibbous',
+  'last-quarter',
+  'waning-crescent',
+]
 /** 月相名称(走 i18n weatherPage.moon.<code>,缺键回退空串) */
 export const moonPhaseText = (t, code) => {
   const key = 'weatherPage.moon.' + code

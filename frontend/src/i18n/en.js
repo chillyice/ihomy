@@ -7388,6 +7388,8 @@ export default {
     sunSunset: 'Sunrise / Sunset',
     // Sun, moon & twilight (V9.92): pure astronomy from /public/sun-info (SolarUtil, NOAA/Meeus), no weather API needed
     astro: 'Sun, Moon & Twilight',
+    moonAtlas: 'Moon phases',
+    moonOutlook: 'Five-day moon phases',
     sunrise: 'Sunrise',
     sunset: 'Sunset',
     solarNoon: 'Solar noon',

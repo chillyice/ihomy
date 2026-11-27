@@ -68,6 +68,13 @@
         <div v-if="curve" class="wtm-curve">
           <div class="wtm-sub">{{ $t('weatherPage.map.todayCurve') }}</div>
           <svg :viewBox="`0 0 ${CURVE_W} ${CURVE_H}`" class="wtm-curve-svg" role="img" :aria-label="$t('weatherPage.map.todayCurve')">
+            <defs>
+              <radialGradient :id="sunId" cx="38%" cy="32%" r="75%">
+                <stop stop-color="#fff5c3" />
+                <stop offset=".62" stop-color="#ffd169" />
+                <stop offset="1" stop-color="#e9973b" />
+              </radialGradient>
+            </defs>
             <template v-for="b in curve.bands" :key="b.key">
               <rect x="0" :y="b.y" :width="CURVE_W" :height="CURVE_H - b.y" :fill="bandColor(b.key)" />
               <line x1="0" :y1="b.y" :x2="CURVE_W" :y2="b.y" class="wtm-curve-th" />
@@ -81,39 +88,32 @@
               :class="{ 'is-below': curve.sunBelow }"
               :transform="`translate(${curve.nowX.toFixed(1)} ${curve.nowY.toFixed(1)})`"
             >
-              <circle class="wtm-sun-glow" r="13" />
-              <g class="wtm-sun-rays">
-                <line v-for="(r, i) in SUN_RAYS" :key="i" :x1="r.x1" :y1="r.y1" :x2="r.x2" :y2="r.y2" />
-              </g>
-              <circle class="wtm-sun-core" r="5.2" />
+              <circle r="15" fill="currentColor" opacity=".14" />
+              <path
+                v-for="i in 8"
+                :key="i"
+                :d="i % 2 ? 'M0 -9v-4' : 'M0 -9v-2'"
+                :transform="`rotate(${i * 45})`"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
+              <circle r="6.1" :fill="curve.sunBelow ? 'var(--color-card-2)' : `url(#${sunId})`" stroke="currentColor" stroke-width="1.1" />
             </g>
           </svg>
         </div>
 
-        <div v-if="astro?.moonPhaseCode" class="wtm-moon">
-          <span class="wtm-moon-icon">{{ moonIcon(astro.moonPhaseCode) }}</span>
-          <div class="wtm-moon-main">
-            <div class="wtm-moon-name">{{ moonPhaseText(t, astro.moonPhaseCode) }}</div>
-            <div class="wtm-moon-sub">
-              <span>{{ $t('weatherPage.moonrise') }} {{ astro.moonrise || '—' }}</span>
-              <span>{{ $t('weatherPage.moonset') }} {{ astro.moonset || '—' }}</span>
-              <span v-if="astro.moonIllumination != null"> {{ $t('weatherPage.illumination') }} {{ astro.moonIllumination }}% </span>
-            </div>
-          </div>
-          <div v-if="moonDays.length" class="wtm-moon-days">
-            <span v-for="d in moonDays" :key="d.fxDate">{{ fmtMD(d.fxDate) }} {{ moonIcon(d.moonPhaseCode) }}</span>
-          </div>
-        </div>
+        <MoonPanel v-if="astro?.moonPhaseCode" :astro="astro" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
-import { moonIcon, moonPhaseText } from '@/utils/dict'
+import MoonPanel from './MoonPanel.vue'
 import { solarClock } from '@/utils/windowLight'
 import { solarSlotPosition } from '@/utils/solarSamples'
 import {
@@ -141,6 +141,7 @@ const props = defineProps({
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
+const sunId = useId()
 
 const SUN_KEYS = ['sunrise', 'solarNoon', 'sunset']
 const TWILIGHT_KEYS = [
@@ -216,11 +217,6 @@ const markerStyle = computed(() => {
 // ── 当地今日(与晨昏地图同源的一份 sun-info) ──
 const cityName = computed(() => props.city || '')
 const twilightMarks = computed(() => TWILIGHT_KEYS.map((key) => ({ key, time: props.astro?.[key] || '' })).filter((m) => m.time))
-const moonDays = computed(() => (props.astro?.moonDays || []).slice(0, 5))
-const fmtMD = (s) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || '')
-  return m ? `${Number(m[2])}/${Number(m[3])}` : ''
-}
 // 当前时刻(本地分钟):地图、今日高度曲线与「下一阶段」共用,每分钟与回到前台时刷新
 // (computed 内不直接读 Date.now / new Date,否则长开后不会重算)
 const currentTime = ref(Date.now())
@@ -238,23 +234,14 @@ const CURVE_W = 720,
   CURVE_H = 90,
   CURVE_LO = -30,
   CURVE_HI = 90
-// 太阳图标:8 条射线(8.6 → 12.6),上下留 16 的余量,正午最高点也不会被 viewBox 裁掉
-const SUN_RAYS = Array.from({ length: 8 }, (_, i) => {
-  const a = (i * Math.PI) / 4
-  return {
-    x1: +(Math.cos(a) * 8.6).toFixed(2),
-    y1: +(Math.sin(a) * 8.6).toFixed(2),
-    x2: +(Math.cos(a) * 12.6).toFixed(2),
-    y2: +(Math.sin(a) * 12.6).toFixed(2),
-  }
-})
 // 当前时刻与地图一起每分钟刷新(computed 内不直接读 Date.now)
 const curve = computed(() => {
   const list = props.astro?.timeline ?? props.astro?.slots ?? []
   if (list.length < 2) return null
   // 上下各留 16 的余量:太阳图标(射线到 15)在正午最高点与半夜最低点都不会被 viewBox 裁掉
   const yOf = (a) => CURVE_H - 16 - ((Math.max(CURVE_LO, Math.min(CURVE_HI, a)) - CURVE_LO) / (CURVE_HI - CURVE_LO)) * (CURVE_H - 32)
-  const pts = list.map((s, i) => ({ x: (i / (list.length - 1)) * CURVE_W, y: yOf(s.altitude) }))
+  const xOf = (slot) => 16 + (slot / (list.length - 1)) * (CURVE_W - 32)
+  const pts = list.map((s, i) => ({ x: xOf(i), y: yOf(s.altitude) }))
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('')
   const t = Math.min(list.length - 1, solarSlotPosition(list, currentTime.value, nowMin.value / 5))
   const i0 = Math.min(list.length - 1, Math.floor(t))
@@ -262,10 +249,10 @@ const curve = computed(() => {
   const alt = Number(list[i0].altitude) + (Number(list[i1].altitude) - Number(list[i0].altitude)) * (t - i0)
   return {
     line,
-    area: `${line}L${CURVE_W} ${CURVE_H}L0 ${CURVE_H}Z`,
+    area: `${line}L${xOf(list.length - 1)} ${CURVE_H}L${xOf(0)} ${CURVE_H}Z`,
     bands: [-6, -12, -18].map((v, i) => ({ key: ['civil', 'nautical', 'astronomical'][i], y: yOf(v) })),
     horizonY: yOf(0),
-    nowX: (t / (list.length - 1)) * CURVE_W,
+    nowX: xOf(t),
     nowY: yOf(alt),
     sunBelow: alt < -0.833,
     stroke: cssVar('--color-brand', '#b88c6e'),
@@ -654,67 +641,14 @@ watch(
   stroke-dasharray: 6 4;
   opacity: 0.55;
 }
-.wtm-curve-sun .wtm-sun-core {
-  fill: var(--color-brand);
-  stroke: var(--color-card);
-  stroke-width: 1.5;
+html.dark .wtm-curve-sun {
+  --sun-ray: #efbd65;
 }
-.wtm-curve-sun .wtm-sun-glow {
-  fill: var(--color-brand);
-  opacity: 0.16;
+.wtm-curve-sun {
+  color: var(--sun-ray, #b77627);
 }
-.wtm-curve-sun .wtm-sun-rays line {
-  stroke: var(--color-brand);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-/* 夜间(太阳在地平线以下)整体压暗,仍保留位置提示 */
 .wtm-curve-sun.is-below {
-  opacity: 0.45;
-}
-.wtm-moon {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: var(--color-card-2);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-.wtm-moon-icon {
-  font-size: 28px;
-  line-height: 1;
-}
-.wtm-moon-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.wtm-moon-name {
-  font-size: 14px;
-  font-weight: 700;
-}
-.wtm-moon-sub {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 11px;
   color: var(--color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-/* 5 天月相条:横向铺开一整行(面板已转通栏,不再挤在右栏),空间够就一行排完 */
-.wtm-moon-days {
-  margin-left: auto;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-.wtm-moon-days span {
-  white-space: nowrap;
 }
 /* 纵屏保持三列:9 个时刻按「凌晨三档 → 日出/正午/日落 → 傍晚三档」各成一行,
    三行之间的对称关系(天文/航海/民用)一眼能对照;两列会把同组拆散、行数也跟着变多。 */
@@ -733,10 +667,6 @@ watch(
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .wtm-moon-days {
-    margin-left: 0;
-    justify-content: flex-start;
   }
 }
 /* 极窄(小屏手机竖屏):再压一档内边距,保证三列不被撑破 */

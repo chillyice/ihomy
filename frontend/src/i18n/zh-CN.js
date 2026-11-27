@@ -7287,6 +7287,8 @@ export default {
     sunSunset: '日出 / 日落',
     // 日月与晨昏(V9.92):纯天文计算,取自 /public/sun-info(SolarUtil 的 NOAA/Meeus 实现),不依赖天气 API
     astro: '日月与晨昏',
+    moonAtlas: '月相图谱',
+    moonOutlook: '五天月相',
     sunrise: '日出',
     sunset: '日落',
     solarNoon: '太阳正午',
