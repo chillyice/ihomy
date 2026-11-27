@@ -14,7 +14,9 @@
       </div>
       <footer v-if="status === 'ready'">
         <p aria-live="polite">{{ t('gardenEntry.potHints.' + step) }}</p>
-        <button v-if="step < 7" ref="action" class="pot-action" @click="post('act')">{{ t('gardenEntry.potActions.' + step) }}</button>
+        <button v-if="step < 7" ref="action" class="pot-action" :class="{ 'pot-shortcut': step <= 4 }" @click="post('act')">
+          {{ t('gardenEntry.potActions.' + step) }}
+        </button>
         <button v-else ref="action" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
       </footer>
     </section>
@@ -162,6 +164,11 @@ button {
   background: #4a6047;
   color: #fff9e8;
   border: 1px solid #42533f;
+}
+.pot-shortcut {
+  color: #584a39;
+  background: transparent;
+  border-color: #b7a481;
 }
 .pot-stage {
   position: relative;
