@@ -2,34 +2,57 @@
   <div class="pot-shade">
     <section class="pot-card" aria-labelledby="pot-name">
       <header>
-        <h2 id="pot-name">{{ t('gardenEntry.pot') }}</h2>
+        <h2 id="pot-name">{{ title }}</h2>
         <button ref="back" class="pot-back" @click="emit('back')">{{ t('gardenEntry.sill') }}</button>
       </header>
       <div class="pot-stage">
-        <iframe v-if="status !== 'error'" ref="frame" :key="attempt" :src="gameUrl.href" :title="t('gardenEntry.pot')" tabindex="-1" />
+        <iframe v-if="status !== 'error'" ref="frame" :key="attempt" :src="gameUrl.href" :title="title" tabindex="-1" />
         <div v-if="status !== 'ready'" class="pot-status" role="status">
           <span>{{ t(status === 'error' ? 'gardenEntry.sceneUnavailable' : 'gardenEntry.sceneLoading') }}</span>
           <button v-if="status === 'error'" @click="loadScene">{{ t('common.retry') }}</button>
         </div>
       </div>
       <footer v-if="status === 'ready'">
-        <p aria-live="polite">{{ t('gardenEntry.potHints.' + step) }}</p>
-        <button v-if="step < 7" ref="action" class="pot-action" :class="{ 'pot-shortcut': step <= 4 }" @click="post('act')">
+        <p aria-live="polite">{{ step === 7 ? t('garden.stages.' + growth) : t('gardenEntry.potHints.' + step) }} {{ costHint }}</p>
+        <button
+          v-if="step < 7"
+          ref="action"
+          class="pot-action"
+          :disabled="busy"
+          :class="{ 'pot-shortcut': step <= 4 }"
+          @click="post('act')"
+        >
           {{ t('gardenEntry.potActions.' + step) }}
         </button>
-        <button v-else ref="action" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
+        <button v-else-if="preview" ref="action" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
+        <div v-if="preview && step === 7" class="pot-samples" role="group" :aria-label="t('garden.review')">
+          <span>{{ t('garden.review') }}</span>
+          <button v-for="n in 3" :key="n" :aria-pressed="growth === n - 1" @click="emit('sample', n - 1)">
+            {{ t('garden.samples.' + (n - 1)) }}
+          </button>
+        </div>
       </footer>
     </section>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps({ step: { type: Number, required: true } })
-const emit = defineEmits(['advance', 'back', 'replay'])
+const props = defineProps({
+  step: { type: Number, required: true },
+  growth: { type: Number, default: 0 },
+  cropCode: String,
+  cropName: String,
+  preview: Boolean,
+  busy: Boolean,
+  costHint: String,
+  firstShoot: Boolean,
+})
+const emit = defineEmits(['advance', 'back', 'replay', 'sample', 'observed'])
 const { t } = useI18n()
+const title = computed(() => (props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName })))
 const frame = ref(null)
 const back = ref(null)
 const action = ref(null)
@@ -40,9 +63,18 @@ const gameUrl = new URL('/index.html', window.location.origin)
 gameUrl.port = '5191'
 let timer
 
-function post(type) {
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  frame.value?.contentWindow?.postMessage({ channel, type, step: props.step, reduced }, gameUrl.origin)
+const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+function post(type, reveal = false) {
+  frame.value?.contentWindow?.postMessage(
+    { channel, type, step: props.step, reduced: motion.matches, growth: props.growth, crop: props.cropCode, reveal },
+    gameUrl.origin,
+  )
+}
+function restore(opening) {
+  if (status.value === 'ready') {
+    post('restore', opening === true && props.firstShoot)
+    emit('observed')
+  }
 }
 
 function timeout(ms) {
@@ -68,17 +100,17 @@ function receive(event) {
     case 'ready':
       clearTimeout(timer)
       status.value = 'ready'
-      post('restore')
+      restore(true)
       break
     case 'advance':
-      if (status.value === 'ready' && event.data.step === props.step && props.step < 7) emit('advance', props.step)
+      if (status.value === 'ready' && !props.busy && event.data.step === props.step && props.step < 7) emit('advance', props.step)
       else post('restore')
       break
     case 'back':
       emit('back')
       break
     case 'focus':
-      action.value?.focus()
+      ;(action.value || back.value)?.focus()
       break
     case 'error':
       clearTimeout(timer)
@@ -87,20 +119,17 @@ function receive(event) {
   }
 }
 
-watch(
-  () => props.step,
-  () => {
-    if (status.value === 'ready') post('restore')
-  },
-)
+watch(() => [props.step, props.growth, props.cropCode], restore)
 onMounted(() => {
   window.addEventListener('message', receive)
+  motion.addEventListener('change', restore)
   timeout(10000)
   nextTick(() => back.value?.focus({ preventScroll: true }))
 })
 onBeforeUnmount(() => {
   clearTimeout(timer)
   window.removeEventListener('message', receive)
+  motion.removeEventListener('change', restore)
 })
 </script>
 
@@ -175,6 +204,23 @@ button {
   height: min(55dvh, 330px);
   min-height: 120px;
   background: #efe5cc;
+}
+.pot-samples {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+}
+.pot-samples button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid #b7a481;
+}
+.pot-samples button[aria-pressed='true'] {
+  background: #e0e6d3;
+  border-color: #687957;
 }
 iframe,
 .pot-status {

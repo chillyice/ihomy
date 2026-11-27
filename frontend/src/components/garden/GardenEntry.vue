@@ -1,8 +1,9 @@
 <template>
   <button
+    v-if="preview || entry?.enabled"
     ref="note"
     class="garden-note"
-    :class="{ 'has-letter': progress < 0 }"
+    :class="{ 'has-letter': preview ? progress < 0 : entry?.note === 'MAIL' || entry?.note === 'CARE' }"
     :aria-label="t('gardenEntry.visit')"
     :title="t('gardenEntry.name')"
     aria-haspopup="dialog"
@@ -30,42 +31,80 @@
         </button>
         <div class="garden-frame">
           <div class="garden-view" aria-hidden="true"></div>
+          <div v-if="planted" class="sill-soil" aria-hidden="true">
+            <i v-if="growth > 0 && sketchCrop" class="sill-shoot" :class="{ leafy: growth >= 2, broad: cropCode === 'MINT' }">
+              <i></i><i v-if="growth >= 2"></i><i v-if="growth >= 2"></i>
+            </i>
+          </div>
           <button
-            v-if="!reading && !tending && progress < 0"
+            v-if="!reading && !tending && (preview ? progress < 0 : mail)"
             ref="envelope"
             class="garden-envelope"
             :aria-label="t('gardenEntry.envelope')"
+            :disabled="busy"
             @click="openLetter"
           >
             <img :src="envelopeArt" alt="" />
             <span>{{ t('gardenEntry.envelope') }}</span>
           </button>
           <button
-            v-if="!reading && !tending && progress >= 0"
+            v-if="!reading && !tending && progress >= 0 && (preview || plot) && (planted || !mail || progress > 0)"
             ref="packet"
             class="garden-envelope garden-packet"
             :class="{ 'at-pot': progress > 0 }"
-            @click="tending = true"
+            @click="openPot"
           >
             <i v-if="progress === 0" class="seed-sachet" aria-hidden="true"><i></i></i>
-            <span>{{ t(progress === 0 ? 'gardenEntry.seeds' : 'gardenEntry.visitPot') }}</span>
+            <span>{{
+              progress === 0 ? (preview ? t('gardenEntry.seeds') : t('garden.seedPacket', { crop: cropName })) : t('gardenEntry.visitPot')
+            }}</span>
           </button>
         </div>
         <div v-show="!tending" class="garden-title">
           <h1 id="garden-name">{{ t('gardenEntry.name') }}</h1>
-          <p>{{ t('gardenEntry.preview') }}</p>
-          <button v-if="progress >= 0 && !reading" class="garden-reread" @click="openLetter">{{ t('gardenEntry.reread') }}</button>
+          <p v-if="preview">{{ t('gardenEntry.preview') }}</p>
+          <p v-else-if="!world && !failed" role="status">{{ t('common.loading') }}</p>
+          <p v-else-if="world && !plot && !failed">{{ t('garden.noPot') }}</p>
+          <button v-if="!reading && (preview ? progress >= 0 : world && !mail)" class="garden-reread" :disabled="busy" @click="openLetter">
+            {{ t('gardenEntry.reread') }}
+          </button>
         </div>
         <Transition name="garden-unfold">
           <article v-if="reading" class="garden-letter" aria-labelledby="garden-letter-title">
             <h2 id="garden-letter-title">{{ t('gardenEntry.salutation') }}</h2>
-            <p>{{ t('gardenEntry.letter') }}</p>
-            <p class="letter-gift">{{ t('gardenEntry.gift') }}</p>
-            <p class="garden-signature">{{ t('gardenEntry.signature') }}</p>
+            <template v-if="preview">
+              <p>{{ t('gardenEntry.letter') }}</p>
+              <p class="letter-gift">{{ t('gardenEntry.gift') }}</p>
+              <p class="garden-signature">{{ t('gardenEntry.signature') }}</p>
+            </template>
+            <template v-else>
+              <div v-for="letter in letters" :key="letter.date">
+                <p>{{ letter.text }}</p>
+                <p class="garden-signature">{{ letter.signature }}</p>
+              </div>
+            </template>
             <button ref="fold" @click="closeLetter">{{ t('gardenEntry.fold') }}</button>
           </article>
         </Transition>
-        <FirstPot v-if="tending" :step="progress" @advance="advance" @back="closePot" @replay="replay" />
+        <FirstPot
+          v-if="tending && progress >= 0"
+          :step="progress"
+          :growth="growth"
+          :crop-code="cropCode"
+          :crop-name="cropName"
+          :preview="preview"
+          :busy="busy"
+          :cost-hint="costHint"
+          :first-shoot="firstShoot"
+          @advance="advance"
+          @back="closePot"
+          @replay="replay"
+          @sample="setSample"
+          @observed="rememberGrowth"
+        />
+        <div v-if="!preview && failed" class="garden-sync" role="status">
+          {{ t('garden.syncFailed') }} <button @click="refresh">{{ t('common.retry') }}</button>
+        </div>
       </section>
     </Transition>
   </Teleport>
@@ -79,8 +118,9 @@ import { Back } from '@element-plus/icons-vue'
 import { useAppBack } from '@/composables/useAppBack'
 import envelopeArt from '@/assets/windowdesk/envelope.webp'
 import FirstPot from './FirstPot.vue'
+import { useWindowsill } from './useWindowsill'
 
-const props = defineProps({ member: [Number, String], family: [Number, String] })
+const props = defineProps({ member: [Number, String], family: [Number, String], preview: Boolean })
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -100,17 +140,94 @@ function savedStep() {
   }
   return -1
 }
-const progress = ref(savedStep())
+const inside = computed(() => route.name === 'Home' && route.query.garden === 'window')
+const {
+  entry,
+  plot,
+  world,
+  crop,
+  mail,
+  letters,
+  busy,
+  failed,
+  step,
+  openMail,
+  advance: advanceLive,
+  refresh,
+} = useWindowsill(props, inside)
+const localStep = ref(props.preview ? savedStep() : -1)
+const progress = computed(() => (props.preview ? localStep.value : step.value))
+function savedSample() {
+  try {
+    const n = Number(localStorage.getItem(saveKey + ':growth'))
+    return [1, 2].includes(n) ? n : 0
+  } catch {
+    return 0
+  }
+}
+const sample = ref(props.preview && localStep.value === 7 ? savedSample() : 0)
+function setSample(n) {
+  if (!props.preview || ![0, 1, 2].includes(n)) return
+  sample.value = n
+  try {
+    localStorage.setItem(saveKey + ':growth', String(n))
+  } catch {
+    /* Session preview. */
+  }
+}
+const growth = computed(() => (props.preview ? (progress.value === 7 ? sample.value : 0) : (plot.value?.stage ?? 0)))
+const planted = computed(() => (props.preview ? progress.value === 7 : !!plot.value?.cropCode))
+const cropCode = computed(() => (props.preview ? 'CATGRASS' : plot.value?.cropCode || crop.value?.code))
+const sketchCrop = computed(() => ['CATGRASS', 'MINT', 'SNAKE_PLANT'].includes(cropCode.value))
+const cropName = computed(() => plot.value?.cropName || crop.value?.name || '')
+const costHint = computed(() => {
+  if (props.preview || !world.value) return ''
+  if (progress.value === 1 && world.value.plots.some((p) => p.prepared)) return t('garden.prepareCost')
+  if (progress.value === 5 && crop.value) return t('garden.sowCost', { price: crop.value.seedPrice })
+  return ''
+})
 const tending = ref(false)
+const firstShoot = ref(false)
+const seenKey = computed(() =>
+  props.preview ? saveKey + ':seen' : 'ihomy:garden:seen:' + props.member + ':' + props.family + ':' + plot.value?.id,
+)
+function viewedStage(n) {
+  return (props.preview ? 'review' : plot.value?.plantedAt) + ':' + n
+}
+function openPot() {
+  firstShoot.value = false
+  if (planted.value && growth.value === 1) {
+    try {
+      firstShoot.value = localStorage.getItem(seenKey.value) === viewedStage(0)
+    } catch {
+      /* Show the current snapshot. */
+    }
+  }
+  tending.value = true
+}
+function rememberGrowth() {
+  if (!planted.value) return
+  firstShoot.value = false
+  try {
+    localStorage.setItem(seenKey.value, viewedStage(growth.value))
+  } catch {
+    /* Optional visit history. */
+  }
+}
 function syncProgress(event) {
+  if (!props.preview) return
+  if (event.key === saveKey + ':growth') {
+    sample.value = savedSample()
+    return
+  }
   if (event.key !== saveKey) return
-  progress.value = savedStep()
+  localStep.value = savedStep()
   if (progress.value < 0) tending.value = false
 }
 onMounted(() => window.addEventListener('storage', syncProgress))
 onBeforeUnmount(() => window.removeEventListener('storage', syncProgress))
 function save(step) {
-  progress.value = step
+  localStep.value = step
   try {
     if (step < 0) localStorage.removeItem(saveKey)
     else localStorage.setItem(saveKey, String(step))
@@ -119,6 +236,7 @@ function save(step) {
   }
 }
 function advance(previous) {
+  if (!props.preview) return advanceLive(previous)
   if (previous === progress.value && previous < 7) save(Math.max(previous + 1, savedStep()))
 }
 async function closePot() {
@@ -127,13 +245,14 @@ async function closePot() {
   packet.value?.focus({ preventScroll: true })
 }
 async function replay() {
+  if (!props.preview) return
+  setSample(0)
   tending.value = false
   save(-1)
   await nextTick()
   envelope.value?.focus({ preventScroll: true })
 }
 const reading = ref(false)
-const inside = computed(() => route.name === 'Home' && route.query.garden === 'window')
 
 function visit() {
   router.push({ path: route.path, query: { ...route.query, garden: 'window' }, hash: route.hash, state: { gardenFrom: route.fullPath } })
@@ -148,8 +267,10 @@ function leave() {
 }
 
 async function openLetter() {
+  if (!props.preview && !(await openMail())) return
+  if (!inside.value) return
   reading.value = true
-  if (progress.value < 0) save(Math.max(0, savedStep()))
+  if (props.preview && progress.value < 0) save(Math.max(0, savedStep()))
   await nextTick()
   fold.value?.focus({ preventScroll: true })
 }
@@ -442,6 +563,79 @@ onBeforeUnmount(() => releaseHome?.())
   top: auto;
   bottom: 0;
 }
+.sill-soil {
+  position: absolute;
+  left: 49.2%;
+  top: 56.9%;
+  width: 10.1%;
+  height: 1.35%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #655039;
+  pointer-events: none;
+}
+.sill-shoot {
+  position: absolute;
+  left: 28%;
+  translate: -50% 0;
+  bottom: 45%;
+  width: 12%;
+  aspect-ratio: 1 / 1.8;
+}
+.sill-shoot i {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 45%;
+  height: 100%;
+  transform-origin: bottom;
+  border-radius: 100% 0 90% 15%;
+  background: linear-gradient(90deg, #536932 50%, #a4b86a 51%);
+  transform: rotate(12deg);
+}
+.sill-shoot.leafy {
+  width: 23%;
+}
+.sill-shoot.leafy i:nth-child(2) {
+  transform: rotate(-35deg);
+  height: 77%;
+}
+.sill-shoot.leafy i:nth-child(3) {
+  transform: rotate(39deg);
+  height: 70%;
+}
+.sill-shoot.broad i {
+  width: 68%;
+  border-radius: 70% 30%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sill-shoot.leafy {
+    transform-origin: 50% 100%;
+    animation: sill-leaves 1.75s ease-in-out infinite alternate;
+  }
+  @keyframes sill-leaves {
+    from {
+      transform: rotate(-1deg);
+    }
+    to {
+      transform: rotate(1deg);
+    }
+  }
+}
+.garden-sync {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: #fff3da;
+  color: #503e2b;
+  padding: 8px;
+  border-radius: 6px;
+}
+.garden-sync button {
+  background: transparent;
+  border: 0;
+  text-decoration: underline;
+}
 .garden-letter .letter-gift {
   font-size: 14px;
   color: #566a47;
@@ -510,6 +704,12 @@ onBeforeUnmount(() => releaseHome?.())
   }
   .garden-view {
     background-image: url('@/assets/garden/windowsill-portrait.webp');
+  }
+  .sill-soil {
+    left: 47.4%;
+    top: 59.4%;
+    width: 11.5%;
+    height: 0.9%;
   }
   .garden-envelope {
     bottom: 29%;

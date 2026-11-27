@@ -29,7 +29,7 @@
       <SiteFooter v-if="!isMobile && !immersive" />
       <GardenEntry
         v-if="
-          (devGardenReview || (localGardenReview && route.query.gardenPreview === '1')) &&
+          (devGardenReview || localGardenReview) &&
           route.name === 'Home' &&
           !route.query.hid &&
           !route.query.home_id &&
@@ -38,7 +38,8 @@
           !appStore.homeEditMode &&
           (userStore.isLoggedIn || route.query.gardenPreview === '1')
         "
-        :key="String(userStore.userInfo?.id) + ':' + String(userStore.userInfo?.familyId)"
+        :key="String(userStore.userInfo?.id) + ':' + String(userStore.userInfo?.familyId) + ':' + (route.query.gardenPreview === '1')"
+        :preview="route.query.gardenPreview === '1'"
         :member="userStore.userInfo?.id"
         :family="userStore.userInfo?.familyId"
       />

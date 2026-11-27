@@ -50,6 +50,16 @@ export const homeApi = {
   getFeed: (limit = 20) => request.get('/home/feed', { params: { limit } }),
 }
 
+const gardenWrite = (path, body, key) => request.post('/garden/' + path, body, { headers: { 'Idempotency-Key': key } })
+export const gardenApi = {
+  entry: () => request.get('/garden/entry', { isBackgroundRead: () => true }),
+  panorama: () => request.get('/garden', { isBackgroundRead: () => true }),
+  openMail: (key) => gardenWrite('mail/open', null, key),
+  prepare: (id, key) => gardenWrite('plot/' + id + '/prepare', null, key),
+  sow: (slotNo, cropCode, key) => gardenWrite('plot', { venue: 'WINDOWSILL', slotNo, cropCode }, key),
+  water: (id, key) => gardenWrite('plot/' + id + '/water', null, key),
+}
+
 // 博客
 export const blogApi = {
   list: (params) => request.get('/blog/list', { params }),
