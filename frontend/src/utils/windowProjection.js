@@ -204,7 +204,6 @@ export function drawWindowProjection(
     softness = weatherSoftness[weather] ?? 0,
     featherStrength = 50,
     shadowAlpha = 0,
-    highlight,
     onMeasure,
     realWeight = 0,
     calibration = WINDOW_CALIBRATION,
@@ -221,11 +220,6 @@ export function drawWindowProjection(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, w, h)
-  const sun = highlight?.getContext('2d')
-  if (sun) {
-    resize(highlight, w, h)
-    sun.clearRect(0, 0, w, h)
-  }
   if (
     !scene?.hasDirectLight ||
     !(scene.altitude > 0 && scene.altitude < 90 && scene.azimuth > 90 && scene.azimuth < 270) ||
@@ -287,12 +281,12 @@ export function drawWindowProjection(
     onMeasure(total / (255 * 24 * 24))
   }
 
-  const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude, calibration)
-  const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
-  transmittedLight.addColorStop(0, scene.palette.core)
-  transmittedLight.addColorStop(0.6, scene.palette.mid)
-  transmittedLight.addColorStop(1, scene.kind === 'lightning' ? scene.palette.ambient : scene.palette.mid)
   if (scene.kind === 'lightning') {
+    const [a, , c, d, x, y] = windowTransform(w, h, scene.altitude, scene.azimuth, realWeight, scene.noonAltitude, calibration)
+    const transmittedLight = ctx.createLinearGradient(x + a * 0.5, y, x + a * 0.5 + c, y + d)
+    transmittedLight.addColorStop(0, scene.palette.core)
+    transmittedLight.addColorStop(0.6, scene.palette.mid)
+    transmittedLight.addColorStop(1, scene.palette.ambient)
     ctx.save()
     ctx.globalCompositeOperation = 'source-in'
     ctx.fillStyle = transmittedLight
@@ -301,17 +295,10 @@ export function drawWindowProjection(
     return true
   }
 
-  if (sun) {
-    sun.drawImage(canvas, 0, 0)
-    sun.save()
-    sun.globalCompositeOperation = 'source-in'
-    sun.fillStyle = transmittedLight
-    sun.fillRect(0, 0, w, h)
-    sun.restore()
-  }
-
+  // White transmits the page colour in the daylight multiply layer. Draw
+  // shade behind the aperture so each penumbra retains its sampled coverage.
   ctx.save()
-  ctx.globalCompositeOperation = 'source-out'
+  ctx.globalCompositeOperation = 'destination-over'
   ctx.fillStyle = scene.shadowColor
   ctx.globalAlpha = Math.min(1, Math.max(0, shadowAlpha))
   ctx.fillRect(0, 0, w, h)

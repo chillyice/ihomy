@@ -13,30 +13,73 @@
     <!-- 毛玻璃背景层:全屏固定,半透明米色覆盖色块(不用 backdrop-filter 避免与面板叠加) -->
     <div class="glass-bg"></div>
 
-    <!-- 晨暮环境色与台灯补光 -->
-    <div
-      v-if="shadowEnabled && skyTint.opacity > 0"
-      class="bright-spot sky-tint"
-      :style="{ background: skyTint.background, '--sky-opacity': skyTint.opacity, '--lamp-mask': lampMask }"
-    ></div>
-    <div v-if="shadowEnabled && diffuseSkyStyle" class="bright-spot" :style="{ ...diffuseSkyStyle, '--lamp-mask': lampMask }"></div>
-    <div v-if="shadowEnabled && roomShadeLayer" class="room-shade" :style="{ ...roomShadeLayer, '--lamp-mask': lampMask }"></div>
-    <WindowProjection
-      v-if="lightLayerOpacity > 0 || stormLight"
-      :key="stormLight ? 'lightning' : 'sun'"
-      :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
-      :weather="weatherMode"
-      :softness="stormLight ? undefined : skyLight.softness"
-      :calibration="windowCalibration"
-      :feather-strength="featherStrength"
-      :standard="projectionStandard"
-      :shadow-alpha="castShade"
-      @measure="litFraction = $event"
-      :occluders="occluders"
-      :desk-casters="deskCasters"
-      :sashes="windowSashes"
-      :style="stormLight ? undefined : { opacity: lightLayerOpacity, '--lamp-mask': lampMask }"
-    />
+    <!-- 同一白底乘色层内合成天光、窗影和补光，完全受光处透出页面原色。 -->
+    <div class="room-lighting" :class="{ 'is-daylit': lightLayerOpacity > 0 && !stormLight }" :style="{ '--room-lamp-mask': lampMask }">
+      <div
+        v-if="shadowEnabled && skyTint.opacity > 0"
+        class="bright-spot sky-tint"
+        :style="{ background: skyTint.background, '--sky-opacity': skyTint.opacity }"
+      ></div>
+      <div v-if="shadowEnabled && diffuseSkyStyle" class="bright-spot" :style="diffuseSkyStyle"></div>
+      <div v-if="shadowEnabled && roomShadeLayer" class="room-shade" :style="roomShadeLayer"></div>
+      <WindowProjection
+        v-if="lightLayerOpacity > 0 || stormLight"
+        :key="stormLight ? 'lightning' : 'sun'"
+        :scene="stormLight ? LIGHTNING_SOURCE : sunScene"
+        :weather="weatherMode"
+        :softness="stormLight ? undefined : skyLight.softness"
+        :calibration="windowCalibration"
+        :feather-strength="featherStrength"
+        :standard="projectionStandard"
+        :shadow-alpha="castShade"
+        @measure="litFraction = $event"
+        :occluders="occluders"
+        :desk-casters="deskCasters"
+        :sashes="windowSashes"
+        :style="stormLight ? { '--lamp-mask': 'none' } : { opacity: projectionOpacity }"
+      />
+
+      <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
+      <div v-if="shadowEnabled" class="vignette"></div>
+
+      <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
+      <div v-if="themeStore.theme === 'warm' && lightLayerOpacity > 0" class="light-layer" :style="{ opacity: lightLayerOpacity }">
+        <div
+          class="light-bloom"
+          :style="{
+            ...sourceStyle,
+            background: `radial-gradient(circle, ${sunScene.palette.bloom}, ${sunScene.palette.mid} 35%, transparent 70%)`,
+          }"
+        ></div>
+        <div class="light-source" :style="sourceStyle">
+          <div v-for="(rs, i) in rayStyles" :key="i" class="light-ray" :style="rs"></div>
+        </div>
+      </div>
+
+      <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
+      <div
+        v-if="(lampDivOpacity ?? 0) > 0.01"
+        class="lamp-light lamp-light-pendulum"
+        :style="{
+          opacity: lampDivOpacity,
+          top: '38.2%',
+          width: lampRadius * 2 + 'vw',
+          height: lampRadius * 2 + 'vw',
+          background:
+            'radial-gradient(circle, rgba(' +
+            lampColor +
+            ',0.6) 0%, rgba(' +
+            lampColor +
+            ',0.45) 15%, rgba(' +
+            lampColor +
+            ',0.3) 35%, rgba(' +
+            lampColor +
+            ',0.18) 55%, rgba(' +
+            lampColor +
+            ',0.08) 75%, transparent 95%)',
+        }"
+      ></div>
+    </div>
     <WindowDrift
       :window-width="windowCalibration.windowWidth / 100"
       v-if="openSashes.length && shadowEnabled && weatherEffectEnabled && driftKind"
@@ -44,48 +87,6 @@
       :kind="driftKind"
       :open-sashes="openSashes"
     />
-
-    <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
-    <div v-if="shadowEnabled" class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
-
-    <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
-    <div v-if="themeStore.theme === 'warm' && lightLayerOpacity > 0" class="light-layer" :style="{ opacity: lightLayerOpacity }">
-      <div
-        class="light-bloom"
-        :style="{
-          ...sourceStyle,
-          background: `radial-gradient(circle, ${sunScene.palette.bloom}, ${sunScene.palette.mid} 35%, transparent 70%)`,
-        }"
-      ></div>
-      <div class="light-source" :style="sourceStyle">
-        <div v-for="(rs, i) in rayStyles" :key="i" class="light-ray" :style="rs"></div>
-      </div>
-    </div>
-
-    <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
-    <div
-      v-if="(lampDivOpacity ?? 0) > 0.01"
-      class="lamp-light lamp-light-pendulum"
-      :style="{
-        opacity: lampDivOpacity,
-        top: '38.2%',
-        width: lampRadius * 2 + 'vw',
-        height: lampRadius * 2 + 'vw',
-        background:
-          'radial-gradient(circle, rgba(' +
-          lampColor +
-          ',0.6) 0%, rgba(' +
-          lampColor +
-          ',0.45) 15%, rgba(' +
-          lampColor +
-          ',0.3) 35%, rgba(' +
-          lampColor +
-          ',0.18) 55%, rgba(' +
-          lampColor +
-          ',0.08) 75%, transparent 95%)',
-      }"
-    ></div>
-
     <!-- 灰尘粒子:光路中的飘浮微粒(天气系数实时应用,opacity 为 0 时移除) -->
     <div v-if="(lightLayerOpacity ?? 0) > 0.01" class="dust-layer" :style="{ opacity: lightLayerOpacity ?? 0 }">
       <div
@@ -181,6 +182,7 @@ const {
   litFraction,
   roomShadeLayer,
   lightLayerOpacity,
+  projectionOpacity,
   blobsEnabled,
   dustParticles,
   snowParticles,
@@ -397,7 +399,29 @@ html.dark .blob-5 {
   }
 }
 
-/* 亮斑图层:multiply 染色,台灯 mask 挖洞(背景光影,盖在弹窗之上) */
+.room-lighting {
+  --room-lamp-mask: none;
+  --lamp-mask: var(--room-lamp-mask);
+  display: contents;
+}
+.room-lighting.is-daylit {
+  --lamp-mask: none;
+  -webkit-mask-image: var(--room-lamp-mask);
+  mask-image: var(--room-lamp-mask);
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-deco);
+  background: white;
+  mix-blend-mode: multiply;
+}
+.is-daylit .vignette {
+  z-index: var(--z-deco);
+}
+.is-daylit .lamp-light {
+  mix-blend-mode: screen;
+}
 .bright-spot {
   position: fixed;
   inset: 0;

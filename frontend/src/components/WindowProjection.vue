@@ -1,12 +1,10 @@
 <template>
   <canvas
     ref="surface"
-    v-bind="$attrs"
     class="window-projection"
     :class="{ 'lightning-projection': scene.kind === 'lightning' }"
     aria-hidden="true"
   ></canvas>
-  <canvas v-if="scene.kind !== 'lightning'" ref="highlight" v-bind="$attrs" class="window-projection sun-patch" aria-hidden="true"></canvas>
 </template>
 
 <script setup>
@@ -26,9 +24,7 @@ const props = defineProps({
   sashes: { type: Array, required: true },
 })
 const surface = ref(null)
-defineOptions({ inheritAttrs: false })
 const emit = defineEmits(['measure'])
-const highlight = ref(null)
 let needsMeter = true
 let observer
 let frame = 0
@@ -66,7 +62,6 @@ function schedulePaint() {
       ...props,
       foliageTime,
       realWeight,
-      highlight: highlight.value,
       onMeasure: needsMeter && realWeight === targetWeight && scene.kind !== 'lightning' ? (fraction) => emit('measure', fraction) : null,
       width: canvas.clientWidth,
       height: canvas.clientHeight,
@@ -157,10 +152,5 @@ onBeforeUnmount(() => {
   opacity: 0;
   z-index: calc(var(--z-atmos) + 6);
   mix-blend-mode: screen;
-}
-.sun-patch {
-  mix-blend-mode: overlay;
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 </style>

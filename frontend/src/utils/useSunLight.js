@@ -488,10 +488,12 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   }
 
   const lightLayerOpacity = computed(() => (shadowEnabled.value ? skyLight.value.direct : 0))
+  // A clear beam at a moderate sun angle already reveals the native page colour.
+  const projectionOpacity = computed(() => Math.min(1, 2 * lightLayerOpacity.value))
   const skyTint = computed(() => skyLight.value.tint)
   // roomShade 是「环境暗度」的亮度口径(曝光模型与用例都按它算),
   // roomShadeLayer 换成暖褐乘色并把不透明度按色值亮度回推,观感偏暖而明暗不变。
-  const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))
+  const roomShade = computed(() => ambientShadowOpacity(castShade.value, projectionOpacity.value))
   const roomShadeLayer = computed(() => (roomShade.value > 0 ? ambientShadeLayer(roomShade.value) : null))
   const diffuseSkyStyle = computed(() => {
     const sky = skyLight.value
@@ -764,6 +766,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     roomShade,
     roomShadeLayer,
     lightLayerOpacity,
+    projectionOpacity,
     skyTint,
     skyLight,
     diffuseSkyStyle,

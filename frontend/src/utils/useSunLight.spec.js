@@ -343,6 +343,19 @@ it('shows the selected slot’s lamp and shadow mask immediately when seeking or
   expect(light.lampMask.value).toBe('none')
 })
 
+it('fully reveals the page in clear direct sun and retains partial shade under cloud', async () => {
+  await mountLight(sunDay('2026-11-25'))
+  light.startLightTest()
+  light.setSlot(144)
+  light.setWeather('clear')
+  expect(light.projectionOpacity.value).toBe(1)
+  light.setWeather('overcast')
+  expect(light.projectionOpacity.value).toBeGreaterThan(0)
+  expect(light.projectionOpacity.value).toBeLessThan(1)
+  light.setSlot(0)
+  expect(light.projectionOpacity.value).toBe(0)
+})
+
 it('adds fill when deep shadows cover the page despite a bright sky', async () => {
   await mountLight(sunDay('2026-11-25'))
   light.seatLighting.value = true
@@ -479,7 +492,7 @@ it.each([
           // White paper at the transparent edge of the diffuse gradient: multiply
           // by the sky tint and composite both black shadow layers at this point.
           const sky = 255 * (1 - opacity) + opacity * (0.2126 * r + 0.7152 * g + 0.0722 * b)
-          return sky * (1 - light.roomShade.value) * (1 - light.castShade.value * light.lightLayerOpacity.value)
+          return sky * (1 - light.roomShade.value) * (1 - light.castShade.value * light.projectionOpacity.value)
         })
         for (let i = 1; i < levels.length; i++) {
           const slot = observations[i][0]
