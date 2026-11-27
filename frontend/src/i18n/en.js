@@ -7849,9 +7849,9 @@ export default {
     f6Title: 'Mouse gestures and wheel',
     f6Desc:
       'Hold the right button, draw a trail, and match it by direction string; the wheel works as a discrete key. Both are Windows-only for now and off by default — enable them under Settings → Experimental.',
-    f7Title: '16 action types in one chain',
+    f7Title: '17 action types in one chain',
     f7Desc:
-      'Text, command, script, app, URL, file, system, window, clipboard, keys, background send, mouse, delay, condition, parallel and group — arranged as a flow chart.',
+      'Text, command, script, app, URL, file, system, window, clipboard, keys, background send, mouse, delay, condition, parallel, cycle and group — arranged as a flow chart.',
     f8Title: 'Current window and background send',
     f8Desc:
       'Maximise, pin, centre or close the window that was in front when the trigger fired — without stealing focus. Keys can also go to a non-foreground app (window actions and background send are Windows-only for now).',
@@ -7867,9 +7867,8 @@ export default {
     f12Title: 'Pixel CRT theme',
     f12Desc:
       'Pixel CRT dark is the default: pixel type, scanlines, phosphor glow and vignette. A CRT light variant and two minimal themes are one click away.',
-    f13Title: 'Three overlays',
-    f13Desc:
-      'Key cast, a draggable cheat-sheet panel that fades when the cursor enters, and a copy menu on double Ctrl+C — each can be toggled on its own.',
+    f13Title: 'Two overlays',
+    f13Desc: 'Key cast and a draggable cheat-sheet panel that fades when the cursor enters — each can be toggled on its own.',
     f14Title: 'Config that survives',
     f14Desc:
       'Atomic writes, a last-known-good copy and corruption recovery — never silently wiped. Edits made outside the app are detected and reported, not overwritten.',

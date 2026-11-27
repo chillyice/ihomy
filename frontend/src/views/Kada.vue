@@ -241,8 +241,8 @@ import { serverUrl } from '@/utils/assetUrl'
 // 安卓是独立的测试通道:探针包(debug 签名)也放服务器 /opt/ihomy/uploads/kada/,
 // 版本号自带 0.2.0-s1,跟桌面 version 常量无关 —— 别把两者对齐。
 // ⚠ 换版本时同步:version 常量、下面各包的 meta 体积、服务器上的同名文件。
-const version = '1.1.0'
-const fileSize = '14.0 MB'
+const version = '1.2.5'
+const fileSize = '20.9 MB'
 const androidVersion = '0.2.0-s8'
 const androidApk = `kada-android-${androidVersion}-debug.apk`
 const repoUrl = 'https://github.com/chillyice/Kada'
@@ -292,7 +292,7 @@ const flowSteps = [
 ]
 
 const stats = [
-  { num: '16', labelKey: 'kada.statActions' },
+  { num: '17', labelKey: 'kada.statActions' },
   { num: '3', labelKey: 'kada.statTriggers' },
   { num: '3', labelKey: 'kada.statPlatforms' },
   { num: '0', labelKey: 'kada.statCloud' },
@@ -314,7 +314,7 @@ const platforms = [
     archKey: 'kada.archWin',
     downloads: [
       { labelKey: 'kada.dlWinPortable', meta: fileSize, href: exeUrl, primary: true, local: true },
-      { labelKey: 'kada.dlWinSetup', meta: '3.6 MB', href: fileUrl(`Kada_${version}_x64-setup.exe`), local: true },
+      { labelKey: 'kada.dlWinSetup', meta: '5.5 MB', href: fileUrl(`Kada_${version}_x64-setup.exe`), local: true },
     ],
   },
   {
@@ -323,8 +323,8 @@ const platforms = [
     nameKey: 'kada.platLinux',
     archKey: 'kada.archLinux',
     downloads: [
-      { labelKey: 'kada.dlLinuxAppImage', meta: '83.1 MB', href: fileUrl(`Kada_${version}_amd64.AppImage`), primary: true, local: true },
-      { labelKey: 'kada.dlLinuxDeb', meta: '4.6 MB', href: fileUrl(`Kada_${version}_amd64.deb`), local: true },
+      { labelKey: 'kada.dlLinuxAppImage', meta: '85.8 MB', href: fileUrl(`Kada_${version}_amd64.AppImage`), primary: true, local: true },
+      { labelKey: 'kada.dlLinuxDeb', meta: '7.6 MB', href: fileUrl(`Kada_${version}_amd64.deb`), local: true },
     ],
   },
   {
