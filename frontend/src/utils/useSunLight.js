@@ -645,6 +645,10 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     ([s]) => {
       if (s && s.azimuth != null) {
         setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
+        // 日表未到时的 sunScene 是占位夜景(高度角 -30),不能拿它自动切晨暮:
+        // 否则白天进站会先被切到暮色扫一遍,拿到 /public/sun-info 再扫回晨色(手机上网络慢,两次扫光看得很清楚)。
+        // 等真实日表落库后再按实际昼夜切换;取不到日表时保持上次的晨/暮偏好不动。
+        if (!activeSunInfo.value) return
         themeStore.applyAuto(s.isNight, { sweep: !lightTestMode.value })
       }
     },

@@ -153,6 +153,18 @@ it('applies the current daylight immediately when auto mode is selected again', 
   expect(request.get).toHaveBeenCalledTimes(1)
 })
 
+it('waits for the real day timeline before auto-switching, so a daytime visit never sweeps to dusk first', async () => {
+  const pending = Promise.withResolvers()
+  await mountLight(pending.promise)
+  // 占位夜景(日表未到)不能驱动晨暮:否则白天进站会先扫到暮色,数据到了再扫回晨色
+  expect(applyAuto).not.toHaveBeenCalled()
+  pending.resolve(sunDay('2026-11-25'))
+  await pending.promise
+  await nextTick()
+  expect(applyAuto).toHaveBeenCalledTimes(1)
+  expect(applyAuto).toHaveBeenCalledWith(false, { sweep: true })
+})
+
 it('samples live between timestamped observations, freezes on entry and resumes from the actual instant', async () => {
   const day = sunDay('2026-11-25')
   const start = Date.parse('2026-11-24T16:00:00Z')
