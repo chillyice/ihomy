@@ -20,7 +20,7 @@
       :style="{ background: skyTint.background, '--sky-opacity': skyTint.opacity, '--lamp-mask': lampMask }"
     ></div>
     <div v-if="shadowEnabled && diffuseSkyStyle" class="bright-spot" :style="{ ...diffuseSkyStyle, '--lamp-mask': lampMask }"></div>
-    <div v-if="shadowEnabled && roomShade > 0" class="room-shade" :style="{ opacity: roomShade, '--lamp-mask': lampMask }"></div>
+    <div v-if="shadowEnabled && roomShadeLayer" class="room-shade" :style="{ ...roomShadeLayer, '--lamp-mask': lampMask }"></div>
     <WindowProjection
       v-if="lightLayerOpacity > 0 || stormLight"
       :key="stormLight ? 'lightning' : 'sun'"
@@ -177,7 +177,7 @@ const {
   projectionStandard,
   featherStrength,
   castShade,
-  roomShade,
+  roomShadeLayer,
   lightLayerOpacity,
   blobsEnabled,
   dustParticles,
@@ -424,12 +424,12 @@ html.dark .sky-tint {
   filter: blur(20px);
 }
 
-/* 背光处仅受环境天光影响；台灯补光处仍由同一遮罩透光。 */
+/* 背光处仅受环境天光影响；台灯补光处仍由同一遮罩透光。
+   乘色与不透明度都由 roomShadeLayer 给(暖褐,亮度按 ambientShadeLayer 回推)。 */
 .room-shade {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-deco) + 1);
-  background: black;
   pointer-events: none;
   mix-blend-mode: multiply;
   -webkit-mask-image: var(--lamp-mask, none);

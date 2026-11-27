@@ -7,6 +7,7 @@ import { gsap } from 'gsap'
 import {
   AUTO_LAMP_ON_BELOW,
   AUTO_LAMP_OFF_ABOVE,
+  ambientShadeLayer,
   lampFromDaylight,
   ambientShadowOpacity,
   skyLighting,
@@ -443,7 +444,10 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
   // Reserve a small part of the daylight range for directional contrast.
   // Keep the blocked surface continuous as the beam crosses the edge of the window.
   const castShade = computed(() => shadowAlpha.value * sunScene.value.skyLevel * optics.value.direct * 0.43)
+  // roomShade 是「环境暗度」的亮度口径(曝光模型与用例都按它算),
+  // roomShadeLayer 换成暖褐乘色并把不透明度按色值亮度回推,观感偏暖而明暗不变。
   const roomShade = computed(() => ambientShadowOpacity(castShade.value, lightLayerOpacity.value))
+  const roomShadeLayer = computed(() => (roomShade.value > 0 ? ambientShadeLayer(roomShade.value) : null))
   const diffuseSkyStyle = computed(() => {
     const sky = skyLight.value
     if (sky.diffuseOpacity <= 0) return null
@@ -702,6 +706,7 @@ export function useSunLight(canReadEnvironment = () => true, canUseLight = () =>
     rainParticles,
     castShade,
     roomShade,
+    roomShadeLayer,
     lightLayerOpacity,
     skyTint,
     skyLight,

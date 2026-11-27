@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { ambientShadowOpacity, skyLighting, weatherOptics, getSunScene, lampFromDaylight, solarClock } from './windowLight'
+import {
+  ambientShadowOpacity,
+  ambientShadeLayer,
+  skyLighting,
+  weatherOptics,
+  getSunScene,
+  lampFromDaylight,
+  solarClock,
+} from './windowLight'
 
 it('selects the date and five-minute slot on the clock used to build the solar table', () => {
   const instant = new Date('2026-11-25T16:04:59Z')
@@ -88,6 +96,20 @@ it('keeps a fully blocked point at the same shade while the direct beam appears 
       const ambient = ambientShadowOpacity(shade, direct)
       expect((1 - ambient) * (1 - shade * direct)).toBeCloseTo(1 - shade, 10)
     }
+  }
+})
+
+it('dresses the ambient shade warm without changing how far it darkens the page', () => {
+  for (const shade of [0, 0.05, 0.2, 0.55]) {
+    const layer = ambientShadeLayer(shade)
+    const [r, g, b] = layer.background.slice(4, -1).split(',').map(Number)
+    const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    // 乘色在 luminance 上必须等价于「黑色 × shade」,明暗节奏才不受影响
+    expect(1 - layer.opacity * (1 - luma)).toBeCloseTo(1 - shade, 4)
+    expect(layer.opacity).toBeLessThanOrEqual(1)
+    // 暖褐:红 > 绿 > 蓝
+    expect(r).toBeGreaterThan(g)
+    expect(g).toBeGreaterThan(b)
   }
 })
 

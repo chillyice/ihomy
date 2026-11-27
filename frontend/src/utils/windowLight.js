@@ -114,10 +114,23 @@ export function skyLighting(scene, optics, passingCloud = 1) {
   const natural = clamp(diffuse + reflected)
   const color = mixColor(scene.skyColor, optics.color, optics.softness * scene.skyLevel)
   const reflectedColor = mixColor(color, scene.beamColor, reflected)
-  // Fix luminance before applying sky chroma. In particular a cool storm tint
-  // must not darken a shaded surface as the morning becomes brighter.
-  const tint = reflectedColor.map((channel) => Math.round(channel * 0.5))
-  const tintLuma = (0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2]) / 255
+  // Fix luminance before applying the shade chroma. In particular a cool storm
+  // tint must not darken a shaded surface as the morning becomes brighter.
+  const skyShade = reflectedColor.map((channel) => channel * 0.5)
+  const shadeLuma = (0.2126 * skyShade[0] + 0.7152 * skyShade[1] + 0.0722 * skyShade[2]) / 255
+  // Daylight bouncing through a cream-and-wood room reads warm, so the shadow
+  // cast on paper should stay warm-neutral while the sun is up and only pick up
+  // the sky's cool cast as the room darkens (blue hour, storms). The warm
+  // chroma is scaled to the same luminance, so shading depth is unchanged.
+  const warmth = clamp(scene.skyLevel)
+  const warmChroma = [1.08, 1, 0.88]
+  const warmLuma = 0.2126 * warmChroma[0] + 0.7152 * warmChroma[1] + 0.0722 * warmChroma[2]
+  const warmScale = (shadeLuma * 255 * warmth) / warmLuma
+  const tintChannels = skyShade.map((channel, i) => channel * (1 - warmth) + warmChroma[i] * warmScale)
+  const tint = tintChannels.map(Math.round)
+  // Keep the transmission divisor on the exact chroma so the exposure curve
+  // stays continuous between neighbouring solar samples.
+  const tintLuma = (0.2126 * tintChannels[0] + 0.7152 * tintChannels[1] + 0.0722 * tintChannels[2]) / 255
   const roomTransmission = 0.33 + 0.67 * natural
   return {
     direct: scene.lightOpacity * direct,
@@ -136,6 +149,20 @@ export function skyLighting(scene, optics, passingCloud = 1) {
 // underneath so a blocked point keeps the same exposure as direct light fades.
 export function ambientShadowOpacity(shade, direct) {
   return direct >= 1 ? 0 : (shade * (1 - direct)) / (1 - shade * direct)
+}
+
+// Shaded daylight in this room bounces off cream walls and floorboards, so the
+// ambient shade that covers the whole page is warm brown rather than neutral
+// black. Its opacity is re-derived from the colour's own luminance, so the
+// shaded surface keeps exactly the exposure path ambientShadowOpacity() was
+// matched to: only the hue of paper in shadow changes, never its darkness.
+export const AMBIENT_SHADE_RGB = [64, 38, 16]
+const ambientShadeLuma = (0.2126 * AMBIENT_SHADE_RGB[0] + 0.7152 * AMBIENT_SHADE_RGB[1] + 0.0722 * AMBIENT_SHADE_RGB[2]) / 255
+
+export function ambientShadeLayer(lumaShade) {
+  // 1 = 完全压黑,再往上没有意义(CSS 不认 >1 的透明度)。
+  const opacity = Math.min(1, lumaShade / (1 - ambientShadeLuma))
+  return { background: 'rgb(' + AMBIENT_SHADE_RGB.join(',') + ')', opacity: Number(opacity.toFixed(4)) }
 }
 
 export const AUTO_LAMP_ON_BELOW = 0.34
