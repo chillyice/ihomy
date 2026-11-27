@@ -2,7 +2,7 @@
   <button
     ref="note"
     class="garden-note"
-    :class="{ 'has-letter': !read }"
+    :class="{ 'has-letter': progress < 0 }"
     :aria-label="t('gardenEntry.visit')"
     :title="t('gardenEntry.name')"
     aria-haspopup="dialog"
@@ -25,47 +25,62 @@
         @keydown.esc.stop.prevent="goBack"
         @keydown.tab="cycleFocus"
       >
-        <button ref="back" class="garden-back" @click="leave">
+        <button v-show="!tending" ref="back" class="garden-back" @click="leave">
           <el-icon><Back /></el-icon>{{ t('gardenEntry.back') }}
         </button>
         <div class="garden-frame">
           <div class="garden-view" aria-hidden="true"></div>
           <button
-            v-if="!reading"
+            v-if="!reading && !tending && progress < 0"
             ref="envelope"
             class="garden-envelope"
-            :aria-label="t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope')"
+            :aria-label="t('gardenEntry.envelope')"
             @click="openLetter"
           >
             <img :src="envelopeArt" alt="" />
-            <span>{{ t(read ? 'gardenEntry.reread' : 'gardenEntry.envelope') }}</span>
+            <span>{{ t('gardenEntry.envelope') }}</span>
+          </button>
+          <button
+            v-if="!reading && !tending && progress >= 0"
+            ref="packet"
+            class="garden-envelope garden-packet"
+            :class="{ 'at-pot': progress > 0 }"
+            @click="tending = true"
+          >
+            <i v-if="progress === 0" class="seed-sachet" aria-hidden="true"><i></i></i>
+            <span>{{ t(progress === 0 ? 'gardenEntry.seeds' : 'gardenEntry.visitPot') }}</span>
           </button>
         </div>
-        <div class="garden-title">
+        <div v-show="!tending" class="garden-title">
           <h1 id="garden-name">{{ t('gardenEntry.name') }}</h1>
           <p>{{ t('gardenEntry.preview') }}</p>
+          <button v-if="progress >= 0 && !reading" class="garden-reread" @click="openLetter">{{ t('gardenEntry.reread') }}</button>
         </div>
         <Transition name="garden-unfold">
           <article v-if="reading" class="garden-letter" aria-labelledby="garden-letter-title">
             <h2 id="garden-letter-title">{{ t('gardenEntry.salutation') }}</h2>
             <p>{{ t('gardenEntry.letter') }}</p>
+            <p class="letter-gift">{{ t('gardenEntry.gift') }}</p>
             <p class="garden-signature">{{ t('gardenEntry.signature') }}</p>
             <button ref="fold" @click="closeLetter">{{ t('gardenEntry.fold') }}</button>
           </article>
         </Transition>
+        <FirstPot v-if="tending" :step="progress" @advance="advance" @back="closePot" @replay="replay" />
       </section>
     </Transition>
   </Teleport>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Back } from '@element-plus/icons-vue'
 import { useAppBack } from '@/composables/useAppBack'
 import envelopeArt from '@/assets/windowdesk/envelope.webp'
+import FirstPot from './FirstPot.vue'
 
+const props = defineProps({ member: [Number, String], family: [Number, String] })
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -73,8 +88,50 @@ const note = ref(null)
 const room = ref(null)
 const back = ref(null)
 const envelope = ref(null)
+const packet = ref(null)
 const fold = ref(null)
-const read = ref(false)
+const saveKey = 'ihomy:garden:first-pot-preview:v1:' + (props.member ?? 'guest') + ':' + (props.family ?? 'guest')
+function savedStep() {
+  try {
+    const raw = localStorage.getItem(saveKey)
+    if (raw !== null && /^[0-7]$/.test(raw)) return Number(raw)
+  } catch {
+    /* The preview also works in memory. */
+  }
+  return -1
+}
+const progress = ref(savedStep())
+const tending = ref(false)
+function syncProgress(event) {
+  if (event.key !== saveKey) return
+  progress.value = savedStep()
+  if (progress.value < 0) tending.value = false
+}
+onMounted(() => window.addEventListener('storage', syncProgress))
+onBeforeUnmount(() => window.removeEventListener('storage', syncProgress))
+function save(step) {
+  progress.value = step
+  try {
+    if (step < 0) localStorage.removeItem(saveKey)
+    else localStorage.setItem(saveKey, String(step))
+  } catch {
+    /* Retain this session's progress. */
+  }
+}
+function advance(previous) {
+  if (previous === progress.value && previous < 7) save(Math.max(previous + 1, savedStep()))
+}
+async function closePot() {
+  tending.value = false
+  await nextTick()
+  packet.value?.focus({ preventScroll: true })
+}
+async function replay() {
+  tending.value = false
+  save(-1)
+  await nextTick()
+  envelope.value?.focus({ preventScroll: true })
+}
 const reading = ref(false)
 const inside = computed(() => route.name === 'Home' && route.query.garden === 'window')
 
@@ -92,7 +149,7 @@ function leave() {
 
 async function openLetter() {
   reading.value = true
-  read.value = true
+  if (progress.value < 0) save(Math.max(0, savedStep()))
   await nextTick()
   fold.value?.focus({ preventScroll: true })
 }
@@ -100,20 +157,23 @@ async function openLetter() {
 async function closeLetter() {
   reading.value = false
   await nextTick()
-  envelope.value?.focus({ preventScroll: true })
+  packet.value?.focus({ preventScroll: true })
 }
 
 function goBack() {
   if (!inside.value) return false
-  if (reading.value) closeLetter()
+  if (tending.value) closePot()
+  else if (reading.value) closeLetter()
   else leave()
   return true
 }
 useAppBack(goBack)
 
 function cycleFocus(event) {
-  const last = reading.value ? fold.value : envelope.value
-  const target = event.shiftKey && event.target === back.value ? last : !event.shiftKey && event.target === last ? back.value : null
+  const buttons = Array.from(room.value.querySelectorAll('button:not(:disabled)')).filter((el) => el.getClientRects().length > 0)
+  const first = buttons[0]
+  const last = buttons.at(-1)
+  const target = event.shiftKey && event.target === first ? last : !event.shiftKey && event.target === last ? first : null
   if (target) {
     event.preventDefault()
     target.focus({ preventScroll: true })
@@ -132,6 +192,7 @@ watch(
     releaseHome?.()
     if (!visible) {
       reading.value = false
+      tending.value = false
       return
     }
     await nextTick()
@@ -321,6 +382,69 @@ onBeforeUnmount(() => releaseHome?.())
   background: linear-gradient(175deg, #fff8e6 25%, #f3e7cb 50%, #faf0d9 51%, #fff8e5);
   box-shadow: 2px 8px 26px #49362345;
   transform: rotate(-1deg);
+}
+.garden-reread {
+  min-height: 44px;
+  padding: 2px 0;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: none;
+}
+.garden-packet {
+  justify-items: center;
+}
+.seed-sachet {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 66px;
+  border: 1px solid #aa8555;
+  border-block: 4px double #b19266;
+  background: linear-gradient(110deg, #ddbd83, #f8e6bb 30%, #e8cc93);
+  color: #526946;
+  transform: rotate(7deg);
+  box-shadow: 1px 3px 4px #62452755;
+}
+.seed-sachet i,
+.seed-sachet i::before,
+.seed-sachet i::after {
+  display: block;
+  width: 5px;
+  height: 29px;
+  border-radius: 0 90% 0 90%;
+  background: #647448;
+  transform: rotate(-6deg);
+}
+.seed-sachet i {
+  position: relative;
+}
+.seed-sachet i::before,
+.seed-sachet i::after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  height: 22px;
+  transform-origin: bottom;
+}
+.seed-sachet i::before {
+  transform: rotate(-23deg);
+}
+.seed-sachet i::after {
+  transform: rotate(27deg);
+}
+.garden-packet.at-pot {
+  left: 50%;
+  bottom: 28%;
+}
+.garden-packet.at-pot span {
+  top: auto;
+  bottom: 0;
+}
+.garden-letter .letter-gift {
+  font-size: 14px;
+  color: #566a47;
 }
 .garden-letter h2 {
   font-size: 21px;

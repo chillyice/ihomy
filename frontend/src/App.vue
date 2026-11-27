@@ -39,6 +39,8 @@
           (userStore.isLoggedIn || route.query.gardenPreview === '1')
         "
         :key="String(userStore.userInfo?.id) + ':' + String(userStore.userInfo?.familyId)"
+        :member="userStore.userInfo?.id"
+        :family="userStore.userInfo?.familyId"
       />
       <ScreensaverOverlay v-if="userStore.isLoggedIn && !route.meta.standalone" />
     </template>
