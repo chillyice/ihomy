@@ -13,9 +13,15 @@
         </div>
       </div>
       <footer v-if="status === 'ready'">
-        <p aria-live="polite">{{ step === 7 ? t('garden.stages.' + growth) : t('gardenEntry.potHints.' + step) }} {{ costHint }}</p>
+        <p aria-live="polite">{{ hint }} {{ costHint }}</p>
+        <button v-if="harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
+          {{ t('garden.harvest') }}
+        </button>
+        <button v-else-if="step === 8 && seedAvailable" ref="action" class="pot-action" :disabled="busy" @click="emit('advance', 8)">
+          {{ t('garden.resow') }}
+        </button>
         <button
-          v-if="step < 7"
+          v-else-if="step < 7"
           ref="action"
           class="pot-action"
           :disabled="busy"
@@ -24,11 +30,11 @@
         >
           {{ t('gardenEntry.potActions.' + step) }}
         </button>
-        <button v-else-if="preview" ref="action" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
+        <button v-if="preview && step >= 7" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
         <div v-if="preview && step === 7" class="pot-samples" role="group" :aria-label="t('garden.review')">
           <span>{{ t('garden.review') }}</span>
-          <button v-for="n in 3" :key="n" :aria-pressed="growth === n - 1" @click="emit('sample', n - 1)">
-            {{ t('garden.samples.' + (n - 1)) }}
+          <button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="growth === n" @click="emit('sample', n)">
+            {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
           </button>
         </div>
       </footer>
@@ -49,10 +55,29 @@ const props = defineProps({
   busy: Boolean,
   costHint: String,
   firstShoot: Boolean,
+  harvestable: Boolean,
+  harvestError: String,
+  seedAvailable: Boolean,
+  receipt: Object,
+  cycle: String,
 })
-const emit = defineEmits(['advance', 'back', 'replay', 'sample', 'observed'])
+const emit = defineEmits(['advance', 'harvest', 'back', 'replay', 'sample', 'observed'])
 const { t } = useI18n()
-const title = computed(() => (props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName })))
+const title = computed(() =>
+  props.step === 8 ? t('garden.soilPot') : props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName }),
+)
+const hint = computed(() => {
+  if (props.step === 8) {
+    const r = props.receipt
+    const parts = []
+    if (r?.name && r.quantity > 0) parts.push(t('garden.stored', { crop: r.name, qty: r.quantity }))
+    if (r?.coins > 0) parts.push(t('garden.earned', { coins: r.coins }))
+    parts.push(t('garden.readySoil'))
+    return parts.join(' ')
+  }
+  if (props.harvestable) return props.harvestError || t('garden.harvestHint')
+  return props.step === 7 ? t('garden.stages.' + props.growth) : t('gardenEntry.potHints.' + props.step)
+})
 const frame = ref(null)
 const back = ref(null)
 const action = ref(null)
@@ -66,7 +91,17 @@ let timer
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
 function post(type, reveal = false) {
   frame.value?.contentWindow?.postMessage(
-    { channel, type, step: props.step, reduced: motion.matches, growth: props.growth, crop: props.cropCode, reveal },
+    {
+      channel,
+      type,
+      step: props.step,
+      reduced: motion.matches,
+      growth: props.growth,
+      crop: props.cropCode,
+      reveal,
+      ripe: props.harvestable,
+      cycle: props.cycle,
+    },
     gameUrl.origin,
   )
 }
@@ -106,6 +141,9 @@ function receive(event) {
       if (status.value === 'ready' && !props.busy && event.data.step === props.step && props.step < 7) emit('advance', props.step)
       else post('restore')
       break
+    case 'harvest':
+      if (status.value === 'ready' && !props.busy && props.harvestable && event.data.cycle === props.cycle) emit('harvest')
+      break
     case 'back':
       emit('back')
       break
@@ -119,7 +157,7 @@ function receive(event) {
   }
 }
 
-watch(() => [props.step, props.growth, props.cropCode], restore)
+watch(() => [props.step, props.growth, props.cropCode, props.harvestable, props.cycle], restore)
 onMounted(() => {
   window.addEventListener('message', receive)
   motion.addEventListener('change', restore)

@@ -3,12 +3,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { gardenApi } from '@/api'
 import { useWindowsill } from './useWindowsill'
 
-vi.mock('@/api', () => ({ gardenApi: { panorama: vi.fn(), entry: vi.fn(), water: vi.fn() } }))
+vi.mock('@/api', () => ({ gardenApi: { panorama: vi.fn(), entry: vi.fn(), water: vi.fn(), harvest: vi.fn(), sow: vi.fn() } }))
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 let app
 let plot
 function snapshot() {
-  return { plots: [{ ...plot, mine: false, id: 33 }, { ...plot }], letters: [], unlockedCrops: [] }
+  return {
+    plots: [{ ...plot, mine: false, id: 33 }, { ...plot }],
+    letters: [],
+    unlockedCrops: [{ code: 'CATGRASS', name: 'Cat grass', packCount: 1 }],
+  }
 }
 function mount(preview = false) {
   let garden
@@ -82,4 +86,74 @@ it('retries an unconfirmed action with the same key and ignores an older panoram
   await read
   expect(garden.step.value).toBe(7)
   expect(gardenApi.water.mock.calls[1]).toEqual(gardenApi.water.mock.calls[0])
+})
+
+function emptyPot() {
+  Object.assign(plot, { prepared: true, cropCode: null, plantedAt: null, stage: null, harvestable: false, lastWateredAt: null })
+}
+
+it('retains the ripe plant after a full store and sows another crop in the same soil after a confirmed harvest', async () => {
+  plot.stage = 5
+  const garden = mount()
+  await garden.refresh()
+  await garden.harvest()
+  expect(gardenApi.harvest).not.toHaveBeenCalled()
+  plot.harvestable = true
+  await garden.refresh()
+  expect(garden.step.value).toBe(7)
+  gardenApi.harvest.mockRejectedValueOnce({ code: 409, message: 'Store full' }).mockImplementationOnce(async () => {
+    emptyPot()
+    return { plot: { ...plot }, yieldQty: 3, coinsGranted: 0 }
+  })
+  await garden.harvest()
+  expect(garden.harvestError.value).toBe('Store full')
+  expect(garden.plot.value.harvestable).toBe(true)
+  await Promise.all([garden.harvest(), garden.harvest()])
+  expect(gardenApi.harvest.mock.calls[1]).toEqual(gardenApi.harvest.mock.calls[0])
+  expect(garden.receipt.value).toMatchObject({ name: 'Cat grass', quantity: 3, coins: 0 })
+  expect(garden.step.value).toBe(8)
+  await garden.harvest()
+  expect(gardenApi.harvest).toHaveBeenCalledTimes(2)
+  await garden.advance(8)
+  await garden.refresh()
+  expect(garden.step.value).toBe(2)
+  expect(garden.receipt.value).toBe(null)
+  for (const n of [2, 3, 4]) await garden.advance(n)
+  gardenApi.sow.mockImplementationOnce(async () => {
+    Object.assign(plot, { cropCode: 'CATGRASS', plantedAt: '2026-11-29', stage: 0 })
+    return { plot: { ...plot } }
+  })
+  await garden.advance(5)
+  expect(gardenApi.sow).toHaveBeenCalledOnce()
+  expect(garden.step.value).toBe(6)
+})
+
+it('recovers the empty soil from the panorama after a lost harvest reply without guessing the yield', async () => {
+  plot.harvestable = true
+  const garden = mount()
+  await garden.refresh()
+  gardenApi.harvest.mockImplementationOnce(async () => {
+    emptyPot()
+    throw Error('offline')
+  })
+  await garden.harvest()
+  expect(garden.step.value).toBe(8)
+  expect(garden.receipt.value).toBe(null)
+  expect(garden.failed.value).toBe(false)
+  await garden.harvest()
+  expect(gardenApi.harvest).toHaveBeenCalledOnce()
+})
+
+it('keeps the next planting when another visit has already replaced the harvested crop', async () => {
+  plot.harvestable = true
+  const garden = mount()
+  await garden.refresh()
+  gardenApi.harvest.mockImplementationOnce(async () => {
+    Object.assign(plot, { plantedAt: '2026-11-29', harvestable: false, stage: 0 })
+    throw Error('offline')
+  })
+  await garden.harvest()
+  expect(garden.step.value).toBe(6)
+  expect(garden.receipt.value).toBe(null)
+  expect(garden.failed.value).toBe(false)
 })

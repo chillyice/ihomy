@@ -58,6 +58,7 @@ export const gardenApi = {
   prepare: (id, key) => gardenWrite('plot/' + id + '/prepare', null, key),
   sow: (slotNo, cropCode, key) => gardenWrite('plot', { venue: 'WINDOWSILL', slotNo, cropCode }, key),
   water: (id, key) => gardenWrite('plot/' + id + '/water', null, key),
+  harvest: (id, key) => gardenWrite('plot/' + id + '/harvest', null, key),
 }
 
 // 博客

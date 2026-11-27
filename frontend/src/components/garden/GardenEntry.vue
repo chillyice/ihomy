@@ -31,9 +31,14 @@
         </button>
         <div class="garden-frame">
           <div class="garden-view" aria-hidden="true"></div>
-          <div v-if="planted" class="sill-soil" aria-hidden="true">
-            <i v-if="growth > 0 && sketchCrop" class="sill-shoot" :class="{ leafy: growth >= 2, broad: cropCode === 'MINT' }">
+          <div v-if="planted || progress === 8" class="sill-soil" aria-hidden="true">
+            <i
+              v-if="growth > 0 && sketchCrop"
+              class="sill-shoot"
+              :class="{ leafy: growth >= 2, mature: harvestable, broad: cropCode === 'MINT' }"
+            >
               <i></i><i v-if="growth >= 2"></i><i v-if="growth >= 2"></i>
+              <template v-if="harvestable"><i></i><i></i><i></i><i></i></template>
             </i>
           </div>
           <button
@@ -55,9 +60,7 @@
             @click="openPot"
           >
             <i v-if="progress === 0" class="seed-sachet" aria-hidden="true"><i></i></i>
-            <span>{{
-              progress === 0 ? (preview ? t('gardenEntry.seeds') : t('garden.seedPacket', { crop: cropName })) : t('gardenEntry.visitPot')
-            }}</span>
+            <span>{{ potLabel }}</span>
           </button>
         </div>
         <div v-show="!tending" class="garden-title">
@@ -96,7 +99,13 @@
           :busy="busy"
           :cost-hint="costHint"
           :first-shoot="firstShoot"
+          :harvestable="harvestable"
+          :cycle="String(preview ? 'preview' : plot?.plantedAt || '')"
+          :receipt="receipt"
+          :harvest-error="harvestError"
+          :seed-available="preview || !!crop"
           @advance="advance"
+          @harvest="harvest"
           @back="closePot"
           @replay="replay"
           @sample="setSample"
@@ -134,7 +143,7 @@ const saveKey = 'ihomy:garden:first-pot-preview:v1:' + (props.member ?? 'guest')
 function savedStep() {
   try {
     const raw = localStorage.getItem(saveKey)
-    if (raw !== null && /^[0-7]$/.test(raw)) return Number(raw)
+    if (raw !== null && /^[0-8]$/.test(raw)) return Number(raw)
   } catch {
     /* The preview also works in memory. */
   }
@@ -150,9 +159,12 @@ const {
   letters,
   busy,
   failed,
+  receipt,
+  harvestError,
   step,
   openMail,
   advance: advanceLive,
+  harvest: harvestLive,
   refresh,
 } = useWindowsill(props, inside)
 const localStep = ref(props.preview ? savedStep() : -1)
@@ -160,14 +172,14 @@ const progress = computed(() => (props.preview ? localStep.value : step.value))
 function savedSample() {
   try {
     const n = Number(localStorage.getItem(saveKey + ':growth'))
-    return [1, 2].includes(n) ? n : 0
+    return [1, 2, 5].includes(n) ? n : 0
   } catch {
     return 0
   }
 }
 const sample = ref(props.preview && localStep.value === 7 ? savedSample() : 0)
 function setSample(n) {
-  if (!props.preview || ![0, 1, 2].includes(n)) return
+  if (!props.preview || ![0, 1, 2, 5].includes(n)) return
   sample.value = n
   try {
     localStorage.setItem(saveKey + ':growth', String(n))
@@ -180,6 +192,15 @@ const planted = computed(() => (props.preview ? progress.value === 7 : !!plot.va
 const cropCode = computed(() => (props.preview ? 'CATGRASS' : plot.value?.cropCode || crop.value?.code))
 const sketchCrop = computed(() => ['CATGRASS', 'MINT', 'SNAKE_PLANT'].includes(cropCode.value))
 const cropName = computed(() => plot.value?.cropName || crop.value?.name || '')
+const harvestable = computed(() =>
+  props.preview ? progress.value === 7 && growth.value === 5 : !!plot.value?.cropCode && plot.value.harvestable === true,
+)
+const potLabel = computed(() => {
+  if (harvestable.value) return t('garden.ripePot')
+  if (progress.value === 8) return t('garden.soilPot')
+  if (progress.value === 0) return props.preview ? t('gardenEntry.seeds') : t('garden.seedPacket', { crop: cropName.value })
+  return t('gardenEntry.visitPot')
+})
 const costHint = computed(() => {
   if (props.preview || !world.value) return ''
   if (progress.value === 1 && world.value.plots.some((p) => p.prepared)) return t('garden.prepareCost')
@@ -237,7 +258,18 @@ function save(step) {
 }
 function advance(previous) {
   if (!props.preview) return advanceLive(previous)
+  if (previous === 8 && progress.value === 8) {
+    setSample(0)
+    save(2)
+    return
+  }
   if (previous === progress.value && previous < 7) save(Math.max(previous + 1, savedStep()))
+}
+function harvest() {
+  if (!harvestable.value) return
+  if (!props.preview) return harvestLive()
+  save(8)
+  setSample(0)
 }
 async function closePot() {
   tending.value = false
@@ -607,6 +639,25 @@ onBeforeUnmount(() => releaseHome?.())
 .sill-shoot.broad i {
   width: 68%;
   border-radius: 70% 30%;
+}
+.sill-shoot.mature {
+  width: 36%;
+}
+.sill-shoot.mature i:nth-child(4) {
+  transform: rotate(-17deg);
+  height: 90%;
+}
+.sill-shoot.mature i:nth-child(5) {
+  transform: rotate(27deg);
+  height: 87%;
+}
+.sill-shoot.mature i:nth-child(6) {
+  transform: rotate(-52deg);
+  height: 61%;
+}
+.sill-shoot.mature i:nth-child(7) {
+  transform: rotate(53deg);
+  height: 54%;
 }
 @media (prefers-reduced-motion: no-preference) {
   .sill-shoot.leafy {
