@@ -10,21 +10,26 @@
           {{ t(fromTask ? 'garden.hand.toTask' : place ? 'garden.book.back' : 'gardenEntry.sill') }}
         </button>
       </header>
-      <div class="pot-stage">
+      <CatgrassStudy v-if="observing" :stage="growth" :cut="cut" :dry="thirsty" :label="stageLabel" />
+      <div v-if="enteredBench" v-show="!observing" class="pot-stage">
         <iframe v-if="status !== 'error'" ref="frame" :key="attempt" :src="gameUrl.href" :title="title" tabindex="-1" />
         <div v-if="status !== 'ready'" class="pot-status" role="status">
           <span>{{ t(status === 'error' ? 'gardenEntry.sceneUnavailable' : 'gardenEntry.sceneLoading') }}</span>
           <button v-if="status === 'error'" @click="loadScene">{{ t('common.retry') }}</button>
+          <button v-if="status === 'error' && studyAvailable" @click="openStudy">{{ t('garden.look.inspect') }}</button>
         </div>
       </div>
-      <footer v-if="status === 'ready'">
+      <footer v-if="observing || status === 'ready'">
         <p aria-live="polite" aria-atomic="true">
           <strong v-if="step >= 2 && step <= 4 && !readOnly" class="seed-count">{{ t('garden.hand.seeds', { n: step - 2 }) }}</strong>
           <strong v-if="step === 1 && !readOnly" class="seed-count">{{ t('garden.hand.preparing', { n: Math.min(4, prep + 2) }) }}</strong>
-          {{ instruction }} {{ costHint }}
-          <span v-if="!sunMode && !readOnly && !inField && step === 7 && sunRest">{{ t('garden.sun.rest') }}</span>
+          <small v-if="observing && previousStage != null && previousStage < growth && !cut" class="last-seen">
+            {{ t('garden.look.lastSeen', { stage: t('garden.look.names.' + previousStage) }) }}
+          </small>
+          {{ observing ? observation : instruction }} {{ costHint }}
+          <span v-if="!observing && !sunMode && !readOnly && !inField && step === 7 && sunRest">{{ t('garden.sun.rest') }}</span>
         </p>
-        <p v-if="!readOnly && (canSun || sunMode)" class="daylight">
+        <p v-if="!observing && !readOnly && (canSun || sunMode)" class="daylight">
           {{
             t(weather ? 'garden.hand.daylight' : 'garden.hand.baseLight', {
               sky: weather?.text,
@@ -32,6 +37,18 @@
             })
           }}
         </p>
+        <button
+          v-if="observing && !readOnly && (harvestable || (canWater && !retryWater && (thirsty || step === 6)))"
+          ref="workButton"
+          class="pot-action"
+          :disabled="busy"
+          @click="openBench(false)"
+        >
+          {{ t(harvestable ? 'garden.look.cutGrass' : 'garden.look.water') }}
+        </button>
+        <button v-if="!observing && studyAvailable && !sunMode" class="pot-back" :disabled="busy" @click="openStudy">
+          {{ t('garden.look.inspect') }}
+        </button>
         <button v-if="sunMode" class="pot-back" :disabled="busy" @click="sunMode = false">{{ t('common.cancel') }}</button>
         <button v-if="!sunMode && !readOnly && canWater && retryWater" class="pot-action" :disabled="busy" @click="emit('water')">
           {{ t('garden.confirmWater') }}
@@ -40,7 +57,7 @@
           {{ t(inField ? 'garden.book.sowBed' : 'garden.resow') }}
         </button>
         <button
-          v-if="!readOnly && (step < 6 || harvestable || (canWater && !retryWater) || sunMode)"
+          v-if="!observing && !readOnly && (step < 6 || harvestable || (canWater && !retryWater) || sunMode)"
           ref="action"
           class="pot-back"
           :disabled="busy"
@@ -48,13 +65,13 @@
         >
           {{ t('garden.hand.keyboard') }}
         </button>
-        <small v-if="keyboard && !readOnly" class="keys">{{ t('garden.hand.keys') }}</small>
+        <small v-if="!observing && keyboard && !readOnly" class="keys">{{ t('garden.hand.keys') }}</small>
         <button
           v-if="!sunMode && canSun && !readOnly"
           ref="sunButton"
           class="pot-back"
           :disabled="busy"
-          @click="retrySun ? emit('sun') : (sunMode = true)"
+          @click="retrySun ? emit('sun') : openBench(true)"
         >
           {{ t(retrySun ? 'garden.sun.confirm' : 'garden.sun.start') }}
         </button>
@@ -65,8 +82,8 @@
           <summary>{{ t('garden.review') }}</summary>
           <div class="pot-samples">
             <template v-if="step === 7"
-              ><button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
-                {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
+              ><button v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
+                {{ t('garden.look.names.' + n) }}
               </button>
               <button :aria-pressed="thirsty" @click="emit('sample', 'dry')">{{ t('garden.drySample') }}</button></template
             >
@@ -81,6 +98,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import CatgrassStudy from './CatgrassStudy.vue'
 
 const props = defineProps({
   step: { type: Number, required: true },
@@ -91,6 +109,7 @@ const props = defineProps({
   busy: Boolean,
   costHint: String,
   firstShoot: Boolean,
+  previousStage: Number,
   harvestable: Boolean,
   thirsty: Boolean,
   canWater: Boolean,
@@ -120,7 +139,53 @@ watch(
   },
 )
 const { t } = useI18n()
+const cut = computed(() => props.step === 8 && props.receipt?.cropCode === 'CATGRASS')
+const studyAvailable = computed(() => !props.inField && (cut.value || (props.cropCode === 'CATGRASS' && [6, 7].includes(props.step))))
+const observing = ref(studyAvailable.value && !props.fromTask)
+const enteredBench = ref(!observing.value)
+const workButton = ref(null)
+const stageLabel = computed(() => t(cut.value ? 'garden.look.clipped' : 'garden.look.names.' + props.growth))
+const observation = computed(() => {
+  if (cut.value) {
+    const r = props.receipt
+    return [
+      t('garden.look.stubble'),
+      r.quantity > 0 ? t('garden.stored', { crop: r.name, qty: r.quantity }) : '',
+      r.coins > 0 ? t('garden.earned', { coins: r.coins }) : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
+  if (props.harvestable) return t(props.readOnly ? 'garden.look.ripeVisitor' : 'garden.look.ripe')
+  if (props.thirsty) return t('garden.look.dry')
+  if (props.step === 6) return t('garden.look.firstWater')
+  return t('garden.look.notes.' + props.growth)
+})
+function openStudy() {
+  observing.value = true
+  cue.value = ''
+  nextTick(() => (workButton.value || back.value)?.focus({ preventScroll: true }))
+}
+function openBench(sun) {
+  observing.value = false
+  sunMode.value = sun
+  if (!enteredBench.value) {
+    enteredBench.value = true
+    loadScene()
+  }
+  nextTick(() => (action.value || back.value)?.focus({ preventScroll: true }))
+}
+watch(studyAvailable, (available) => {
+  if (!available && observing.value) openBench(false)
+})
+watch(cut, (confirmed) => {
+  if (confirmed) openStudy()
+})
+watch([observing, () => props.growth], ([on]) => {
+  if (on) emit('observed')
+})
 const title = computed(() => {
+  if (cut.value) return t('garden.look.cutPot')
   if (props.place) {
     if (props.step === 8 || (props.readOnly && props.step === 0)) return t(props.inField ? 'garden.book.emptyBed' : 'garden.book.emptyPot')
     return props.cropName || t('garden.book.catgrass')
@@ -251,7 +316,7 @@ function post(type, reveal = false) {
       reveal,
       ripe: !props.readOnly && props.harvestable,
       field: props.inField,
-      readOnly: props.readOnly,
+      readOnly: props.readOnly || observing.value,
       form: props.cropForm,
       dry: props.thirsty,
       canWater: !sunMode.value && props.canWater && !props.retryWater,
@@ -279,12 +344,13 @@ function timeout(ms) {
 function loadScene() {
   status.value = 'loading'
   attempt.value++
-  timeout(10000)
+  if (enteredBench.value) timeout(10000)
 }
 
 function receive(event) {
   if (event.origin !== gameUrl.origin || !frame.value || event.source !== frame.value.contentWindow || event.data?.channel !== channel)
     return
+  if (observing.value && !['loading', 'ready', 'error'].includes(event.data.type)) return
   switch (event.data.type) {
     case 'prep':
       if (
@@ -370,6 +436,7 @@ watch(
     props.step,
     prep.value,
     props.growth,
+    observing.value,
     props.cropCode,
     props.harvestable,
     props.readOnly,
@@ -388,7 +455,8 @@ watch(
 onMounted(() => {
   window.addEventListener('message', receive)
   motion.addEventListener('change', restore)
-  timeout(10000)
+  if (enteredBench.value) timeout(10000)
+  if (observing.value) emit('observed')
   nextTick(() => back.value?.focus({ preventScroll: true }))
 })
 onBeforeUnmount(() => {
@@ -455,6 +523,11 @@ footer p {
 .keys {
   flex-basis: 100%;
   color: #63583d;
+}
+.last-seen {
+  display: block;
+  color: #63694d;
+  margin-bottom: 3px;
 }
 footer .daylight {
   min-height: 0;

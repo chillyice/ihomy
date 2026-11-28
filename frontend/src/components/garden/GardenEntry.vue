@@ -37,16 +37,22 @@
           <div
             v-if="sillPlant?.cropCode || sillPlant?.prepared"
             class="sill-soil"
-            :class="{ thirsty: sillPlant.thirsty }"
+            :class="{ thirsty: sillPlant.thirsty, clipped: sillClipped }"
             aria-hidden="true"
           >
             <i
               v-if="sillPlant.cropCode && sillPlant.stage > 0"
               class="sill-shoot"
-              :class="{ leafy: sillPlant.stage >= 2, mature: sillPlant.harvestable, broad: sillPlant.cropCode === 'MINT' }"
+              :class="{
+                leafy: sillPlant.stage >= 2,
+                tall: sillPlant.stage >= 3,
+                full: sillPlant.stage >= 4,
+                mature: sillPlant.harvestable,
+                broad: sillPlant.cropCode === 'MINT',
+              }"
             >
-              <i></i><i v-if="sillPlant.stage >= 2"></i><i v-if="sillPlant.stage >= 2"></i>
-              <template v-if="sillPlant.harvestable"><i></i><i></i><i></i><i></i></template>
+              <i></i><i v-if="sillPlant.stage >= 2"></i><i v-if="sillPlant.stage >= 2"></i> <i v-if="sillPlant.stage >= 3"></i
+              ><i v-if="sillPlant.stage >= 4"></i><template v-if="sillPlant.harvestable"><i></i><i></i></template>
             </i>
           </div>
           <button
@@ -130,6 +136,7 @@
           :busy="busy"
           :cost-hint="costHint"
           :first-shoot="firstShoot"
+          :previous-stage="previousStage"
           :harvestable="harvestable"
           :thirsty="thirsty"
           :can-water="canWater"
@@ -139,7 +146,7 @@
           :retry-water="retryWater"
           :already-watered="alreadyWatered"
           :cycle="homeReview ? 'preview' : [plot?.id, plot?.plantedAt].join('/')"
-          :receipt="receipt"
+          :receipt="potReceipt"
           :harvest-error="harvestError"
           :seed-available="homeReview || !!crop"
           @advance="advance"
@@ -241,12 +248,14 @@ const place = computed(() => {
 })
 const localStep = ref(props.preview ? savedStep() : -1)
 const progress = computed(() => (homeReview.value ? localStep.value : step.value))
+// The local art review follows the reference spring cat-grass day. Member gardens always read plot.stage.
+const reviewStageHours = [0, 2.4, 8.4, 14.4, 20.4, 24]
 function savedSample() {
   try {
     const raw = localStorage.getItem(saveKey + ':growth')
     if (raw === 'dry') return raw
     const n = Number(raw)
-    return [1, 2, 5].includes(n) ? n : 0
+    return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0
   } catch {
     return 0
   }
@@ -267,15 +276,34 @@ const sillPlant = computed(() => {
 })
 const bookWorld = computed(() => {
   const data = world.value
-  return props.preview && data ? { ...data, plots: data.plots.map((p) => (p.id === homePlot.value?.id ? sillPlant.value : p)) } : data
+  if (!props.preview || !data) return data
+  const qty = review.slip.grassStored
+  return {
+    ...data,
+    plots: data.plots.map((p) => (p.id === homePlot.value?.id ? sillPlant.value : p)),
+    fruits: qty ? [{ itemCode: 'CATGRASS', cropCode: 'CATGRASS', qty }] : [],
+  }
 })
 function setSample(n) {
-  if (!props.preview || ![0, 1, 2, 5, 'dry'].includes(n)) return
+  if (!props.preview || ![0, 1, 2, 3, 4, 5, 'dry'].includes(n)) return
   sample.value = n
   try {
     localStorage.setItem(saveKey + ':growth', String(n))
+    if (n === 'dry') localStorage.removeItem(saveKey + ':growth-start')
+    else localStorage.setItem(saveKey + ':growth-start', String(Date.now() - reviewStageHours[n] * 3600000))
   } catch {
     /* Session preview. */
+  }
+}
+function resumeGrowth() {
+  if (!props.preview || document.hidden || localStep.value !== 7 || sample.value === 'dry') return
+  try {
+    const start = Number(localStorage.getItem(saveKey + ':growth-start'))
+    if (!start) return setSample(sample.value)
+    const hours = (Date.now() - start) / 3600000
+    sample.value = Math.max(sample.value, reviewStageHours.filter((h) => h <= hours).length - 1)
+  } catch {
+    /* The manual studies are available without a device clock record. */
   }
 }
 const growth = computed(() => {
@@ -293,11 +321,23 @@ const cropName = computed(() => plot.value?.cropName || crop.value?.name || '')
 const harvestable = computed(() =>
   homeReview.value ? progress.value === 7 && growth.value === 5 : !!plot.value?.cropCode && plot.value.harvestable === true,
 )
+const potReceipt = computed(() =>
+  homeReview.value
+    ? progress.value === 8 && review.slip.lastCut > 0
+      ? { cropCode: 'CATGRASS', name: t('garden.book.catgrass'), quantity: review.slip.lastCut }
+      : null
+    : receipt.value,
+)
+const sillClipped = computed(
+  () => !sillPlant.value?.cropCode && plot.value?.id === homePlot.value?.id && potReceipt.value?.cropCode === 'CATGRASS',
+)
 const potLabel = computed(() => {
   if (harvestable.value) return t('garden.ripePot')
   if (thirsty.value) return t('garden.dryPot')
+  if (sillClipped.value) return t('garden.look.seeCut')
   if (progress.value === 8) return t('garden.soilPot')
   if (progress.value === 0) return props.preview ? t('gardenEntry.seeds') : t('garden.seedPacket', { crop: cropName.value })
+  if (cropCode.value === 'CATGRASS' && progress.value >= 6) return t('garden.look.inspect')
   return t('gardenEntry.visitPot')
 })
 const costHint = computed(() => {
@@ -308,6 +348,7 @@ const costHint = computed(() => {
 })
 const tending = ref(false)
 const firstShoot = ref(false)
+const previousStage = ref(null)
 const seenKey = computed(() =>
   homeReview.value ? saveKey + ':seen' : 'ihomy:garden:seen:' + props.member + ':' + props.family + ':' + plot.value?.id,
 )
@@ -315,10 +356,15 @@ function viewedStage(n) {
   return (props.preview ? 'review' : plot.value?.plantedAt) + ':' + n
 }
 function openPot() {
+  resumeGrowth()
   firstShoot.value = false
-  if (planted.value && growth.value === 1) {
+  previousStage.value = null
+  if (planted.value) {
     try {
-      firstShoot.value = localStorage.getItem(seenKey.value) === viewedStage(0)
+      const seen = localStorage.getItem(seenKey.value)
+      const n = Number(seen?.slice(-1))
+      if (seen === viewedStage(n) && n >= 0 && n <= 5) previousStage.value = n
+      firstShoot.value = previousStage.value === 0 && growth.value === 1
     } catch {
       /* Show the current snapshot. */
     }
@@ -348,8 +394,19 @@ function syncProgress(event) {
   localStep.value = savedStep()
   if (progress.value < 0) tending.value = false
 }
-onMounted(() => window.addEventListener('storage', syncProgress))
-onBeforeUnmount(() => window.removeEventListener('storage', syncProgress))
+let reviewTimer
+onMounted(() => {
+  if (!props.preview) return
+  window.addEventListener('storage', syncProgress)
+  document.addEventListener('visibilitychange', resumeGrowth)
+  resumeGrowth()
+  reviewTimer = setInterval(resumeGrowth, 60000)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', syncProgress)
+  document.removeEventListener('visibilitychange', resumeGrowth)
+  clearInterval(reviewTimer)
+})
 function save(step) {
   localStep.value = step
   try {
@@ -362,16 +419,18 @@ function save(step) {
 function advance(previous) {
   if (!homeReview.value) return advanceLive(previous)
   if (previous === 8 && progress.value === 8) {
+    review.mark({ lastCut: 0 })
     setSample(0)
     save(2)
     return
   }
+  if (previous === 6 && progress.value === 6) setSample(0)
   if (previous === progress.value && previous < 7) save(Math.max(previous + 1, savedStep()))
 }
 function harvest() {
   if (!harvestable.value) return
   if (!homeReview.value) return harvestLive()
-  review.mark({ harvested: true, inLight: false })
+  review.mark({ harvested: true, inLight: false, lastCut: 2, grassStored: review.slip.grassStored + 2 })
   save(8)
   setSample(0)
 }
@@ -427,6 +486,11 @@ watch(plot, (current) => {
 async function replay() {
   if (!props.preview) return
   review.resetSlip()
+  try {
+    localStorage.removeItem(saveKey + ':seen')
+  } catch {
+    /* The preview can restart without visit history. */
+  }
   setSample(0)
   tending.value = false
   bookOpen.value = false
@@ -771,12 +835,15 @@ onBeforeUnmount(() => releaseHome?.())
   transform: rotate(27deg);
 }
 .garden-packet.at-pot {
-  left: 50%;
-  bottom: 28%;
+  left: var(--rim-x, 49.2%);
+  top: var(--rim-y, 56.9%);
+  bottom: auto;
+  width: max(10%, 52px);
+  height: max(7%, 44px);
+  translate: -50% -12%;
 }
 .garden-packet.at-pot span {
-  top: auto;
-  bottom: 0;
+  top: 100%;
 }
 .sill-soil {
   position: absolute;
@@ -811,6 +878,22 @@ onBeforeUnmount(() => releaseHome?.())
 .sill-shoot.leafy {
   width: 23%;
 }
+.sill-shoot.tall {
+  width: 27%;
+}
+.sill-shoot.full {
+  width: 31%;
+}
+.sill-soil.clipped::after {
+  content: '';
+  position: absolute;
+  left: 25%;
+  bottom: 40%;
+  width: 18%;
+  height: 90%;
+  background: repeating-linear-gradient(81deg, #78894d 0 2px, transparent 2px 4px);
+  border-radius: 30% 18% 25% 10%;
+}
 .sill-shoot.leafy i:nth-child(2) {
   transform: rotate(-35deg);
   height: 77%;
@@ -842,11 +925,11 @@ onBeforeUnmount(() => releaseHome?.())
 .sill-shoot.mature {
   width: 36%;
 }
-.sill-shoot.mature i:nth-child(4) {
+.sill-shoot.tall i:nth-child(4) {
   transform: rotate(-17deg);
   height: 90%;
 }
-.sill-shoot.mature i:nth-child(5) {
+.sill-shoot.full i:nth-child(5) {
   transform: rotate(27deg);
   height: 87%;
 }
@@ -949,6 +1032,8 @@ onBeforeUnmount(() => releaseHome?.())
 }
 @media (orientation: portrait) {
   .garden-frame {
+    --rim-x: 47.4%;
+    --rim-y: 59.4%;
     width: max(100cqw, calc(100cqh * 2 / 3));
     aspect-ratio: 2 / 3;
   }

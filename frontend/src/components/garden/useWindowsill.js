@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { gardenApi } from '@/api'
 import { ulid } from '@/utils/tools/generatorTool'
 
-// The server owns the pot. Only unfinished hand movements and pending request keys live on this device.
+// The server owns the pot. Local notes cover hand movements, pending requests and the last confirmed harvest.
 export function useWindowsill(props, inside, review = null) {
   const api = review || gardenApi
   const entry = ref(null)
@@ -102,10 +102,18 @@ export function useWindowsill(props, inside, review = null) {
     startedWith.value = p?.mine && !p.cropCode ? get('seed:' + p.id) : null
     const n = p?.mine && !p.cropCode ? Number(get('draft:' + p.id)) : 0
     draft.value = Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0
+    receipt.value = null
     if (!p?.mine) return
+    if (p.cropCode || n > 0) put('harvest-note:' + p.id, null)
+    else if (p.prepared || p.venue === 'BACKYARD') {
+      try {
+        receipt.value = JSON.parse(get('harvest-note:' + p.id))
+      } catch {
+        put('harvest-note:' + p.id, null)
+      }
+    }
     if (p.prepared) put('action:prepare:' + p.id, null)
     if (p.cropCode) {
-      receipt.value = null
       saveDraft(0)
       put('action:sow:' + p.id + ':' + p.cropCode, null)
       if (p.lastWateredAt) put('action:water:' + p.id + ':' + p.plantedAt, null)
@@ -187,6 +195,7 @@ export function useWindowsill(props, inside, review = null) {
     if (previous === 6) return water()
     if (previous === 8 && crop.value) {
       receipt.value = null
+      put('harvest-note:' + p.id, null)
       saveDraft(2)
       return
     }
@@ -256,9 +265,13 @@ export function useWindowsill(props, inside, review = null) {
       if (!alive) return
       if (result?.plot?.id === p.id) {
         world.value.plots = world.value.plots.map((item) => (item.id === p.id ? result.plot : item))
+        const note = result.alreadyDone
+          ? { alreadyDone: true }
+          : { cropCode: p.cropCode, name, quantity: result.yieldQty, coins: result.coinsGranted }
+        if (!result.plot.cropCode) put('harvest-note:' + p.id, JSON.stringify(note))
         if (plot.value?.id === p.id) {
           saveDraft(0)
-          receipt.value = result.alreadyDone ? { alreadyDone: true } : { name, quantity: result.yieldQty, coins: result.coinsGranted }
+          receipt.value = result.plot.cropCode ? null : note
         }
       }
       await refresh()

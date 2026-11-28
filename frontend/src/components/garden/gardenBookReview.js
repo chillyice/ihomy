@@ -10,7 +10,7 @@ export function createGardenBookReview(t, saveKey) {
       return {}
     }
   }
-  const blank = { sunned: false, inLight: false, harvested: false, sunClaimed: false, harvestClaimed: false }
+  const blank = { sunned: false, inLight: false, harvested: false, sunClaimed: false, harvestClaimed: false, lastCut: 0, grassStored: 0 }
   const slip = reactive({ ...blank, ...readSlip() })
   function mark(values) {
     Object.assign(slip, values)

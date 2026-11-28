@@ -272,6 +272,32 @@ it('recovers the empty soil from the panorama after a lost harvest reply without
   expect(gardenApi.harvest).toHaveBeenCalledOnce()
 })
 
+it('restores the last confirmed cut on a return visit and retires it when the server shows a new crop', async () => {
+  Object.assign(plot, { prepared: true, stage: 5, harvestable: true })
+  let garden = mount()
+  await garden.refresh()
+  gardenApi.harvest.mockImplementationOnce(async () => {
+    emptyPot()
+    return { plot: { ...plot }, yieldQty: 2, coinsGranted: 12 }
+  })
+  await garden.harvest()
+  app.unmount()
+  garden = mount()
+  await garden.refresh()
+  expect(garden.receipt.value).toMatchObject({ cropCode: 'CATGRASS', quantity: 2, coins: 12 })
+  expect(garden.step.value).toBe(8)
+  expect(garden.selectPlot(33)).toBe(true)
+  expect(garden.receipt.value).toBeNull()
+  garden.selectPlot(null)
+  Object.assign(plot, { cropCode: 'MINT', plantedAt: '2026-11-29' })
+  await garden.refresh()
+  expect(garden.receipt.value).toBeNull()
+  emptyPot()
+  await garden.refresh()
+  expect(garden.receipt.value).toBeNull()
+  expect(gardenApi.harvest).toHaveBeenCalledTimes(1)
+})
+
 it('keeps the next planting when another visit has already replaced the harvested crop', async () => {
   plot.harvestable = true
   const garden = mount()

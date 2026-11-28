@@ -36,9 +36,10 @@
         </section>
         <p v-if="page !== 'tasks' && !groups.length" class="empty">{{ t(page === 'own' ? 'garden.noPot' : 'garden.book.noFamily') }}</p>
       </div>
-      <details v-if="Number.isFinite(world.inventoryCap)" class="stores">
+      <details v-if="Number.isFinite(world.inventoryCap) || items.length" class="stores">
         <summary>
-          {{ t('garden.book.store') }} <small>{{ world.inventoryUsed }} / {{ world.inventoryCap }}</small>
+          {{ t('garden.book.store') }}
+          <small v-if="Number.isFinite(world.inventoryCap)">{{ world.inventoryUsed }} / {{ world.inventoryCap }}</small>
         </summary>
         <p v-if="!items.length">{{ t('garden.book.storeEmpty') }}</p>
         <p v-for="item in items" :key="item.itemCode">{{ item.name }} ×{{ item.qty }}</p>
