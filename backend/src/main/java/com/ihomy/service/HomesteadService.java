@@ -16,6 +16,7 @@ import com.ihomy.homestead.content.SkillDef;
 import com.ihomy.homestead.content.ToolDef;
 import com.ihomy.homestead.core.HomesteadEngine;
 import com.ihomy.homestead.core.HomesteadIndex;
+import com.ihomy.homestead.core.HomesteadMarket;
 import com.ihomy.mapper.HomesteadItemMapper;
 import com.ihomy.mapper.HomesteadPlayerMapper;
 import com.ihomy.mapper.HomesteadSkillMapper;
@@ -128,7 +129,7 @@ public class HomesteadService {
         return snapshot(profile, settle);
     }
 
-    /** 卖物品换铜板:单价只看服务端内容表 */
+    /** 卖物品换铜板:命中当天赶集行情且还有额度的部分按行情价,其余按内容表原价 */
     @Transactional
     public Map<String, Object> sell(Long userId, Long familyId, String itemCode, long qty, String opId) {
         Profile profile = load(userId, familyId);
@@ -145,10 +146,14 @@ public class HomesteadService {
         if (have < qty) {
             throw new BizException(ResultCode.BAD_REQUEST, "背包里没有这么多");
         }
+        LocalDate today = LocalDate.now(ZONE);
+        HomesteadMarket.Sale sale = HomesteadMarket.plan(
+                HomesteadMarket.orders(today, content), marketUsed(profile.player, today), item, qty);
         if (allowOp(userId, opId)) {
             applyItems(profile, Map.of(), Map.of(itemCode, qty));
-            long gain = item.sellPrice() * qty;
-            profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) + gain));
+            profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) + sale.coins()));
+            profile.player.setMarketDate(today);
+            profile.player.setMarketUsed(sale.usedAfter());
             playerMapper.updateProgress(profile.player);
         }
         return snapshot(profile, settle);
@@ -286,6 +291,7 @@ public class HomesteadService {
             fresh.setActionSeq(0L);
             fresh.setActionProgressMs(0L);
             fresh.setTotalActions(0L);
+            fresh.setMarketUsed(0);
             fresh.setLastSettleAt(now());
             fresh.setContentVersion(content.contentVersion());
             playerMapper.insertPlayerIfAbsent(fresh);
@@ -501,6 +507,7 @@ public class HomesteadService {
         out.put("serverNow", Instant.now().toEpochMilli());
         out.put("msPerItem", currentMsPerItem(profile));
         out.put("speedBp", currentSpeedBp(profile));
+        out.put("market", marketView(profile));
         out.put("offline", offlineView(settle));
         out.put("content", contentView());
         return out;
@@ -521,6 +528,37 @@ public class HomesteadService {
             return HomesteadConst.SPEED_BASE_BP;
         }
         return HomesteadEngine.speedBp(skillOf(profile, action.skill()).getLevel(), tierOf(profile, action.skill()));
+    }
+
+    /** 赶集日行情:当天两单 + 共享额度 + 下次换货时刻(前端据此显示剩余与倒计时) */
+    private Map<String, Object> marketView(Profile profile) {
+        LocalDate today = LocalDate.now(ZONE);
+        int used = marketUsed(profile.player, today);
+        List<Map<String, Object>> orders = new ArrayList<>();
+        for (HomesteadMarket.Order order : HomesteadMarket.orders(today, content)) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("code", order.itemCode());
+            view.put("price", order.price());
+            view.put("basePrice", order.basePrice());
+            view.put("remaining", order.remaining(used));
+            orders.add(view);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("date", today.toString());
+        out.put("bonusBp", HomesteadConst.MARKET_BONUS_BP);
+        out.put("quota", HomesteadConst.MARKET_QUOTA);
+        out.put("used", used);
+        out.put("resetAt", today.plusDays(1).atStartOfDay(ZONE).toInstant().toEpochMilli());
+        out.put("orders", orders);
+        return out;
+    }
+
+    /** 当天已用额度:存档日期不是今天就当 0(读的时候不写库,真正卖货时才落日期) */
+    private int marketUsed(HomesteadPlayer player, LocalDate today) {
+        if (player == null || player.getMarketDate() == null || !today.equals(player.getMarketDate())) {
+            return 0;
+        }
+        return player.getMarketUsed() == null ? 0 : Math.max(0, player.getMarketUsed());
     }
 
     /** 离线摘要只在离开够久且有实际产出时返回,前端据此弹一次结算卡片 */

@@ -216,6 +216,24 @@
           </div>
 
           <div class="hs-side">
+            <!-- 赶集日:每天两单溢价收,当天共享额度,卖货时由服务端按额度拆价 -->
+            <section v-if="marketOrders.length" class="hs-market">
+              <h2 class="hs-pane-title">
+                <span>{{ $t('games.homestead.market.title') }}</span>
+                <em>{{ marketResetText }}</em>
+              </h2>
+              <p class="hs-market-hint">
+                {{ $t('games.homestead.market.hint', { p: marketBonusPercent, n: market.quota }) }}
+              </p>
+              <div v-for="row in marketOrders" :key="row.code" class="hs-market-row" :class="{ 'is-done': !row.remaining }">
+                <span class="hs-market-name">{{ row.name }}</span>
+                <b class="hs-market-price">{{ compact(row.price) }}</b>
+                <span class="hs-market-left">
+                  {{ row.remaining ? $t('games.homestead.market.left', { n: row.remaining }) : $t('games.homestead.market.soldOut') }}
+                </span>
+              </div>
+            </section>
+
             <!-- 背包:素材/成品/特产分组,单击卖一个、全卖一键清空 -->
             <section class="hs-bag">
               <h2 class="hs-pane-title">
@@ -228,7 +246,9 @@
                 <div v-for="item in group.rows" :key="item.code" class="hs-item">
                   <span class="hs-item-name">{{ item.name }}</span>
                   <b class="hs-item-qty">×{{ compact(item.qty) }}</b>
-                  <span class="hs-item-price">{{ $t('games.homestead.sellPrice', { n: compact(item.price) }) }}</span>
+                  <span class="hs-item-price" :class="{ 'is-market': item.boosted }">
+                    {{ $t('games.homestead.sellPrice', { n: compact(item.price) }) }}
+                  </span>
                   <span class="hs-item-btns">
                     <button type="button" class="hs-mini" :disabled="busy" @click="sellItem(item.code, 1)">
                       {{ $t('games.homestead.sellOne') }}
@@ -417,6 +437,36 @@ const barPercent = computed(() => Math.round(progress.value.ratio * 100))
 const remainingSec = computed(() => Math.max(1, Math.ceil(progress.value.remainingMs / 1000)))
 const speedPercent = computed(() => Math.round((Number(state.value?.speedBp) || 10000) / 100))
 
+// ---------- 赶集日行情(价格与额度全由服务端算,这里只展示) ----------
+const market = computed(() => state.value?.market || { quota: 0, orders: [] })
+const marketOrderMap = computed(() => {
+  const out = {}
+  for (const order of market.value.orders || []) out[order.code] = order
+  return out
+})
+const marketBonusPercent = computed(() => Math.round((Number(market.value.bonusBp) || 0) / 100) - 100)
+const marketOrders = computed(() =>
+  (market.value.orders || []).map((order) => ({
+    code: order.code,
+    name: itemName(order.code),
+    price: Number(order.price) || 0,
+    remaining: Number(order.remaining) || 0,
+  })),
+)
+/** 换货倒计时:以服务端 serverNow 为锚,本地只补流逝(和进度环同一套口径) */
+const marketResetText = computed(() => {
+  const resetAt = Number(market.value.resetAt) || 0
+  const serverNow = Number(state.value?.serverNow) || 0
+  if (!resetAt || !serverNow) return ''
+  const left = resetAt - serverNow - elapsedMs.value
+  if (left <= 0) return t('games.homestead.market.soon')
+  const hours = Math.floor(left / 3600000)
+  const minutes = Math.floor((left % 3600000) / 60000)
+  return hours > 0
+    ? t('games.homestead.market.resetHours', { h: hours, m: minutes })
+    : t('games.homestead.market.resetMinutes', { m: Math.max(1, minutes) })
+})
+
 const actionRows = computed(() =>
   skillActions.value.map((def) => {
     const level = levelOf(def.skill)
@@ -445,11 +495,15 @@ const actionRows = computed(() =>
 const bagGroups = computed(() => {
   const rows = (state.value?.items || []).map((row) => {
     const def = itemMap.value[row.code] || {}
+    const order = marketOrderMap.value[row.code]
+    const boosted = !!order && Number(order.remaining) > 0
     return {
       code: row.code,
       name: pickName(def, locale.value),
       qty: Number(row.qty) || 0,
-      price: Number(def.sellPrice) || 0,
+      // 命中当天赶集行情且有额度时显示溢价,实际成交价仍以服务端返回的铜板为准
+      price: Number((boosted ? order.price : def.sellPrice) || 0),
+      boosted,
       category: def.category || 'MATERIAL',
     }
   })
@@ -972,6 +1026,51 @@ onBeforeUnmount(() => {
   font-weight: 400;
   color: var(--color-text-tertiary);
 }
+
+/* --- 赶集日(右栏顶部,和背包一起看) --- */
+.hs-market {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: rgb(var(--color-card-rgb) / 35%);
+}
+.hs-market-hint {
+  margin: 0 0 1px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--color-text-tertiary);
+}
+.hs-market-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+.hs-market-row.is-done {
+  opacity: 0.55;
+}
+.hs-market-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-market-price {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+.hs-market-left {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
 .hs-sub {
   margin: 4px 0 0;
   font-size: 10.5px;
@@ -1011,6 +1110,10 @@ onBeforeUnmount(() => {
   font-size: 10.5px;
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
+}
+.hs-item-price.is-market {
+  color: var(--color-warning);
+  font-weight: 600;
 }
 .hs-item-btns {
   flex: 0 0 auto;
@@ -1200,6 +1303,7 @@ onBeforeUnmount(() => {
   .hs-side {
     margin-top: var(--gs-gap);
   }
+  .hs-market,
   .hs-bag,
   .hs-tools {
     margin-bottom: 6px;
@@ -1233,6 +1337,7 @@ onBeforeUnmount(() => {
   .hs-wrap[data-pane='BAG'] .hs-tools,
   .hs-wrap[data-pane='TOOLS'] .hs-rail,
   .hs-wrap[data-pane='TOOLS'] .hs-actions,
+  .hs-wrap[data-pane='TOOLS'] .hs-market,
   .hs-wrap[data-pane='TOOLS'] .hs-bag {
     display: none;
   }

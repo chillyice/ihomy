@@ -6,7 +6,8 @@
         `id`, `user_id` AS `userId`, `family_id` AS `familyId`, `coins`,
         `action_code` AS `actionCode`, `action_seq` AS `actionSeq`,
         `action_progress_ms` AS `actionProgressMs`, `last_settle_at` AS `lastSettleAt`,
-        `total_actions` AS `totalActions`, `content_version` AS `contentVersion`,
+        `total_actions` AS `totalActions`, `market_date` AS `marketDate`,
+        `market_used` AS `marketUsed`, `content_version` AS `contentVersion`,
         `created_at` AS `createdAt`, `updated_at` AS `updatedAt`
     </sql>
 
@@ -36,6 +37,8 @@
             `action_progress_ms` = #{actionProgressMs},
             `last_settle_at`     = #{lastSettleAt},
             `total_actions`      = #{totalActions},
+            `market_date`        = #{marketDate},
+            `market_used`        = #{marketUsed},
             `content_version`    = #{contentVersion}
         WHERE `user_id` = #{userId}
     </update>

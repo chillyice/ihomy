@@ -3499,6 +3499,8 @@ CREATE TABLE `game_homestead_player` (
   `action_progress_ms` BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作已积累毫秒',
   `last_settle_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '上次结算时刻(离线补算锚点)',
   `total_actions`      BIGINT      NOT NULL DEFAULT 0 COMMENT '历史完成动作总数(成就指标)',
+  `market_date`        DATE        DEFAULT NULL COMMENT '上次赶集卖货日期(与今天不同即当天额度已重置)',
+  `market_used`        INT         NOT NULL DEFAULT 0 COMMENT '当天已用掉的集市收购额度(件)',
   `content_version`    CHAR(64)    DEFAULT NULL COMMENT '落库时的内容版本',
   `created_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

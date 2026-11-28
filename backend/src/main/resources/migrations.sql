@@ -4142,3 +4142,18 @@ CREATE TABLE IF NOT EXISTS `game_homestead_tool` (
 DROP TABLE IF EXISTS `game_bakery_idle_score`;
 
 DELETE FROM `family_points_rule` WHERE `feature_code` = 'game_bakery';
+
+-- ------------------------------------------------------------
+-- 小院慢生活赶集日:玩家档加「当天收购额度」两列(与 schema.sql 同结构)。
+-- MySQL 8 不支持 ADD COLUMN IF NOT EXISTS,用 information_schema 条件判断保证幂等。
+-- ------------------------------------------------------------
+SET @add_homestead_market := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `game_homestead_player` ADD COLUMN `market_date` DATE DEFAULT NULL COMMENT ''上次赶集卖货日期(与今天不同即当天额度已重置)'' AFTER `total_actions`, ADD COLUMN `market_used` INT NOT NULL DEFAULT 0 COMMENT ''当天已用掉的集市收购额度(件)'' AFTER `market_date`',
+    'SELECT ''skip: homestead market columns already exist'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_player' AND COLUMN_NAME = 'market_date'
+);
+PREPARE add_homestead_market_stmt FROM @add_homestead_market;
+EXECUTE add_homestead_market_stmt;
+DEALLOCATE PREPARE add_homestead_market_stmt;

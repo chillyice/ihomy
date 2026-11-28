@@ -33,6 +33,13 @@ public final class HomesteadConst {
     public static final long INDEX_LEVEL_POINTS = 1000L;
     public static final int INDEX_ITEM_SELL_BP = 5000;
 
+    /** 基点基数(100% = 10000,溢价/折扣一律按它换算) */
+    public static final int BP_BASE = 10_000;
+    /** 赶集日:溢价幅度(15000 = 原价 1.5 倍) */
+    public static final int MARKET_BONUS_BP = 15_000;
+    /** 赶集日:当天共享的收购额度(件,两单共用;用完就回到原价,次日 0 点换货) */
+    public static final int MARKET_QUOTA = 40;
+
     /** 动作停止原因(写入结算结果,前端据此提示) */
     public static final String STOP_MATERIALS = "MATERIALS";
 }

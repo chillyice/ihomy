@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -25,6 +26,10 @@ public class HomesteadPlayer {
     private Long actionProgressMs;
     private LocalDateTime lastSettleAt;
     private Long totalActions;
+    /** 赶集日:最近一次卖货的日期(与今天不同即额度已重置) */
+    private LocalDate marketDate;
+    /** 赶集日:当天已用掉的收购额度(件) */
+    private Integer marketUsed;
     private String contentVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
