@@ -8,12 +8,15 @@ import {
   costGap,
   countdownParts,
   elapsedText,
+  expeditionScore,
+  fitsSlot,
   formatCompact,
   hasMaterials,
   msPerItem,
   pickName,
   progressOf,
   sellCoinsWithBonus,
+  slotFamily,
   speedBp,
   toolContribution,
   xpRatio,
@@ -190,5 +193,26 @@ describe('homestead display helpers', () => {
   it('compact numbers survive locale differences', () => {
     expect(formatCompact(0)).toBe('0')
     expect(formatCompact(1000)).toMatch(/1/)
+  })
+
+  it('expedition score folds level weight and worn power', () => {
+    // 与后端 HomesteadConst.EXPEDITION_LEVEL_WEIGHT 同口径:每级 3 分 + 穿戴战力
+    expect(expeditionScore(5, 20)).toBe(35)
+    expect(expeditionScore(0, 0)).toBe(0)
+    expect(expeditionScore('12', '40')).toBe(76)
+    expect(expeditionScore(-3, -1)).toBe(0)
+  })
+
+  it('ring slots share one gear family', () => {
+    expect(slotFamily('RING_A')).toBe('RING')
+    expect(slotFamily('RING_B')).toBe('RING')
+    expect(slotFamily('HEAD')).toBe('HEAD')
+    expect(slotFamily('')).toBe('')
+    // 蓝本挂在家族上,两格戒指都能穿同一件
+    expect(fitsSlot('RING_A', 'RING')).toBe(true)
+    expect(fitsSlot('RING_B', 'RING')).toBe(true)
+    expect(fitsSlot('HEAD', 'RING')).toBe(false)
+    expect(fitsSlot('', 'HEAD')).toBe(false)
+    expect(fitsSlot('HEAD', '')).toBe(false)
   })
 })

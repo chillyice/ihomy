@@ -7,7 +7,9 @@
         `action_code` AS `actionCode`, `action_seq` AS `actionSeq`,
         `action_progress_ms` AS `actionProgressMs`, `last_settle_at` AS `lastSettleAt`,
         `total_actions` AS `totalActions`, `market_date` AS `marketDate`,
-        `market_used` AS `marketUsed`, `content_version` AS `contentVersion`,
+        `market_used` AS `marketUsed`, `explore_points` AS `explorePoints`,
+        `expedition_date` AS `expeditionDate`, `expedition_used` AS `expeditionUsed`,
+        `shop_seq` AS `shopSeq`, `content_version` AS `contentVersion`,
         `created_at` AS `createdAt`, `updated_at` AS `updatedAt`
     </sql>
 
@@ -39,6 +41,10 @@
             `total_actions`      = #{totalActions},
             `market_date`        = #{marketDate},
             `market_used`        = #{marketUsed},
+            `explore_points`     = #{explorePoints},
+            `expedition_date`    = #{expeditionDate},
+            `expedition_used`    = #{expeditionUsed},
+            `shop_seq`           = #{shopSeq},
             `content_version`    = #{contentVersion}
         WHERE `user_id` = #{userId}
     </update>

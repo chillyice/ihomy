@@ -3440,10 +3440,12 @@ CREATE TABLE `family_house_share` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';
 
 -- ------------------------------------------------------------
--- 92. game_homestead_* 小院慢生活(V15.45):
+-- 92. game_homestead_* 小院慢生活(V15.47):
 --     服务端权威的放置游戏存档——进度只由服务端结算,离线时长按 last_settle_at 补算(上限 24 小时)。
---     player 一人一行;skill / item / tool / gear / building 按 user_id + 编码各一行;
---     wear 一人一部位一行;buff 一人最多 3 条(到期删除);meta 是全局键值(当前只放存档重置守卫)。
+--     player 一人一行;skill / item / tool / building 按 user_id + 编码各一行;
+--     gear 是「装备实例」(同一蓝本可有多件,带品质/词缀/强化/锁定);wear 一人一部位一行(12 格,穿的是实例 id);
+--     loadout 换装预设(前 2 套免费,第 3–5 套铜板解锁);expedition 探险(每天 3 趟,与挂机并行);
+--     buff 一人最多 3 条(到期删除);meta 是全局键值(当前只放存档重置守卫)。
 --     家庭榜指数不落列:读取时由 HomesteadIndex 现算(等级×1000 + 铜板 + 库存半价),
 --     避免内容调价后留下陈旧分数,也杜绝客户端上报。时间列一律毫秒精度(离线补算锚点)。
 -- ------------------------------------------------------------
@@ -3460,6 +3462,10 @@ CREATE TABLE `game_homestead_player` (
   `total_actions`      BIGINT      NOT NULL DEFAULT 0 COMMENT '历史完成动作总数(成就指标)',
   `market_date`        DATE        DEFAULT NULL COMMENT '上次赶集卖货日期(与今天不同即当天额度已重置)',
   `market_used`        INT         NOT NULL DEFAULT 0 COMMENT '当天已用掉的集市收购额度(件)',
+  `explore_points`     BIGINT      NOT NULL DEFAULT 0 COMMENT '探险积分(商店换宝箱/物品)',
+  `expedition_date`    DATE        DEFAULT NULL COMMENT '上次派遣探险的日期(按自然日重置次数)',
+  `expedition_used`    INT         NOT NULL DEFAULT 0 COMMENT '当天已派遣探险次数',
+  `shop_seq`           BIGINT      NOT NULL DEFAULT 0 COMMENT '积分商店兑换累计次数(确定性掷点序号)',
   `content_version`    CHAR(64)    DEFAULT NULL COMMENT '落库时的内容版本',
   `created_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -3506,27 +3512,32 @@ CREATE TABLE `game_homestead_tool` (
 
 DROP TABLE IF EXISTS `game_homestead_gear`;
 CREATE TABLE `game_homestead_gear` (
-  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
-  `gear_code`  VARCHAR(24) NOT NULL COMMENT '装备编码(见 content/homestead/equipment.json)',
-  `enhance`    INT         NOT NULL DEFAULT 0 COMMENT '强化等级(0–5,每级效果 +50%)',
-  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
-  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键(装备实例 id)',
+  `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+  `gear_code`  VARCHAR(24)  NOT NULL COMMENT '装备蓝本编码(见 content/homestead/equipment.json,同一蓝本可多件)',
+  `quality`    VARCHAR(16)  NOT NULL DEFAULT 'COMMON' COMMENT '品质(COMMON/FINE/RARE/EPIC/LEGENDARY,打造固定 COMMON)',
+  `affixes`    VARCHAR(255) NOT NULL DEFAULT '' COMMENT '词缀(SPEED:ALL:120,XP:FARM:80;打造装为空串)',
+  `enhance`    INT          NOT NULL DEFAULT 0 COMMENT '强化等级(0–5,每级效果 +50%)',
+  `locked`     TINYINT      NOT NULL DEFAULT 0 COMMENT '锁定(1=防误分解/重铸)',
+  `reroll_seq` INT          NOT NULL DEFAULT 0 COMMENT '词缀重铸累计次数(确定性掷点序号,换词缀必变)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '获得时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_gear` (`user_id`, `gear_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活装备(已制造)';
+  KEY `idx_user_code` (`user_id`, `gear_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活装备实例(打造 / 探险 / 宝箱掉落)';
 
 DROP TABLE IF EXISTS `game_homestead_wear`;
 CREATE TABLE `game_homestead_wear` (
   `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
-  `slot_code`  VARCHAR(16) NOT NULL COMMENT '部位编码(HEAD/BODY/HANDS/FEET/CHARM)',
-  `gear_code`  VARCHAR(24) DEFAULT NULL COMMENT '穿着的装备编码(NULL=空着)',
+  `slot_code`  VARCHAR(16) NOT NULL COMMENT '穿戴格(HEAD/NECK/SHOULDER/BODY/CLOAK/WRIST/HANDS/WAIST/FEET/RING_A/RING_B/CHARM)',
+  `gear_id`    BIGINT      DEFAULT NULL COMMENT '穿着的装备实例 id(NULL=空着,同一实例只能穿一格)',
   `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_slot` (`user_id`, `slot_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴(一人一部位)';
+  UNIQUE KEY `uk_user_slot` (`user_id`, `slot_code`),
+  KEY `idx_user_gear` (`user_id`, `gear_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴(一人 12 格)';
 
 DROP TABLE IF EXISTS `game_homestead_building`;
 CREATE TABLE `game_homestead_building` (
@@ -3554,9 +3565,36 @@ CREATE TABLE `game_homestead_buff` (
   KEY `idx_user_expire` (`user_id`, `expire_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活料理 buff(同时最多 3 条)';
 
+DROP TABLE IF EXISTS `game_homestead_loadout`;
+CREATE TABLE `game_homestead_loadout` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+  `slot_index` INT          NOT NULL COMMENT '预设序号(1–5,1/2 建号即有,3–5 铜板解锁)',
+  `name`       VARCHAR(24)  NOT NULL DEFAULT '' COMMENT '预设名(空则前端按序号展示)',
+  `payload`    VARCHAR(512) NOT NULL DEFAULT '' COMMENT '穿戴快照(HEAD:12,RING_A:15;空串=空预设)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_index` (`user_id`, `slot_index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活换装预设(最多 5 套)';
+
+DROP TABLE IF EXISTS `game_homestead_expedition`;
+CREATE TABLE `game_homestead_expedition` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键(也是掉落掷点序号的一部分)',
+  `user_id`     BIGINT        NOT NULL COMMENT '用户ID',
+  `region_code` VARCHAR(24)   NOT NULL COMMENT '探险区域编码(见 content/homestead/expeditions.json)',
+  `status`      VARCHAR(16)   NOT NULL DEFAULT 'ACTIVE' COMMENT '状态(ACTIVE 在途 / DONE 已结算)',
+  `started_at`  DATETIME(3)   NOT NULL COMMENT '出发时刻',
+  `ends_at`     DATETIME(3)   NOT NULL COMMENT '返回时刻(到点由结算惰性收尾)',
+  `report`      VARCHAR(2048) DEFAULT NULL COMMENT '探险手记(结算后写入的紧凑 JSON,含事件判定与掉落)',
+  `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_status` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活探险(每天 3 趟,与挂机并行)';
+
 DROP TABLE IF EXISTS `game_homestead_meta`;
 CREATE TABLE `game_homestead_meta` (
-  `k`          VARCHAR(48) NOT NULL COMMENT '键(当前只放存档重置守卫 reset_v16)',
+  `k`          VARCHAR(48) NOT NULL COMMENT '键(存档重置守卫 reset_v16 / reset_v17)',
   `v`          VARCHAR(64) NOT NULL COMMENT '值',
   `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '写入时间',
   PRIMARY KEY (`k`)

@@ -32,24 +32,94 @@ class HomesteadBonusTest {
     @Test
     void gearEnhanceScalesByHalf() {
         HomesteadBonus.Bonus plain = HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_TWIG"), 0,
-                List.of(new HomesteadBonus.WornGear("STRAW_HAT", 0)), Map.of());
+                List.of(HomesteadBonus.WornGear.plain("STRAW_HAT", 0)), Map.of());
         assertEquals(800, plain.speedBp());
         HomesteadBonus.Bonus strong = HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_TWIG"), 0,
-                List.of(new HomesteadBonus.WornGear("STRAW_HAT", 5)), Map.of());
+                List.of(HomesteadBonus.WornGear.plain("STRAW_HAT", 5)), Map.of());
         assertEquals(2800, strong.speedBp());
         // 超过上限按上限算
         HomesteadBonus.Bonus clamped = HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_TWIG"), 0,
-                List.of(new HomesteadBonus.WornGear("STRAW_HAT", 99)), Map.of());
+                List.of(HomesteadBonus.WornGear.plain("STRAW_HAT", 99)), Map.of());
         assertEquals(2800, clamped.speedBp());
     }
 
     @Test
     void gearTargetFiltersBySkillKind() {
-        List<HomesteadBonus.WornGear> apron = List.of(new HomesteadBonus.WornGear("CLOTH_APRON", 0));
+        List<HomesteadBonus.WornGear> apron = List.of(HomesteadBonus.WornGear.plain("CLOTH_APRON", 0));
         assertEquals(800, HomesteadBonus.resolve(CONTENT, CONTENT.action("COOK_RICE"), 0, apron, Map.of())
                 .speedBp());
         assertEquals(0, HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_TWIG"), 0, apron, Map.of())
                 .speedBp());
+    }
+
+    @Test
+    void qualityMultipliesBlueprintValue() {
+        // 羊毛披风 牧场速度 250,稀有品质(12500) → 312
+        HomesteadBonus.WornGear fine = new HomesteadBonus.WornGear("WOOL_CLOAK", "RARE", 0, List.of());
+        assertEquals(312, HomesteadBonus.resolve(CONTENT, CONTENT.action("MILK_GOAT"), 0, List.of(fine), Map.of())
+                .speedBp());
+        HomesteadBonus.WornGear epic = new HomesteadBonus.WornGear("WOOL_CLOAK", "EPIC", 0, List.of());
+        assertEquals(362, HomesteadBonus.resolve(CONTENT, CONTENT.action("MILK_GOAT"), 0, List.of(epic), Map.of())
+                .speedBp());
+    }
+
+    @Test
+    void skillCodeTargetOnlyAffectsThatSkill() {
+        // 羊毛披风只加 RANCH,木作与采集都不该吃
+        List<HomesteadBonus.WornGear> cloak = List.of(HomesteadBonus.WornGear.plain("WOOL_CLOAK", 0));
+        assertEquals(250, HomesteadBonus.resolve(CONTENT, CONTENT.action("MILK_GOAT"), 0, cloak, Map.of())
+                .speedBp());
+        assertEquals(0, HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_TWIG"), 0, cloak, Map.of())
+                .speedBp(), "定向到别的技能不应生效");
+    }
+
+    @Test
+    void affixesAddWithoutEnhanceScaling() {
+        List<HomesteadBonus.Affix> affixes = List.of(
+                new HomesteadBonus.Affix("SPEED", "ALL", 120),
+                new HomesteadBonus.Affix("XP", "RANCH", 80),
+                new HomesteadBonus.Affix("XP", "FARM", 999));
+        HomesteadBonus.WornGear gear = new HomesteadBonus.WornGear("WOOL_CLOAK", "FINE", 5, affixes);
+        HomesteadBonus.Bonus bonus = HomesteadBonus.resolve(CONTENT, CONTENT.action("MILK_GOAT"), 0,
+                List.of(gear), Map.of());
+        // 250 × 1.1 × 3.5 = 962;词缀 120 全额加
+        assertEquals(962 + 120, bonus.speedBp());
+        assertEquals(80, bonus.xpBp(), "只命中 RANCH 的词缀");
+    }
+
+    @Test
+    void setsCountPiecesAndStackTiers() {
+        List<HomesteadBonus.WornGear> two = List.of(
+                HomesteadBonus.WornGear.plain("STRAW_HAT", 0),
+                HomesteadBonus.WornGear.plain("CLOTH_APRON", 0));
+        assertEquals(Map.of("GROVE", 2), HomesteadBonus.setCounts(CONTENT, two));
+        // 林间 2 件:采集速度 +300。草帽对全部动作 +800,围裙只给加工 +800
+        assertEquals(1100, HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_BERRY"), 0, two, Map.of())
+                .speedBp(), "捡野莓应吃到林间 2 件的采集速度");
+        assertEquals(1600, HomesteadBonus.resolve(CONTENT, CONTENT.action("COOK_RICE"), 0, two, Map.of())
+                .speedBp(), "加工动作只吃两件蓝本自身加成,不该吃采集套装");
+
+        List<HomesteadBonus.WornGear> six = List.of(
+                HomesteadBonus.WornGear.plain("STRAW_HAT", 0),
+                HomesteadBonus.WornGear.plain("CLOTH_APRON", 0),
+                HomesteadBonus.WornGear.plain("LINEN_SLEEVES", 0),
+                HomesteadBonus.WornGear.plain("CLOTH_SHOES", 0),
+                HomesteadBonus.WornGear.plain("PINE_CHARM", 0),
+                HomesteadBonus.WornGear.plain("WOOL_CLOAK", 0));
+        HomesteadBonus.Bonus full = HomesteadBonus.resolve(CONTENT, CONTENT.action("PICK_BERRY"), 0, six, Map.of());
+        assertEquals(400, full.rareBp(), "林间 6 件应给采集稀有 +400");
+        assertEquals(3, HomesteadBonus.setSteps(CONTENT, six).size(), "2/4/6 三档全生效");
+    }
+
+    @Test
+    void powerGrowsWithQualityAndEnhance() {
+        List<HomesteadBonus.WornGear> plus0 = List.of(HomesteadBonus.WornGear.plain("WOOL_CLOAK", 0));
+        assertEquals(3, HomesteadBonus.powerOf(CONTENT, plus0));
+        List<HomesteadBonus.WornGear> rare5 = List.of(
+                new HomesteadBonus.WornGear("WOOL_CLOAK", "RARE", 5, List.of()));
+        // 3 × 1.25 = 3,再 × 3.5 = 10
+        assertEquals(10, HomesteadBonus.powerOf(CONTENT, rare5));
+        assertEquals(0, HomesteadBonus.powerOf(CONTENT, List.of()));
     }
 
     @Test

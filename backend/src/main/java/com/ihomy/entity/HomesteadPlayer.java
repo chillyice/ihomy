@@ -30,6 +30,14 @@ public class HomesteadPlayer {
     private LocalDate marketDate;
     /** 赶集日:当天已用掉的收购额度(件) */
     private Integer marketUsed;
+    /** 探险积分(商店换宝箱/物品) */
+    private Long explorePoints;
+    /** 探险:上次派遣的日期(与今天不同即次数重置) */
+    private LocalDate expeditionDate;
+    /** 探险:当天已派遣次数 */
+    private Integer expeditionUsed;
+    /** 积分商店:兑换累计次数(确定性掷点序号) */
+    private Long shopSeq;
     private String contentVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

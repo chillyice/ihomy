@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 内容装载与自洽:六份 JSON 能被装载、引用完整、经验曲线长度对齐、content_version 稳定。
+ * 内容装载与自洽:七份 JSON 能被装载、引用完整、经验曲线长度对齐、content_version 稳定。
  * 校验逻辑本身在构造器里(非法内容启动即失败),这里只保证「当前仓库里的内容合法」。
  */
 class HomesteadContentTest {
@@ -22,27 +22,43 @@ class HomesteadContentTest {
     private static final HomesteadContent CONTENT = new HomesteadContent();
 
     @Test
-    void loadsAllSixFiles() {
+    void loadsAllSevenFiles() {
         assertEquals(11, CONTENT.skills().size());
         assertEquals(63, CONTENT.items().size());
         assertEquals(66, CONTENT.actions().size());
         assertEquals(66, CONTENT.tools().size());
-        assertEquals(15, CONTENT.equipment().size());
+        assertEquals(44, CONTENT.equipment().size());
+        assertEquals(5, CONTENT.rarities().size());
+        assertEquals(4, CONTENT.gearSets().size());
+        assertEquals(12, CONTENT.affixPool().size());
+        assertEquals(11, CONTENT.dropGear().size(), "每家族一件掉落专属");
         assertEquals(14, CONTENT.buildings().size());
+        assertEquals(6, CONTENT.regions().size());
+        assertEquals(7, CONTENT.shops().size());
         assertEquals(100, CONTENT.maxLevel());
         assertEquals(64, CONTENT.contentVersion().length());
     }
 
     @Test
-    void equipmentCoversFiveSlotsWithThreeEach() {
-        Map<String, Integer> perSlot = new HashMap<>();
+    void equipmentCoversElevenFamiliesWithFourEach() {
+        Map<String, Integer> perFamily = new HashMap<>();
+        Map<String, Integer> craftedPerFamily = new HashMap<>();
         Set<String> codes = new HashSet<>();
         CONTENT.equipment().forEach(gear -> {
             assertTrue(codes.add(gear.code()), "装备编码重复:" + gear.code());
-            assertTrue(HomesteadConst.GEAR_SLOTS.contains(gear.slot()), "部位非法:" + gear.code());
-            perSlot.merge(gear.slot(), 1, Integer::sum);
+            assertTrue(HomesteadConst.GEAR_FAMILIES.contains(gear.slot()), "部位非法:" + gear.code());
+            perFamily.merge(gear.slot(), 1, Integer::sum);
+            if (gear.craftable()) {
+                craftedPerFamily.merge(gear.slot(), 1, Integer::sum);
+                assertNotNull(gear.craft(), "打造装缺配方:" + gear.code());
+                gear.craft().materials().forEach(material -> assertNotNull(CONTENT.item(material.item())));
+            } else {
+                assertNull(gear.craft(), "掉落装不应有配方:" + gear.code());
+            }
             assertEquals(HomesteadConst.MAX_GEAR_TIER, gear.steps().size(), "强化档数不符:" + gear.code());
-            assertNotNull(gear.craft(), "装备缺制造配方:" + gear.code());
+            assertTrue(gear.power() > 0, "装备缺战力:" + gear.code());
+            assertNotNull(CONTENT.gearSet(gear.set()), "套装未知:" + gear.code());
+            assertTrue(!gear.dismantle().isEmpty(), "装备缺分解产出:" + gear.code());
             assertTrue(gear.requireLevel() > 0, "装备缺等级门槛:" + gear.code());
             assertTrue(!gear.effects().isEmpty(), "装备缺效果:" + gear.code());
             for (int tier = 0; tier < HomesteadConst.MAX_GEAR_TIER; tier++) {
@@ -51,10 +67,77 @@ class HomesteadContentTest {
             assertNull(gear.nextStep(HomesteadConst.MAX_GEAR_TIER));
             gear.steps().forEach(step -> step.materials()
                     .forEach(material -> assertNotNull(CONTENT.item(material.item()))));
-            gear.craft().materials().forEach(material -> assertNotNull(CONTENT.item(material.item())));
+            gear.dismantle().forEach(material -> assertNotNull(CONTENT.item(material.item())));
         });
-        assertEquals(HomesteadConst.SLOT_COUNT, perSlot.size());
-        perSlot.forEach((slot, count) -> assertEquals(HomesteadConst.GEAR_PER_SLOT, count, "部位件数不符:" + slot));
+        assertEquals(HomesteadConst.GEAR_FAMILIES.size(), perFamily.size());
+        perFamily.forEach((family, count) -> {
+            assertEquals(HomesteadConst.GEAR_PER_FAMILY, count, "家族件数不符:" + family);
+            assertEquals(HomesteadConst.GEAR_PER_FAMILY - 1, craftedPerFamily.getOrDefault(family, 0),
+                    "每家族应 3 件打造档:" + family);
+        });
+    }
+
+    @Test
+    void raritiesSetsAndAffixesAreConsistent() {
+        assertEquals(HomesteadConst.QUALITY_COMMON, CONTENT.rarities().get(0).code());
+        for (int i = 1; i < CONTENT.rarities().size(); i++) {
+            assertTrue(CONTENT.rarities().get(i).multBp() > CONTENT.rarities().get(i - 1).multBp(),
+                    "品质倍率应递增:" + CONTENT.rarities().get(i).code());
+            assertTrue(CONTENT.rarityIndex(CONTENT.rarities().get(i).code()) == i);
+        }
+        for (GearSetDef set : CONTENT.gearSets()) {
+            assertTrue(!set.steps().isEmpty(), "套装缺档位:" + set.code());
+            int pieces = 0;
+            for (GearSetDef.SetStep step : set.steps()) {
+                assertTrue(step.pieces() > pieces, "套装件数应递增:" + set.code());
+                pieces = step.pieces();
+                assertTrue(!step.effects().isEmpty(), "套装档位缺效果:" + set.code());
+            }
+            long members = CONTENT.equipment().stream().filter(g -> set.code().equals(g.set())).count();
+            assertTrue(members >= pieces, "套装成员不足:" + set.code());
+        }
+        assertTrue(CONTENT.affixPool().size() > 0);
+        CONTENT.affixPool().forEach(affix -> assertTrue(affix.target() != null && !affix.target().isBlank()));
+    }
+
+    @Test
+    void expeditionRegionsReferenceKnownContent() {
+        for (ExpeditionDef.Region region : CONTENT.regions()) {
+            assertNotNull(CONTENT.skill(region.skill()), "区域指向未知技能:" + region.code());
+            assertTrue(region.powerFloor() > 0, "区域应有战力下限:" + region.code());
+            assertTrue(region.feeCoins() > 0, "区域应有费用:" + region.code());
+            assertTrue(region.minutes() > 0, "区域应有耗时:" + region.code());
+            assertTrue(!region.supplies().isEmpty(), "区域应有供给要求:" + region.code());
+            region.supplies().forEach(s -> assertNotNull(CONTENT.item(s.item())));
+            assertTrue(!region.events().isEmpty(), "区域应有事件:" + region.code());
+            region.gearPool().forEach(code -> {
+                EquipmentDef gear = CONTENT.gear(code);
+                assertNotNull(gear, "区域装备池引用未知装备:" + code);
+                assertTrue(!gear.craftable(), "区域装备池不应放打造装:" + code);
+            });
+            region.events().forEach(event -> {
+                assertNotNull(CONTENT.skill(event.skill()), "事件指向未知技能:" + region.code());
+                assertTrue(event.difficulty() > 0);
+                assertTrue(!event.loot().isEmpty());
+                event.loot().forEach(loot -> {
+                    if (loot.gear()) {
+                        assertNotNull(CONTENT.rarity(loot.qualityFloor() == null || loot.qualityFloor().isBlank()
+                                ? region.gearQualityFloor() : loot.qualityFloor()));
+                    } else {
+                        assertNotNull(CONTENT.item(loot.item()), "事件掉落引用未知物品:" + loot.item());
+                    }
+                });
+            });
+        }
+        for (ExpeditionDef.Shop shop : CONTENT.shops()) {
+            assertTrue(shop.points() > 0, "商店价格非法:" + shop.code());
+            if (shop.chest()) {
+                assertTrue(!shop.pool().isEmpty(), "宝箱缺材料池:" + shop.code());
+                assertNotNull(CONTENT.rarity(shop.gearQualityFloor()));
+            } else {
+                assertNotNull(CONTENT.item(shop.item()), "商店物品未知:" + shop.code());
+            }
+        }
     }
 
     @Test

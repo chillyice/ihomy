@@ -445,17 +445,33 @@ function homesteadOp(opId) {
   return opId ? { headers: { 'Idempotency-Key': opId } } : undefined
 }
 
-// 小院慢生活(放置:服务端存档 + 离线结算)。读状态会顺带结算离线收益并返回全量存档
+// 小院慢生活(放置:服务端存档 + 离线结算)。读状态会顺带结算离线收益并返回全量存档;
+// 内容表(蓝本/区域/商店)单独一次拉,按 contentVersion 复用,60 秒轮询不再拖着几十件蓝本
 export const homesteadApi = {
   state: () => request.get('/game/homestead/state'),
+  content: () => request.get('/game/homestead/content'),
   action: (actionCode, opId) => request.post('/game/homestead/action', { actionCode }, homesteadOp(opId)),
   stop: (opId) => request.post('/game/homestead/stop', null, homesteadOp(opId)),
   sell: (itemCode, qty, opId) => request.post('/game/homestead/sell', { itemCode, qty }, homesteadOp(opId)),
   tool: (toolCode, opId) => request.post('/game/homestead/tool', { toolCode }, homesteadOp(opId)),
-  // 装备:craft 制造 → enhance 强化 0→5 → wear 穿脱(gearCode 传空串即脱下该部位)
+  // 装备按「实例 id」操作:制造出实例后可强化/分解/锁定/重铸,穿戴 gearId 留空即脱下该部位
   craftGear: (gearCode, opId) => request.post('/game/homestead/gear', { gearCode }, homesteadOp(opId)),
-  enhanceGear: (gearCode, opId) => request.post('/game/homestead/gear/enhance', { gearCode }, homesteadOp(opId)),
-  wear: (slotCode, gearCode, opId) => request.post('/game/homestead/wear', { slotCode, gearCode: gearCode || '' }, homesteadOp(opId)),
+  enhanceGear: (gearId, opId) => request.post('/game/homestead/gear/enhance', { gearId }, homesteadOp(opId)),
+  dismantleGear: (gearId, opId) => request.post('/game/homestead/gear/dismantle', { gearId }, homesteadOp(opId)),
+  lockGear: (gearId, locked, opId) =>
+    request.post('/game/homestead/gear/lock', { gearId, locked: !!locked }, homesteadOp(opId)),
+  rerollGear: (gearId, opId) => request.post('/game/homestead/gear/reroll', { gearId }, homesteadOp(opId)),
+  // 一键最优:focus 为 SPEED / XP / RARE / YIELD,留空按综合战力
+  autoGear: (focus, opId) =>
+    request.post('/game/homestead/gear/auto', null, { params: focus ? { focus } : undefined, ...homesteadOp(opId) }),
+  wear: (slotCode, gearId, opId) =>
+    request.post('/game/homestead/wear', { slotCode: slotCode || '', gearId: gearId || null }, homesteadOp(opId)),
+  // 换装预设:index 1~5(前两套建号即有,3~5 用铜板买)
+  saveLoadout: (index, name, opId) => request.post('/game/homestead/loadout', { index, name }, homesteadOp(opId)),
+  applyLoadout: (index, opId) => request.post('/game/homestead/loadout/apply', { index }, homesteadOp(opId)),
+  buyLoadout: (index, opId) => request.post('/game/homestead/loadout/buy', { index }, homesteadOp(opId)),
+  startExpedition: (regionCode, opId) => request.post('/game/homestead/expedition/start', { regionCode }, homesteadOp(opId)),
+  exchange: (shopCode, opId) => request.post('/game/homestead/shop/exchange', { shopCode }, homesteadOp(opId)),
   building: (buildingCode, opId) => request.post('/game/homestead/building', { buildingCode }, homesteadOp(opId)),
   consume: (itemCode, qty, opId) => request.post('/game/homestead/consume', { itemCode, qty }, homesteadOp(opId)),
   ranking: () => request.get('/game/homestead/ranking'),

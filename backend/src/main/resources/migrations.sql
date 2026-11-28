@@ -4260,3 +4260,144 @@ DROP TABLE IF EXISTS `game_homestead_equipment`;
 
 INSERT IGNORE INTO `game_homestead_meta` (`k`, `v`)
 VALUES ('reset_v16', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'));
+
+-- ------------------------------------------------------------
+-- V15.47 小院慢生活装备大扩版(12 槽 / 44 蓝本 / 品质词缀 / 套装 / 探险 / 积分商店 / 换装预设):
+--   装备从「按蓝本一行」改成「实例制」(同一蓝本可多件),穿戴记实例 id;
+--   新增 loadout(换装预设)与 expedition(探险)两张表;player 加探险积分与每日次数三列。
+--   reset_v17 只清 gear / wear / expedition / loadout:技能、库存、工具、场地、铜板全部保留,
+--   旧装备结构不可迁移(蓝本与强化记录对不上实例 id),由产品决定重来一次。
+-- ------------------------------------------------------------
+
+-- 1) player:探险积分与每日次数(按首列存在性判断,三列一起加)
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_player' AND COLUMN_NAME = 'explore_points') = 0,
+  'ALTER TABLE `game_homestead_player`
+     ADD COLUMN `explore_points` BIGINT NOT NULL DEFAULT 0 COMMENT ''探险积分(商店换宝箱/物品)'' AFTER `market_used`,
+     ADD COLUMN `expedition_date` DATE DEFAULT NULL COMMENT ''上次派遣探险的日期(按自然日重置次数)'' AFTER `explore_points`,
+     ADD COLUMN `expedition_used` INT NOT NULL DEFAULT 0 COMMENT ''当天已派遣探险次数'' AFTER `expedition_date`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+-- 2) gear:品质 / 词缀 / 锁定三列
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_gear' AND COLUMN_NAME = 'quality') = 0,
+  'ALTER TABLE `game_homestead_gear`
+     ADD COLUMN `quality` VARCHAR(16) NOT NULL DEFAULT ''COMMON'' COMMENT ''品质(COMMON/FINE/RARE/EPIC/LEGENDARY,打造固定 COMMON)'' AFTER `gear_code`,
+     ADD COLUMN `affixes` VARCHAR(255) NOT NULL DEFAULT '''' COMMENT ''词缀(SPEED:ALL:120,XP:FARM:80;打造装为空串)'' AFTER `quality`,
+     ADD COLUMN `locked` TINYINT NOT NULL DEFAULT 0 COMMENT ''锁定(1=防误分解/重铸)'' AFTER `enhance`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+-- 2b) 兑换 / 重铸的掷点序号:两者都必须「每做一次结果必变」,所以落一个累计计数器当掷点种子
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_player' AND COLUMN_NAME = 'shop_seq') = 0,
+  'ALTER TABLE `game_homestead_player`
+     ADD COLUMN `shop_seq` BIGINT NOT NULL DEFAULT 0 COMMENT ''积分商店兑换累计次数(确定性掷点序号)'' AFTER `expedition_used`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_gear' AND COLUMN_NAME = 'reroll_seq') = 0,
+  'ALTER TABLE `game_homestead_gear`
+     ADD COLUMN `reroll_seq` INT NOT NULL DEFAULT 0 COMMENT ''词缀重铸累计次数(确定性掷点序号,换词缀必变)'' AFTER `locked`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+-- 3) gear 索引:去掉「一人一蓝本一件」的唯一键,换成按用户查蓝本的普通索引
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_gear' AND INDEX_NAME = 'uk_user_gear') > 0,
+  'ALTER TABLE `game_homestead_gear` DROP INDEX `uk_user_gear`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_gear' AND INDEX_NAME = 'idx_user_code') = 0,
+  'ALTER TABLE `game_homestead_gear` ADD KEY `idx_user_code` (`user_id`, `gear_code`)',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+-- 4) wear:gear_code → gear_id(穿戴记实例 id)
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_wear' AND COLUMN_NAME = 'gear_id') = 0,
+  'ALTER TABLE `game_homestead_wear`
+     ADD COLUMN `gear_id` BIGINT DEFAULT NULL COMMENT ''穿着的装备实例 id(NULL=空着,同一实例只能穿一格)'' AFTER `slot_code`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_wear' AND COLUMN_NAME = 'gear_code') > 0,
+  'ALTER TABLE `game_homestead_wear` DROP COLUMN `gear_code`',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+SET @hs_sql := IF(
+  (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_homestead_wear' AND INDEX_NAME = 'idx_user_gear') = 0,
+  'ALTER TABLE `game_homestead_wear` ADD KEY `idx_user_gear` (`user_id`, `gear_id`)',
+  'DO 0');
+PREPARE hs_stmt FROM @hs_sql;
+EXECUTE hs_stmt;
+DEALLOCATE PREPARE hs_stmt;
+
+-- 5) 换装预设与探险
+CREATE TABLE IF NOT EXISTS `game_homestead_loadout` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+  `slot_index` INT          NOT NULL COMMENT '预设序号(1–5,1/2 建号即有,3–5 铜板解锁)',
+  `name`       VARCHAR(24)  NOT NULL DEFAULT '' COMMENT '预设名(空则前端按序号展示)',
+  `payload`    VARCHAR(512) NOT NULL DEFAULT '' COMMENT '穿戴快照(HEAD:12,RING_A:15;空串=空预设)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_index` (`user_id`, `slot_index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活换装预设(最多 5 套)';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_expedition` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键(也是掉落掷点序号的一部分)',
+  `user_id`     BIGINT        NOT NULL COMMENT '用户ID',
+  `region_code` VARCHAR(24)   NOT NULL COMMENT '探险区域编码(见 content/homestead/expeditions.json)',
+  `status`      VARCHAR(16)   NOT NULL DEFAULT 'ACTIVE' COMMENT '状态(ACTIVE 在途 / DONE 已结算)',
+  `started_at`  DATETIME(3)   NOT NULL COMMENT '出发时刻',
+  `ends_at`     DATETIME(3)   NOT NULL COMMENT '返回时刻(到点由结算惰性收尾)',
+  `report`      VARCHAR(2048) DEFAULT NULL COMMENT '探险手记(结算后写入的紧凑 JSON,含事件判定与掉落)',
+  `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_status` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活探险(每天 3 趟,与挂机并行)';
+
+-- 6) 一次性清装备(只有 meta 里没有 reset_v17 时才生效;技能/库存/工具/场地/铜板保留)
+SET @hs_reset17 := (SELECT COUNT(*) = 0 FROM `game_homestead_meta` WHERE `k` = 'reset_v17');
+
+DELETE FROM `game_homestead_wear`       WHERE @hs_reset17 = 1;
+DELETE FROM `game_homestead_gear`       WHERE @hs_reset17 = 1;
+DELETE FROM `game_homestead_expedition` WHERE @hs_reset17 = 1;
+DELETE FROM `game_homestead_loadout`    WHERE @hs_reset17 = 1;
+
+INSERT IGNORE INTO `game_homestead_meta` (`k`, `v`)
+VALUES ('reset_v17', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'));
+

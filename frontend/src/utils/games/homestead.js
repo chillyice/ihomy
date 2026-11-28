@@ -176,3 +176,25 @@ export function countdownParts(ms) {
   const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000))
   return { minutes: Math.floor(total / 60), seconds: total % 60 }
 }
+
+/** 探险事件判定:每级技能折 3 分(与后端 HomesteadConst.EXPEDITION_LEVEL_WEIGHT 同口径) */
+export const EXPEDITION_LEVEL_WEIGHT = 3
+
+/** 探险事件的预计评分(还不含服务端那 ±10% 的确定性抖动),界面先亮个底 */
+export function expeditionScore(level, power) {
+  const lv = Math.max(0, Number(level) || 0)
+  const pw = Math.max(0, Number(power) || 0)
+  return lv * EXPEDITION_LEVEL_WEIGHT + pw
+}
+
+/** 穿戴格 → 蓝本家族:RING_A / RING_B 都归 RING,其余同名(戒指两格通用) */
+export function slotFamily(slot) {
+  if (!slot) return ''
+  const code = String(slot)
+  return code.startsWith('RING') ? 'RING' : code
+}
+
+/** 这件蓝本放得进这个格吗(按家族比,不看具体是左戒还是右戒) */
+export function fitsSlot(slot, family) {
+  return !!slot && !!family && slotFamily(slot) === family
+}

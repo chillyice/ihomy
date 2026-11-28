@@ -1,0 +1,960 @@
+{
+  "comment": "探险区域与积分商店。一趟 = 区域内事件逐个判定(技能等级×权重 + 装备战力,叠确定性抖动),通过拿掉落或积分;每天 3 趟,与挂机并行。",
+  "regions": [
+    {
+      "code": "HILL_PATH",
+      "name": "后山小径",
+      "name_en": "Hillside Path",
+      "skill": "FORAGE",
+      "require_level": 5,
+      "power_floor": 20,
+      "fee_coins": 300,
+      "supplies": [
+        {
+          "item": "RICE_MEAL",
+          "qty": 1
+        }
+      ],
+      "minutes": 10,
+      "gear_quality_floor": "FINE",
+      "gear_pool": [
+        "FOREST_CROWN",
+        "MOSS_SANDALS"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "FORAGE",
+          "difficulty": 28,
+          "points": 6,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 3,
+              "weight": 60
+            },
+            {
+              "item": "MINT",
+              "qty": 2,
+              "weight": 40
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FORAGE",
+          "difficulty": 34,
+          "points": 8,
+          "fail_points": 1,
+          "loot": [
+            {
+              "item": "MUSHROOM",
+              "qty": 2,
+              "weight": 70
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1,
+              "weight": 8
+            },
+            {
+              "gear": true,
+              "weight": 3,
+              "quality_floor": "FINE"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "FORAGE",
+          "difficulty": 30,
+          "points": 6,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 4,
+              "weight": 70
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1,
+              "weight": 6
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FORAGE",
+          "difficulty": 38,
+          "points": 10,
+          "fail_points": 1,
+          "loot": [
+            {
+              "item": "MINT",
+              "qty": 3,
+              "weight": 60
+            },
+            {
+              "item": "GINSENG",
+              "qty": 1,
+              "weight": 10
+            },
+            {
+              "gear": true,
+              "weight": 6,
+              "quality_floor": "FINE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CREEK_VALLEY",
+      "name": "溪谷",
+      "name_en": "Creek Valley",
+      "skill": "FISHING",
+      "require_level": 15,
+      "power_floor": 60,
+      "fee_coins": 1200,
+      "supplies": [
+        {
+          "item": "FISH_SOUP",
+          "qty": 2
+        }
+      ],
+      "minutes": 15,
+      "gear_quality_floor": "FINE",
+      "gear_pool": [
+        "TIDE_AMULET",
+        "HERD_RING"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "FISHING",
+          "difficulty": 55,
+          "points": 10,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 3,
+              "weight": 60
+            },
+            {
+              "item": "RIVER_SHRIMP",
+              "qty": 2,
+              "weight": 40
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FISHING",
+          "difficulty": 62,
+          "points": 12,
+          "fail_points": 2,
+          "loot": [
+            {
+              "item": "ROCK_FISH",
+              "qty": 2,
+              "weight": 60
+            },
+            {
+              "item": "PEARL",
+              "qty": 1,
+              "weight": 8
+            },
+            {
+              "gear": true,
+              "weight": 4,
+              "quality_floor": "FINE"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "FISHING",
+          "difficulty": 58,
+          "points": 10,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 4,
+              "weight": 70
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1,
+              "weight": 6
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FISHING",
+          "difficulty": 70,
+          "points": 14,
+          "fail_points": 2,
+          "loot": [
+            {
+              "item": "SILVER_FISH",
+              "qty": 1,
+              "weight": 50
+            },
+            {
+              "item": "PEARL",
+              "qty": 1,
+              "weight": 12
+            },
+            {
+              "gear": true,
+              "weight": 7,
+              "quality_floor": "RARE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PINE_RIDGE",
+      "name": "松风岭",
+      "name_en": "Pine Ridge",
+      "skill": "WOOD",
+      "require_level": 30,
+      "power_floor": 120,
+      "fee_coins": 4000,
+      "supplies": [
+        {
+          "item": "MUSHROOM_STEW",
+          "qty": 2
+        }
+      ],
+      "minutes": 25,
+      "gear_quality_floor": "RARE",
+      "gear_pool": [
+        "QUARRY_GUARD",
+        "GRAIN_WRISTBAND"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "WOOD",
+          "difficulty": 110,
+          "points": 16,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "PINE_LOG",
+              "qty": 3,
+              "weight": 60
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 2,
+              "weight": 40
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "WOOD",
+          "difficulty": 120,
+          "points": 18,
+          "fail_points": 2,
+          "loot": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 1,
+              "weight": 50
+            },
+            {
+              "item": "AMBER",
+              "qty": 1,
+              "weight": 10
+            },
+            {
+              "gear": true,
+              "weight": 5,
+              "quality_floor": "RARE"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "WOOD",
+          "difficulty": 115,
+          "points": 16,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 2,
+              "weight": 60
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1,
+              "weight": 8
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "WOOD",
+          "difficulty": 130,
+          "points": 20,
+          "fail_points": 3,
+          "loot": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 2,
+              "weight": 50
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1,
+              "weight": 6
+            },
+            {
+              "gear": true,
+              "weight": 8,
+              "quality_floor": "RARE"
+            }
+          ]
+        },
+        {
+          "kind": "SCOUT",
+          "skill": "STONE",
+          "difficulty": 118,
+          "points": 16,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "WHETSTONE",
+              "qty": 2,
+              "weight": 60
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2,
+              "weight": 40
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "MIST_CLIFF",
+      "name": "雾崖",
+      "name_en": "Mist Cliff",
+      "skill": "STONE",
+      "require_level": 50,
+      "power_floor": 200,
+      "fee_coins": 14000,
+      "supplies": [
+        {
+          "item": "HERBAL_FEAST",
+          "qty": 1
+        }
+      ],
+      "minutes": 40,
+      "gear_quality_floor": "RARE",
+      "gear_pool": [
+        "SHEPHERD_CLOAK",
+        "BREWER_BELT"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "STONE",
+          "difficulty": 190,
+          "points": 26,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "INKSTONE",
+              "qty": 2,
+              "weight": 60
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 2,
+              "weight": 40
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "STONE",
+          "difficulty": 210,
+          "points": 30,
+          "fail_points": 4,
+          "loot": [
+            {
+              "item": "JADE_ORE",
+              "qty": 1,
+              "weight": 40
+            },
+            {
+              "item": "AMBER",
+              "qty": 1,
+              "weight": 18
+            },
+            {
+              "gear": true,
+              "weight": 6,
+              "quality_floor": "RARE"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "STONE",
+          "difficulty": 200,
+          "points": 26,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "BLUESTONE",
+              "qty": 4,
+              "weight": 60
+            },
+            {
+              "item": "AGATE",
+              "qty": 1,
+              "weight": 20
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "STONE",
+          "difficulty": 230,
+          "points": 34,
+          "fail_points": 4,
+          "loot": [
+            {
+              "item": "JADE_ORE",
+              "qty": 2,
+              "weight": 45
+            },
+            {
+              "item": "PEARL",
+              "qty": 2,
+              "weight": 15
+            },
+            {
+              "gear": true,
+              "weight": 9,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "SCOUT",
+          "skill": "FORAGE",
+          "difficulty": 205,
+          "points": 26,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "GINSENG",
+              "qty": 1,
+              "weight": 45
+            },
+            {
+              "item": "WILD_HONEY",
+              "qty": 1,
+              "weight": 35
+            },
+            {
+              "gear": true,
+              "weight": 4,
+              "quality_floor": "RARE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "OLD_MINE",
+      "name": "旧矿洞",
+      "name_en": "Old Mine",
+      "skill": "RANCH",
+      "require_level": 70,
+      "power_floor": 300,
+      "fee_coins": 40000,
+      "supplies": [
+        {
+          "item": "GINSENG_BREW",
+          "qty": 2
+        }
+      ],
+      "minutes": 60,
+      "gear_quality_floor": "EPIC",
+      "gear_pool": [
+        "THORN_GLOVES",
+        "SPIRIT_BELL"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "RANCH",
+          "difficulty": 300,
+          "points": 40,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "CASHMERE",
+              "qty": 2,
+              "weight": 50
+            },
+            {
+              "item": "WOOL",
+              "qty": 4,
+              "weight": 50
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "RANCH",
+          "difficulty": 330,
+          "points": 46,
+          "fail_points": 5,
+          "loot": [
+            {
+              "item": "AGATE",
+              "qty": 2,
+              "weight": 40
+            },
+            {
+              "item": "AMBER",
+              "qty": 1,
+              "weight": 22
+            },
+            {
+              "gear": true,
+              "weight": 7,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "RANCH",
+          "difficulty": 315,
+          "points": 40,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "CREAM",
+              "qty": 3,
+              "weight": 45
+            },
+            {
+              "item": "PEARL",
+              "qty": 1,
+              "weight": 20
+            },
+            {
+              "gear": true,
+              "weight": 4,
+              "quality_floor": "RARE"
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "STONE",
+          "difficulty": 350,
+          "points": 52,
+          "fail_points": 6,
+          "loot": [
+            {
+              "item": "JADE_ORE",
+              "qty": 2,
+              "weight": 40
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1,
+              "weight": 12
+            },
+            {
+              "gear": true,
+              "weight": 10,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "SCOUT",
+          "skill": "WOOD",
+          "difficulty": 320,
+          "points": 40,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "REDWOOD",
+              "qty": 1,
+              "weight": 40
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1,
+              "weight": 18
+            },
+            {
+              "gear": true,
+              "weight": 4,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "RANCH",
+          "difficulty": 360,
+          "points": 56,
+          "fail_points": 6,
+          "loot": [
+            {
+              "item": "CASHMERE",
+              "qty": 3,
+              "weight": 40
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 2,
+              "weight": 10
+            },
+            {
+              "gear": true,
+              "weight": 12,
+              "quality_floor": "EPIC"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "SNOW_RIDGE",
+      "name": "雪岭",
+      "name_en": "Snow Ridge",
+      "skill": "FARM",
+      "require_level": 90,
+      "power_floor": 450,
+      "fee_coins": 120000,
+      "supplies": [
+        {
+          "item": "CASHMERE_CHEESE",
+          "qty": 1
+        },
+        {
+          "item": "BROCADE",
+          "qty": 1
+        }
+      ],
+      "minutes": 90,
+      "gear_quality_floor": "EPIC",
+      "gear_pool": [
+        "HUNTER_VEST"
+      ],
+      "events": [
+        {
+          "kind": "SCOUT",
+          "skill": "FARM",
+          "difficulty": 420,
+          "points": 60,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 2,
+              "weight": 45
+            },
+            {
+              "item": "BARLEY",
+              "qty": 4,
+              "weight": 55
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FARM",
+          "difficulty": 460,
+          "points": 68,
+          "fail_points": 8,
+          "loot": [
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1,
+              "weight": 12
+            },
+            {
+              "item": "AMBER",
+              "qty": 2,
+              "weight": 25
+            },
+            {
+              "gear": true,
+              "weight": 10,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "TRAP",
+          "skill": "FARM",
+          "difficulty": 440,
+          "points": 60,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "STAR_SHARD",
+              "qty": 2,
+              "weight": 20
+            },
+            {
+              "item": "JADE_ORE",
+              "qty": 2,
+              "weight": 35
+            },
+            {
+              "gear": true,
+              "weight": 6,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "RANCH",
+          "difficulty": 490,
+          "points": 74,
+          "fail_points": 8,
+          "loot": [
+            {
+              "item": "CASHMERE",
+              "qty": 4,
+              "weight": 35
+            },
+            {
+              "item": "PEARL",
+              "qty": 2,
+              "weight": 20
+            },
+            {
+              "gear": true,
+              "weight": 14,
+              "quality_floor": "LEGENDARY"
+            }
+          ]
+        },
+        {
+          "kind": "SCOUT",
+          "skill": "STONE",
+          "difficulty": 450,
+          "points": 60,
+          "fail_points": 0,
+          "loot": [
+            {
+              "item": "OLD_COIN",
+              "qty": 1,
+              "weight": 18
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 2,
+              "weight": 18
+            },
+            {
+              "gear": true,
+              "weight": 6,
+              "quality_floor": "EPIC"
+            }
+          ]
+        },
+        {
+          "kind": "FIGHT",
+          "skill": "FARM",
+          "difficulty": 520,
+          "points": 80,
+          "fail_points": 10,
+          "loot": [
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1,
+              "weight": 15
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 3,
+              "weight": 15
+            },
+            {
+              "gear": true,
+              "weight": 18,
+              "quality_floor": "LEGENDARY"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "shop": [
+    {
+      "code": "CHEST_WOOD",
+      "kind": "CHEST",
+      "name": "木箱",
+      "name_en": "Wooden Chest",
+      "desc": "两只手掌大的旧木箱，多半是家常材料。",
+      "desc_en": "A small old chest, mostly everyday materials.",
+      "points": 60,
+      "item": null,
+      "qty": 1,
+      "materials": 2,
+      "gear_rolls": 0,
+      "gear_quality_floor": "COMMON",
+      "pool": [
+        {
+          "item": "WILD_BERRY",
+          "qty": 2,
+          "weight": 40
+        },
+        {
+          "item": "PINE_TWIG",
+          "qty": 3,
+          "weight": 30
+        },
+        {
+          "item": "PEBBLE",
+          "qty": 3,
+          "weight": 30
+        }
+      ]
+    },
+    {
+      "code": "CHEST_IRON",
+      "kind": "CHEST",
+      "name": "铁箱",
+      "name_en": "Iron Chest",
+      "desc": "上了漆的铁箱，一定有一件装备。",
+      "desc_en": "A painted iron chest that always holds a piece of gear.",
+      "points": 180,
+      "item": null,
+      "qty": 1,
+      "materials": 3,
+      "gear_rolls": 1,
+      "gear_quality_floor": "FINE",
+      "pool": [
+        {
+          "item": "MUSHROOM",
+          "qty": 2,
+          "weight": 25
+        },
+        {
+          "item": "STREAM_FISH",
+          "qty": 2,
+          "weight": 25
+        },
+        {
+          "item": "BLUESTONE",
+          "qty": 2,
+          "weight": 25
+        },
+        {
+          "item": "WOOL",
+          "qty": 2,
+          "weight": 25
+        }
+      ]
+    },
+    {
+      "code": "CHEST_SECRET",
+      "kind": "CHEST",
+      "name": "秘箱",
+      "name_en": "Secret Chest",
+      "desc": "落了锁的深色木箱，能开出两件稀有装备。",
+      "desc_en": "A dark locked chest with two rare pieces inside.",
+      "points": 500,
+      "item": null,
+      "qty": 1,
+      "materials": 4,
+      "gear_rolls": 2,
+      "gear_quality_floor": "RARE",
+      "pool": [
+        {
+          "item": "AMBER",
+          "qty": 1,
+          "weight": 25
+        },
+        {
+          "item": "SILK_BOLT",
+          "qty": 2,
+          "weight": 25
+        },
+        {
+          "item": "JADE_ORE",
+          "qty": 1,
+          "weight": 25
+        },
+        {
+          "item": "STAR_SHARD",
+          "qty": 1,
+          "weight": 25
+        }
+      ]
+    },
+    {
+      "code": "ITEM_AMBER",
+      "kind": "ITEM",
+      "name": "琥珀",
+      "name_en": "Amber",
+      "desc": "直接换一块琥珀，比开箱贵得多。",
+      "desc_en": "Trade for a piece of amber; far pricier than a chest.",
+      "points": 480,
+      "item": "AMBER",
+      "qty": 1
+    },
+    {
+      "code": "ITEM_BROCADE",
+      "kind": "ITEM",
+      "name": "云锦",
+      "name_en": "Brocade",
+      "desc": "直接换一段云锦，做高档装备用得上。",
+      "desc_en": "Trade for a length of brocade.",
+      "points": 560,
+      "item": "BROCADE",
+      "qty": 1
+    },
+    {
+      "code": "ITEM_JADE",
+      "kind": "ITEM",
+      "name": "玉矿",
+      "name_en": "Jade Ore",
+      "desc": "直接换一块玉矿，磨护肩用。",
+      "desc_en": "Trade for a chunk of jade ore.",
+      "points": 240,
+      "item": "JADE_ORE",
+      "qty": 1
+    },
+    {
+      "code": "ITEM_GINSENG_BREW",
+      "kind": "ITEM",
+      "name": "参茸酒",
+      "name_en": "Ginseng Brew",
+      "desc": "直接换一壶参茸酒，进山前喝一口。",
+      "desc_en": "Trade for a flask of ginseng brew.",
+      "points": 300,
+      "item": "GINSENG_BREW",
+      "qty": 1
+    }
+  ]
+}

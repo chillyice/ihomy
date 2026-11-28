@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,7 +22,8 @@ import java.util.function.Function;
 
 /**
  * 小院慢生活内容配置(content/homestead/*.json,classpath):
- * 技能 / 物品 / 动作 / 工具 / 装备 / 场地。启动即装载、校验不过即失败(内容完整性优先于可用性)。
+ * 技能 / 物品 / 动作 / 工具 / 装备(蓝本 + 品质 + 词缀池 + 套装) / 场地 / 探险(区域 + 商店)。
+ * 启动即装载、校验不过即失败(内容完整性优先于可用性)。
  * content_version = sha256(按文件名排序拼接「文件名 + 内容」),写入存档用于内容升级后的口径核对。
  * 数值只在这里维护一份,引擎与前端都从这里取,禁止第二份数值来源。
  */
@@ -44,20 +46,39 @@ public class HomesteadContent {
     private final Map<String, List<ToolDef>> toolsBySkill;
     private final List<EquipmentDef> equipment;
     private final Map<String, EquipmentDef> equipmentByCode;
+    private final List<RarityDef> rarities;
+    private final Map<String, RarityDef> rarityByCode;
+    private final List<GearSetDef> gearSets;
+    private final Map<String, GearSetDef> gearSetByCode;
+    private final List<AffixDef> affixPool;
+    private final List<EquipmentDef> dropGear;
     private final List<BuildingDef> buildings;
     private final Map<String, BuildingDef> buildingByCode;
+    private final List<ExpeditionDef.Region> regions;
+    private final Map<String, ExpeditionDef.Region> regionByCode;
+    private final List<ExpeditionDef.Shop> shops;
+    private final Map<String, ExpeditionDef.Shop> shopByCode;
     private final String contentVersion;
 
     public HomesteadContent() {
         ObjectMapper mapper = new ObjectMapper();
         SkillsFile skillsFile;
+        EquipmentFile equipmentFile;
+        ExpeditionsFile expeditionsFile;
         try {
             skillsFile = load(mapper, "skills.json", SkillsFile.class);
             this.items = List.copyOf(load(mapper, "items.json", ItemsFile.class).items());
             this.actions = List.copyOf(load(mapper, "actions.json", ActionsFile.class).actions());
             this.tools = List.copyOf(load(mapper, "tools.json", ToolsFile.class).tools());
-            this.equipment = List.copyOf(load(mapper, "equipment.json", EquipmentFile.class).slots());
+            equipmentFile = load(mapper, "equipment.json", EquipmentFile.class);
+            this.equipment = List.copyOf(equipmentFile.slots());
+            this.rarities = List.copyOf(equipmentFile.rarities());
+            this.gearSets = List.copyOf(equipmentFile.sets());
+            this.affixPool = List.copyOf(equipmentFile.affixes());
             this.buildings = List.copyOf(load(mapper, "buildings.json", BuildingsFile.class).buildings());
+            expeditionsFile = load(mapper, "expeditions.json", ExpeditionsFile.class);
+            this.regions = List.copyOf(expeditionsFile.regions());
+            this.shops = List.copyOf(expeditionsFile.shop());
         } catch (Exception e) {
             throw new IllegalStateException("homestead content 加载失败:检查 resources/content/homestead/*.json", e);
         }
@@ -83,7 +104,11 @@ public class HomesteadContent {
         this.actionByCode = index(actions, ActionDef::code, "action");
         this.toolByCode = index(tools, ToolDef::code, "tool");
         this.equipmentByCode = index(equipment, EquipmentDef::code, "equipment");
+        this.rarityByCode = index(rarities, RarityDef::code, "rarity");
+        this.gearSetByCode = index(gearSets, GearSetDef::code, "gear_set");
         this.buildingByCode = index(buildings, BuildingDef::code, "building");
+        this.regionByCode = index(regions, ExpeditionDef.Region::code, "region");
+        this.shopByCode = index(shops, ExpeditionDef.Shop::code, "shop");
 
         Map<String, List<ActionDef>> bySkill = new HashMap<>();
         for (ActionDef action : actions) {
@@ -102,10 +127,20 @@ public class HomesteadContent {
         toolBySkillMap.replaceAll((k, v) -> List.copyOf(v));
         this.toolsBySkill = Map.copyOf(toolBySkillMap);
 
+        List<EquipmentDef> drops = new ArrayList<>();
+        for (EquipmentDef gear : equipment) {
+            if (!gear.craftable()) {
+                drops.add(gear);
+            }
+        }
+        this.dropGear = List.copyOf(drops);
+
         validate();
         this.contentVersion = computeVersion();
-        log.info("[homestead] content loaded: {} skills, {} items, {} actions, {} tools, {} gear, {} buildings, maxLevel={}, content_version={}",
-                skills.size(), items.size(), actions.size(), tools.size(), equipment.size(), buildings.size(),
+        log.info("[homestead] content loaded: {} skills, {} items, {} actions, {} tools, {} gear ({} drop-only), "
+                        + "{} rarities, {} sets, {} affixes, {} buildings, {} regions, {} shop, maxLevel={}, content_version={}",
+                skills.size(), items.size(), actions.size(), tools.size(), equipment.size(), dropGear.size(),
+                rarities.size(), gearSets.size(), affixPool.size(), buildings.size(), regions.size(), shops.size(),
                 maxLevel, contentVersion);
     }
 
@@ -129,11 +164,33 @@ public class HomesteadContent {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record EquipmentFile(@JsonProperty("slots") List<EquipmentDef> slots) {
+    private record EquipmentFile(
+            @JsonProperty("slots") List<EquipmentDef> slots,
+            @JsonProperty("rarities") List<RarityDef> rarities,
+            @JsonProperty("sets") List<GearSetDef> sets,
+            @JsonProperty("affixes") List<AffixDef> affixes) {
+
+        EquipmentFile {
+            slots = slots == null ? List.of() : slots;
+            rarities = rarities == null ? List.of() : rarities;
+            sets = sets == null ? List.of() : sets;
+            affixes = affixes == null ? List.of() : affixes;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record BuildingsFile(@JsonProperty("buildings") List<BuildingDef> buildings) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record ExpeditionsFile(
+            @JsonProperty("regions") List<ExpeditionDef.Region> regions,
+            @JsonProperty("shop") List<ExpeditionDef.Shop> shop) {
+
+        ExpeditionsFile {
+            regions = regions == null ? List.of() : regions;
+            shop = shop == null ? List.of() : shop;
+        }
     }
 
     private <T> T load(ObjectMapper mapper, String name, Class<T> type) throws Exception {
@@ -156,7 +213,7 @@ public class HomesteadContent {
         return Map.copyOf(map);
     }
 
-    /** 内容自洽校验:引用完整、门槛单调、无自喂循环、每动作一件工具、每技能一座工坊 */
+    /** 内容自洽校验:引用完整、门槛单调、无自喂循环、每动作一件工具、每家族四件装备、探险与商店可解析 */
     private void validate() {
         if (maxLevel < 2) {
             throw new IllegalStateException("homestead content 非法:max_level 至少 2");
@@ -281,17 +338,75 @@ public class HomesteadContent {
             }
         }
 
-        if (equipment.size() != HomesteadConst.SLOT_COUNT * HomesteadConst.GEAR_PER_SLOT) {
-            throw new IllegalStateException("homestead content 非法:装备数量应为 5 部位 × 3 件");
+        validateGear();
+        validateBuildings();
+        validateExpeditions();
+    }
+
+    private void validateGear() {
+        if (rarities.isEmpty() || !rarityByCode.containsKey(HomesteadConst.QUALITY_COMMON)) {
+            throw new IllegalStateException("homestead content 非法:品质档至少要包含 " + HomesteadConst.QUALITY_COMMON);
         }
-        Set<String> slotsSeen = new HashSet<>();
-        Map<String, Integer> perSlot = new HashMap<>();
+        for (RarityDef rarity : rarities) {
+            if (rarity.multBp() < 1) {
+                throw new IllegalStateException("homestead content 非法:品质 " + rarity.code() + " mult_bp 非法");
+            }
+            if (rarity.affixes() < 0 || rarity.affixes() > 6) {
+                throw new IllegalStateException("homestead content 非法:品质 " + rarity.code() + " affixes 越界");
+            }
+            if (rarity.affixes() > 0 && (rarity.minBp() < 1 || rarity.maxBp() < rarity.minBp())) {
+                throw new IllegalStateException("homestead content 非法:品质 " + rarity.code() + " 词缀区间非法");
+            }
+        }
+        if (affixPool.isEmpty()) {
+            throw new IllegalStateException("homestead content 非法:词缀池为空");
+        }
+        for (AffixDef affix : affixPool) {
+            validateEffect("词缀池", affix.kind(), affix.target(), 1, 0);
+        }
+        Set<String> setCodes = new HashSet<>();
+        for (GearSetDef set : gearSets) {
+            setCodes.add(set.code());
+            if (set.steps().isEmpty()) {
+                throw new IllegalStateException("homestead content 非法:套装 " + set.code() + " 没有档位");
+            }
+            int lastPieces = 0;
+            for (GearSetDef.SetStep step : set.steps()) {
+                if (step.pieces() <= lastPieces) {
+                    throw new IllegalStateException("homestead content 非法:套装 " + set.code() + " 件数不是递增");
+                }
+                lastPieces = step.pieces();
+                if (step.effects().isEmpty()) {
+                    throw new IllegalStateException("homestead content 非法:套装 " + set.code() + " 档位没有效果");
+                }
+                for (EquipmentDef.EffectDef effect : step.effects()) {
+                    validateEffect("套装 " + set.code(), effect.kind(), effect.target(), effect.bp(), effect.hours());
+                }
+            }
+        }
+
+        if (equipment.size() != HomesteadConst.GEAR_FAMILIES.size() * HomesteadConst.GEAR_PER_FAMILY) {
+            throw new IllegalStateException("homestead content 非法:装备数量应为 "
+                    + HomesteadConst.GEAR_FAMILIES.size() + " 家族 × " + HomesteadConst.GEAR_PER_FAMILY + " 件");
+        }
+        Map<String, Integer> perFamily = new LinkedHashMap<>();
+        Map<String, Integer> craftedPerFamily = new LinkedHashMap<>();
         for (EquipmentDef gear : equipment) {
-            if (!HomesteadConst.GEAR_SLOTS.contains(gear.slot())) {
+            if (!HomesteadConst.GEAR_FAMILIES.contains(gear.slot())) {
                 throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 部位未知 " + gear.slot());
             }
-            slotsSeen.add(gear.slot());
-            perSlot.merge(gear.slot(), 1, Integer::sum);
+            perFamily.merge(gear.slot(), 1, Integer::sum);
+            if (!HomesteadConst.SOURCE_CRAFT.equals(gear.source()) && !HomesteadConst.SOURCE_DROP.equals(gear.source())) {
+                throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " source 未知 " + gear.source());
+            }
+            if (HomesteadConst.SOURCE_CRAFT.equals(gear.source())) {
+                if (gear.craft() == null) {
+                    throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 缺少制造配方");
+                }
+                craftedPerFamily.merge(gear.slot(), 1, Integer::sum);
+            } else if (gear.craft() != null) {
+                throw new IllegalStateException("homestead content 非法:掉落装备 " + gear.code() + " 不应有制造配方");
+            }
             SkillDef skill = skillByCode.get(gear.skill());
             if (skill == null) {
                 throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 指向未知技能");
@@ -299,16 +414,28 @@ public class HomesteadContent {
             if (gear.requireLevel() < 1 || gear.requireLevel() > maxLevel) {
                 throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 等级门槛越界");
             }
+            if (gear.power() < 1) {
+                throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " power 非法");
+            }
+            if (gear.set() == null || !setCodes.contains(gear.set())) {
+                throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 套装未知 " + gear.set());
+            }
             if (gear.effects().isEmpty()) {
                 throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 没有效果");
             }
             for (EquipmentDef.EffectDef effect : gear.effects()) {
                 validateEffect("装备 " + gear.code(), effect.kind(), effect.target(), effect.bp(), effect.hours());
             }
-            if (gear.craft() == null || gear.craft().coins() < 0) {
-                throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 缺少制造花费");
+            if (gear.craft() != null) {
+                if (gear.craft().coins() < 0) {
+                    throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 制造花费为负");
+                }
+                requireItems(gear.craft().materials(), "装备 " + gear.code() + " 制造");
             }
-            requireItems(gear.craft().materials(), "装备 " + gear.code() + " 制造");
+            if (gear.dismantle().isEmpty()) {
+                throw new IllegalStateException("homestead content 非法:装备 " + gear.code() + " 没有分解产出");
+            }
+            requireItems(gear.dismantle(), "装备 " + gear.code() + " 分解");
             if (gear.steps().size() != HomesteadConst.MAX_GEAR_TIER) {
                 throw new IllegalStateException("homestead content 非法:装备 " + gear.code()
                         + " steps 应为 " + HomesteadConst.MAX_GEAR_TIER + " 级");
@@ -320,15 +447,21 @@ public class HomesteadContent {
                 requireItems(step.materials(), "装备 " + gear.code());
             }
         }
-        if (!slotsSeen.equals(HomesteadConst.GEAR_SLOTS)) {
-            throw new IllegalStateException("homestead content 非法:装备部位不全 " + slotsSeen);
+        if (!perFamily.keySet().equals(new HashSet<>(HomesteadConst.GEAR_FAMILIES))) {
+            throw new IllegalStateException("homestead content 非法:装备家族不全 " + perFamily.keySet());
         }
-        perSlot.forEach((slot, count) -> {
-            if (count != HomesteadConst.GEAR_PER_SLOT) {
-                throw new IllegalStateException("homestead content 非法:部位 " + slot + " 装备数量应为 3");
+        perFamily.forEach((family, count) -> {
+            if (count != HomesteadConst.GEAR_PER_FAMILY) {
+                throw new IllegalStateException("homestead content 非法:家族 " + family + " 装备数量应为 "
+                        + HomesteadConst.GEAR_PER_FAMILY);
+            }
+            if (craftedPerFamily.getOrDefault(family, 0) != HomesteadConst.GEAR_PER_FAMILY - 1) {
+                throw new IllegalStateException("homestead content 非法:家族 " + family + " 打造档数量不对");
             }
         });
+    }
 
+    private void validateBuildings() {
         for (BuildingDef building : buildings) {
             if (building.maxLevel() < 1 || building.steps().size() != building.maxLevel()) {
                 throw new IllegalStateException("homestead content 非法:场地 " + building.code() + " max_level/steps 不一致");
@@ -360,14 +493,104 @@ public class HomesteadContent {
         }
     }
 
+    private void validateExpeditions() {
+        if (regions.isEmpty()) {
+            throw new IllegalStateException("homestead content 非法:没有探险区域");
+        }
+        Set<String> eventKinds = Set.of("FIGHT", "SCOUT", "TRAP");
+        for (ExpeditionDef.Region region : regions) {
+            if (!skillByCode.containsKey(region.skill())) {
+                throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 指向未知技能");
+            }
+            if (region.requireLevel() < 1 || region.requireLevel() > maxLevel) {
+                throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 等级门槛越界");
+            }
+            if (region.powerFloor() < 0 || region.feeCoins() < 0 || region.minutes() < 1) {
+                throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 参数非法");
+            }
+            requireItems(region.supplies(), "区域 " + region.code() + " 供给");
+            requireRarity(region.gearQualityFloor(), "区域 " + region.code() + " 装备品质下限");
+            if (region.gearPool().isEmpty()) {
+                throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 没有装备池");
+            }
+            for (String code : region.gearPool()) {
+                EquipmentDef gear = equipmentByCode.get(code);
+                if (gear == null || gear.craftable()) {
+                    throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 装备池指向非掉落装备 " + code);
+                }
+            }
+            if (region.events().isEmpty()) {
+                throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 没有事件");
+            }
+            for (ExpeditionDef.Event event : region.events()) {
+                if (!eventKinds.contains(event.kind())) {
+                    throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 事件 kind=" + event.kind());
+                }
+                if (!skillByCode.containsKey(event.skill())) {
+                    throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 事件指向未知技能");
+                }
+                if (event.difficulty() < 1 || event.points() < 0 || event.failPoints() < 0) {
+                    throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 事件参数非法");
+                }
+                if (event.loot().isEmpty()) {
+                    throw new IllegalStateException("homestead content 非法:区域 " + region.code() + " 事件没有掉落");
+                }
+                for (ExpeditionDef.Loot loot : event.loot()) {
+                    validateLoot(loot, "区域 " + region.code() + " 事件掉落");
+                }
+            }
+        }
+        if (shops.isEmpty()) {
+            throw new IllegalStateException("homestead content 非法:积分商店为空");
+        }
+        for (ExpeditionDef.Shop shop : shops) {
+            if (shop.points() < 1) {
+                throw new IllegalStateException("homestead content 非法:商店 " + shop.code() + " 积分价格非法");
+            }
+            if (shop.chest()) {
+                requireRarity(shop.gearQualityFloor(), "商店 " + shop.code() + " 装备品质下限");
+                if (shop.gearRolls() < 0 || shop.materials() < 0) {
+                    throw new IllegalStateException("homestead content 非法:商店 " + shop.code() + " 次数非法");
+                }
+                if (shop.pool().isEmpty()) {
+                    throw new IllegalStateException("homestead content 非法:商店 " + shop.code() + " 没有材料池");
+                }
+                for (ExpeditionDef.Loot loot : shop.pool()) {
+                    validateLoot(loot, "商店 " + shop.code() + " 材料池");
+                }
+            } else if (!"ITEM".equals(shop.kind())) {
+                throw new IllegalStateException("homestead content 非法:商店 " + shop.code() + " kind=" + shop.kind());
+            } else if (itemByCode.get(shop.item()) == null) {
+                throw new IllegalStateException("homestead content 非法:商店 " + shop.code() + " 指向未知物品");
+            }
+        }
+    }
+
+    private void validateLoot(ExpeditionDef.Loot loot, String where) {
+        if (loot.weight() < 1) {
+            throw new IllegalStateException("homestead content 非法:" + where + " 权重非法");
+        }
+        if (loot.gear()) {
+            requireRarity(loot.qualityFloor(), where + " 品质下限");
+        } else if (itemByCode.get(loot.item()) == null) {
+            throw new IllegalStateException("homestead content 非法:" + where + " 引用未知物品 " + loot.item());
+        }
+    }
+
+    private void requireRarity(String code, String where) {
+        if (code != null && !code.isBlank() && !rarityByCode.containsKey(code)) {
+            throw new IllegalStateException("homestead content 非法:" + where + " 品质未知 " + code);
+        }
+    }
+
     private void validateEffect(String where, String kind, String target, int bp, int hours) {
         Set<String> effectKinds = Set.of(EffectKind.SPEED, EffectKind.XP, EffectKind.YIELD, EffectKind.RARE,
                 EffectKind.EFFICIENCY, EffectKind.OFFLINE_CAP, EffectKind.SELL_BONUS);
-        Set<String> targets = Set.of(EffectKind.TARGET_GATHER, EffectKind.TARGET_PROCESS, EffectKind.TARGET_ALL);
         if (!effectKinds.contains(kind)) {
             throw new IllegalStateException("homestead content 非法:" + where + " kind 未知 " + kind);
         }
-        if (!targets.contains(target)) {
+        if (!EffectKind.TARGET_ALL.equals(target) && !EffectKind.TARGET_GATHER.equals(target)
+                && !EffectKind.TARGET_PROCESS.equals(target) && !skillByCode.containsKey(target)) {
             throw new IllegalStateException("homestead content 非法:" + where + " target 未知 " + target);
         }
         switch (kind) {
@@ -399,7 +622,7 @@ public class HomesteadContent {
     private String computeVersion() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            List<String> names = List.of("actions.json", "buildings.json", "equipment.json",
+            List<String> names = List.of("actions.json", "buildings.json", "equipment.json", "expeditions.json",
                     "items.json", "skills.json", "tools.json");
             for (String name : names.stream().sorted().toList()) {
                 byte[] bytes;
@@ -476,12 +699,63 @@ public class HomesteadContent {
         return code == null ? null : equipmentByCode.get(code);
     }
 
+    /** 只能掉落获得的装备(探险区域池与宝箱用) */
+    public List<EquipmentDef> dropGear() {
+        return dropGear;
+    }
+
+    public List<RarityDef> rarities() {
+        return rarities;
+    }
+
+    public RarityDef rarity(String code) {
+        return code == null ? null : rarityByCode.get(code);
+    }
+
+    /** 品质在品质表里的序号(未知按 0 = 最低档) */
+    public int rarityIndex(String code) {
+        for (int i = 0; i < rarities.size(); i++) {
+            if (rarities.get(i).code().equals(code)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    public List<GearSetDef> gearSets() {
+        return gearSets;
+    }
+
+    public GearSetDef gearSet(String code) {
+        return code == null ? null : gearSetByCode.get(code);
+    }
+
+    public List<AffixDef> affixPool() {
+        return affixPool;
+    }
+
     public List<BuildingDef> buildings() {
         return buildings;
     }
 
     public BuildingDef building(String code) {
         return code == null ? null : buildingByCode.get(code);
+    }
+
+    public List<ExpeditionDef.Region> regions() {
+        return regions;
+    }
+
+    public ExpeditionDef.Region region(String code) {
+        return code == null ? null : regionByCode.get(code);
+    }
+
+    public List<ExpeditionDef.Shop> shops() {
+        return shops;
+    }
+
+    public ExpeditionDef.Shop shop(String code) {
+        return code == null ? null : shopByCode.get(code);
     }
 
     public String contentVersion() {

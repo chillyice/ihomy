@@ -1,11 +1,14 @@
 {
-  "comment": "小院慢生活装备表:5 个部位(HEAD/BODY/HANDS/FEET/CHARM)各 3 件,共 15 件。craft = 制造花费;steps[i] = 强化 i+1 级的花费(0→5)。效果数值为强化 0 级时的基础值,每级 +50%(向下取整),全部整数基点。",
+  "comment": "装备蓝本(11 家族 × 4 件 = 44 件):3 件打造档 + 1 件掉落专属。rarities 品质倍率与词缀条数,affixes 词缀池,sets 套装 2/4/6 件加成。effects 在强化 0、品质普通时为基准,品质倍率与每级 +50% 强化在 HomesteadBonus 里乘算。",
   "slots": [
     {
       "code": "STRAW_HAT",
       "slot": "HEAD",
       "skill": "FORAGE",
       "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
       "name": "草帽",
       "name_en": "Straw Hat",
       "desc": "晒场上挡太阳的宽檐草帽。",
@@ -30,6 +33,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "WILD_BERRY",
+          "qty": 4
+        },
+        {
+          "item": "MINT",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 540,
@@ -115,6 +128,9 @@
       "slot": "HEAD",
       "skill": "FORAGE",
       "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
       "name": "药农斗笠",
       "name_en": "Herbalist Hat",
       "desc": "竹篾编的斗笠,山里人认药的眼力戴在头上。",
@@ -139,6 +155,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "GINSENG",
+          "qty": 2
+        },
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 4680,
@@ -224,6 +250,9 @@
       "slot": "HEAD",
       "skill": "SEWING",
       "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
       "name": "绣花头巾",
       "name_en": "Embroidered Hood",
       "desc": "一针一线绣了满月的头巾,戴上心里静。",
@@ -248,6 +277,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "BROCADE",
+          "qty": 1
+        },
+        {
+          "item": "SILK_BOLT",
+          "qty": 3
+        }
+      ],
       "steps": [
         {
           "coins": 16200,
@@ -333,6 +372,9 @@
       "slot": "BODY",
       "skill": "COOKING",
       "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
       "name": "粗布围裙",
       "name_en": "Cloth Apron",
       "desc": "靛蓝粗布围裙,溅上油星也不心疼。",
@@ -357,6 +399,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 2
+        },
+        {
+          "item": "FLAX",
+          "qty": 3
+        }
+      ],
       "steps": [
         {
           "coins": 540,
@@ -442,6 +494,9 @@
       "slot": "BODY",
       "skill": "DAIRY",
       "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
       "name": "皮围裙",
       "name_en": "Leather Apron",
       "desc": "压酪时穿的厚皮围裙,奶渍一擦就掉。",
@@ -466,6 +521,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "AGED_CHEESE",
+          "qty": 2
+        },
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 4680,
@@ -551,6 +616,9 @@
       "slot": "BODY",
       "skill": "SEWING",
       "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
       "name": "云锦长衫",
       "name_en": "Brocade Robe",
       "desc": "云锦裁的长衫,走动时像有光在流。",
@@ -580,6 +648,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "BROCADE",
+          "qty": 2
+        },
+        {
+          "item": "SILK_BOLT",
+          "qty": 3
+        }
+      ],
       "steps": [
         {
           "coins": 16200,
@@ -665,6 +743,9 @@
       "slot": "HANDS",
       "skill": "CRAFT",
       "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
       "name": "麻布袖套",
       "name_en": "Linen Sleeves",
       "desc": "护住袖口的麻布套,搬石头不磨手。",
@@ -689,6 +770,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 2
+        },
+        {
+          "item": "WHETSTONE",
+          "qty": 1
+        }
+      ],
       "steps": [
         {
           "coins": 540,
@@ -774,6 +865,9 @@
       "slot": "HANDS",
       "skill": "CRAFT",
       "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
       "name": "工匠手套",
       "name_en": "Craftsman Gloves",
       "desc": "指节加厚的皮手套,省料也省力。",
@@ -798,6 +892,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        },
+        {
+          "item": "STONE_MILL",
+          "qty": 1
+        }
+      ],
       "steps": [
         {
           "coins": 4680,
@@ -883,6 +987,9 @@
       "slot": "HANDS",
       "skill": "SEWING",
       "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
       "name": "银丝护腕",
       "name_en": "Silver Bracers",
       "desc": "缠了银丝的护腕,抬手时叮当作响。",
@@ -907,6 +1014,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "SILK_BOLT",
+          "qty": 3
+        },
+        {
+          "item": "JADE_ORE",
+          "qty": 1
+        }
+      ],
       "steps": [
         {
           "coins": 16200,
@@ -992,6 +1109,9 @@
       "slot": "FEET",
       "skill": "FISHING",
       "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
       "name": "布鞋",
       "name_en": "Cloth Shoes",
       "desc": "千层底的布鞋,走一天不累。",
@@ -1016,6 +1136,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 2
+        },
+        {
+          "item": "PINE_TWIG",
+          "qty": 4
+        }
+      ],
       "steps": [
         {
           "coins": 540,
@@ -1101,6 +1231,9 @@
       "slot": "FEET",
       "skill": "RANCH",
       "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
       "name": "远行靴",
       "name_en": "Travel Boots",
       "desc": "靴筒到膝的皮靴,走远路也不灌风。",
@@ -1130,6 +1263,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 3
+        },
+        {
+          "item": "CREAM",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 4680,
@@ -1215,6 +1358,9 @@
       "slot": "FEET",
       "skill": "RANCH",
       "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
       "name": "云履",
       "name_en": "Cloud Shoes",
       "desc": "鞋底软得像踩云,回来时天还没黑。",
@@ -1244,6 +1390,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "CASHMERE",
+          "qty": 2
+        },
+        {
+          "item": "SILK_BOLT",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 16200,
@@ -1329,6 +1485,9 @@
       "slot": "CHARM",
       "skill": "STONE",
       "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
       "name": "松果挂饰",
       "name_en": "Pinecone Charm",
       "desc": "晒干的松果串,镇上看货的都说吉利。",
@@ -1353,6 +1512,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "PINE_RESIN",
+          "qty": 2
+        },
+        {
+          "item": "PEBBLE",
+          "qty": 3
+        }
+      ],
       "steps": [
         {
           "coins": 540,
@@ -1438,6 +1607,9 @@
       "slot": "CHARM",
       "skill": "STONE",
       "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
       "name": "琥珀坠",
       "name_en": "Amber Pendant",
       "desc": "裹着旧叶的琥珀坠子,越戴越亮。",
@@ -1467,6 +1639,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "AMBER",
+          "qty": 2
+        },
+        {
+          "item": "SILVER_FISH",
+          "qty": 2
+        }
+      ],
       "steps": [
         {
           "coins": 4680,
@@ -1552,6 +1734,9 @@
       "slot": "CHARM",
       "skill": "STONE",
       "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
       "name": "星屑铃",
       "name_en": "Star Shard Bell",
       "desc": "星屑磨成的小铃,风一过有细响。",
@@ -1581,6 +1766,16 @@
           }
         ]
       },
+      "dismantle": [
+        {
+          "item": "STAR_SHARD",
+          "qty": 1
+        },
+        {
+          "item": "BROCADE",
+          "qty": 1
+        }
+      ],
       "steps": [
         {
           "coins": 16200,
@@ -1656,6 +1851,3483 @@
             {
               "item": "CASHMERE_CHEESE",
               "qty": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "FISH_BONE_NECKLACE",
+      "slot": "NECK",
+      "skill": "FISHING",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "鱼骨项链",
+      "name_en": "Fishbone Necklace",
+      "desc": "溪鱼骨串成的小项链，走水边不招虫。",
+      "desc_en": "A little necklace of stream-fish bones.",
+      "effects": [
+        {
+          "kind": "XP",
+          "target": "FISHING",
+          "bp": 250
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 200
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "STREAM_FISH",
+            "qty": 8
+          },
+          {
+            "item": "PINE_RESIN",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "STREAM_FISH",
+          "qty": 4
+        },
+        {
+          "item": "PINE_RESIN",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 8
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 11
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 14
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 18
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 21
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PEARL_NECKLACE",
+      "slot": "NECK",
+      "skill": "FISHING",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "珍珠项圈",
+      "name_en": "Pearl Collar",
+      "desc": "一圈溪珠，光下泛着水色。",
+      "desc_en": "A collar of river pearls.",
+      "effects": [
+        {
+          "kind": "RARE",
+          "target": "FISHING",
+          "bp": 450
+        },
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 200
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "PEARL",
+            "qty": 3
+          },
+          {
+            "item": "SILK_BOLT",
+            "qty": 4
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "PEARL",
+          "qty": 2
+        },
+        {
+          "item": "SILK_BOLT",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 3
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 4
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 5
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 7
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 9
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "DEEPSEA_PENDANT",
+      "slot": "NECK",
+      "skill": "FISHING",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "深海坠",
+      "name_en": "Deepsea Pendant",
+      "desc": "鲟鱼鳞与锦缎缠成的深水护符。",
+      "desc_en": "A deepwater pendant of sturgeon scale and brocade.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "FISHING",
+          "bp": 700
+        },
+        {
+          "kind": "XP",
+          "target": "ALL",
+          "bp": 400
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "STURGEON",
+            "qty": 3
+          },
+          {
+            "item": "BROCADE",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "STURGEON",
+          "qty": 2
+        },
+        {
+          "item": "BROCADE",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 3
+            },
+            {
+              "item": "BROCADE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 4
+            },
+            {
+              "item": "BROCADE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 5
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 7
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "BROCADE",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PEBBLE_PADS",
+      "slot": "SHOULDER",
+      "skill": "STONE",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "卵石护肩",
+      "name_en": "Pebble Pads",
+      "desc": "缝着圆卵石的粗布护肩，挑担不硌。",
+      "desc_en": "Coarse cloth pads sewn with round pebbles.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "STONE",
+          "bp": 250
+        },
+        {
+          "kind": "YIELD",
+          "target": "ALL",
+          "bp": 200
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "PEBBLE",
+            "qty": 10
+          },
+          {
+            "item": "LINEN_CLOTH",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "PEBBLE",
+          "qty": 5
+        },
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 10
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 14
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 18
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 22
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 26
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "STONE_MANTLE",
+      "slot": "SHOULDER",
+      "skill": "STONE",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "青石披肩",
+      "name_en": "Stone Mantle",
+      "desc": "青石片缀成的披肩，压得住风。",
+      "desc_en": "A mantle of blue stone plates.",
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "target": "STONE",
+          "bp": 450
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 250
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "BLUESTONE",
+            "qty": 6
+          },
+          {
+            "item": "WOOL_CLOTH",
+            "qty": 3
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "BLUESTONE",
+          "qty": 3
+        },
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 11
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 13
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 16
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "JADE_PAULDRON",
+      "slot": "SHOULDER",
+      "skill": "STONE",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "玉矿护肩",
+      "name_en": "Jade Pauldron",
+      "desc": "玉矿薄片磨圆的护肩，镇纸一样沉。",
+      "desc_en": "Pauldrons of polished jade ore.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "STONE",
+          "bp": 650
+        },
+        {
+          "kind": "XP",
+          "target": "ALL",
+          "bp": 400
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "JADE_ORE",
+            "qty": 4
+          },
+          {
+            "item": "BROCADE",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "JADE_ORE",
+          "qty": 2
+        },
+        {
+          "item": "BROCADE",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 4
+            },
+            {
+              "item": "BROCADE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 6
+            },
+            {
+              "item": "BROCADE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 7
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 9
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "BROCADE",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "WOOL_CLOAK",
+      "slot": "CLOAK",
+      "skill": "RANCH",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "羊毛披风",
+      "name_en": "Wool Cloak",
+      "desc": "旧羊毛披风，羊圈里坐得住。",
+      "desc_en": "An old wool cloak for long nights in the pen.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "RANCH",
+          "bp": 250
+        },
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "bp": 0,
+          "hours": 1
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "WOOL",
+            "qty": 6
+          },
+          {
+            "item": "LINEN_CLOTH",
+            "qty": 3
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "WOOL",
+          "qty": 3
+        },
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 6
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 8
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 11
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 13
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 16
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CASHMERE_CLOAK",
+      "slot": "CLOAK",
+      "skill": "RANCH",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "绒线斗篷",
+      "name_en": "Cashmere Cloak",
+      "desc": "绒线织的厚斗篷，落雪也不冷。",
+      "desc_en": "A thick cashmere cloak that shrugs off snow.",
+      "effects": [
+        {
+          "kind": "XP",
+          "target": "RANCH",
+          "bp": 450
+        },
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "bp": 0,
+          "hours": 2
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "CASHMERE",
+            "qty": 4
+          },
+          {
+            "item": "WOOL_CLOTH",
+            "qty": 4
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "CASHMERE",
+          "qty": 2
+        },
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 4
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 7
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 9
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 9
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BROCADE_GREATCLOAK",
+      "slot": "CLOAK",
+      "skill": "RANCH",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "云锦大氅",
+      "name_en": "Brocade Greatcloak",
+      "desc": "云锦里子的大氅，出门像过节。",
+      "desc_en": "A greatcloak lined with cloud brocade.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "RANCH",
+          "bp": 600
+        },
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "bp": 0,
+          "hours": 3
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "BROCADE",
+            "qty": 3
+          },
+          {
+            "item": "CASHMERE",
+            "qty": 4
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "BROCADE",
+          "qty": 2
+        },
+        {
+          "item": "CASHMERE",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 3
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 4
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 5
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 7
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 9
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "WOOD_BRACELET",
+      "slot": "WRIST",
+      "skill": "CRAFT",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "木珠手串",
+      "name_en": "Wood Bead Bracelet",
+      "desc": "松木车的小珠，抬手就闻香。",
+      "desc_en": "Little pine beads turned on the lathe.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "CRAFT",
+          "bp": 250
+        },
+        {
+          "kind": "EFFICIENCY",
+          "target": "ALL",
+          "bp": 150
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "PINE_LOG",
+            "qty": 4
+          },
+          {
+            "item": "PINE_RESIN",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "PINE_LOG",
+          "qty": 2
+        },
+        {
+          "item": "PINE_RESIN",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 7
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 9
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 10
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CHISEL_BRACER",
+      "slot": "WRIST",
+      "skill": "CRAFT",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "凿工护腕",
+      "name_en": "Chisel Bracer",
+      "desc": "硬皮护腕，凿凿子不磨手。",
+      "desc_en": "A hard leather bracer for long chisel work.",
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "target": "CRAFT",
+          "bp": 450
+        },
+        {
+          "kind": "YIELD",
+          "target": "ALL",
+          "bp": 250
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "WOODEN_BOX",
+            "qty": 2
+          },
+          {
+            "item": "WHETSTONE",
+            "qty": 4
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "WOODEN_BOX",
+          "qty": 1
+        },
+        {
+          "item": "WHETSTONE",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 9
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 5
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CAMPHOR_WRISTRAP",
+      "slot": "WRIST",
+      "skill": "CRAFT",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "香樟护腕",
+      "name_en": "Camphor Wristguard",
+      "desc": "香樟木片包边，虫不蛀手不酸。",
+      "desc_en": "Camphor plates bound into a wristguard.",
+      "effects": [
+        {
+          "kind": "XP",
+          "target": "CRAFT",
+          "bp": 700
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 350
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "REDWOOD_CABINET",
+            "qty": 2
+          },
+          {
+            "item": "CAMPHOR_WOOD",
+            "qty": 6
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "REDWOOD_CABINET",
+          "qty": 1
+        },
+        {
+          "item": "CAMPHOR_WOOD",
+          "qty": 3
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 2
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 3
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 4
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 11
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 4
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 13
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 5
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "STRAW_ROPE_BELT",
+      "slot": "WAIST",
+      "skill": "BREWING",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "草绳腰带",
+      "name_en": "Straw Rope Belt",
+      "desc": "一截草绳，酒瓮边站着顺手系。",
+      "desc_en": "A length of straw rope for standing by the vats.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "BREWING",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "ALL",
+          "bp": 200
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "WHEAT",
+            "qty": 8
+          },
+          {
+            "item": "PINE_TWIG",
+            "qty": 8
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "WHEAT",
+          "qty": 4
+        },
+        {
+          "item": "PINE_TWIG",
+          "qty": 4
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 8
+            },
+            {
+              "item": "PINE_TWIG",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 11
+            },
+            {
+              "item": "PINE_TWIG",
+              "qty": 11
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 14
+            },
+            {
+              "item": "PINE_TWIG",
+              "qty": 14
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 18
+            },
+            {
+              "item": "PINE_TWIG",
+              "qty": 18
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 21
+            },
+            {
+              "item": "PINE_TWIG",
+              "qty": 21
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BARREL_BELT",
+      "slot": "WAIST",
+      "skill": "BREWING",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "酒桶腰封",
+      "name_en": "Barrel Belt",
+      "desc": "旧桶箍改成腰封，稳当。",
+      "desc_en": "A barrel hoop turned into a wide belt.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "BREWING",
+          "bp": 450
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 250
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "AGED_WINE",
+            "qty": 2
+          },
+          {
+            "item": "WOOL_CLOTH",
+            "qty": 3
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "AGED_WINE",
+          "qty": 1
+        },
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 2
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 3
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 5
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "GINSENG_GIRDLE",
+      "slot": "WAIST",
+      "skill": "BREWING",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "参酒围腰",
+      "name_en": "Ginseng Girdle",
+      "desc": "参酒浸过的围腰，冬天也不僵。",
+      "desc_en": "A girdle soaked in ginseng brew.",
+      "effects": [
+        {
+          "kind": "RARE",
+          "target": "BREWING",
+          "bp": 600
+        },
+        {
+          "kind": "XP",
+          "target": "ALL",
+          "bp": 400
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "GINSENG_BREW",
+            "qty": 2
+          },
+          {
+            "item": "BROCADE",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "GINSENG_BREW",
+          "qty": 1
+        },
+        {
+          "item": "BROCADE",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 2
+            },
+            {
+              "item": "BROCADE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 3
+            },
+            {
+              "item": "BROCADE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 4
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 4
+            },
+            {
+              "item": "BROCADE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 5
+            },
+            {
+              "item": "BROCADE",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CHEESE_RING",
+      "slot": "RING",
+      "skill": "DAIRY",
+      "require_level": 5,
+      "source": "CRAFT",
+      "power": 3,
+      "set": "GROVE",
+      "name": "酪纹戒指",
+      "name_en": "Cheese Mark Ring",
+      "desc": "奶酪压纹的铜圈，图个吉利。",
+      "desc_en": "A copper ring stamped with a cheese mark.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "DAIRY",
+          "bp": 250
+        },
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 150
+        }
+      ],
+      "craft": {
+        "coins": 320,
+        "materials": [
+          {
+            "item": "FRESH_CHEESE",
+            "qty": 4
+          },
+          {
+            "item": "PINE_RESIN",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "FRESH_CHEESE",
+          "qty": 2
+        },
+        {
+          "item": "PINE_RESIN",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 576,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1152,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 1728,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 7
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2304,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 9
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 2880,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BUTTER_RING",
+      "slot": "RING",
+      "skill": "DAIRY",
+      "require_level": 45,
+      "source": "CRAFT",
+      "power": 10,
+      "set": "KILN",
+      "name": "黄油指环",
+      "name_en": "Butter Ring",
+      "desc": "奶香渗进铜纹里，镇上人认得。",
+      "desc_en": "A ring that keeps the smell of butter.",
+      "effects": [
+        {
+          "kind": "XP",
+          "target": "DAIRY",
+          "bp": 450
+        },
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 200
+        }
+      ],
+      "craft": {
+        "coins": 2700,
+        "materials": [
+          {
+            "item": "AGED_CHEESE",
+            "qty": 3
+          },
+          {
+            "item": "PEARL",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "AGED_CHEESE",
+          "qty": 2
+        },
+        {
+          "item": "PEARL",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 4860,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 9720,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 14580,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 5
+            },
+            {
+              "item": "PEARL",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 19440,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 7
+            },
+            {
+              "item": "PEARL",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 24300,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "PEARL",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CREAM_SIGNET",
+      "slot": "RING",
+      "skill": "DAIRY",
+      "require_level": 80,
+      "source": "CRAFT",
+      "power": 22,
+      "set": "FROST",
+      "name": "奶糕印戒",
+      "name_en": "Cream Signet",
+      "desc": "印在奶糕上的花纹，如今成了戒指。",
+      "desc_en": "The pattern pressed into cream cakes, cast as a ring.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "DAIRY",
+          "bp": 600
+        },
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 300
+        }
+      ],
+      "craft": {
+        "coins": 9200,
+        "materials": [
+          {
+            "item": "CREAM_CAKE",
+            "qty": 2
+          },
+          {
+            "item": "AMBER",
+            "qty": 2
+          }
+        ]
+      },
+      "dismantle": [
+        {
+          "item": "CREAM_CAKE",
+          "qty": 1
+        },
+        {
+          "item": "AMBER",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 16560,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 2
+            },
+            {
+              "item": "AMBER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 33120,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 49680,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 66240,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 82800,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 5
+            },
+            {
+              "item": "AMBER",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "TIDE_AMULET",
+      "slot": "NECK",
+      "skill": "FISHING",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "潮汐护符",
+      "name_en": "Tide Amulet",
+      "desc": "潮水退去时捡到的护符，凑近能听见水声。",
+      "desc_en": "An amulet found when the tide went out.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "FISHING",
+          "bp": 500
+        },
+        {
+          "kind": "RARE",
+          "target": "ALL",
+          "bp": 300
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "PEARL",
+          "qty": 1
+        },
+        {
+          "item": "STREAM_FISH",
+          "qty": 4
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 1
+            },
+            {
+              "item": "STREAM_FISH",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 1
+            },
+            {
+              "item": "STREAM_FISH",
+              "qty": 6
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 2
+            },
+            {
+              "item": "STREAM_FISH",
+              "qty": 7
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 2
+            },
+            {
+              "item": "STREAM_FISH",
+              "qty": 9
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "PEARL",
+              "qty": 3
+            },
+            {
+              "item": "STREAM_FISH",
+              "qty": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "QUARRY_GUARD",
+      "slot": "SHOULDER",
+      "skill": "STONE",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "采石护肩",
+      "name_en": "Quarry Guard",
+      "desc": "旧矿工留下的护肩，垫肩处磨得发亮。",
+      "desc_en": "A quarryman's shoulder guard, polished at the ridge.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "STONE",
+          "bp": 450
+        },
+        {
+          "kind": "EFFICIENCY",
+          "target": "ALL",
+          "bp": 250
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "BLUESTONE",
+          "qty": 3
+        },
+        {
+          "item": "WHETSTONE",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WHETSTONE",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "SHEPHERD_CLOAK",
+      "slot": "CLOAK",
+      "skill": "RANCH",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "牧人披风",
+      "name_en": "Shepherd's Cloak",
+      "desc": "沾着草籽的旧披风，盖着能睡一晚。",
+      "desc_en": "A seed-flecked cloak that makes a warm night outdoors.",
+      "effects": [
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "bp": 0,
+          "hours": 3
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 350
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "WOOL",
+          "qty": 5
+        },
+        {
+          "item": "CASHMERE",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 5
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 7
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 9
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 11
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 13
+            },
+            {
+              "item": "CASHMERE",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "GRAIN_WRISTBAND",
+      "slot": "WRIST",
+      "skill": "CRAFT",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "木纹腕带",
+      "name_en": "Grain Wristband",
+      "desc": "顺着木纹削出来的腕带，握凿更稳。",
+      "desc_en": "A wristband cut along the grain.",
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "CRAFT",
+          "bp": 450
+        },
+        {
+          "kind": "XP",
+          "target": "ALL",
+          "bp": 300
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "PINE_LOG",
+          "qty": 4
+        },
+        {
+          "item": "CAMPHOR_WOOD",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 7
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 9
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 10
+            },
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BREWER_BELT",
+      "slot": "WAIST",
+      "skill": "BREWING",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "酿师腰带",
+      "name_en": "Brewer's Belt",
+      "desc": "酒坊老师傅传下来的腰带，浸透了酒气。",
+      "desc_en": "A master brewer's belt, steeped in wine.",
+      "effects": [
+        {
+          "kind": "XP",
+          "target": "BREWING",
+          "bp": 500
+        },
+        {
+          "kind": "EFFICIENCY",
+          "target": "ALL",
+          "bp": 250
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "BARLEY",
+          "qty": 6
+        },
+        {
+          "item": "AGED_WINE",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 6
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 8
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 11
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 13
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 16
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "HERD_RING",
+      "slot": "RING",
+      "skill": "DAIRY",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "牧铃指环",
+      "name_en": "Herd Bell Ring",
+      "desc": "小铃铛做的指环，走一圈羊群就跟着走。",
+      "desc_en": "A ring of tiny bells that keeps the herd close.",
+      "effects": [
+        {
+          "kind": "RARE",
+          "target": "DAIRY",
+          "bp": 450
+        },
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 300
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "MILK",
+          "qty": 4
+        },
+        {
+          "item": "PEARL",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 6
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 7
+            },
+            {
+              "item": "PEARL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 9
+            },
+            {
+              "item": "PEARL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 10
+            },
+            {
+              "item": "PEARL",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "FOREST_CROWN",
+      "slot": "HEAD",
+      "skill": "FORAGE",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "林冠头环",
+      "name_en": "Forest Crown",
+      "desc": "藤与野莓缠的头环，林子里很显眼。",
+      "desc_en": "A crown of vines and berries.",
+      "effects": [
+        {
+          "kind": "RARE",
+          "target": "ALL",
+          "bp": 350
+        },
+        {
+          "kind": "YIELD",
+          "target": "FORAGE",
+          "bp": 450
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "WILD_BERRY",
+          "qty": 6
+        },
+        {
+          "item": "FOUR_LEAF",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 6
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 8
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 11
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 13
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 16
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "HUNTER_VEST",
+      "slot": "BODY",
+      "skill": "RANCH",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "猎户背心",
+      "name_en": "Hunter Vest",
+      "desc": "猎户的旧背心，口袋多得数不清。",
+      "desc_en": "An old hunter's vest with too many pockets.",
+      "effects": [
+        {
+          "kind": "YIELD",
+          "target": "ALL",
+          "bp": 400
+        },
+        {
+          "kind": "XP",
+          "target": "RANCH",
+          "bp": 450
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "WOOL_CLOTH",
+          "qty": 2
+        },
+        {
+          "item": "PEARL",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 5
+            },
+            {
+              "item": "PEARL",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "THORN_GLOVES",
+      "slot": "HANDS",
+      "skill": "FORAGE",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "荆棘手套",
+      "name_en": "Thorn Gloves",
+      "desc": "摘野果不怕刺的手套。",
+      "desc_en": "Gloves that laugh at thorns.",
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "target": "ALL",
+          "bp": 300
+        },
+        {
+          "kind": "YIELD",
+          "target": "FORAGE",
+          "bp": 450
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "LINEN_CLOTH",
+          "qty": 3
+        },
+        {
+          "item": "FOUR_LEAF",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 5
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 7
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 8
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "MOSS_SANDALS",
+      "slot": "FEET",
+      "skill": "FARM",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "苔痕草鞋",
+      "name_en": "Moss Sandals",
+      "desc": "鞋底长过苔的草鞋，走田埂最稳。",
+      "desc_en": "Sandals whose soles have grown moss.",
+      "effects": [
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "bp": 0,
+          "hours": 2
+        },
+        {
+          "kind": "SPEED",
+          "target": "FARM",
+          "bp": 450
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "FLAX",
+          "qty": 4
+        },
+        {
+          "item": "MUSHROOM",
+          "qty": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 4
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 6
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 7
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 9
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 10
+            },
+            {
+              "item": "MUSHROOM",
+              "qty": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "SPIRIT_BELL",
+      "slot": "CHARM",
+      "skill": "WOOD",
+      "require_level": 60,
+      "source": "DROP",
+      "power": 14,
+      "set": "WAYFARER",
+      "name": "山灵铃",
+      "name_en": "Spirit Bell",
+      "desc": "进山时挂在腰上的小铃，风一动就响。",
+      "desc_en": "A little bell hung at the waist on the way into the woods.",
+      "effects": [
+        {
+          "kind": "RARE",
+          "target": "WOOD",
+          "bp": 450
+        },
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 300
+        }
+      ],
+      "craft": null,
+      "dismantle": [
+        {
+          "item": "PINE_RESIN",
+          "qty": 3
+        },
+        {
+          "item": "STAR_SHARD",
+          "qty": 1
+        }
+      ],
+      "steps": [
+        {
+          "coins": 10800,
+          "materials": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 21600,
+          "materials": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 32400,
+          "materials": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 5
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 43200,
+          "materials": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 7
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 54000,
+          "materials": [
+            {
+              "item": "PINE_RESIN",
+              "qty": 8
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rarities": [
+    {
+      "code": "COMMON",
+      "name": "普通",
+      "name_en": "Common",
+      "mult_bp": 10000,
+      "affixes": 0,
+      "min_bp": 0,
+      "max_bp": 0
+    },
+    {
+      "code": "FINE",
+      "name": "精良",
+      "name_en": "Fine",
+      "mult_bp": 11000,
+      "affixes": 1,
+      "min_bp": 80,
+      "max_bp": 160
+    },
+    {
+      "code": "RARE",
+      "name": "稀有",
+      "name_en": "Rare",
+      "mult_bp": 12500,
+      "affixes": 2,
+      "min_bp": 150,
+      "max_bp": 300
+    },
+    {
+      "code": "EPIC",
+      "name": "史诗",
+      "name_en": "Epic",
+      "mult_bp": 14500,
+      "affixes": 3,
+      "min_bp": 280,
+      "max_bp": 520
+    },
+    {
+      "code": "LEGENDARY",
+      "name": "传说",
+      "name_en": "Legendary",
+      "mult_bp": 17000,
+      "affixes": 4,
+      "min_bp": 500,
+      "max_bp": 900
+    }
+  ],
+  "affixes": [
+    {
+      "kind": "SPEED",
+      "target": "ALL"
+    },
+    {
+      "kind": "SPEED",
+      "target": "GATHER"
+    },
+    {
+      "kind": "SPEED",
+      "target": "PROCESS"
+    },
+    {
+      "kind": "XP",
+      "target": "ALL"
+    },
+    {
+      "kind": "XP",
+      "target": "GATHER"
+    },
+    {
+      "kind": "YIELD",
+      "target": "ALL"
+    },
+    {
+      "kind": "YIELD",
+      "target": "PROCESS"
+    },
+    {
+      "kind": "RARE",
+      "target": "ALL"
+    },
+    {
+      "kind": "RARE",
+      "target": "GATHER"
+    },
+    {
+      "kind": "EFFICIENCY",
+      "target": "ALL"
+    },
+    {
+      "kind": "EFFICIENCY",
+      "target": "PROCESS"
+    },
+    {
+      "kind": "SELL_BONUS",
+      "target": "ALL"
+    }
+  ],
+  "sets": [
+    {
+      "code": "GROVE",
+      "name": "林间套",
+      "name_en": "Grove Set",
+      "steps": [
+        {
+          "pieces": 2,
+          "effects": [
+            {
+              "kind": "SPEED",
+              "target": "GATHER",
+              "bp": 300
+            }
+          ]
+        },
+        {
+          "pieces": 4,
+          "effects": [
+            {
+              "kind": "YIELD",
+              "target": "GATHER",
+              "bp": 300
+            }
+          ]
+        },
+        {
+          "pieces": 6,
+          "effects": [
+            {
+              "kind": "RARE",
+              "target": "GATHER",
+              "bp": 400
+            },
+            {
+              "kind": "XP",
+              "target": "GATHER",
+              "bp": 300
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "KILN",
+      "name": "窑火套",
+      "name_en": "Kiln Set",
+      "steps": [
+        {
+          "pieces": 2,
+          "effects": [
+            {
+              "kind": "SPEED",
+              "target": "PROCESS",
+              "bp": 400
+            }
+          ]
+        },
+        {
+          "pieces": 4,
+          "effects": [
+            {
+              "kind": "XP",
+              "target": "PROCESS",
+              "bp": 400
+            }
+          ]
+        },
+        {
+          "pieces": 6,
+          "effects": [
+            {
+              "kind": "YIELD",
+              "target": "PROCESS",
+              "bp": 400
+            },
+            {
+              "kind": "EFFICIENCY",
+              "target": "PROCESS",
+              "bp": 300
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "FROST",
+      "name": "星霜套",
+      "name_en": "Frost Set",
+      "steps": [
+        {
+          "pieces": 2,
+          "effects": [
+            {
+              "kind": "RARE",
+              "target": "ALL",
+              "bp": 200
+            }
+          ]
+        },
+        {
+          "pieces": 4,
+          "effects": [
+            {
+              "kind": "SELL_BONUS",
+              "target": "ALL",
+              "bp": 300
+            }
+          ]
+        },
+        {
+          "pieces": 6,
+          "effects": [
+            {
+              "kind": "RARE",
+              "target": "ALL",
+              "bp": 500
+            },
+            {
+              "kind": "XP",
+              "target": "ALL",
+              "bp": 400
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "WAYFARER",
+      "name": "行者套",
+      "name_en": "Wayfarer Set",
+      "steps": [
+        {
+          "pieces": 2,
+          "effects": [
+            {
+              "kind": "OFFLINE_CAP",
+              "target": "ALL",
+              "bp": 0,
+              "hours": 2
+            }
+          ]
+        },
+        {
+          "pieces": 4,
+          "effects": [
+            {
+              "kind": "SPEED",
+              "target": "ALL",
+              "bp": 400
+            }
+          ]
+        },
+        {
+          "pieces": 6,
+          "effects": [
+            {
+              "kind": "OFFLINE_CAP",
+              "target": "ALL",
+              "bp": 0,
+              "hours": 4
+            },
+            {
+              "kind": "YIELD",
+              "target": "ALL",
+              "bp": 400
             }
           ]
         }
