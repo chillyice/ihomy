@@ -6,31 +6,36 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * 穿戴条目(content/homestead/equipment.json)。
- * 五个部位各一件;steps[i] = 从 i 阶升到 i+1 阶的花费,0 阶 = 还没穿上。
+ * 装备条目(content/homestead/equipment.json)。
+ * 5 个部位(HEAD/BODY/HANDS/FEET/CHARM)各 3 件,共 15 件;一件装备要先制造、再强化 0→5。
  * <p>
- * effect 只放整数口径:
- * SPEED(按基点给 GATHER/PROCESS/ALL 某类技能加速)、
- * OFFLINE_CAP(每阶多补几小时离线)、
- * SELL_BONUS(每阶卖价高几个基点)。
+ * craft = 制造花费;steps[i] = 强化 i→i+1 级的花费。
+ * effects 是强化 0 级时的基础值,每强化一级 +50%(整数向下取整)。
+ * kind:SPEED / XP / YIELD / RARE / EFFICIENCY / OFFLINE_CAP / SELL_BONUS;
+ * target:GATHER / PROCESS / ALL(只有 SPEED/XP/YIELD/RARE/EFFICIENCY 用得上,离线上限与卖价按全部算)。
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record EquipmentDef(
         @JsonProperty("code") String code,
+        @JsonProperty("slot") String slot,
+        @JsonProperty("skill") String skill,
+        @JsonProperty("require_level") int requireLevel,
         @JsonProperty("name") String name,
         @JsonProperty("name_en") String nameEn,
         @JsonProperty("desc") String desc,
         @JsonProperty("desc_en") String descEn,
-        @JsonProperty("effect") EffectDef effect,
+        @JsonProperty("effects") List<EffectDef> effects,
+        @JsonProperty("craft") EquipmentStep craft,
         @JsonProperty("steps") List<EquipmentStep> steps) {
 
     public EquipmentDef {
+        effects = effects == null ? List.of() : List.copyOf(effects);
         steps = steps == null ? List.of() : List.copyOf(steps);
     }
 
-    /** 升到下一阶的花费(tier 为当前阶,0 起) */
-    public EquipmentStep nextStep(int tier) {
-        return tier >= 0 && tier < steps.size() ? steps.get(tier) : null;
+    /** 强化到下一级的花费(level 为当前强化等级,0 起) */
+    public EquipmentStep nextStep(int level) {
+        return level >= 0 && level < steps.size() ? steps.get(level) : null;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -44,8 +49,7 @@ public record EquipmentDef(
     }
 
     /**
-     * 效果定义(每阶数值;target 只给 SPEED 用)。
-     * bp / hours 用包装类型:JSON 里按效果类型只写其中一个,缺省的那项归一成 0。
+     * 效果定义(bp / hours 按类型只写一个,缺省归一成 0)。
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record EffectDef(
@@ -57,14 +61,7 @@ public record EquipmentDef(
         public EffectDef {
             bp = bp == null ? 0 : bp;
             hours = hours == null ? 0 : hours;
+            target = target == null || target.isBlank() ? EffectKind.TARGET_ALL : target;
         }
-
-        public static final String KIND_SPEED = "SPEED";
-        public static final String KIND_OFFLINE_CAP = "OFFLINE_CAP";
-        public static final String KIND_SELL_BONUS = "SELL_BONUS";
-
-        public static final String TARGET_GATHER = "GATHER";
-        public static final String TARGET_PROCESS = "PROCESS";
-        public static final String TARGET_ALL = "ALL";
     }
 }

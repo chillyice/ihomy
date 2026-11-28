@@ -1,81 +1,5746 @@
 {
-  "comment": "小院慢生活工具表:每技能一件工具,0 阶=徒手,steps[i] 表示升到 (i+1) 阶的花费。阶数加成统一 +8%/阶(引擎常量 TOOL_STEP_BP),材料刻意跨技能,让四个采集/三个加工互相咬合。",
+  "comment": "小院慢生活工具表:66 个动作各一件,steps[0] = 从无到有(制造),steps[1..4] = 1→5 阶强化。每件工具只作用于自己的动作,效果分 SPEED/XP/YIELD/RARE/EFFICIENCY 五类(每阶数值乘阶数);升级材料刻意取自更高档的采集/加工产物。",
   "tools": [
     {
-      "code": "AXE", "skill": "WOOD", "name": "柴刀", "name_en": "Axe",
-      "desc": "砍柴用的厚背刀,刃口越磨越快。", "desc_en": "A thick-bladed axe for firewood.",
+      "code": "T_PICK_TWIG",
+      "action": "PICK_TWIG",
+      "skill": "WOOD",
+      "name": "柴刀",
+      "name_en": "Twig Knife",
+      "desc": "拾柴用的柴刀,阶数越高越顺手。",
+      "desc_en": "A twig knife for firewood.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
       "steps": [
-        { "coins": 30, "materials": [{ "item": "DRY_WOOD", "qty": 4 }] },
-        { "coins": 120, "materials": [{ "item": "DRY_WOOD", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
-        { "coins": 420, "materials": [{ "item": "PINE_LOG", "qty": 6 }, { "item": "WHETSTONE", "qty": 1 }] },
-        { "coins": 1400, "materials": [{ "item": "PINE_LOG", "qty": 18 }, { "item": "STONE_MILL", "qty": 1 }] },
-        { "coins": 4800, "materials": [{ "item": "CAMPHOR_WOOD", "qty": 10 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "PINE_TWIG",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "BASKET", "skill": "FORAGE", "name": "背篓", "name_en": "Gathering Basket",
-      "desc": "编得密实的背篓,装莓子不压坏。", "desc_en": "A tightly woven basket for berries.",
+      "code": "T_GATHER_WOOD",
+      "action": "GATHER_WOOD",
+      "skill": "WOOD",
+      "name": "砍柴斧",
+      "name_en": "Felling Axe",
+      "desc": "拾柴用的砍柴斧,阶数越高越顺手。",
+      "desc_en": "A felling axe for firewood.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
       "steps": [
-        { "coins": 30, "materials": [{ "item": "WILD_BERRY", "qty": 6 }] },
-        { "coins": 120, "materials": [{ "item": "WILD_BERRY", "qty": 16 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
-        { "coins": 420, "materials": [{ "item": "MUSHROOM", "qty": 8 }, { "item": "WHETSTONE", "qty": 1 }] },
-        { "coins": 1400, "materials": [{ "item": "WILD_HONEY", "qty": 12 }, { "item": "STONE_MILL", "qty": 1 }] },
-        { "coins": 4800, "materials": [{ "item": "HONEY_FRUIT", "qty": 6 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "ROD", "skill": "FISHING", "name": "鱼竿", "name_en": "Fishing Rod",
-      "desc": "竹节竿配细线,溪边坐一下午。", "desc_en": "A bamboo rod with a fine line.",
+      "code": "T_FELL_PINE",
+      "action": "FELL_PINE",
+      "skill": "WOOD",
+      "name": "伐木斧",
+      "name_en": "Timber Axe",
+      "desc": "拾柴用的伐木斧,阶数越高越顺手。",
+      "desc_en": "A timber axe for firewood.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
       "steps": [
-        { "coins": 30, "materials": [{ "item": "STREAM_FISH", "qty": 5 }] },
-        { "coins": 120, "materials": [{ "item": "RIVER_SHRIMP", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
-        { "coins": 420, "materials": [{ "item": "ROCK_FISH", "qty": 6 }, { "item": "WHETSTONE", "qty": 1 }] },
-        { "coins": 1400, "materials": [{ "item": "SILVER_FISH", "qty": 6 }, { "item": "STONE_MILL", "qty": 1 }] },
-        { "coins": 4800, "materials": [{ "item": "AGED_WINE", "qty": 3 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "SIEVE", "skill": "STONE", "name": "石筛", "name_en": "Stone Sieve",
-      "desc": "筛河滩用的粗筛,石子分得清。", "desc_en": "A coarse sieve for riverbank stones.",
+      "code": "T_FELL_CAMPHOR",
+      "action": "FELL_CAMPHOR",
+      "skill": "WOOD",
+      "name": "香樟斧",
+      "name_en": "Camphor Axe",
+      "desc": "拾柴用的香樟斧,阶数越高越顺手。",
+      "desc_en": "A camphor axe for firewood.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
       "steps": [
-        { "coins": 40, "materials": [{ "item": "PEBBLE", "qty": 8 }] },
-        { "coins": 150, "materials": [{ "item": "BLUESTONE", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
-        { "coins": 460, "materials": [{ "item": "WHETSTONE", "qty": 4 }, { "item": "STONE_MILL", "qty": 1 }] },
-        { "coins": 1500, "materials": [{ "item": "INKSTONE", "qty": 4 }, { "item": "WOODEN_STOOL", "qty": 2 }] },
-        { "coins": 5000, "materials": [{ "item": "INKSTONE", "qty": 12 }, { "item": "STONE_MILL", "qty": 2 }] }
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "POT", "skill": "COOKING", "name": "铁锅", "name_en": "Iron Pot",
-      "desc": "灶上那口老铁锅,越用越顺手。", "desc_en": "A well-seasoned iron pot.",
+      "code": "T_FELL_REDWOOD",
+      "action": "FELL_REDWOOD",
+      "skill": "WOOD",
+      "name": "红杉大斧",
+      "name_en": "Redwood Axe",
+      "desc": "拾柴用的红杉大斧,阶数越高越顺手。",
+      "desc_en": "A redwood axe for firewood.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
       "steps": [
-        { "coins": 40, "materials": [{ "item": "RICE_MEAL", "qty": 4 }] },
-        { "coins": 150, "materials": [{ "item": "FISH_SOUP", "qty": 4 }] },
-        { "coins": 480, "materials": [{ "item": "MUSHROOM_STEW", "qty": 3 }] },
-        { "coins": 1600, "materials": [{ "item": "HONEY_FRUIT", "qty": 4 }] },
-        { "coins": 5200, "materials": [{ "item": "MUSHROOM_SAUCE", "qty": 4 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "JAR", "skill": "BREWING", "name": "酒瓮", "name_en": "Wine Jar",
-      "desc": "口小肚大的陶瓮,封得越久越香。", "desc_en": "A narrow-mouthed clay jar.",
+      "code": "T_SORT_TIMBER",
+      "action": "SORT_TIMBER",
+      "skill": "WOOD",
+      "name": "理木钩",
+      "name_en": "Timber Hook",
+      "desc": "拾柴用的理木钩,阶数越高越顺手。",
+      "desc_en": "A timber hook for firewood.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
       "steps": [
-        { "coins": 40, "materials": [{ "item": "BERRY_WINE", "qty": 4 }] },
-        { "coins": 150, "materials": [{ "item": "MINT_DEW", "qty": 4 }] },
-        { "coins": 480, "materials": [{ "item": "MUSHROOM_SAUCE", "qty": 3 }] },
-        { "coins": 1600, "materials": [{ "item": "AGED_WINE", "qty": 3 }] },
-        { "coins": 5200, "materials": [{ "item": "AGED_WINE", "qty": 8 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "REDWOOD",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "PINE_RESIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     },
     {
-      "code": "PLANE", "skill": "CRAFT", "name": "木刨", "name_en": "Plane",
-      "desc": "推平木料的旧刨子,刨花卷成圈。", "desc_en": "An old plane that curls perfect shavings.",
+      "code": "T_PICK_BERRY",
+      "action": "PICK_BERRY",
+      "skill": "FORAGE",
+      "name": "采莓篮",
+      "name_en": "Berry Basket",
+      "desc": "采撷用的采莓篮,阶数越高越顺手。",
+      "desc_en": "A berry basket for foraging.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
       "steps": [
-        { "coins": 40, "materials": [{ "item": "WOODEN_BASIN", "qty": 3 }] },
-        { "coins": 150, "materials": [{ "item": "WOODEN_STOOL", "qty": 3 }] },
-        { "coins": 480, "materials": [{ "item": "STONE_MILL", "qty": 2 }] },
-        { "coins": 1600, "materials": [{ "item": "WOODEN_BOX", "qty": 2 }] },
-        { "coins": 5200, "materials": [{ "item": "WOODEN_BOX", "qty": 6 }] }
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "WILD_BERRY",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "MINT",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "MUSHROOM",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "WILD_HONEY",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PICK_MINT",
+      "action": "PICK_MINT",
+      "skill": "FORAGE",
+      "name": "薄荷剪",
+      "name_en": "Mint Shears",
+      "desc": "采撷用的薄荷剪,阶数越高越顺手。",
+      "desc_en": "A mint shears for foraging.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "MINT",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "MUSHROOM",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "WILD_HONEY",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PICK_MUSHROOM",
+      "action": "PICK_MUSHROOM",
+      "skill": "FORAGE",
+      "name": "菌篓",
+      "name_en": "Mushroom Creel",
+      "desc": "采撷用的菌篓,阶数越高越顺手。",
+      "desc_en": "A mushroom creel for foraging.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "MUSHROOM",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "WILD_HONEY",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_GATHER_HONEY",
+      "action": "GATHER_HONEY",
+      "skill": "FORAGE",
+      "name": "蜜勺",
+      "name_en": "Honey Ladle",
+      "desc": "采撷用的蜜勺,阶数越高越顺手。",
+      "desc_en": "A honey ladle for foraging.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "WILD_HONEY",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_DIG_GINSENG",
+      "action": "DIG_GINSENG",
+      "skill": "FORAGE",
+      "name": "参锄",
+      "name_en": "Ginseng Hoe",
+      "desc": "采撷用的参锄,阶数越高越顺手。",
+      "desc_en": "A ginseng hoe for foraging.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_DRY_HERBS",
+      "action": "DRY_HERBS",
+      "skill": "FORAGE",
+      "name": "晒药架",
+      "name_en": "Drying Rack",
+      "desc": "采撷用的晒药架,阶数越高越顺手。",
+      "desc_en": "A drying rack for foraging.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "GINSENG",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "FOUR_LEAF",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CATCH_MINNOW",
+      "action": "CATCH_MINNOW",
+      "skill": "FISHING",
+      "name": "溪钓竿",
+      "name_en": "Stream Rod",
+      "desc": "垂钓用的溪钓竿,阶数越高越顺手。",
+      "desc_en": "A stream rod for fishing.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "STREAM_FISH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "RIVER_SHRIMP",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "ROCK_FISH",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "SILVER_FISH",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CATCH_SHRIMP",
+      "action": "CATCH_SHRIMP",
+      "skill": "FISHING",
+      "name": "河虾网",
+      "name_en": "Shrimp Net",
+      "desc": "垂钓用的河虾网,阶数越高越顺手。",
+      "desc_en": "A shrimp net for fishing.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "RIVER_SHRIMP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "ROCK_FISH",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "SILVER_FISH",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CATCH_ROCKFISH",
+      "action": "CATCH_ROCKFISH",
+      "skill": "FISHING",
+      "name": "石钓竿",
+      "name_en": "Rock Rod",
+      "desc": "垂钓用的石钓竿,阶数越高越顺手。",
+      "desc_en": "A rock rod for fishing.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "ROCK_FISH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "SILVER_FISH",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CATCH_SILVER",
+      "action": "CATCH_SILVER",
+      "skill": "FISHING",
+      "name": "银丝钩",
+      "name_en": "Silver Hook",
+      "desc": "垂钓用的银丝钩,阶数越高越顺手。",
+      "desc_en": "A silver hook for fishing.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "SILVER_FISH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CATCH_STURGEON",
+      "action": "CATCH_STURGEON",
+      "skill": "FISHING",
+      "name": "鲟鱼叉",
+      "name_en": "Sturgeon Spear",
+      "desc": "垂钓用的鲟鱼叉,阶数越高越顺手。",
+      "desc_en": "A sturgeon spear for fishing.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SALT_CATCH",
+      "action": "SALT_CATCH",
+      "skill": "FISHING",
+      "name": "熏鱼篓",
+      "name_en": "Smoking Creel",
+      "desc": "垂钓用的熏鱼篓,阶数越高越顺手。",
+      "desc_en": "A smoking creel for fishing.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "STURGEON",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "PEARL",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PICK_PEBBLE",
+      "action": "PICK_PEBBLE",
+      "skill": "STONE",
+      "name": "拾石铲",
+      "name_en": "Stone Spade",
+      "desc": "捡石用的拾石铲,阶数越高越顺手。",
+      "desc_en": "A stone spade for stonecraft.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "PEBBLE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "WHETSTONE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "INKSTONE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PICK_BLUESTONE",
+      "action": "PICK_BLUESTONE",
+      "skill": "STONE",
+      "name": "青石锤",
+      "name_en": "Bluestone Mallet",
+      "desc": "捡石用的青石锤,阶数越高越顺手。",
+      "desc_en": "A bluestone mallet for stonecraft.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "WHETSTONE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "INKSTONE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_POLISH_WHETSTONE",
+      "action": "POLISH_WHETSTONE",
+      "skill": "STONE",
+      "name": "磨石凿",
+      "name_en": "Whetstone Chisel",
+      "desc": "捡石用的磨石凿,阶数越高越顺手。",
+      "desc_en": "A whetstone chisel for stonecraft.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "WHETSTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "INKSTONE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SEEK_INKSTONE",
+      "action": "SEEK_INKSTONE",
+      "skill": "STONE",
+      "name": "砚石刀",
+      "name_en": "Inkstone Knife",
+      "desc": "捡石用的砚石刀,阶数越高越顺手。",
+      "desc_en": "A inkstone knife for stonecraft.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "INKSTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_MINE_JADE",
+      "action": "MINE_JADE",
+      "skill": "STONE",
+      "name": "玉矿凿",
+      "name_en": "Jade Chisel",
+      "desc": "捡石用的玉矿凿,阶数越高越顺手。",
+      "desc_en": "A jade chisel for stonecraft.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CUT_JADE",
+      "action": "CUT_JADE",
+      "skill": "STONE",
+      "name": "切石架",
+      "name_en": "Cutting Stand",
+      "desc": "捡石用的切石架,阶数越高越顺手。",
+      "desc_en": "A cutting stand for stonecraft.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "JADE_ORE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AGATE",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_MILK_GOAT",
+      "action": "MILK_GOAT",
+      "skill": "RANCH",
+      "name": "奶桶",
+      "name_en": "Milk Pail",
+      "desc": "牧养用的奶桶,阶数越高越顺手。",
+      "desc_en": "A milk pail for ranching.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "MILK",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "EGG",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "CREAM",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COLLECT_EGG",
+      "action": "COLLECT_EGG",
+      "skill": "RANCH",
+      "name": "蛋篮",
+      "name_en": "Egg Basket",
+      "desc": "牧养用的蛋篮,阶数越高越顺手。",
+      "desc_en": "A egg basket for ranching.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "EGG",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "CREAM",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SHEAR_WOOL",
+      "action": "SHEAR_WOOL",
+      "skill": "RANCH",
+      "name": "羊毛剪",
+      "name_en": "Wool Shears",
+      "desc": "牧养用的羊毛剪,阶数越高越顺手。",
+      "desc_en": "A wool shears for ranching.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "WOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "CREAM",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CHURN_CREAM",
+      "action": "CHURN_CREAM",
+      "skill": "RANCH",
+      "name": "酪桶",
+      "name_en": "Cream Churn",
+      "desc": "牧养用的酪桶,阶数越高越顺手。",
+      "desc_en": "A cream churn for ranching.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "CREAM",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COMB_CASHMERE",
+      "action": "COMB_CASHMERE",
+      "skill": "RANCH",
+      "name": "绒梳",
+      "name_en": "Cashmere Comb",
+      "desc": "牧养用的绒梳,阶数越高越顺手。",
+      "desc_en": "A cashmere comb for ranching.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_RUN_FODDER",
+      "action": "RUN_FODDER",
+      "skill": "RANCH",
+      "name": "草料车",
+      "name_en": "Fodder Cart",
+      "desc": "牧养用的草料车,阶数越高越顺手。",
+      "desc_en": "A fodder cart for ranching.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "CASHMERE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "GOLDEN_EGG",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SOW_BEAN",
+      "action": "SOW_BEAN",
+      "skill": "FARM",
+      "name": "豆锄",
+      "name_en": "Bean Hoe",
+      "desc": "田作用的豆锄,阶数越高越顺手。",
+      "desc_en": "A bean hoe for farming.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "BEAN",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_HARVEST_WHEAT",
+      "action": "HARVEST_WHEAT",
+      "skill": "FARM",
+      "name": "麦镰",
+      "name_en": "Wheat Sickle",
+      "desc": "田作用的麦镰,阶数越高越顺手。",
+      "desc_en": "A wheat sickle for farming.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "WHEAT",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PULL_FLAX",
+      "action": "PULL_FLAX",
+      "skill": "FARM",
+      "name": "拔麻手套",
+      "name_en": "Flax Gloves",
+      "desc": "田作用的拔麻手套,阶数越高越顺手。",
+      "desc_en": "A flax gloves for farming.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "FLAX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_REAP_BARLEY",
+      "action": "REAP_BARLEY",
+      "skill": "FARM",
+      "name": "大麦镰",
+      "name_en": "Barley Sickle",
+      "desc": "田作用的大麦镰,阶数越高越顺手。",
+      "desc_en": "A barley sickle for farming.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "BARLEY",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PICK_SILK_LEAF",
+      "action": "PICK_SILK_LEAF",
+      "skill": "FARM",
+      "name": "桑叶剪",
+      "name_en": "Mulberry Shears",
+      "desc": "田作用的桑叶剪,阶数越高越顺手。",
+      "desc_en": "A mulberry shears for farming.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_THRESH_GRAIN",
+      "action": "THRESH_GRAIN",
+      "skill": "FARM",
+      "name": "打谷架",
+      "name_en": "Threshing Frame",
+      "desc": "田作用的打谷架,阶数越高越顺手。",
+      "desc_en": "A threshing frame for farming.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "SILK_LEAF",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COOK_RICE",
+      "action": "COOK_RICE",
+      "skill": "COOKING",
+      "name": "小铁锅",
+      "name_en": "Iron Pot",
+      "desc": "灶台用的小铁锅,阶数越高越顺手。",
+      "desc_en": "A iron pot for cooking.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "RICE_MEAL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "FISH_SOUP",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COOK_SOUP",
+      "action": "COOK_SOUP",
+      "skill": "COOKING",
+      "name": "汤镬",
+      "name_en": "Soup Cauldron",
+      "desc": "灶台用的汤镬,阶数越高越顺手。",
+      "desc_en": "A soup cauldron for cooking.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COOK_STEW",
+      "action": "COOK_STEW",
+      "skill": "COOKING",
+      "name": "蒸笼",
+      "name_en": "Steamer",
+      "desc": "灶台用的蒸笼,阶数越高越顺手。",
+      "desc_en": "A steamer for cooking.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COOK_HONEY_FRUIT",
+      "action": "COOK_HONEY_FRUIT",
+      "skill": "COOKING",
+      "name": "烤炉",
+      "name_en": "Baking Oven",
+      "desc": "灶台用的烤炉,阶数越高越顺手。",
+      "desc_en": "A baking oven for cooking.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_COOK_FEAST",
+      "action": "COOK_FEAST",
+      "skill": "COOKING",
+      "name": "药膳鼎",
+      "name_en": "Herbal Tripod",
+      "desc": "灶台用的药膳鼎,阶数越高越顺手。",
+      "desc_en": "A herbal tripod for cooking.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PREP_BANQUET",
+      "action": "PREP_BANQUET",
+      "skill": "COOKING",
+      "name": "百草灶",
+      "name_en": "Hundred-Herb Stove",
+      "desc": "灶台用的百草灶,阶数越高越顺手。",
+      "desc_en": "A hundred-herb stove for cooking.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 4
+            },
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_STEW",
+              "qty": 3
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "HERBAL_FEAST",
+              "qty": 10
+            },
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "STAR_SHARD",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BREW_BERRY",
+      "action": "BREW_BERRY",
+      "skill": "BREWING",
+      "name": "小酒坛",
+      "name_en": "Wine Jar",
+      "desc": "酒瓮用的小酒坛,阶数越高越顺手。",
+      "desc_en": "A wine jar for brewing.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "BERRY_WINE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "MINT_DEW",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BREW_MINT",
+      "action": "BREW_MINT",
+      "skill": "BREWING",
+      "name": "薄荷瓮",
+      "name_en": "Mint Crock",
+      "desc": "酒瓮用的薄荷瓮,阶数越高越顺手。",
+      "desc_en": "A mint crock for brewing.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BREW_SAUCE",
+      "action": "BREW_SAUCE",
+      "skill": "BREWING",
+      "name": "酱缸",
+      "name_en": "Sauce Vat",
+      "desc": "酒瓮用的酱缸,阶数越高越顺手。",
+      "desc_en": "A sauce vat for brewing.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BREW_AGED",
+      "action": "BREW_AGED",
+      "skill": "BREWING",
+      "name": "陈酿窖",
+      "name_en": "Aging Cellar",
+      "desc": "酒瓮用的陈酿窖,阶数越高越顺手。",
+      "desc_en": "A aging cellar for brewing.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "AGED_WINE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BREW_GINSENG",
+      "action": "BREW_GINSENG",
+      "skill": "BREWING",
+      "name": "参茸甑",
+      "name_en": "Ginseng Still",
+      "desc": "酒瓮用的参茸甑,阶数越高越顺手。",
+      "desc_en": "A ginseng still for brewing.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BLEND_WINE",
+      "action": "BLEND_WINE",
+      "skill": "BREWING",
+      "name": "调酒器",
+      "name_en": "Blending Set",
+      "desc": "酒瓮用的调酒器,阶数越高越顺手。",
+      "desc_en": "A blending set for brewing.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 4
+            },
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 6
+            },
+            {
+              "item": "FISH_SOUP",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 8
+            },
+            {
+              "item": "MUSHROOM_SAUCE",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "GINSENG_BREW",
+              "qty": 10
+            },
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SET_CHEESE",
+      "action": "SET_CHEESE",
+      "skill": "DAIRY",
+      "name": "奶锅",
+      "name_en": "Milk Pan",
+      "desc": "乳酪用的奶锅,阶数越高越顺手。",
+      "desc_en": "A milk pan for dairy.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "BUTTER",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CHURN_BUTTER",
+      "action": "CHURN_BUTTER",
+      "skill": "DAIRY",
+      "name": "搅乳器",
+      "name_en": "Butter Churn",
+      "desc": "乳酪用的搅乳器,阶数越高越顺手。",
+      "desc_en": "A butter churn for dairy.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_AGE_CHEESE",
+      "action": "AGE_CHEESE",
+      "skill": "DAIRY",
+      "name": "酪模",
+      "name_en": "Cheese Mould",
+      "desc": "乳酪用的酪模,阶数越高越顺手。",
+      "desc_en": "A cheese mould for dairy.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "AGED_CHEESE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_BAKE_CREAM_CAKE",
+      "action": "BAKE_CREAM_CAKE",
+      "skill": "DAIRY",
+      "name": "奶糕模",
+      "name_en": "Cake Tin",
+      "desc": "乳酪用的奶糕模,阶数越高越顺手。",
+      "desc_en": "A cake tin for dairy.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "CREAM_CAKE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_MAKE_CASHMERE_CHEESE",
+      "action": "MAKE_CASHMERE_CHEESE",
+      "skill": "DAIRY",
+      "name": "绒酪模",
+      "name_en": "Cashmere Mould",
+      "desc": "乳酪用的绒酪模,阶数越高越顺手。",
+      "desc_en": "A cashmere mould for dairy.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_PRESS_WHEEL",
+      "action": "PRESS_WHEEL",
+      "skill": "DAIRY",
+      "name": "压酪架",
+      "name_en": "Cheese Press",
+      "desc": "乳酪用的压酪架,阶数越高越顺手。",
+      "desc_en": "A cheese press for dairy.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 4
+            },
+            {
+              "item": "RICE_MEAL",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 6
+            },
+            {
+              "item": "MINT_DEW",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 8
+            },
+            {
+              "item": "AGED_CHEESE",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "CASHMERE_CHEESE",
+              "qty": 10
+            },
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_WEAVE_LINEN",
+      "action": "WEAVE_LINEN",
+      "skill": "SEWING",
+      "name": "缝针",
+      "name_en": "Sewing Needle",
+      "desc": "缝纫用的缝针,阶数越高越顺手。",
+      "desc_en": "A sewing needle for sewing.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "LINEN_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "SILK_BOLT",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "PADDED_COAT",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_WEAVE_WOOL",
+      "action": "WEAVE_WOOL",
+      "skill": "SEWING",
+      "name": "织梭",
+      "name_en": "Shuttle",
+      "desc": "缝纫用的织梭,阶数越高越顺手。",
+      "desc_en": "A shuttle for sewing.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "SILK_BOLT",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "PADDED_COAT",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_WEAVE_SILK",
+      "action": "WEAVE_SILK",
+      "skill": "SEWING",
+      "name": "丝织机",
+      "name_en": "Silk Loom",
+      "desc": "缝纫用的丝织机,阶数越高越顺手。",
+      "desc_en": "A silk loom for sewing.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "SILK_BOLT",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "PADDED_COAT",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_SEW_COAT",
+      "action": "SEW_COAT",
+      "skill": "SEWING",
+      "name": "棉衣架",
+      "name_en": "Coat Frame",
+      "desc": "缝纫用的棉衣架,阶数越高越顺手。",
+      "desc_en": "A coat frame for sewing.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "PADDED_COAT",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_WEAVE_BROCADE",
+      "action": "WEAVE_BROCADE",
+      "skill": "SEWING",
+      "name": "云锦机",
+      "name_en": "Brocade Loom",
+      "desc": "缝纫用的云锦机,阶数越高越顺手。",
+      "desc_en": "A brocade loom for sewing.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_DYE_CLOTH",
+      "action": "DYE_CLOTH",
+      "skill": "SEWING",
+      "name": "染布缸",
+      "name_en": "Dye Vat",
+      "desc": "缝纫用的染布缸,阶数越高越顺手。",
+      "desc_en": "A dye vat for sewing.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 4
+            },
+            {
+              "item": "BERRY_WINE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 6
+            },
+            {
+              "item": "BUTTER",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 8
+            },
+            {
+              "item": "SILK_BOLT",
+              "qty": 3
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "BROCADE",
+              "qty": 10
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "AMBER",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CRAFT_BASIN",
+      "action": "CRAFT_BASIN",
+      "skill": "CRAFT",
+      "name": "小刨",
+      "name_en": "Small Plane",
+      "desc": "木作用的小刨,阶数越高越顺手。",
+      "desc_en": "A small plane for woodcraft.",
+      "require_level": 1,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "bp": 600
+        }
+      ],
+      "steps": [
+        {
+          "coins": 40,
+          "materials": [
+            {
+              "item": "WOODEN_BASIN",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 108,
+          "materials": [
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 292,
+          "materials": [
+            {
+              "item": "STONE_MILL",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 787,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2126,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CRAFT_STOOL",
+      "action": "CRAFT_STOOL",
+      "skill": "CRAFT",
+      "name": "木凿",
+      "name_en": "Wood Chisel",
+      "desc": "木作用的木凿,阶数越高越顺手。",
+      "desc_en": "A wood chisel for woodcraft.",
+      "require_level": 15,
+      "effects": [
+        {
+          "kind": "XP",
+          "bp": 500
+        }
+      ],
+      "steps": [
+        {
+          "coins": 56,
+          "materials": [
+            {
+              "item": "WOODEN_STOOL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 151,
+          "materials": [
+            {
+              "item": "STONE_MILL",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 408,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1102,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 2976,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CRAFT_MILL",
+      "action": "CRAFT_MILL",
+      "skill": "CRAFT",
+      "name": "石磨刀",
+      "name_en": "Mill Chisel",
+      "desc": "木作用的石磨刀,阶数越高越顺手。",
+      "desc_en": "A mill chisel for woodcraft.",
+      "require_level": 35,
+      "effects": [
+        {
+          "kind": "YIELD",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 72,
+          "materials": [
+            {
+              "item": "STONE_MILL",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 194,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 525,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1417,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 3826,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CRAFT_BOX",
+      "action": "CRAFT_BOX",
+      "skill": "CRAFT",
+      "name": "匣刀",
+      "name_en": "Box Knife",
+      "desc": "木作用的匣刀,阶数越高越顺手。",
+      "desc_en": "A box knife for woodcraft.",
+      "require_level": 60,
+      "effects": [
+        {
+          "kind": "RARE",
+          "bp": 200
+        }
+      ],
+      "steps": [
+        {
+          "coins": 88,
+          "materials": [
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 238,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 642,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 1732,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 4677,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_CRAFT_CABINET",
+      "action": "CRAFT_CABINET",
+      "skill": "CRAFT",
+      "name": "红木刨",
+      "name_en": "Redwood Plane",
+      "desc": "木作用的红木刨,阶数越高越顺手。",
+      "desc_en": "A redwood plane for woodcraft.",
+      "require_level": 85,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "T_REPAIR_BENCH",
+      "action": "REPAIR_BENCH",
+      "skill": "CRAFT",
+      "name": "木工台",
+      "name_en": "Workbench",
+      "desc": "木作用的木工台,阶数越高越顺手。",
+      "desc_en": "A workbench for woodcraft.",
+      "require_level": 70,
+      "effects": [
+        {
+          "kind": "EFFICIENCY",
+          "bp": 400
+        }
+      ],
+      "steps": [
+        {
+          "coins": 104,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 281,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 4
+            },
+            {
+              "item": "FRESH_CHEESE",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 758,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 6
+            },
+            {
+              "item": "WOOL_CLOTH",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 2047,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 8
+            },
+            {
+              "item": "STONE_MILL",
+              "qty": 3
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        },
+        {
+          "coins": 5527,
+          "materials": [
+            {
+              "item": "REDWOOD_CABINET",
+              "qty": 10
+            },
+            {
+              "item": "HONEY_FRUIT",
+              "qty": 4
+            },
+            {
+              "item": "OLD_COIN",
+              "qty": 1
+            }
+          ]
+        }
       ]
     }
   ]

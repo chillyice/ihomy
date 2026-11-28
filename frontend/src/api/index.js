@@ -452,7 +452,12 @@ export const homesteadApi = {
   stop: (opId) => request.post('/game/homestead/stop', null, homesteadOp(opId)),
   sell: (itemCode, qty, opId) => request.post('/game/homestead/sell', { itemCode, qty }, homesteadOp(opId)),
   tool: (toolCode, opId) => request.post('/game/homestead/tool', { toolCode }, homesteadOp(opId)),
-  equipment: (slotCode, opId) => request.post('/game/homestead/equipment', { slotCode }, homesteadOp(opId)),
+  // 装备:craft 制造 → enhance 强化 0→5 → wear 穿脱(gearCode 传空串即脱下该部位)
+  craftGear: (gearCode, opId) => request.post('/game/homestead/gear', { gearCode }, homesteadOp(opId)),
+  enhanceGear: (gearCode, opId) => request.post('/game/homestead/gear/enhance', { gearCode }, homesteadOp(opId)),
+  wear: (slotCode, gearCode, opId) => request.post('/game/homestead/wear', { slotCode, gearCode: gearCode || '' }, homesteadOp(opId)),
+  building: (buildingCode, opId) => request.post('/game/homestead/building', { buildingCode }, homesteadOp(opId)),
+  consume: (itemCode, qty, opId) => request.post('/game/homestead/consume', { itemCode, qty }, homesteadOp(opId)),
   ranking: () => request.get('/game/homestead/ranking'),
 }
 

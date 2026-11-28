@@ -1,0 +1,2154 @@
+{
+  "comment": "小院慢生活场地表:11 座技能工坊 + 仓房/晒场/井台,共 14 栋。max_level=10,每级按 effects 的 bp/hours 线性累加;工坊 5 级解锁本技能第 6 个动作(unlock_action)。",
+  "buildings": [
+    {
+      "code": "LUMBER_YARD",
+      "name": "木料场",
+      "name_en": "Lumber Yard",
+      "icon": "🪵",
+      "desc": "归拢木料、开料堆垛的场地，五级后能理木换料。",
+      "desc_en": "A yard for stacking and splitting timber; level 5 sorts logs into planks.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "WOOD",
+      "unlock_action": "SORT_TIMBER"
+    },
+    {
+      "code": "HERB_SHED",
+      "name": "晒药棚",
+      "name_en": "Herb Shed",
+      "icon": "🌿",
+      "desc": "挂满草药的棚子，五级后能把山参晒成蜜与菌。",
+      "desc_en": "A shed hung with drying herbs; level 5 turns ginseng into honey and mushrooms.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "FORAGE",
+      "unlock_action": "DRY_HERBS"
+    },
+    {
+      "code": "FISH_POND",
+      "name": "鱼塘",
+      "name_en": "Fish Pond",
+      "icon": "🎣",
+      "desc": "引活水养鱼的塘子，五级后能把鲟鱼腌成银鳞与河虾。",
+      "desc_en": "A spring-fed pond; level 5 salts sturgeon into silver fish and shrimp.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "FISHING",
+      "unlock_action": "SALT_CATCH"
+    },
+    {
+      "code": "STONE_SHOP",
+      "name": "石作坊",
+      "name_en": "Stone Shop",
+      "icon": "🪨",
+      "desc": "堆放石料、打磨砚台的棚屋，五级后能开玉料。",
+      "desc_en": "A shed of stone slabs and inkstones; level 5 opens jade cutting.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "STONE",
+      "unlock_action": "CUT_JADE"
+    },
+    {
+      "code": "BARN",
+      "name": "畜棚",
+      "name_en": "Barn",
+      "icon": "🐐",
+      "desc": "牲口过冬的棚子，五级后能拿麦子换奶与蛋。",
+      "desc_en": "A warm barn for the animals; level 5 trades wheat for milk and eggs.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "RANCH",
+      "unlock_action": "RUN_FODDER"
+    },
+    {
+      "code": "THRESHING_FLOOR",
+      "name": "打谷场",
+      "name_en": "Threshing Floor",
+      "icon": "🌾",
+      "desc": "碾谷脱粒的硬地，五级后能把大麦打成麦与豆。",
+      "desc_en": "A hard-packed floor for threshing; level 5 turns barley into wheat and beans.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "GATHER",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "GATHER",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "FARM",
+      "unlock_action": "THRESH_GRAIN"
+    },
+    {
+      "code": "STOVE_HOUSE",
+      "name": "灶房",
+      "name_en": "Stove House",
+      "icon": "🍲",
+      "desc": "两灶并排的厨房，五级后能把汤与煲配成一桌。",
+      "desc_en": "A kitchen with two stoves; level 5 pairs soup and stew into a banquet.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "PROCESS",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "PROCESS",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "COOKING",
+      "unlock_action": "PREP_BANQUET"
+    },
+    {
+      "code": "WINE_CELLAR",
+      "name": "酒窖",
+      "name_en": "Wine Cellar",
+      "icon": "🍶",
+      "desc": "半埋在地下的酒窖，五级后能勾调陈酿。",
+      "desc_en": "A half-buried cellar; level 5 lets you blend aged wine.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "PROCESS",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "PROCESS",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "BREWING",
+      "unlock_action": "BLEND_WINE"
+    },
+    {
+      "code": "DAIRY_HOUSE",
+      "name": "乳坊",
+      "name_en": "Dairy House",
+      "icon": "🧈",
+      "desc": "凉爽的乳坊，五级后能把熟成酪压回鲜酪与黄油。",
+      "desc_en": "A cool dairy; level 5 presses aged cheese into fresh cheese and butter.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "PROCESS",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "PROCESS",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "DAIRY",
+      "unlock_action": "PRESS_WHEEL"
+    },
+    {
+      "code": "DYE_WORKS",
+      "name": "染坊",
+      "name_en": "Dye Works",
+      "icon": "🧵",
+      "desc": "晾满彩布的院子，五级后能染出成匹布帛。",
+      "desc_en": "A yard full of drying cloth; level 5 dyes whole bolts.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "PROCESS",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "PROCESS",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "SEWING",
+      "unlock_action": "DYE_CLOTH"
+    },
+    {
+      "code": "WORKSHOP",
+      "name": "木工坊",
+      "name_en": "Workshop",
+      "icon": "🪚",
+      "desc": "刨花铺地的工坊，五级后能把匣与磨拆改成凳与盆。",
+      "desc_en": "A workshop deep in shavings; level 5 rebuilds boxes and mills into stools and basins.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "PROCESS",
+          "bp": 250
+        },
+        {
+          "kind": "XP",
+          "target": "PROCESS",
+          "bp": 180
+        }
+      ],
+      "steps": [
+        {
+          "coins": 350,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1137,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2266,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 3695,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 5399,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 7361,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 9566,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 12004,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 14665,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 17542,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ],
+      "skill": "CRAFT",
+      "unlock_action": "REPAIR_BENCH"
+    },
+    {
+      "code": "GRANARY",
+      "name": "仓房",
+      "name_en": "Granary",
+      "icon": "🏚️",
+      "desc": "存粮的大仓房,仓底越厚离线补得越久。",
+      "desc_en": "A deep granary that keeps your yard running longer while you are away.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "OFFLINE_CAP",
+          "target": "ALL",
+          "hours": 2
+        }
+      ],
+      "steps": [
+        {
+          "coins": 400,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1300,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 2589,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 4222,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 6170,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 8412,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 10933,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 13719,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 16760,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 20047,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "DRYING_YARD",
+      "name": "晒场",
+      "name_en": "Drying Yard",
+      "icon": "☀️",
+      "desc": "摊晒谷物的硬地,镇上收粮的愿意多给点。",
+      "desc_en": "A sunny yard where grain dries and the town pays a little more.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SELL_BONUS",
+          "target": "ALL",
+          "bp": 150
+        }
+      ],
+      "steps": [
+        {
+          "coins": 500,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1625,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 3237,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 5278,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 7713,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 10515,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 13666,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 17148,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 20950,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 25059,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "WELL",
+      "name": "井台",
+      "name_en": "Well",
+      "icon": "⛲",
+      "desc": "石砌的老井,打水快,做什么都利索。",
+      "desc_en": "An old stone well that makes every chore a little faster.",
+      "max_level": 10,
+      "effects": [
+        {
+          "kind": "SPEED",
+          "target": "ALL",
+          "bp": 120
+        }
+      ],
+      "steps": [
+        {
+          "coins": 600,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 1949,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 8
+            }
+          ]
+        },
+        {
+          "coins": 3884,
+          "materials": [
+            {
+              "item": "DRY_WOOD",
+              "qty": 12
+            }
+          ]
+        },
+        {
+          "coins": 6334,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 9256,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 12619,
+          "materials": [
+            {
+              "item": "PINE_LOG",
+              "qty": 8
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 4
+            }
+          ]
+        },
+        {
+          "coins": 16399,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 3
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "coins": 20578,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 4
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 6
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 2
+            }
+          ]
+        },
+        {
+          "coins": 25140,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 5
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 7
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 3
+            }
+          ]
+        },
+        {
+          "coins": 30071,
+          "materials": [
+            {
+              "item": "CAMPHOR_WOOD",
+              "qty": 6
+            },
+            {
+              "item": "BLUESTONE",
+              "qty": 8
+            },
+            {
+              "item": "WOODEN_BOX",
+              "qty": 4
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

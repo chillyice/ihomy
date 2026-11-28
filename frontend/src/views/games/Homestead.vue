@@ -39,6 +39,7 @@
         <li>{{ $t('games.homestead.rules.play2') }}</li>
         <li>{{ $t('games.homestead.rules.play3') }}</li>
         <li>{{ $t('games.homestead.rules.play4') }}</li>
+        <li>{{ $t('games.homestead.rules.play5') }}</li>
         <li>{{ $t('games.homestead.rules.play6') }}</li>
       </ul>
       <ul v-else-if="page === 1">
@@ -115,8 +116,8 @@
           type="button"
           class="hs-tab"
           role="tab"
-          :class="{ 'is-on': pane === tab.value }"
-          :aria-selected="pane === tab.value"
+          :class="{ 'is-on': sideTab === tab.value }"
+          :aria-selected="sideTab === tab.value"
           @click="pane = tab.value"
         >
           {{ $t(tab.key) }}
@@ -130,208 +131,307 @@
       </div>
 
       <div v-else class="hs-grid">
-        <!-- 技能列:选一个技能,右栏只出它的动作 -->
-        <div class="hs-rail">
+        <!-- 左:工作门类(11 门),等级环 + 正在做的高亮 -->
+        <aside class="hs-rail">
           <button
-            v-for="skill in skills"
+            v-for="skill in skillRows"
             :key="skill.code"
             type="button"
             class="hs-skill"
             :class="{ 'is-on': skill.code === activeSkill, 'is-working': skill.code === workingSkill }"
             @click="selectedSkill = skill.code"
           >
-            <span class="hs-skill-row">
+            <span class="hs-skill-icon" aria-hidden="true">{{ skill.icon }}</span>
+            <span class="hs-skill-body">
               <span class="hs-skill-name">{{ skill.name }}</span>
-              <b class="hs-skill-lv">{{ $t('games.homestead.level', { n: skill.level }) }}</b>
+              <i class="hs-skill-bar"><b :style="{ width: skill.percent + '%' }"></b></i>
             </span>
-            <i class="hs-skill-bar"><b :style="{ width: skill.percent + '%' }"></b></i>
-            <span class="hs-skill-meta">
-              <span>{{ $t('games.homestead.kind.' + skill.kind) }}</span>
-              <span class="hs-skill-side">
-                <span v-if="skill.toolTier > 0">{{ $t('games.homestead.toolShort', { n: skill.toolTier }) }}</span>
-                <span v-if="skill.gearBp > 0">{{ $t('games.homestead.gearShort', { p: bpToPercent(skill.gearBp) }) }}</span>
-              </span>
-            </span>
+            <b class="hs-skill-lv">{{
+              skill.maxed ? $t('games.homestead.maxedLevel') : $t('games.homestead.level', { n: skill.level })
+            }}</b>
           </button>
-        </div>
+        </aside>
 
-        <div class="hs-main">
-          <div class="hs-actions">
-            <!-- 当前动作:进度条由本地按服务端锚点插值,到点就提前对一次账 -->
-            <header class="hs-now" :class="{ 'is-warn': currentMaterialsOut }">
-              <div class="hs-now-row">
-                <span class="hs-now-label">
+        <section class="hs-main">
+          <!-- 当前工作:进度条是 CSS 循环动画(时长 = 单次耗时,负延迟 = 已走部分),不每帧写 ref -->
+          <header class="hs-now" :class="{ 'is-warn': currentMaterialsOut, 'is-idle': !currentAction }">
+            <div class="hs-now-top">
+              <span class="hs-now-icon" aria-hidden="true">{{ currentIcon }}</span>
+              <div class="hs-now-text">
+                <b class="hs-now-title">
                   {{
                     currentAction ? $t('games.homestead.working', { name: pickName(currentAction, locale) }) : $t('games.homestead.idle')
                   }}
+                </b>
+                <span class="hs-now-sub">
+                  {{
+                    currentAction
+                      ? $t('games.homestead.actionMeta', { s: perText(currentPerMs), xp: currentXp })
+                      : $t('games.homestead.idleHint')
+                  }}
                 </span>
-                <span v-if="currentAction && !currentMaterialsOut" class="hs-now-left">
-                  {{ $t('games.homestead.remaining', { s: remainingSec }) }}
-                </span>
-                <el-button v-if="currentAction" size="small" round :disabled="busy" @click="stopAction">
-                  {{ $t('games.homestead.stop') }}
-                </el-button>
               </div>
-              <i v-if="currentAction" class="hs-bar"><b :style="{ width: barPercent + '%' }"></b></i>
-              <p v-if="!currentAction" class="hs-now-hint">{{ $t('games.homestead.idleHint') }}</p>
-              <p v-else-if="currentMaterialsOut" class="hs-now-hint">{{ $t('games.homestead.materialsAuto') }}</p>
-              <p v-else class="hs-now-hint">{{ activeSkillDesc }}</p>
-            </header>
-
-            <div class="hs-act-list">
-              <div
-                v-for="row in actionRows"
-                :key="row.code"
-                class="hs-act"
-                :class="['is-' + row.state.toLowerCase(), { 'is-current': row.current }]"
-              >
-                <div class="hs-act-info">
-                  <span class="hs-act-head">
-                    <span class="hs-act-name">{{ row.name }}</span>
-                    <span v-if="row.state === 'LOCKED'" class="hs-act-tag is-lock">
-                      {{ $t('games.homestead.actionLocked', { n: row.level }) }}
-                    </span>
-                    <span v-else-if="row.state === 'MATERIALS'" class="hs-act-tag is-warn">
-                      {{ $t('games.homestead.actionLack') }}
-                    </span>
-                    <span v-else-if="row.current" class="hs-act-tag is-live">{{ $t('games.homestead.current') }}</span>
-                  </span>
-                  <span class="hs-act-meta">{{ $t('games.homestead.actionMeta', { s: row.per, xp: row.xp }) }}</span>
-                  <span v-if="row.inputsText" class="hs-act-io">{{ $t('games.homestead.actionIn', { list: row.inputsText }) }}</span>
-                  <span class="hs-act-io">{{ $t('games.homestead.actionOut', { list: row.outputsText }) }}</span>
-                  <span v-if="row.rareText" class="hs-act-io is-rare">
-                    {{ $t('games.homestead.actionRare', { list: row.rareText, n: row.rareEvery }) }}
-                  </span>
-                  <span v-if="row.missingText" class="hs-act-io is-warn">
-                    {{ $t('games.homestead.actionMissing', { list: row.missingText }) }}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  class="hs-act-go"
-                  :class="{ 'is-stop': row.current }"
-                  :disabled="busy || (!row.current && row.state !== 'READY')"
-                  @click="row.current ? stopAction() : startAction(row.code)"
-                >
-                  {{ row.current ? $t('games.homestead.stop') : $t('games.homestead.start') }}
-                </button>
-              </div>
+              <el-button v-if="currentAction" size="small" round :disabled="busy" @click="stopAction">
+                {{ $t('games.homestead.stop') }}
+              </el-button>
             </div>
-          </div>
+            <div class="hs-progress" :style="progressStyle">
+              <i v-if="currentAction && !currentMaterialsOut" class="hs-progress-fill"></i>
+            </div>
+            <div class="hs-now-foot">
+              <span v-if="currentAction && !currentMaterialsOut" class="hs-now-left">
+                {{ $t('games.homestead.remaining', { s: remainingSec }) }}
+              </span>
+              <span v-if="currentMaterialsOut" class="hs-now-hint">{{ $t('games.homestead.materialsAuto') }}</span>
+              <span v-else-if="currentYieldText" class="hs-now-out">
+                {{ $t('games.homestead.actionOut', { list: currentYieldText }) }}
+              </span>
+            </div>
+            <div v-if="currentAction && bonusChips.length" class="hs-now-bonus">
+              <span v-for="chip in bonusChips" :key="chip" class="hs-bonus">{{ chip }}</span>
+            </div>
+            <div class="hs-buffs">
+              <span class="hs-buffs-label">{{ $t('games.homestead.buffs') }}</span>
+              <span v-if="!buffRows.length" class="hs-buff-empty">{{ $t('games.homestead.buffNone') }}</span>
+              <span v-for="buff in buffRows" :key="buff.item" class="hs-buff" :class="'is-' + buff.kind.toLowerCase()">
+                {{ buff.name }} · {{ $t('games.homestead.buffKind.' + buff.kind) }} +{{ bpToPercent(buff.bp) }}%
+                <em>{{ buff.leftText }}</em>
+              </span>
+            </div>
+          </header>
 
-          <div class="hs-side">
-            <!-- 赶集日:每天两单溢价收,当天共享额度,卖货时由服务端按额度拆价 -->
-            <section v-if="marketOrders.length" class="hs-market">
-              <h2 class="hs-pane-title">
-                <span>{{ $t('games.homestead.market.title') }}</span>
-                <em>{{ marketResetText }}</em>
-              </h2>
-              <p class="hs-market-hint">
-                {{ $t('games.homestead.market.hint', { p: marketBonusPercent, n: market.quota }) }}
+          <!-- 具体工作:卡片网格(门槛/耗材/产出/稀有概率/锁在哪一步) -->
+          <div class="hs-cards">
+            <article
+              v-for="row in actionRows"
+              :key="row.code"
+              class="hs-card"
+              :class="['is-' + row.state.toLowerCase(), { 'is-current': row.current }]"
+            >
+              <header class="hs-card-head">
+                <b class="hs-card-name">{{ row.name }}</b>
+                <span class="hs-card-lv">{{ $t('games.homestead.level', { n: row.level }) }}</span>
+              </header>
+              <p v-if="row.state !== 'READY'" class="hs-card-tag" :class="'is-' + row.state.toLowerCase()">{{ row.tagText }}</p>
+              <p class="hs-card-line">{{ $t('games.homestead.actionMeta', { s: row.per, xp: row.xp }) }}</p>
+              <p v-if="row.inputsText" class="hs-card-line">{{ $t('games.homestead.actionIn', { list: row.inputsText }) }}</p>
+              <p class="hs-card-line">{{ $t('games.homestead.actionOut', { list: row.outputsText }) }}</p>
+              <p v-if="row.rareText" class="hs-card-line is-rare">
+                {{ $t('games.homestead.actionRare', { p: row.rarePercent, list: row.rareText }) }}
               </p>
-              <div v-for="row in marketOrders" :key="row.code" class="hs-market-row" :class="{ 'is-done': !row.remaining }">
-                <span class="hs-market-name">{{ row.name }}</span>
-                <b class="hs-market-price">{{ compact(row.price) }}</b>
-                <span class="hs-market-left">
-                  {{ row.remaining ? $t('games.homestead.market.left', { n: row.remaining }) : $t('games.homestead.market.soldOut') }}
-                </span>
+              <p v-if="row.missingText" class="hs-card-line is-warn">
+                {{ $t('games.homestead.actionMissing', { list: row.missingText }) }}
+              </p>
+              <p v-if="row.toolText" class="hs-card-line is-tool">{{ row.toolText }}</p>
+              <button
+                type="button"
+                class="hs-card-go"
+                :class="{ 'is-stop': row.current }"
+                :disabled="busy || (!row.current && row.state !== 'READY')"
+                @click="row.current ? stopAction() : startAction(row.code)"
+              >
+                {{ row.current ? $t('games.homestead.stop') : $t('games.homestead.start') }}
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <!-- 右:物品 / 工具(含穿戴)/ 场地 三个子页签 -->
+        <aside class="hs-side">
+          <nav class="hs-subtabs" role="tablist">
+            <button
+              v-for="tab in SIDE_TABS"
+              :key="tab.value"
+              type="button"
+              class="hs-subtab"
+              role="tab"
+              :class="{ 'is-on': sideTab === tab.value }"
+              :aria-selected="sideTab === tab.value"
+              @click="pane = tab.value"
+            >
+              {{ $t(tab.key) }}
+            </button>
+          </nav>
+
+          <div class="hs-side-body">
+            <!-- 物品:赶集行情 + 素材/成品/特产分组;带 buff 的成品可以吃 -->
+            <section v-show="sideTab === 'BAG'" class="hs-pane">
+              <div v-if="marketOrders.length" class="hs-market">
+                <h2 class="hs-pane-title">
+                  <span>{{ $t('games.homestead.market.title') }}</span>
+                  <em>{{ marketResetText }}</em>
+                </h2>
+                <p class="hs-market-hint">{{ $t('games.homestead.market.hint', { p: marketBonusPercent, n: market.quota }) }}</p>
+                <div v-for="row in marketOrders" :key="row.code" class="hs-market-row" :class="{ 'is-done': !row.remaining }">
+                  <span class="hs-market-name">{{ row.name }}</span>
+                  <b class="hs-market-price">{{ compact(row.price) }}</b>
+                  <span class="hs-market-left">
+                    {{ row.remaining ? $t('games.homestead.market.left', { n: row.remaining }) : $t('games.homestead.market.soldOut') }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="hs-bag">
+                <h2 class="hs-pane-title">
+                  <span>{{ $t('games.homestead.bag') }}</span>
+                  <em v-if="itemKinds">{{ $t('games.homestead.kinds', { n: itemKinds }) }}</em>
+                </h2>
+                <p v-if="!bagGroups.length" class="hs-empty">{{ $t('games.homestead.bagEmpty') }}</p>
+                <template v-for="group in bagGroups" :key="group.category">
+                  <h3 class="hs-sub">{{ $t('games.homestead.category.' + group.category) }}</h3>
+                  <div v-for="item in group.rows" :key="item.code" class="hs-item">
+                    <div class="hs-item-top">
+                      <span class="hs-item-name">{{ item.name }}</span>
+                      <b class="hs-item-qty">×{{ compact(item.qty) }}</b>
+                      <span class="hs-item-price" :class="{ 'is-market': item.boosted }">
+                        {{ $t('games.homestead.sellPrice', { n: compact(item.price) }) }}
+                      </span>
+                    </div>
+                    <p v-if="item.buffText" class="hs-item-buff">{{ item.buffText }}</p>
+                    <div class="hs-item-acts">
+                      <button type="button" class="hs-mini" :disabled="busy" @click="sellItem(item.code, 1)">
+                        {{ $t('games.homestead.sellOne') }}
+                      </button>
+                      <button type="button" class="hs-mini" :disabled="busy" @click="sellItem(item.code, item.qty)">
+                        {{ $t('games.homestead.sellAll') }}
+                      </button>
+                      <button v-if="item.consumable" type="button" class="hs-mini is-main" :disabled="busy" @click="eatItem(item.code)">
+                        {{ $t('games.homestead.consume') }}
+                      </button>
+                    </div>
+                  </div>
+                </template>
               </div>
             </section>
 
-            <!-- 背包:素材/成品/特产分组,单击卖一个、全卖一键清空 -->
-            <section class="hs-bag">
-              <h2 class="hs-pane-title">
-                <span>{{ $t('games.homestead.bag') }}</span>
-                <em v-if="itemKinds">{{ $t('games.homestead.kinds', { n: itemKinds }) }}</em>
-              </h2>
-              <p v-if="!bagGroups.length" class="hs-empty">{{ $t('games.homestead.bagEmpty') }}</p>
-              <template v-for="group in bagGroups" :key="group.category">
-                <h3 class="hs-sub">{{ $t('games.homestead.category.' + group.category) }}</h3>
-                <div v-for="item in group.rows" :key="item.code" class="hs-item">
-                  <span class="hs-item-name">{{ item.name }}</span>
-                  <b class="hs-item-qty">×{{ compact(item.qty) }}</b>
-                  <span class="hs-item-price" :class="{ 'is-market': item.boosted }">
-                    {{ $t('games.homestead.sellPrice', { n: compact(item.price) }) }}
-                  </span>
-                  <span class="hs-item-btns">
-                    <button type="button" class="hs-mini" :disabled="busy" @click="sellItem(item.code, 1)">
-                      {{ $t('games.homestead.sellOne') }}
+            <!-- 工具:当前门类 6 件专属工具 + 五个部位的穿戴 -->
+            <section v-show="sideTab === 'TOOLS'" class="hs-pane">
+              <div class="hs-tools">
+                <h2 class="hs-pane-title">
+                  <span>{{ $t('games.homestead.tools') }}</span>
+                  <em>{{ $t('games.homestead.toolHint') }}</em>
+                </h2>
+                <article v-for="tool in toolRows" :key="tool.code" class="hs-tool" :class="{ 'is-maxed': tool.maxed }">
+                  <div class="hs-tool-head">
+                    <span class="hs-tool-name">{{ tool.name }}</span>
+                    <b class="hs-tool-tier">
+                      {{ tool.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolTier', { n: tool.tier, max: tool.max }) }}
+                    </b>
+                  </div>
+                  <p class="hs-tool-sub">{{ tool.actionName }}</p>
+                  <i class="hs-steps"><b v-for="step in tool.max" :key="step" :class="{ 'is-on': step <= tool.tier }"></b></i>
+                  <p v-if="tool.effectText" class="hs-tool-effect">{{ tool.effectText }}</p>
+                  <div class="hs-tool-foot">
+                    <span class="hs-tool-cost">
+                      {{ tool.costText }}
+                      <em v-if="tool.lackText">{{ $t('games.homestead.costLack', { list: tool.lackText }) }}</em>
+                      <em v-else-if="!tool.levelOk">{{ $t('games.homestead.toolRequireLevel', { n: tool.requireLevel }) }}</em>
+                    </span>
+                    <button type="button" class="hs-mini is-main" :disabled="busy || !tool.ok" @click="craftTool(tool.code)">
+                      {{
+                        tool.maxed
+                          ? $t('games.homestead.toolMaxed')
+                          : tool.tier > 0
+                            ? $t('games.homestead.toolUpgrade')
+                            : $t('games.homestead.toolCraft')
+                      }}
                     </button>
-                    <button type="button" class="hs-mini is-main" :disabled="busy" @click="sellItem(item.code, item.qty)">
-                      {{ $t('games.homestead.sellAll') }}
-                    </button>
-                  </span>
-                </div>
-              </template>
-            </section>
+                  </div>
+                </article>
+              </div>
 
-            <!-- 穿戴:五个部位各一件,穿上就生效;加速/离线上限/卖价由服务端折叠后下发 -->
-            <section v-if="gearRows.length" class="hs-tools hs-gear">
-              <h2 class="hs-pane-title">
-                <span>{{ $t('games.homestead.gear.title') }}</span>
-                <em>{{ $t('games.homestead.gear.hint') }}</em>
-              </h2>
-              <div v-for="slot in gearRows" :key="slot.code" class="hs-tool" :class="{ 'is-maxed': slot.maxed }">
-                <div class="hs-tool-head">
-                  <span class="hs-tool-name">{{ slot.name }}</span>
-                  <b class="hs-tool-tier">
-                    {{ slot.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolTier', { n: slot.tier, max: slot.max }) }}
-                  </b>
-                </div>
-                <i class="hs-tool-steps">
-                  <b v-for="step in slot.max" :key="step" :class="{ 'is-on': step <= slot.tier }"></b>
-                </i>
-                <p v-if="slot.effectText" class="hs-tool-effect">{{ slot.effectText }}</p>
-                <p v-if="slot.desc" class="hs-tool-desc">{{ slot.desc }}</p>
-                <div class="hs-tool-foot">
-                  <span class="hs-tool-cost">
-                    {{ slot.costText }}
-                    <em v-if="slot.lackText">{{ $t('games.homestead.toolLack', { list: slot.lackText }) }}</em>
-                  </span>
-                  <button type="button" class="hs-mini is-main" :disabled="busy || !slot.ok" @click="upgradeGear(slot.code)">
-                    {{ slot.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolUpgrade') }}
-                  </button>
-                </div>
+              <div class="hs-gear">
+                <h2 class="hs-pane-title">
+                  <span>{{ $t('games.homestead.gear.title') }}</span>
+                  <em>{{ $t('games.homestead.gear.hint') }}</em>
+                </h2>
+                <template v-for="group in gearGroups" :key="group.slot">
+                  <h3 class="hs-sub">{{ group.name }}</h3>
+                  <article
+                    v-for="gear in group.items"
+                    :key="gear.code"
+                    class="hs-tool"
+                    :class="{ 'is-worn': gear.worn, 'is-maxed': gear.maxed }"
+                  >
+                    <div class="hs-tool-head">
+                      <span class="hs-tool-name">{{ gear.name }}</span>
+                      <b class="hs-tool-tier">{{ gear.stateText }}</b>
+                    </div>
+                    <i v-if="gear.owned" class="hs-steps">
+                      <b v-for="step in gear.max" :key="step" :class="{ 'is-on': step <= gear.enhance }"></b>
+                    </i>
+                    <p v-if="gear.effectText" class="hs-tool-effect">{{ gear.effectText }}</p>
+                    <div class="hs-tool-foot">
+                      <span class="hs-tool-cost">
+                        {{ gear.costText }}
+                        <em v-if="gear.lackText">{{ $t('games.homestead.costLack', { list: gear.lackText }) }}</em>
+                        <em v-else-if="!gear.levelOk">{{ $t('games.homestead.gear.requireLevel', { n: gear.requireLevel }) }}</em>
+                      </span>
+                      <span class="hs-tool-btns">
+                        <button type="button" class="hs-mini is-main" :disabled="busy || !gear.ok" @click="gearAction(gear)">
+                          {{ gear.buttonText }}
+                        </button>
+                        <button
+                          v-if="gear.owned"
+                          type="button"
+                          class="hs-mini"
+                          :disabled="busy || (!gear.worn && !gear.canWear)"
+                          @click="toggleWear(gear)"
+                        >
+                          {{ gear.worn ? $t('games.homestead.gear.takeOff') : $t('games.homestead.gear.wear') }}
+                        </button>
+                      </span>
+                    </div>
+                  </article>
+                </template>
               </div>
             </section>
 
-            <!-- 工具:每件对应一个技能,升一阶涨 8% 速度 -->
-            <section class="hs-tools">
-              <h2 class="hs-pane-title">
-                <span>{{ $t('games.homestead.tools') }}</span>
-                <em>{{ $t('games.homestead.toolHint') }}</em>
-              </h2>
-              <div v-for="tool in toolRows" :key="tool.code" class="hs-tool" :class="{ 'is-maxed': tool.maxed }">
-                <div class="hs-tool-head">
-                  <span class="hs-tool-name">{{ tool.name }}</span>
-                  <b class="hs-tool-tier">
-                    {{ tool.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolTier', { n: tool.tier, max: tool.max }) }}
-                  </b>
-                </div>
-                <i class="hs-tool-steps">
-                  <b v-for="step in tool.max" :key="step" :class="{ 'is-on': step <= tool.tier }"></b>
-                </i>
-                <p v-if="tool.desc" class="hs-tool-desc">{{ tool.desc }}</p>
-                <div class="hs-tool-foot">
-                  <span class="hs-tool-cost">
-                    {{ tool.costText }}
-                    <em v-if="tool.lackText">{{ $t('games.homestead.toolLack', { list: tool.lackText }) }}</em>
-                  </span>
-                  <button type="button" class="hs-mini is-main" :disabled="busy || !tool.ok" @click="upgradeTool(tool.code)">
-                    {{ tool.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolUpgrade') }}
-                  </button>
+            <!-- 场地:14 栋建筑,按级加成本门类;工坊 Lv.5 解锁 70 级工坊工作 -->
+            <section v-show="sideTab === 'YARD'" class="hs-pane">
+              <div class="hs-yard">
+                <h2 class="hs-pane-title">
+                  <span>{{ $t('games.homestead.yard.title') }}</span>
+                  <em>{{ $t('games.homestead.yard.hint') }}</em>
+                </h2>
+                <div class="hs-yard-grid">
+                  <article v-for="row in buildingRows" :key="row.code" class="hs-tool hs-building" :class="{ 'is-maxed': row.maxed }">
+                    <div class="hs-tool-head">
+                      <span class="hs-tool-icon" aria-hidden="true">{{ row.icon }}</span>
+                      <span class="hs-tool-name">{{ row.name }}</span>
+                      <b class="hs-tool-tier">{{ $t('games.homestead.yard.level', { n: row.level, max: row.maxLevel }) }}</b>
+                    </div>
+                    <i class="hs-steps"><b v-for="step in row.maxLevel" :key="step" :class="{ 'is-on': step <= row.level }"></b></i>
+                    <p v-if="row.effectText" class="hs-tool-effect">{{ row.effectText }}</p>
+                    <p v-if="row.unlockText" class="hs-tool-desc">{{ row.unlockText }}</p>
+                    <div class="hs-tool-foot">
+                      <span class="hs-tool-cost">
+                        {{ row.costText }}
+                        <em v-if="row.lackText">{{ $t('games.homestead.costLack', { list: row.lackText }) }}</em>
+                      </span>
+                      <button type="button" class="hs-mini is-main" :disabled="busy || !row.ok" @click="upgradeBuilding(row.code)">
+                        {{
+                          row.maxed
+                            ? $t('games.homestead.yard.maxed')
+                            : row.level > 0
+                              ? $t('games.homestead.yard.upgrade')
+                              : $t('games.homestead.yard.build')
+                        }}
+                      </button>
+                    </div>
+                  </article>
                 </div>
               </div>
             </section>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   </GameShell>
 </template>
 
 <script setup>
-// 小院慢生活(放置):服务端存档 + 离线结算,客户端只渲染状态、按服务端锚点插值进度环。
+// 小院慢生活(放置):服务端存档 + 离线结算,客户端只渲染状态、按服务端锚点给进度条设动画。
 // 产出/经验/稀有掉落一律以 /state 为准(utils/games/homestead.js 只放展示侧纯函数),
 // 本地不模拟收益 —— 否则会和 HomesteadEngine 变成两套引擎,离线回来数字对不上。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -341,33 +441,35 @@ import { Trophy } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
 import { homesteadApi } from '@/api'
 import {
+  actionBonus,
   actionState,
   bpToPercent,
+  buffRemainingMs,
+  chancePercent,
+  costGap,
+  countdownParts,
   elapsedText,
   formatCompact,
-  gearSpeedBonus,
-  hasMaterials,
   msPerItem,
   pickName,
   progressOf,
   sellCoinsWithBonus,
-  toolUpgradeCheck,
   xpRatio,
 } from '@/utils/games/homestead'
 
-/** 站在页面里对账的节奏:进度环 1 秒重画一次,状态 60 秒拉一次(写操作直接回全量状态) */
+/** 站在页面里对账的节奏:数字 1 秒重画一次,状态 60 秒拉一次(写操作直接回全量状态) */
 const TICK_MS = 1000
 const POLL_MS = 60000
 /** 本地插值到点后提前对账,两次请求至少隔这么久(服务端才是入账方,这里只是让数字早点跟上) */
 const DUE_SYNC_GAP_MS = 1500
 const TABS = [
-  { value: 'SKILLS', key: 'games.homestead.tabSkills' },
+  { value: 'WORK', key: 'games.homestead.tabWork' },
   { value: 'BAG', key: 'games.homestead.tabBag' },
   { value: 'TOOLS', key: 'games.homestead.tabTools' },
+  { value: 'YARD', key: 'games.homestead.tabYard' },
 ]
+const SIDE_TABS = TABS.slice(1)
 const BAG_CATEGORIES = ['MATERIAL', 'PRODUCT', 'RARE']
-/** 工具阶数上限由内容表决定,这里只留一个兜底(内容缺失时不至于渲染出空槽) */
-const FALLBACK_TIERS = 5
 
 const router = useRouter()
 const { t, locale } = useI18n()
@@ -380,10 +482,11 @@ const loading = ref(true)
 const loadError = ref(false)
 const busy = ref(false)
 const syncing = ref(false)
-const pane = ref('SKILLS')
+/** 手机四页签与桌面右栏三个子页签共用一个状态:WORK 时桌面子页签默认落在「物品」 */
+const pane = ref('WORK')
 const selectedSkill = ref('')
 
-/** 进度环插值锚点:拿到 /state 的本地时刻;nowTick 每秒推进 */
+/** 进度条动画锚点:拿到 /state 的本地时刻;nowTick 每秒推进(只喂数字与到点对账) */
 const anchorAt = ref(Date.now())
 const nowTick = ref(Date.now())
 let syncedAt = 0
@@ -396,29 +499,34 @@ const rankFailed = ref(false)
 const rankRows = ref([])
 
 // ---------- 内容表与服务端状态 ----------
-const content = computed(() => state.value?.content || { skills: [], items: [], actions: [], tools: [], equipment: [] })
+const content = computed(
+  () => state.value?.content || { skills: [], items: [], actions: [], tools: [], equipment: [], buildings: [], gearSlots: [] },
+)
 const player = computed(() => state.value?.player || {})
 const coins = computed(() => Number(player.value.coins) || 0)
 const index = computed(() => Number(state.value?.index) || 0)
 const currentCode = computed(() => player.value.actionCode || null)
 const compact = (value) => formatCompact(value, locale.value)
 const listSep = computed(() => t('games.homestead.listSep'))
+const sideTab = computed(() => (pane.value === 'WORK' ? 'BAG' : pane.value))
 
-const codeMap = (list) => {
+const byCode = (list) => {
   const out = {}
   for (const def of list || []) out[def.code] = def
   return out
 }
-const skillMap = computed(() => codeMap(content.value.skills))
-const itemMap = computed(() => codeMap(content.value.items))
-const actionMap = computed(() => codeMap(content.value.actions))
+const skillMap = computed(() => byCode(content.value.skills))
+const itemMap = computed(() => byCode(content.value.items))
+const actionMap = computed(() => byCode(content.value.actions))
+const gearMap = computed(() => byCode(content.value.equipment))
+const buildingMap = computed(() => byCode(content.value.buildings))
+const toolByAction = computed(() => {
+  const out = {}
+  for (const tool of content.value.tools || []) out[tool.action] = tool
+  return out
+})
 
 const itemName = (code) => pickName(itemMap.value[code], locale.value)
-const pickDesc = (def) => {
-  if (!def) return ''
-  const en = String(locale.value).toLowerCase().startsWith('en')
-  return (en && def.descEn) || def.desc || ''
-}
 
 const levelBySkill = computed(() => {
   const out = {}
@@ -430,27 +538,31 @@ const tierByTool = computed(() => {
   for (const row of state.value?.tools || []) out[row.code] = Number(row.tier) || 0
   return out
 })
-const tierBySkill = computed(() => {
+const enhanceByGear = computed(() => {
   const out = {}
-  for (const def of content.value.tools || []) out[def.skill] = tierByTool.value[def.code] || 0
+  for (const row of state.value?.gear || []) out[row.code] = Number(row.enhance) || 0
   return out
 })
-/** 穿戴加成(服务端折叠好的基点汇总):动作耗时、卖价、离线上限都从这里取 */
-const gearBonus = computed(() => state.value?.gearBonus || {})
-const tierBySlot = computed(() => {
+const wornBySlot = computed(() => {
   const out = {}
-  for (const row of state.value?.gear || []) out[row.code] = Number(row.tier) || 0
+  for (const row of state.value?.wear || []) out[row.slot] = row.gearCode || null
   return out
 })
-const speedBonusOf = (skillCode) => gearSpeedBonus(gearBonus.value, skillMap.value[skillCode]?.kind)
-const capHours = computed(() => Number(gearBonus.value.capHours) || 24)
-const sellBonusBp = computed(() => Math.max(0, Number(gearBonus.value.sellBp) || 0))
+const levelByBuilding = computed(() => {
+  const out = {}
+  for (const row of state.value?.buildings || []) out[row.code] = Number(row.level) || 0
+  return out
+})
 const inventory = computed(() => {
   const out = {}
   for (const row of state.value?.items || []) out[row.code] = Number(row.qty) || 0
   return out
 })
 const levelOf = (skillCode) => levelBySkill.value[skillCode] || 1
+const buildingLevel = (code) => (code ? levelByBuilding.value[code] || 0 : 0)
+/** 服务端折叠好的当前动作加成(工具 + 穿戴 + 场地 + 生效 buff) */
+const bonus = computed(() => state.value?.bonus || {})
+const capHours = computed(() => Number(bonus.value.capHours) || 24)
 
 const skills = computed(() =>
   (state.value?.skills || []).map((row) => {
@@ -458,34 +570,155 @@ const skills = computed(() =>
     return {
       code: row.code,
       name: pickName(def, locale.value),
+      icon: def.icon || '·',
       kind: def.kind || 'GATHER',
       level: Number(row.level) || 1,
       percent: xpRatio(row) * 100,
-      toolTier: tierBySkill.value[row.code] || 0,
-      gearBp: gearSpeedBonus(gearBonus.value, def.kind || 'GATHER'),
+      maxed: Number(row.xpToNext) <= 0,
+    }
+  }),
+)
+const skillRows = skills
+
+const currentAction = computed(() => (currentCode.value ? actionMap.value[currentCode.value] || null : null))
+const currentTool = computed(() => (currentCode.value ? toolByAction.value[currentCode.value] || null : null))
+const currentTier = computed(() => (currentTool.value ? tierByTool.value[currentTool.value.code] || 0 : 0))
+const workingSkill = computed(() => currentAction.value?.skill || '')
+const activeSkill = computed(() => selectedSkill.value || workingSkill.value || skills.value[0]?.code || '')
+const currentIcon = computed(() => {
+  const def = skillMap.value[currentAction.value?.skill || activeSkill.value]
+  return def?.icon || '🌾'
+})
+
+/** 某一门工作吃到的加成:从服务端给的总量里换掉「当前动作的工具」那一份 */
+const bonusOf = (actionCode) => {
+  const tool = toolByAction.value[actionCode] || null
+  return actionBonus(bonus.value, currentTool.value, currentTier.value, tool, tool ? tierByTool.value[tool.code] || 0 : 0)
+}
+const xpText = (baseXp, xpBp) => {
+  const base = Number(baseXp) || 0
+  if (base <= 0) return 0
+  return Math.max(1, Math.floor((base * (10000 + Math.max(0, xpBp))) / 10000))
+}
+const perText = (ms) => {
+  const value = Math.max(0, Number(ms) || 0)
+  return value % 1000 === 0 ? String(value / 1000) : (value / 1000).toFixed(1)
+}
+
+const perItemMs = computed(() =>
+  currentAction.value ? msPerItem(currentAction.value, levelOf(currentAction.value.skill), bonus.value.speedBp) : 0,
+)
+const currentPerMs = computed(() => Number(state.value?.msPerItem) || perItemMs.value)
+const currentXp = computed(() => xpText(currentAction.value?.xp, bonus.value.xpBp))
+const currentYieldText = computed(() =>
+  (currentAction.value?.yields || []).map((out) => `${itemName(out.item)} ×${out.qty}`).join(listSep.value),
+)
+
+const elapsedMs = computed(() => Math.max(0, nowTick.value - anchorAt.value))
+/** 材料断了就不再让进度条空转(服务端那一刻的 progressMs 是 0,动画只是误导) */
+const currentMaterialsOut = computed(() => {
+  if (!currentAction.value) return false
+  return (
+    actionState(
+      currentAction.value,
+      levelOf(currentAction.value.skill),
+      inventory.value,
+      buildingLevel(currentAction.value.requireBuilding),
+    ) === 'MATERIALS'
+  )
+})
+const progress = computed(() =>
+  currentMaterialsOut.value ? { ratio: 0, remainingMs: 0, due: 0 } : progressOf(state.value, elapsedMs.value),
+)
+const remainingSec = computed(() => Math.max(1, Math.ceil(progress.value.remainingMs / 1000)))
+const speedPercent = computed(() => Math.round((Number(state.value?.speedBp) || 10000) / 100))
+
+/** 进度条:一条 CSS 循环动画,时长 = 单次耗时、负延迟 = 已走的毫秒(状态同步时才重设) */
+const progressStyle = computed(() => {
+  if (!currentAction.value || currentPerMs.value <= 0) return {}
+  const walked = Math.max(0, Number(player.value.progressMs) || 0)
+  return { '--hs-per': currentPerMs.value + 'ms', '--hs-delay': '-' + walked + 'ms' }
+})
+
+const bonusChips = computed(() => {
+  const rows = []
+  const push = (key, bp) => {
+    const value = Number(bp) || 0
+    if (value <= 0) return
+    rows.push(t('games.homestead.bonusValue', { label: t('games.homestead.bonus.' + key), p: bpToPercent(value) }))
+  }
+  push('speed', bonus.value.speedBp)
+  push('xp', bonus.value.xpBp)
+  push('yield', bonus.value.yieldBp)
+  push('rare', bonus.value.rareBp)
+  push('efficiency', bonus.value.efficiencyBp)
+  push('sell', bonus.value.sellBonusBp)
+  if (capHours.value > 24) rows.push(t('games.homestead.bonusCap', { label: t('games.homestead.bonus.cap'), h: capHours.value }))
+  return rows
+})
+
+const buffRows = computed(() =>
+  (state.value?.buffs || []).map((buff) => {
+    const left = countdownParts(buffRemainingMs(buff, elapsedMs.value))
+    return {
+      item: buff.item,
+      name: itemName(buff.item),
+      kind: buff.kind,
+      bp: Number(buff.bp) || 0,
+      leftText: t('games.homestead.buffLeft', {
+        m: left.minutes,
+        s: String(left.seconds).padStart(2, '0'),
+      }),
     }
   }),
 )
 
-const currentAction = computed(() => (currentCode.value ? actionMap.value[currentCode.value] || null : null))
-const workingSkill = computed(() => currentAction.value?.skill || '')
-const activeSkill = computed(() => selectedSkill.value || workingSkill.value || skills.value[0]?.code || '')
-const activeSkillDesc = computed(() => pickDesc(skillMap.value[activeSkill.value]))
-const skillActions = computed(() =>
-  (content.value.actions || []).filter((def) => def.skill === activeSkill.value).sort((a, b) => a.level - b.level),
+const activeActions = computed(() =>
+  (content.value.actions || [])
+    .filter((def) => def.skill === activeSkill.value)
+    .sort((a, b) => (a.requireBuilding ? 9000 : 0) + a.level - ((b.requireBuilding ? 9000 : 0) + b.level)),
 )
 
-const elapsedMs = computed(() => Math.max(0, nowTick.value - anchorAt.value))
-/** 材料断了就不再让进度环空转(服务端的 progressMs 那一刻是 0,动画只是误导) */
-const currentMaterialsOut = computed(() => !!currentAction.value && !hasMaterials(currentAction.value, inventory.value))
-const progress = computed(() =>
-  currentMaterialsOut.value ? { ratio: 0, remainingMs: 0, due: 0 } : progressOf(state.value, elapsedMs.value),
+const actionRows = computed(() =>
+  activeActions.value.map((def) => {
+    const level = levelOf(def.skill)
+    const own = bonusOf(def.code)
+    const perItem = msPerItem(def, level, own.speedBp)
+    const inputs = def.inputs || []
+    const missing = inputs.filter((need) => (inventory.value[need.item] || 0) < need.qty)
+    const amountText = (need) => `${itemName(need.item)} ×${need.qty}`
+    const state_ = actionState(def, level, inventory.value, buildingLevel(def.requireBuilding))
+    const tool = toolByAction.value[def.code]
+    const tier = tool ? tierByTool.value[tool.code] || 0 : 0
+    let tagText = ''
+    if (state_ === 'LOCKED') tagText = t('games.homestead.actionLocked', { n: def.level })
+    else if (state_ === 'BUILDING') {
+      const building = buildingMap.value[def.requireBuilding]
+      tagText = t('games.homestead.actionBuilding', {
+        name: building ? pickName(building, locale.value) : '',
+        n: def.requireBuildingLevel,
+      })
+    } else if (state_ === 'MATERIALS') tagText = t('games.homestead.actionLack')
+    return {
+      code: def.code,
+      name: pickName(def, locale.value),
+      level: Number(def.level) || 1,
+      xp: xpText(def.xp, own.xpBp),
+      per: perText(perItem),
+      state: state_,
+      tagText,
+      current: currentCode.value === def.code,
+      inputsText: inputs.map(amountText).join(listSep.value),
+      outputsText: (def.yields || []).map(amountText).join(listSep.value),
+      rarePercent: def.rare ? chancePercent(Math.min(5000, Number(def.rare.chanceBp) + own.rareBp)) : 0,
+      rareText: def.rare ? amountText(def.rare) : '',
+      missingText: missing.map((need) => `${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`).join(listSep.value),
+      toolText: tool ? t('games.homestead.toolTier', { n: tier, max: (tool.steps || []).length }) : '',
+    }
+  }),
 )
-const barPercent = computed(() => Math.round(progress.value.ratio * 100))
-const remainingSec = computed(() => Math.max(1, Math.ceil(progress.value.remainingMs / 1000)))
-const speedPercent = computed(() => Math.round((Number(state.value?.speedBp) || 10000) / 100))
 
-// ---------- 赶集日行情(价格与额度全由服务端算,这里只展示) ----------
+// ---------- 物品栏 ----------
 const market = computed(() => state.value?.market || { quota: 0, orders: [] })
 const marketOrderMap = computed(() => {
   const out = {}
@@ -501,7 +734,7 @@ const marketOrders = computed(() =>
     remaining: Number(order.remaining) || 0,
   })),
 )
-/** 换货倒计时:以服务端 serverNow 为锚,本地只补流逝(和进度环同一套口径) */
+/** 换货倒计时:以服务端 serverNow 为锚,本地只补流逝(和进度条同一套口径) */
 const marketResetText = computed(() => {
   const resetAt = Number(market.value.resetAt) || 0
   const serverNow = Number(state.value?.serverNow) || 0
@@ -515,98 +748,173 @@ const marketResetText = computed(() => {
     : t('games.homestead.market.resetMinutes', { m: Math.max(1, minutes) })
 })
 
-const actionRows = computed(() =>
-  skillActions.value.map((def) => {
-    const level = levelOf(def.skill)
-    const tier = tierBySkill.value[def.skill] || 0
-    const perItem = msPerItem(def, level, tier, speedBonusOf(def.skill))
-    const inputs = def.inputs || []
-    const missing = inputs.filter((need) => (inventory.value[need.item] || 0) < need.qty)
-    const amountText = (need) => `${itemName(need.item)} ×${need.qty}`
+/** 加成效果文案(工具/装备/场地共用):基点转百分比,带目标类别时前置「采集·」 */
+const effectText = (effect) => {
+  if (!effect) return ''
+  const text = t('games.homestead.effect.' + effect.kind, {
+    p: bpToPercent(effect.bp),
+    h: Number(effect.hours) || 0,
+  })
+  const target = effect.target
+  if (!target || target === 'ALL' || target === 'ACTION') return text
+  return t('games.homestead.effectTargeted', { target: t('games.homestead.effectTarget.' + target), text })
+}
+const effectsText = (list) => (list || []).map(effectText).filter(Boolean).join(listSep.value)
+
+const bagGroups = computed(() =>
+  BAG_CATEGORIES.map((category) => ({
+    category,
+    rows: (state.value?.items || [])
+      .filter((row) => (itemMap.value[row.code]?.category || 'MATERIAL') === category)
+      .map((row) => {
+        const def = itemMap.value[row.code] || {}
+        const order = marketOrderMap.value[row.code]
+        const boosted = !!order && Number(order.remaining) > 0
+        const buff = def.buff
+        return {
+          code: row.code,
+          name: pickName(def, locale.value),
+          qty: Number(row.qty) || 0,
+          // 赶集日额度内显示溢价,再叠上卖价加成(实际入账仍以服务端返回为准)
+          price: sellCoinsWithBonus((boosted ? order.price : def.sellPrice) || 0, bonus.value.sellBonusBp),
+          boosted,
+          consumable: !!buff,
+          buffText: buff
+            ? t('games.homestead.buffText', {
+                kind: t('games.homestead.buffKind.' + buff.kind),
+                p: bpToPercent(buff.bp),
+                m: buff.minutes,
+              })
+            : '',
+        }
+      }),
+  })).filter((group) => group.rows.length > 0),
+)
+const itemKinds = computed(() => bagGroups.value.reduce((sum, group) => sum + group.rows.length, 0))
+
+// ---------- 工具与穿戴 ----------
+/** 花费文案 + 缺口文案(工具/装备/场地共用) */
+function costTextOf(step) {
+  if (!step) return ''
+  const mats = (step.materials || []).map((need) => `${itemName(need.item)} ×${need.qty}`)
+  return mats.length
+    ? t('games.homestead.costItems', { coins: compact(step.coins), items: mats.join(listSep.value) })
+    : t('games.homestead.costCoins', { coins: compact(step.coins) })
+}
+function lackTextOf(gap) {
+  const rows = []
+  if (gap.missingCoins > 0) rows.push(`${t('games.homestead.coins')} ×${compact(gap.missingCoins)}`)
+  for (const need of gap.missingItems || []) {
+    rows.push(`${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`)
+  }
+  return rows.join(listSep.value)
+}
+
+const toolRows = computed(() =>
+  activeActions.value.map((actionDef) => {
+    const tool = toolByAction.value[actionDef.code]
+    if (!tool) {
+      return {
+        code: actionDef.code,
+        name: '',
+        actionName: pickName(actionDef, locale.value),
+        tier: 0,
+        max: 0,
+        maxed: true,
+        ok: false,
+        costText: '',
+        lackText: '',
+        levelOk: true,
+        requireLevel: 1,
+        effectText: '',
+      }
+    }
+    const tier = tierByTool.value[tool.code] || 0
+    const steps = tool.steps || []
+    const step = steps[tier] || null
+    const gap = costGap(step, coins.value, inventory.value)
+    const levelOk = levelOf(tool.skill) >= (Number(tool.requireLevel) || 1)
     return {
-      code: def.code,
-      name: pickName(def, locale.value),
-      level: Number(def.level) || 1,
-      xp: Number(def.xp) || 0,
-      per: (perItem / 1000).toFixed(perItem % 1000 === 0 ? 0 : 1),
-      state: actionState(def, level, inventory.value),
-      current: currentCode.value === def.code,
-      inputsText: inputs.map(amountText).join(listSep.value),
-      outputsText: (def.yields || []).map(amountText).join(listSep.value),
-      rareText: def.rare ? amountText(def.rare) : '',
-      rareEvery: def.rare?.every || 0,
-      missingText: missing.map((need) => `${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`).join(listSep.value),
+      code: tool.code,
+      name: pickName(tool, locale.value),
+      actionName: pickName(actionDef, locale.value),
+      tier,
+      max: steps.length,
+      maxed: gap.maxed,
+      ok: gap.ok && levelOk,
+      costText: costTextOf(step),
+      lackText: lackTextOf(gap),
+      levelOk,
+      requireLevel: Number(tool.requireLevel) || 1,
+      effectText: effectsText(tool.effects),
     }
   }),
 )
 
-const bagGroups = computed(() => {
-  const rows = (state.value?.items || []).map((row) => {
-    const def = itemMap.value[row.code] || {}
-    const order = marketOrderMap.value[row.code]
-    const boosted = !!order && Number(order.remaining) > 0
-    return {
-      code: row.code,
-      name: pickName(def, locale.value),
-      qty: Number(row.qty) || 0,
-      // 赶集日额度内显示溢价,再叠上穿戴在卖价上的加成(实际入账仍以服务端返回为准)
-      price: sellCoinsWithBonus((boosted ? order.price : def.sellPrice) || 0, sellBonusBp.value),
-      boosted,
-      category: def.category || 'MATERIAL',
-    }
-  })
-  return BAG_CATEGORIES.map((category) => ({ category, rows: rows.filter((row) => row.category === category) })).filter(
-    (group) => group.rows.length > 0,
-  )
-})
-const itemKinds = computed(() => bagGroups.value.reduce((sum, group) => sum + group.rows.length, 0))
-
-/** 工具与穿戴共用一张升阶卡:阶数、进度点、花费、缺什么 */
-function upgradeView(def, tier) {
-  const steps = def.steps || []
-  const step = steps[tier] || null
-  const check = toolUpgradeCheck(def, tier, coins.value, inventory.value)
-  const mats = (step?.materials || []).map((need) => `${itemName(need.item)} ×${need.qty}`)
-  const lack = []
-  if (step && check.missingCoins > 0) lack.push(`${t('games.homestead.coins')} ×${compact(check.missingCoins)}`)
-  for (const need of check.missingItems || []) {
-    lack.push(`${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`)
-  }
-  return {
-    code: def.code,
-    name: pickName(def, locale.value),
-    desc: pickDesc(def),
-    tier,
-    max: steps.length || FALLBACK_TIERS,
-    maxed: check.maxed,
-    ok: check.ok,
-    costText: !step
-      ? ''
-      : mats.length
-        ? t('games.homestead.toolCost', { coins: compact(step.coins), items: mats.join(listSep.value) })
-        : t('games.homestead.toolCostCoins', { coins: compact(step.coins) }),
-    lackText: lack.join(listSep.value),
-  }
-}
-
-const toolRows = computed(() => (content.value.tools || []).map((def) => upgradeView(def, tierByTool.value[def.code] || 0)))
-
-/** 穿戴效果文案:每阶加成,币值口径与内容表一致(基点 → 百分比) */
-const gearEffectText = (effect) => {
-  if (!effect) return ''
-  if (effect.kind === 'SPEED') {
-    const key = effect.target === 'GATHER' ? 'speedGather' : effect.target === 'PROCESS' ? 'speedProcess' : 'speedAll'
-    return t('games.homestead.gear.' + key, { p: bpToPercent(effect.bp) })
-  }
-  if (effect.kind === 'OFFLINE_CAP') return t('games.homestead.gear.cap', { h: effect.hours })
-  if (effect.kind === 'SELL_BONUS') return t('games.homestead.gear.sell', { p: bpToPercent(effect.bp) })
-  return ''
-}
-const gearRows = computed(() =>
-  (content.value.equipment || []).map((def) => ({
-    ...upgradeView(def, tierBySlot.value[def.code] || 0),
-    effectText: gearEffectText(def.effect),
+const gearGroups = computed(() =>
+  (content.value.gearSlots || []).map((slot) => ({
+    slot,
+    name: t('games.homestead.slot.' + slot),
+    items: (content.value.equipment || [])
+      .filter((gear) => gear.slot === slot)
+      .map((gear) => {
+        const owned = Object.prototype.hasOwnProperty.call(enhanceByGear.value, gear.code)
+        const enhance = owned ? enhanceByGear.value[gear.code] : 0
+        const max = (gear.steps || []).length
+        const maxed = owned && enhance >= max
+        const step = owned ? gear.steps?.[enhance] : gear.craft
+        const gap = costGap(maxed ? null : step, coins.value, inventory.value)
+        const levelOk = levelOf(gear.skill) >= (Number(gear.requireLevel) || 1)
+        const worn = wornBySlot.value[slot] === gear.code
+        return {
+          code: gear.code,
+          name: pickName(gear, locale.value),
+          owned,
+          worn,
+          enhance,
+          max,
+          maxed,
+          canWear: levelOk,
+          levelOk,
+          requireLevel: Number(gear.requireLevel) || 1,
+          effectText: effectsText(gear.effects),
+          costText: costTextOf(maxed ? null : step),
+          lackText: maxed ? '' : lackTextOf(gap),
+          ok: !maxed && gap.ok && levelOk,
+          stateText: !owned
+            ? t('games.homestead.level', { n: gear.requireLevel })
+            : maxed
+              ? t('games.homestead.toolMaxed')
+              : t('games.homestead.gear.enhanceLevel', { n: enhance, max }),
+          buttonText: !owned ? t('games.homestead.gear.craft') : t('games.homestead.gear.enhance'),
+        }
+      }),
   })),
+)
+
+// ---------- 场地 ----------
+const buildingRows = computed(() =>
+  (content.value.buildings || []).map((def) => {
+    const level = buildingLevel(def.code)
+    const maxLevel = Number(def.maxLevel) || 10
+    const maxed = level >= maxLevel
+    const step = maxed ? null : def.steps?.[level]
+    const gap = costGap(step, coins.value, inventory.value)
+    const action = def.unlockAction ? actionMap.value[def.unlockAction] : null
+    return {
+      code: def.code,
+      name: pickName(def, locale.value),
+      icon: def.icon || '🏠',
+      level,
+      maxLevel,
+      maxed,
+      ok: !maxed && gap.ok,
+      costText: costTextOf(step),
+      lackText: maxed ? '' : lackTextOf(gap),
+      effectText: effectsText(def.effects),
+      unlockText: action ? t('games.homestead.yard.unlock', { name: pickName(action, locale.value) }) : '',
+    }
+  }),
 )
 
 // ---------- 离线摘要文案 ----------
@@ -684,16 +992,28 @@ async function runOp(call) {
 
 const startAction = (code) => {
   const def = actionMap.value[code]
-  const level = def ? levelOf(def.skill) : 1
-  if (!def || actionState(def, level, inventory.value) !== 'READY') return
+  if (!def) return
+  const stateOf = actionState(def, levelOf(def.skill), inventory.value, buildingLevel(def.requireBuilding))
+  if (stateOf !== 'READY') return
   runOp((key) => homesteadApi.action(code, key))
 }
 const stopAction = () => runOp((key) => homesteadApi.stop(key))
 const sellItem = (code, qty) => {
   if (qty > 0) runOp((key) => homesteadApi.sell(code, qty, key))
 }
-const upgradeTool = (code) => runOp((key) => homesteadApi.tool(code, key))
-const upgradeGear = (code) => runOp((key) => homesteadApi.equipment(code, key))
+const eatItem = (code) => runOp((key) => homesteadApi.consume(code, 1, key))
+const craftTool = (code) => runOp((key) => homesteadApi.tool(code, key))
+const gearAction = (gear) => {
+  if (!gear.owned) runOp((key) => homesteadApi.craftGear(gear.code, key))
+  else if (!gear.maxed) runOp((key) => homesteadApi.enhanceGear(gear.code, key))
+}
+const toggleWear = (gear) => {
+  const slot = gearMap.value[gear.code]?.slot
+  if (!slot) return
+  if (gear.worn) runOp((key) => homesteadApi.wear(slot, '', key))
+  else runOp((key) => homesteadApi.wear(slot, gear.code, key))
+}
+const upgradeBuilding = (code) => runOp((key) => homesteadApi.building(code, key))
 
 async function openRanking() {
   rankOpen.value = true
@@ -701,7 +1021,10 @@ async function openRanking() {
   rankFailed.value = false
   try {
     const res = await homesteadApi.ranking()
-    rankRows.value = Array.isArray(res?.ranking) ? res.ranking : []
+    const rows = Array.isArray(res?.ranking) ? [...res.ranking] : []
+    // 自己排在榜尾之外(家庭人多时)也要能看到自己的名次,否则榜单没有参照
+    if (res?.me && !rows.some((row) => row.isMe || row.userId === res.me.userId)) rows.push(res.me)
+    rankRows.value = rows
   } catch {
     rankFailed.value = true
     rankRows.value = []
@@ -741,8 +1064,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 页面结构:技能列(选择器) | 动作区 | 背包与工具。宽屏三块各自滚动;
-   中等宽度技能列收成顶部横条,整块纵向滚动;手机上再收成三个分页(外壳横屏两栏不受影响)。 */
+/* 页面结构:工作门类(选择器) | 当前工作 + 具体工作卡片 | 物品/工具/场地三个子页签。
+   宽屏三块各自滚动;中等宽度门类收成顶部横条、整块纵向滚动;手机上收成四个页签。 */
 .hs-wrap {
   display: flex;
   flex-direction: column;
@@ -759,7 +1082,7 @@ onBeforeUnmount(() => {
 .hs-tab {
   flex: 1 1 0;
   height: var(--gs-control-h);
-  padding: 0 10px;
+  padding: 0 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--gs-radius);
   background: none;
@@ -799,34 +1122,26 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  /* 站点内容列最宽只有 836px(侧栏 230 + studio 上限),三栏按这个宽度设计:
-     176 技能列 + 动作区 + 236~288 背包/工具 */
-  grid-template-columns: 176px minmax(0, 1fr);
-  gap: var(--gs-gap);
-}
-.hs-main {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(232px, 30%, 288px);
+  /* 站点内容列最宽 836px:168 门类 + 中间工作区 + 254~300 右栏 */
+  grid-template-columns: 168px minmax(0, 1fr) clamp(252px, 32%, 300px);
   gap: var(--gs-gap);
 }
 
-/* --- 技能列 --- */
+/* --- 工作门类 --- */
 .hs-rail {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .hs-skill {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 7px 9px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--gs-radius);
   background: rgb(var(--color-card-rgb) / 45%);
@@ -842,12 +1157,31 @@ onBeforeUnmount(() => {
   border-color: var(--gs-accent);
   background: rgb(var(--color-brand-rgb) / 9%);
 }
+.hs-skill-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1;
+}
+.hs-skill-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hs-skill-name {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hs-skill.is-working .hs-skill-name::after {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 5px;
+  width: 5px;
+  height: 5px;
+  margin-left: 4px;
   border-radius: 50%;
   background: var(--gs-accent);
   vertical-align: middle;
@@ -857,26 +1191,6 @@ onBeforeUnmount(() => {
   50% {
     opacity: 0.25;
   }
-}
-.hs-skill-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-.hs-skill-name {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-skill-lv {
-  flex: 0 0 auto;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-secondary);
 }
 .hs-skill-bar {
   display: block;
@@ -892,21 +1206,15 @@ onBeforeUnmount(() => {
   background: var(--gs-accent);
   transition: width 0.4s ease;
 }
-.hs-skill-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 10.5px;
-  color: var(--color-text-tertiary);
-}
-.hs-skill-side {
+.hs-skill-lv {
   flex: 0 0 auto;
-  display: inline-flex;
-  gap: 6px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
 }
 
-/* --- 动作区 --- */
-.hs-actions {
+/* --- 中间:当前工作 + 工作卡片 --- */
+.hs-main {
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -920,7 +1228,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   border: 1px solid var(--color-border);
   border-radius: var(--gs-radius);
   background: rgb(var(--color-card-rgb) / 55%);
@@ -928,160 +1236,264 @@ onBeforeUnmount(() => {
 .hs-now.is-warn {
   border-color: rgb(var(--color-danger-rgb) / 35%);
 }
-.hs-now-row {
+.hs-now-top {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.hs-now-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-now-left {
+.hs-now-icon {
   flex: 0 0 auto;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-secondary);
+  font-size: 20px;
+  line-height: 1;
 }
-.hs-bar {
-  display: block;
-  height: 5px;
-  border-radius: 3px;
-  background: rgb(var(--color-brand-rgb) / 14%);
-  overflow: hidden;
-}
-.hs-bar b {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--gs-accent);
-}
-.hs-now-hint {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--color-text-tertiary);
-}
-.hs-now.is-warn .hs-now-hint {
-  color: var(--color-danger);
-}
-.hs-act-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.hs-act {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--gs-radius);
-  background: rgb(var(--color-card-rgb) / 45%);
-}
-.hs-act.is-current {
-  border-color: var(--gs-accent);
-  background: rgb(var(--color-brand-rgb) / 8%);
-}
-.hs-act.is-locked {
-  opacity: 0.62;
-}
-.hs-act-info {
+.hs-now-text {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.hs-act-head {
+.hs-now-title {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-now-sub {
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 4px;
+  background: rgb(var(--color-brand-rgb) / 14%);
+  overflow: hidden;
+}
+/* 连续进度:一个循环的 scaleX 动画,时长=单次耗时、负延迟=已走部分;不占 JS 帧 */
+.hs-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gs-accent);
+  transform-origin: left center;
+  animation: hs-sweep var(--hs-per, 3000ms) linear infinite;
+  animation-delay: var(--hs-delay, 0ms);
+}
+@keyframes hs-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.hs-now-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.hs-now-left {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.hs-now-out {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-tertiary);
+}
+.hs-now-hint {
+  min-width: 0;
+  color: var(--color-danger);
+}
+.hs-now-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.hs-bonus {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgb(var(--color-brand-rgb) / 12%);
+  color: var(--gs-accent);
+  font-size: 10.5px;
+  line-height: 17px;
+  font-weight: 600;
+}
+.hs-buffs {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--color-text-tertiary);
 }
-.hs-act-name {
-  font-size: 13px;
+.hs-buffs-label {
+  flex: 0 0 auto;
   font-weight: 600;
 }
-.hs-act-tag {
+.hs-buff {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgb(var(--color-card-rgb) / 60%);
+  border: 1px solid var(--color-border);
+  line-height: 17px;
+}
+.hs-buff em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--gs-accent);
+}
+.hs-buff.is-xp {
+  color: var(--color-text-secondary);
+}
+.hs-buff-empty {
+  opacity: 0.75;
+}
+.hs-cards {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  align-content: start;
+  gap: 6px;
+}
+.hs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--gs-radius);
+  background: rgb(var(--color-card-rgb) / 45%);
+}
+.hs-card.is-current {
+  border-color: var(--gs-accent);
+  background: rgb(var(--color-brand-rgb) / 8%);
+}
+.hs-card.is-locked,
+.hs-card.is-building {
+  opacity: 0.66;
+}
+.hs-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.hs-card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.hs-card-lv {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.hs-card-tag {
+  align-self: flex-start;
+  margin: 0;
   padding: 0 5px;
   border-radius: 4px;
-  font-size: 10.5px;
+  font-size: 10px;
   line-height: 16px;
-  font-style: normal;
-}
-.hs-act-tag.is-lock {
   background: rgb(var(--color-brand-rgb) / 12%);
   color: var(--color-text-secondary);
 }
-.hs-act-tag.is-warn {
+.hs-card-tag.is-materials {
   background: rgb(var(--color-danger-rgb) / 12%);
   color: var(--color-danger);
 }
-.hs-act-tag.is-live {
-  background: rgb(var(--color-brand-rgb) / 16%);
-  color: var(--gs-accent);
-}
-.hs-act-meta {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-.hs-act-io {
-  font-size: 11px;
+.hs-card-line {
+  margin: 0;
+  font-size: 10.5px;
   line-height: 1.45;
   color: var(--color-text-tertiary);
 }
-.hs-act-io.is-rare {
+.hs-card-line.is-rare {
   color: var(--color-warning);
 }
-.hs-act-io.is-warn {
+.hs-card-line.is-warn {
   color: var(--color-danger);
 }
-.hs-act-go {
-  flex: 0 0 auto;
-  min-width: 56px;
-  height: 28px;
-  padding: 0 10px;
+.hs-card-line.is-tool {
+  color: var(--color-text-secondary);
+}
+.hs-card-go {
+  margin-top: 2px;
+  height: 26px;
   border: 0;
   border-radius: 8px;
   background: var(--gs-accent);
   color: var(--color-brand-text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
-.hs-act-go.is-stop {
+.hs-card-go.is-stop {
   background: none;
   border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
 }
-.hs-act-go:disabled {
+.hs-card-go:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 
-/* --- 背包与工具(右栏) --- */
+/* --- 右栏:三个子页签 --- */
 .hs-side {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gs-gap);
+  gap: 6px;
+}
+.hs-subtabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 5px;
+}
+.hs-subtab {
+  flex: 1 1 0;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hs-subtab.is-on {
+  border-color: var(--gs-accent);
+  background: rgb(var(--color-brand-rgb) / 10%);
+  color: var(--gs-accent);
+  font-weight: 600;
+}
+.hs-side-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.hs-bag,
-.hs-tools {
-  flex: 0 0 auto;
+.hs-pane {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--gs-gap);
 }
 .hs-pane-title {
   display: flex;
@@ -1093,15 +1505,29 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 .hs-pane-title em {
-  font-size: 10.5px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 400;
+  line-height: 1.35;
+  text-align: right;
+  color: var(--color-text-tertiary);
+}
+.hs-sub {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+.hs-empty {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
   color: var(--color-text-tertiary);
 }
 
-/* --- 赶集日(右栏顶部,和背包一起看) --- */
+/* --- 赶集日 --- */
 .hs-market {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1143,28 +1569,27 @@ onBeforeUnmount(() => {
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
-.hs-sub {
-  margin: 4px 0 0;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--color-text-tertiary);
-}
-.hs-empty {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--color-text-tertiary);
+
+/* --- 物品 --- */
+.hs-bag {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .hs-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 8px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: rgb(var(--color-card-rgb) / 40%);
   font-size: 12px;
+}
+.hs-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 .hs-item-name {
   flex: 1 1 auto;
@@ -1187,10 +1612,122 @@ onBeforeUnmount(() => {
   color: var(--color-warning);
   font-weight: 600;
 }
-.hs-item-btns {
+.hs-item-buff {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--gs-accent);
+}
+.hs-item-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* --- 工具 / 穿戴 / 场地(同一张紧凑卡) --- */
+.hs-tools,
+.hs-gear,
+.hs-yard {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.hs-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--gs-radius);
+  background: rgb(var(--color-card-rgb) / 40%);
+}
+.hs-tool.is-maxed {
+  background: rgb(var(--color-brand-rgb) / 7%);
+}
+.hs-tool.is-worn {
+  border-color: var(--gs-accent);
+}
+.hs-tool-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.hs-tool-icon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1;
+}
+.hs-tool-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-tool-tier {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.hs-tool-sub {
+  margin: 0;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+.hs-steps {
+  display: flex;
+  gap: 3px;
+}
+.hs-steps b {
+  flex: 1 1 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(var(--color-brand-rgb) / 14%);
+}
+.hs-steps b.is-on {
+  background: var(--gs-accent);
+}
+.hs-tool-effect {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--gs-accent);
+}
+.hs-tool-desc {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--color-text-tertiary);
+}
+.hs-tool-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.hs-tool-btns {
   flex: 0 0 auto;
   display: flex;
   gap: 4px;
+}
+.hs-tool-cost {
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.hs-tool-cost em {
+  display: block;
+  font-style: normal;
+  color: var(--color-danger);
+}
+.hs-yard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 .hs-mini {
   height: 22px;
@@ -1213,75 +1750,6 @@ onBeforeUnmount(() => {
 .hs-mini:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-.hs-tool {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 7px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--gs-radius);
-  background: rgb(var(--color-card-rgb) / 40%);
-}
-.hs-tool.is-maxed {
-  background: rgb(var(--color-brand-rgb) / 7%);
-}
-.hs-tool-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-.hs-tool-name {
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.hs-tool-tier {
-  flex: 0 0 auto;
-  font-size: 10.5px;
-  color: var(--color-text-secondary);
-}
-.hs-tool-steps {
-  display: flex;
-  gap: 3px;
-}
-.hs-tool-steps b {
-  flex: 1 1 0;
-  height: 3px;
-  border-radius: 2px;
-  background: rgb(var(--color-brand-rgb) / 14%);
-}
-.hs-tool-steps b.is-on {
-  background: var(--gs-accent);
-}
-.hs-tool-effect {
-  margin: 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--gs-accent);
-}
-.hs-tool-desc {
-  margin: 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--color-text-tertiary);
-}
-.hs-tool-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.hs-tool-cost {
-  min-width: 0;
-  font-size: 10.5px;
-  line-height: 1.45;
-  color: var(--color-text-secondary);
-}
-.hs-tool-cost em {
-  display: block;
-  font-style: normal;
-  color: var(--color-danger);
 }
 
 /* --- 弹窗 --- */
@@ -1352,7 +1820,7 @@ onBeforeUnmount(() => {
   padding: 6px 0;
 }
 
-/* --- 中等宽度(容器 <780):技能列变顶部横条,整块纵向滚动 ---
+/* --- 中等宽度(容器 <780):门类变顶部横条,三块纵向堆叠 ---
    断点按游戏区实际宽度定而不是视口:站点内容列最宽 836px,写 979 的话桌面永远进不了三栏 */
 @container (max-width: 779px) {
   .hs-grid {
@@ -1371,29 +1839,30 @@ onBeforeUnmount(() => {
   .hs-skill {
     flex: 1 1 128px;
   }
-  .hs-main {
-    display: block;
-  }
-  .hs-actions,
-  .hs-side {
+  .hs-main,
+  .hs-side-body {
     overflow: visible;
   }
   .hs-side {
     margin-top: var(--gs-gap);
   }
-  .hs-market,
-  .hs-bag,
-  .hs-tools {
+  .hs-subtabs {
     margin-bottom: 6px;
+  }
+  .hs-cards {
+    grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  }
+  .hs-yard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   }
 }
 
-/* --- 手机:三个分页,一次只看一块 --- */
+/* --- 手机(容器 <660):四个页签,一次只看一块 --- */
 @container (max-width: 659px) {
   .hs-tabs {
     display: flex;
   }
-  /* 技能页高度有限,技能回一行可横划的条(触屏习惯动作);隐藏原生滚动条,不占布局盒 */
+  /* 工作页高度有限,门类回一行可横划的条(触屏习惯动作);隐藏原生滚动条,不占布局盒 */
   .hs-rail {
     flex-direction: row;
     flex-wrap: nowrap;
@@ -1407,27 +1876,27 @@ onBeforeUnmount(() => {
     display: none;
   }
   .hs-skill {
-    flex: 0 0 132px;
+    flex: 0 0 138px;
   }
-  .hs-wrap[data-pane='SKILLS'] .hs-side,
+  /* 手机上一屏只看一块:侧栏自己的三个子页签收起(顶部主标签已经在切) */
+  .hs-subtabs {
+    display: none;
+  }
+  .hs-wrap[data-pane='WORK'] .hs-side,
   .hs-wrap[data-pane='BAG'] .hs-rail,
-  .hs-wrap[data-pane='BAG'] .hs-actions,
-  .hs-wrap[data-pane='BAG'] .hs-tools,
+  .hs-wrap[data-pane='BAG'] .hs-main,
   .hs-wrap[data-pane='TOOLS'] .hs-rail,
-  .hs-wrap[data-pane='TOOLS'] .hs-actions,
-  .hs-wrap[data-pane='TOOLS'] .hs-market,
-  .hs-wrap[data-pane='TOOLS'] .hs-bag {
+  .hs-wrap[data-pane='TOOLS'] .hs-main,
+  .hs-wrap[data-pane='YARD'] .hs-rail,
+  .hs-wrap[data-pane='YARD'] .hs-main {
     display: none;
   }
   .hs-side {
     margin-top: 0;
   }
-  .hs-act-go {
-    min-width: 52px;
-  }
 }
 
-/* 鼠标设备(含窄窗口的桌面)不靠横划取技能:把技能条换成换行铺开,滚轮即可看到全部 */
+/* 鼠标设备(含窄窗口的桌面)不靠横划取门类:把门类条换成换行铺开,滚轮即可看到全部 */
 @media (hover: hover) {
   @container (max-width: 659px) {
     .hs-rail {

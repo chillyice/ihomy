@@ -2,22 +2,29 @@ package com.ihomy.homestead.core;
 
 import com.ihomy.homestead.HomesteadConst;
 import com.ihomy.homestead.content.ActionDef;
+import com.ihomy.homestead.content.HomesteadContent;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * 小院慢生活的结算引擎(纯函数,唯一数值口径)。
  * <p>
- * 约定:整数毫秒 / 基点倍率,不取时钟(now 由调用方给),不用浮点,不用随机数
- * (稀有产出按动作累计次数 seq % every 确定性发放),因此离线补算与单测都可精确复现。
+ * 约定:整数毫秒 / 基点倍率,不取时钟(now 由调用方给),不用浮点,不用随机数生成器。
  * <p>
- * 一次结算只推进「当前一个动作」:挂机时长先按档位上限封顶(默认 24h,穿鞋后放宽),
- * 再按「升到下一级所需次数」分段,每段用该段起点的等级/工具/穿戴重算单次耗时(升级会变快),
- * 材料耗尽即停在 MATERIALS。
+ * 「概率」全部是确定性掷点:每次完成用 {@code mix64(seed ^ actionHash ^ (seq+1)*GOLDEN)}
+ * 切三段比特分别判省料 / 多收 / 稀有,同一玩家同一动作同一次数永远得到同一结果,
+ * 因此离线补算、重连补算与单测都能精确复现(刷新页面不会重掷)。
+ * <p>
+ * 一次结算只推进「当前一个动作」:挂机时长先按加成上限封顶(默认 24h,仓房/鞋可放宽),
+ * 之后逐次完成——每次按当时等级与生效中的料理 buff 重算单次耗时/加成,材料耗尽停在 MATERIALS。
  */
 public final class HomesteadEngine {
+
+    private static final long GOLDEN = 0x9E3779B97F4A7C15L;
 
     private HomesteadEngine() {
     }
@@ -27,26 +34,36 @@ public final class HomesteadEngine {
             ActionDef action,
             int level,
             long xp,
-            int toolTier,
             long actionSeq,
             long progressMs,
             long lastSettleAt,
             long now,
             Map<String, Long> materials,
-            int speedBonusBp,
-            long capMs) {
+            HomesteadBonus.Bonus bonus,
+            List<HomesteadBonus.BuffSpan> buffs,
+            long capMs,
+            long seed) {
 
         public SettleInput {
             materials = materials == null ? Map.of() : Map.copyOf(materials);
-            speedBonusBp = Math.max(0, speedBonusBp);
+            bonus = bonus == null ? HomesteadBonus.NONE : bonus;
+            buffs = buffs == null ? List.of() : List.copyOf(buffs);
             capMs = capMs > 0 ? capMs : HomesteadConst.OFFLINE_CAP_MS;
         }
 
-        /** 未穿戴时的写法(离线上限取全局默认) */
-        public SettleInput(ActionDef action, int level, long xp, int toolTier, long actionSeq,
-                           long progressMs, long lastSettleAt, long now, Map<String, Long> materials) {
-            this(action, level, xp, toolTier, actionSeq, progressMs, lastSettleAt, now, materials,
-                    0, HomesteadConst.OFFLINE_CAP_MS);
+        /** 口袋写法:上限取静态加成的 capMs,不做掷点扰动(seed=0) */
+        public SettleInput(ActionDef action, int level, long xp, long actionSeq, long progressMs,
+                           long lastSettleAt, long now, Map<String, Long> materials,
+                           HomesteadBonus.Bonus bonus) {
+            this(action, level, xp, actionSeq, progressMs, lastSettleAt, now, materials,
+                    bonus, List.of(), bonus == null ? HomesteadConst.OFFLINE_CAP_MS : bonus.capMs(), 0L);
+        }
+
+        /** 无任何加成的写法(单测与徒手采集) */
+        public SettleInput(ActionDef action, int level, long xp, long actionSeq, long progressMs,
+                           long lastSettleAt, long now, Map<String, Long> materials) {
+            this(action, level, xp, actionSeq, progressMs, lastSettleAt, now, materials,
+                    HomesteadBonus.NONE);
         }
     }
 
@@ -71,27 +88,16 @@ public final class HomesteadEngine {
         }
     }
 
-    /** 当前速度倍率(基点):10000 + (等级-1)×100 + 工具阶×800 */
-    public static long speedBp(int level, int toolTier) {
-        return speedBp(level, toolTier, 0);
-    }
-
-    /** 含穿戴加成的速度倍率:在上面基础上加穿戴给的基点(采集/加工/全部已由 HomesteadGear 折叠) */
-    public static long speedBp(int level, int toolTier, int speedBonusBp) {
+    /** 当前速度倍率(基点):10000 + (等级-1)×100 + 各项加成 */
+    public static long speedBp(int level, int bonusBp) {
         return HomesteadConst.SPEED_BASE_BP
                 + (long) Math.max(0, level - 1) * HomesteadConst.LEVEL_STEP_BP
-                + (long) Math.max(0, toolTier) * HomesteadConst.TOOL_STEP_BP
-                + Math.max(0, speedBonusBp);
+                + Math.max(0, bonusBp);
     }
 
     /** 单次动作耗时:ceil(baseMs × 10000 / speedBp),至少 1ms */
-    public static long msPerItem(long baseMs, int level, int toolTier) {
-        return msPerItem(baseMs, level, toolTier, 0);
-    }
-
-    /** 含穿戴加成的单次动作耗时(与 speedBp 同口径) */
-    public static long msPerItem(long baseMs, int level, int toolTier, int speedBonusBp) {
-        long speedBp = speedBp(level, toolTier, speedBonusBp);
+    public static long msPerItem(long baseMs, int level, int bonusBp) {
+        long speedBp = speedBp(level, bonusBp);
         long ms = (baseMs * HomesteadConst.SPEED_BASE_BP + speedBp - 1) / speedBp;
         return Math.max(1L, ms);
     }
@@ -99,15 +105,15 @@ public final class HomesteadEngine {
     /**
      * 结算。
      *
-     * @param in 输入(当前动作/等级/经验/工具阶/动作次数/余量/上次结算时刻/现在/库存)
+     * @param in      输入(当前动作/等级/经验/动作次数/余量/上次结算时刻/现在/库存/加成/buff/上限/掷点种子)
      * @param content 内容表(取经验曲线与满级)
      */
-    public static SettleResult settle(SettleInput in, com.ihomy.homestead.content.HomesteadContent content) {
+    public static SettleResult settle(SettleInput in, HomesteadContent content) {
         ActionDef action = in.action();
         int maxLevel = content.maxLevel();
         int level = Math.min(Math.max(in.level(), 1), maxLevel);
         long xp = Math.max(0, in.xp());
-        // 经验已够但存档没升级:先补齐(升级不改经验口径,只是把等级推上去)
+        // 经验已够但存档没升级:先补齐
         while (level < maxLevel) {
             int need = content.xpForNextLevel(level);
             if (need <= 0 || xp < need) {
@@ -136,54 +142,61 @@ public final class HomesteadEngine {
         Map<String, Long> consumed = new LinkedHashMap<>();
         Map<String, Long> gained = new LinkedHashMap<>();
 
+        String skillKind = skillKindOf(content, action.skill());
+        int actionHash = actionHash(action.code());
         long completions = 0;
         long xpGained = 0;
         int levelUps = 0;
         long seq = Math.max(0, in.actionSeq());
+        long remaining = totalMs;
+        // 当前这段剩余时间对应的墙上时刻:用于判断 buff 是否已到期(每完成一次次向前推进)
+        long cursor = in.now() - totalMs;
         String stopReason = null;
 
         int guard = 0;
-        while (guard++ < HomesteadConst.MAX_SETTLE_SEGMENTS) {
-            long perItem = msPerItem(action.baseMs(), level, in.toolTier(), in.speedBonusBp());
-            long byTime = totalMs / perItem;
-            if (byTime <= 0) {
+        while (remaining > 0 && guard++ < HomesteadConst.MAX_COMPLETIONS_PER_SETTLE) {
+            HomesteadBonus.Bonus eff = HomesteadBonus.withBuffs(in.bonus(), skillKind, in.buffs(), cursor);
+            long perItem = msPerItem(action.baseMs(), level, eff.speedBp());
+            if (remaining < perItem) {
                 break;
             }
-            long byLevel = itemsToNextLevel(level, xp, content.xpForNextLevel(level), action.xp(), maxLevel);
-            long byMaterials = action.consumesMaterials() ? affordable(action, stock) : Long.MAX_VALUE;
-            long n = Math.min(byTime, Math.min(byLevel, byMaterials));
-            if (n <= 0) {
-                if (action.consumesMaterials() && byMaterials <= 0) {
-                    stopReason = HomesteadConst.STOP_MATERIALS;
-                }
+            if (action.consumesMaterials() && !hasMaterials(action, stock)) {
+                stopReason = HomesteadConst.STOP_MATERIALS;
+                remaining = 0;
                 break;
             }
 
-            // 材料
-            for (ActionDef.ItemAmount input : action.inputs()) {
-                long use = input.qty() * n;
-                stock.merge(input.item(), -use, Long::sum);
-                consume(consumed, input.item(), use);
+            long roll = roll(in.seed(), actionHash, seq);
+            boolean savedMaterials = action.consumesMaterials()
+                    && rollBp(roll, 29) < eff.efficiencyBp();
+            if (!savedMaterials) {
+                for (ActionDef.ItemAmount input : action.inputs()) {
+                    stock.merge(input.item(), -input.qty(), Long::sum);
+                    consumed.merge(input.item(), input.qty(), Long::sum);
+                }
             }
-            // 产出(含稀有)
-            for (ActionDef.ItemAmount output : action.yields()) {
-                gain(gained, output.item(), output.qty() * n);
+
+            List<ActionDef.ItemAmount> yields = action.yields();
+            boolean bonusYield = !yields.isEmpty() && rollBp(roll, 13) < eff.yieldBp();
+            for (int i = 0; i < yields.size(); i++) {
+                ActionDef.ItemAmount output = yields.get(i);
+                long qty = output.qty() + (bonusYield && i == 0 ? 1 : 0);
+                gained.merge(output.item(), qty, Long::sum);
             }
+
             ActionDef.RareDrop rare = action.rare();
-            if (rare != null) {
-                long before = seq / rare.every();
-                long after = (seq + n) / rare.every();
-                long drops = after - before;
-                if (drops > 0) {
-                    gain(gained, rare.item(), drops * rare.qty());
+            if (rare != null && rare.chanceBp() > 0) {
+                int chance = Math.min(HomesteadConst.MAX_CHANCE_BP, rare.chanceBp() + eff.rareBp());
+                if (rollBp(roll, 0) < chance) {
+                    gained.merge(rare.item(), rare.qty(), Long::sum);
                 }
             }
-            seq += n;
-            completions += n;
-            xpGained += action.xp() * n;
 
-            // 经验推进(可能连升多级)
-            xp += action.xp() * n;
+            seq++;
+            completions++;
+            long xpGain = xpFor(action.xp(), eff.xpBp());
+            xpGained += xpGain;
+            xp += xpGain;
             int before = level;
             while (level < maxLevel) {
                 int need = content.xpForNextLevel(level);
@@ -195,20 +208,10 @@ public final class HomesteadEngine {
             }
             levelUps += level - before;
 
-            totalMs -= n * perItem;
-            if (action.consumesMaterials() && affordable(action, stock) <= 0) {
-                stopReason = HomesteadConst.STOP_MATERIALS;
-                break;
-            }
-            if (level == before) {
-                break; // 没升级:剩余时间不够下一次(byTime 已取整)
-            }
-            // 升级了:等级变了,单次耗时变短,继续用剩余时间推进
+            remaining -= perItem;
+            cursor += perItem;
         }
 
-        if (stopReason != null) {
-            totalMs = 0;
-        }
         return new SettleResult(
                 completions,
                 xpGained,
@@ -220,39 +223,61 @@ public final class HomesteadEngine {
                 Map.copyOf(gained),
                 elapsed,
                 capped,
-                totalMs,
+                stopReason != null ? 0 : remaining,
                 stopReason);
     }
 
-    /** 距离下一级还差多少次动作(满级返回 Long.MAX_VALUE) */
-    private static long itemsToNextLevel(int level, long xp, int need, long xpPerAction, int maxLevel) {
-        if (level >= maxLevel || need <= 0) {
-            return Long.MAX_VALUE;
+    /** 每次完成的经验(含经验加成,至少 1) */
+    private static long xpFor(long baseXp, int xpBp) {
+        if (baseXp <= 0) {
+            return 0;
         }
-        long gap = Math.max(0, need - xp);
-        if (xpPerAction <= 0) {
-            return Long.MAX_VALUE;
-        }
-        return (gap + xpPerAction - 1) / xpPerAction;
+        long gain = baseXp * (HomesteadConst.BP_BASE + (long) Math.max(0, xpBp)) / HomesteadConst.BP_BASE;
+        return Math.max(1L, gain);
     }
 
-    /** 现有库存还能做多少次(取最紧的一种材料) */
-    private static long affordable(ActionDef action, Map<String, Long> stock) {
-        long min = Long.MAX_VALUE;
+    /** 库存是否够做一次 */
+    private static boolean hasMaterials(ActionDef action, Map<String, Long> stock) {
         for (ActionDef.ItemAmount input : action.inputs()) {
-            long have = Math.max(0, stock.getOrDefault(input.item(), 0L));
-            min = Math.min(min, have / input.qty());
+            if (stock.getOrDefault(input.item(), 0L) < input.qty()) {
+                return false;
+            }
         }
-        return min == Long.MAX_VALUE ? 0 : min;
+        return true;
     }
 
-    private static void consume(Map<String, Long> consumed, String item, long qty) {
-        consumed.merge(item, qty, Long::sum);
+    /** 一次完成的确定性掷点(引擎与单测共用同一口径) */
+    static long roll(long seed, int actionHash, long seq) {
+        return mix64(seed ^ actionHash ^ (seq + 1) * GOLDEN);
     }
 
-    private static void gain(Map<String, Long> gained, String item, long qty) {
-        if (qty > 0) {
-            gained.merge(item, qty, Long::sum);
+    /** 从 64 位掷点里切出一段当 0–9999 的基点概率 */
+    private static int rollBp(long roll, int shift) {
+        return (int) Long.remainderUnsigned(roll >>> shift, HomesteadConst.BP_BASE);
+    }
+
+    /** splitmix64 收尾:雪崩好、无状态、跨 JVM 一致 */
+    static long mix64(long z) {
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
+    }
+
+    /** 动作编码的 FNV-1a 32 位哈希(跨进程稳定,不用 String.hashCode) */
+    static int actionHash(String code) {
+        int hash = 0x811C9DC5;
+        if (code != null) {
+            for (byte b : code.getBytes(StandardCharsets.UTF_8)) {
+                hash ^= (b & 0xFF);
+                hash *= 0x01000193;
+            }
         }
+        return hash == 0 ? 1 : hash;
+    }
+
+    /** 动作所属技能的类别(有加成按 GATHER/PROCESS 分类,查不到按 ALL) */
+    private static String skillKindOf(HomesteadContent content, String skillCode) {
+        var skill = content == null ? null : content.skill(skillCode);
+        return skill == null || skill.kind() == null ? "ALL" : skill.kind();
     }
 }

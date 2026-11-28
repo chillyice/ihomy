@@ -3440,9 +3440,10 @@ CREATE TABLE `family_house_share` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';
 
 -- ------------------------------------------------------------
--- 92. game_homestead_* 小院慢生活(V15.39):
+-- 92. game_homestead_* 小院慢生活(V15.45):
 --     服务端权威的放置游戏存档——进度只由服务端结算,离线时长按 last_settle_at 补算(上限 24 小时)。
---     player 一人一行;skill / item / tool 按 user_id + 编码各一行(建号时一次补齐 7 技能 + 7 工具)。
+--     player 一人一行;skill / item / tool / gear / building 按 user_id + 编码各一行;
+--     wear 一人一部位一行;buff 一人最多 3 条(到期删除);meta 是全局键值(当前只放存档重置守卫)。
 --     家庭榜指数不落列:读取时由 HomesteadIndex 现算(等级×1000 + 铜板 + 库存半价),
 --     避免内容调价后留下陈旧分数,也杜绝客户端上报。时间列一律毫秒精度(离线补算锚点)。
 -- ------------------------------------------------------------
@@ -3453,7 +3454,7 @@ CREATE TABLE `game_homestead_player` (
   `family_id`          BIGINT      DEFAULT NULL COMMENT '最近一次进入时的家庭ID(仅冗余,榜单按 sys_user_role 现算)',
   `coins`              BIGINT      NOT NULL DEFAULT 0 COMMENT '铜板',
   `action_code`        VARCHAR(32) DEFAULT NULL COMMENT '当前挂机动作(NULL=空闲)',
-  `action_seq`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作累计完成次数(稀有掉落计数,换动作归零)',
+  `action_seq`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作累计完成次数(确定性掷点序号,换动作归零)',
   `action_progress_ms` BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作已积累毫秒',
   `last_settle_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '上次结算时刻(离线补算锚点)',
   `total_actions`      BIGINT      NOT NULL DEFAULT 0 COMMENT '历史完成动作总数(成就指标)',
@@ -3470,8 +3471,8 @@ DROP TABLE IF EXISTS `game_homestead_skill`;
 CREATE TABLE `game_homestead_skill` (
   `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
-  `skill_code` VARCHAR(16) NOT NULL COMMENT '技能编码(WOOD/FORAGE/FISHING/STONE/COOKING/BREWING/CRAFT)',
-  `level`      INT         NOT NULL DEFAULT 1 COMMENT '当前等级',
+  `skill_code` VARCHAR(16) NOT NULL COMMENT '技能编码(11 门,见 content/homestead/skills.json)',
+  `level`      INT         NOT NULL DEFAULT 1 COMMENT '当前等级(1–100)',
   `xp`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前等级内经验(满级后不再增长)',
   `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -3495,23 +3496,69 @@ DROP TABLE IF EXISTS `game_homestead_tool`;
 CREATE TABLE `game_homestead_tool` (
   `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
-  `tool_code`  VARCHAR(16) NOT NULL COMMENT '工具编码(AXE/BASKET/ROD/SIEVE/POT/JAR/PLANE)',
-  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '等阶(0=徒手,5=最高)',
+  `tool_code`  VARCHAR(24) NOT NULL COMMENT '工具编码(T_<动作编码>,每个动作一件)',
+  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '阶数(0=未制造,5=最高)',
   `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_tool` (`user_id`, `tool_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活工具档';
 
-DROP TABLE IF EXISTS `game_homestead_equipment`;
-CREATE TABLE `game_homestead_equipment` (
+DROP TABLE IF EXISTS `game_homestead_gear`;
+CREATE TABLE `game_homestead_gear` (
   `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
-  `slot_code`  VARCHAR(16) NOT NULL COMMENT '部位编码(HAT/APRON/SLEEVE/BOOTS/CHARM)',
-  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '阶数(0=未穿,5=最高)',
+  `gear_code`  VARCHAR(24) NOT NULL COMMENT '装备编码(见 content/homestead/equipment.json)',
+  `enhance`    INT         NOT NULL DEFAULT 0 COMMENT '强化等级(0–5,每级效果 +50%)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_gear` (`user_id`, `gear_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活装备(已制造)';
+
+DROP TABLE IF EXISTS `game_homestead_wear`;
+CREATE TABLE `game_homestead_wear` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `slot_code`  VARCHAR(16) NOT NULL COMMENT '部位编码(HEAD/BODY/HANDS/FEET/CHARM)',
+  `gear_code`  VARCHAR(24) DEFAULT NULL COMMENT '穿着的装备编码(NULL=空着)',
   `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
   `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_slot` (`user_id`, `slot_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴档';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴(一人一部位)';
+
+DROP TABLE IF EXISTS `game_homestead_building`;
+CREATE TABLE `game_homestead_building` (
+  `id`            BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`       BIGINT      NOT NULL COMMENT '用户ID',
+  `building_code` VARCHAR(24) NOT NULL COMMENT '场地编码(见 content/homestead/buildings.json)',
+  `level`         INT         NOT NULL DEFAULT 0 COMMENT '等级(0=未建,10=满级)',
+  `created_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_building` (`user_id`, `building_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活场地';
+
+DROP TABLE IF EXISTS `game_homestead_buff`;
+CREATE TABLE `game_homestead_buff` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `item_code`  VARCHAR(24) NOT NULL COMMENT '来源料理编码',
+  `kind`       VARCHAR(16) NOT NULL COMMENT '效果类型(SPEED/XP/YIELD/RARE)',
+  `target`     VARCHAR(16) NOT NULL COMMENT '作用类别(GATHER/PROCESS/ALL)',
+  `bp`         INT         NOT NULL DEFAULT 0 COMMENT '加成基点',
+  `expire_at`  DATETIME(3) NOT NULL COMMENT '到期时刻(服务端按它清理)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '食用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_expire` (`user_id`, `expire_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活料理 buff(同时最多 3 条)';
+
+DROP TABLE IF EXISTS `game_homestead_meta`;
+CREATE TABLE `game_homestead_meta` (
+  `k`          VARCHAR(48) NOT NULL COMMENT '键(当前只放存档重置守卫 reset_v16)',
+  `v`          VARCHAR(64) NOT NULL COMMENT '值',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '写入时间',
+  PRIMARY KEY (`k`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活全局键值(迁移守卫)';
 

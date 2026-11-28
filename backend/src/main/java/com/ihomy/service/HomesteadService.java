@@ -1,30 +1,38 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.PointsRuleConst;
 import com.ihomy.common.ResultCode;
-import com.ihomy.entity.HomesteadEquipment;
+import com.ihomy.entity.HomesteadBuff;
+import com.ihomy.entity.HomesteadBuilding;
+import com.ihomy.entity.HomesteadGear;
 import com.ihomy.entity.HomesteadItem;
 import com.ihomy.entity.HomesteadPlayer;
 import com.ihomy.entity.HomesteadSkill;
 import com.ihomy.entity.HomesteadTool;
+import com.ihomy.entity.HomesteadWear;
 import com.ihomy.homestead.HomesteadConst;
 import com.ihomy.homestead.content.ActionDef;
+import com.ihomy.homestead.content.BuildingDef;
 import com.ihomy.homestead.content.EquipmentDef;
 import com.ihomy.homestead.content.HomesteadContent;
 import com.ihomy.homestead.content.ItemDef;
 import com.ihomy.homestead.content.SkillDef;
 import com.ihomy.homestead.content.ToolDef;
+import com.ihomy.homestead.core.HomesteadBonus;
 import com.ihomy.homestead.core.HomesteadEngine;
-import com.ihomy.homestead.core.HomesteadGear;
 import com.ihomy.homestead.core.HomesteadIndex;
 import com.ihomy.homestead.core.HomesteadMarket;
-import com.ihomy.mapper.HomesteadEquipmentMapper;
+import com.ihomy.mapper.HomesteadBuffMapper;
+import com.ihomy.mapper.HomesteadBuildingMapper;
+import com.ihomy.mapper.HomesteadGearMapper;
 import com.ihomy.mapper.HomesteadItemMapper;
 import com.ihomy.mapper.HomesteadPlayerMapper;
 import com.ihomy.mapper.HomesteadSkillMapper;
 import com.ihomy.mapper.HomesteadToolMapper;
+import com.ihomy.mapper.HomesteadWearMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -51,7 +59,9 @@ import java.util.Set;
  * 口径:
  * <ul>
  *   <li>进度只由服务端结算;客户端只渲染状态并插值进度环,不做本地收益模拟(避免两套引擎漂移)。</li>
- *   <li>每次读状态都先结算一次(离线时长按 last_settle_at 补算,上限 24 小时;时钟回拨记 0 并把锚点拉回现在)。</li>
+ *   <li>每次读状态都先结算一次(离线时长按 last_settle_at 补算,上限 24 小时 + 仓房/鞋加成)。</li>
+ *   <li>概率产出(省料 / 多收 / 稀有)由引擎用「玩家 + 动作 + 次数」确定性掷点,同一进度重读结果不变。</li>
+ *   <li>加成唯一口径 {@link HomesteadBonus}:工具(按动作) + 已穿装备(含强化) + 场地 + 生效中的料理 buff。</li>
  *   <li>并发:事务内 SELECT ... FOR UPDATE 锁玩家行,同一账号的多标签页/多设备串行入账。</li>
  *   <li>幂等:写操作带 Idempotency-Key 时用 Redis SETNX 去重(10 分钟);Redis 不可用则放行(家庭内互信)。</li>
  *   <li>积分:技能升级由服务端直接发放(每天最多 {@value #LEVEL_AWARD_DAILY_LIMIT} 次),
@@ -72,6 +82,8 @@ public class HomesteadService {
     /** 技能升级发积分的每日上限(次),防止离线回来一次升几十级刷爆积分 */
     private static final int LEVEL_AWARD_DAILY_LIMIT = 5;
     private static final String LEVEL_AWARD_KEY_PREFIX = "ihomy:homestead:levelup:";
+    /** 一次最多吃几份料理(份数只用来延长同一份 buff 的时长) */
+    private static final int MAX_CONSUME_QTY = 5;
     private static final ZoneId ZONE = ZoneId.systemDefault();
 
     private final HomesteadContent content;
@@ -79,7 +91,10 @@ public class HomesteadService {
     private final HomesteadSkillMapper skillMapper;
     private final HomesteadItemMapper itemMapper;
     private final HomesteadToolMapper toolMapper;
-    private final HomesteadEquipmentMapper equipmentMapper;
+    private final HomesteadGearMapper gearMapper;
+    private final HomesteadWearMapper wearMapper;
+    private final HomesteadBuildingMapper buildingMapper;
+    private final HomesteadBuffMapper buffMapper;
     private final StringRedisTemplate redis;
     private final PointsService pointsService;
 
@@ -93,7 +108,7 @@ public class HomesteadService {
         return snapshot(profile, settle);
     }
 
-    /** 切换挂机动作:先结算旧动作,再落新动作(同一动作不清零稀有计数与余量) */
+    /** 切换挂机动作:先结算旧动作,再落新动作(同一动作不清零掷点计数与余量) */
     @Transactional
     public Map<String, Object> startAction(Long userId, Long familyId, String actionCode, String opId) {
         Profile profile = load(userId, familyId);
@@ -102,11 +117,7 @@ public class HomesteadService {
         if (action == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "没有这个动作");
         }
-        HomesteadSkill skill = skillOf(profile, action.skill());
-        if (skill.getLevel() < action.level()) {
-            throw new BizException(ResultCode.BAD_REQUEST,
-                    "这个动作要 " + action.level() + " 级才能做");
-        }
+        requireActionUnlocked(profile, action);
         if (allowOp(userId, opId)) {
             if (!action.code().equals(profile.player.getActionCode())) {
                 profile.player.setActionCode(action.code());
@@ -147,7 +158,7 @@ public class HomesteadService {
             throw new BizException(ResultCode.BAD_REQUEST, "数量至少为 1");
         }
         HomesteadItem row = itemRow(profile, itemCode);
-        long have = row == null ? 0L : row.getQty();
+        long have = row == null ? 0L : nz(row.getQty());
         if (have < qty) {
             throw new BizException(ResultCode.BAD_REQUEST, "背包里没有这么多");
         }
@@ -156,8 +167,8 @@ public class HomesteadService {
                 HomesteadMarket.orders(today, content), marketUsed(profile.player, today), item, qty);
         if (allowOp(userId, opId)) {
             applyItems(profile, Map.of(), Map.of(itemCode, qty));
-            // 行情价算完再乘穿戴卖价加成(挂饰),两段都向下取整,便于对账
-            long coins = gearBonuses(profile).sellCoins(sale.coins());
+            // 行情价算完再乘卖价加成(晒场/挂饰),两段都向下取整,便于对账
+            long coins = bonusOf(profile, null).sellCoins(sale.coins());
             profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) + coins));
             profile.player.setMarketDate(today);
             profile.player.setMarketUsed(sale.usedAfter());
@@ -166,9 +177,9 @@ public class HomesteadService {
         return snapshot(profile, settle);
     }
 
-    /** 工具升一阶:扣铜板与材料,速度加成由引擎按阶数算 */
+    /** 制造 / 升级工具:每个动作一件,tier 0→5,配方逐阶换更高档材料 */
     @Transactional
-    public Map<String, Object> upgradeTool(Long userId, Long familyId, String toolCode, String opId) {
+    public Map<String, Object> craftTool(Long userId, Long familyId, String toolCode, String opId) {
         Profile profile = load(userId, familyId);
         HomesteadEngine.SettleResult settle = advance(profile, familyId);
         ToolDef tool = content.tool(toolCode);
@@ -176,22 +187,16 @@ public class HomesteadService {
             throw new BizException(ResultCode.BAD_REQUEST, "没有这个工具");
         }
         HomesteadTool row = toolRow(profile, toolCode);
-        int tier = row == null ? 0 : row.getTier();
+        int tier = row == null ? 0 : nzInt(row.getTier());
+        if (tier >= HomesteadConst.MAX_TOOL_TIER) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这件工具已经升到顶了");
+        }
+        requireSkillLevel(profile, tool.skill(), tool.requireLevel(), "做这件工具");
         ToolDef.ToolStep step = tool.nextStep(tier);
         if (step == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "这件工具已经升到顶了");
         }
-        if (nz(profile.player.getCoins()) < step.coins()) {
-            throw new BizException(ResultCode.BAD_REQUEST, "铜板不够");
-        }
-        Map<String, Long> need = new HashMap<>();
-        Map<String, Long> stock = qtyMap(profile.items);
-        for (ActionDef.ItemAmount material : step.materials()) {
-            if (stock.getOrDefault(material.item(), 0L) < material.qty()) {
-                throw new BizException(ResultCode.BAD_REQUEST, "材料不够");
-            }
-            need.merge(material.item(), material.qty(), Long::sum);
-        }
+        Map<String, Long> need = checkCost(profile, step.coins(), step.materials());
         if (allowOp(userId, opId)) {
             applyItems(profile, Map.of(), need);
             profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) - step.coins()));
@@ -211,48 +216,205 @@ public class HomesteadService {
         return snapshot(profile, settle);
     }
 
-    /**
-     * 穿戴升一阶:扣铜板与材料,加成由 HomesteadGear 折叠(采集/加工/全部加速、离线上限、卖价)。
-     * 与工具一样「一人一部位一件」,升阶即替换,不做装备背包。
-     */
+    /** 制造装备:做出来是 0 级强化,之后才能用 / 强化 */
     @Transactional
-    public Map<String, Object> upgradeGear(Long userId, Long familyId, String slotCode, String opId) {
+    public Map<String, Object> craftGear(Long userId, Long familyId, String gearCode, String opId) {
         Profile profile = load(userId, familyId);
         HomesteadEngine.SettleResult settle = advance(profile, familyId);
-        EquipmentDef slot = content.equipmentSlot(slotCode);
-        if (slot == null) {
-            throw new BizException(ResultCode.BAD_REQUEST, "没有这个部位");
+        EquipmentDef def = content.gear(gearCode);
+        if (def == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "没有这件装备");
         }
-        HomesteadEquipment row = equipmentRow(profile, slotCode);
-        int tier = row == null ? 0 : row.getTier();
-        EquipmentDef.EquipmentStep step = slot.nextStep(tier);
+        if (gearRow(profile, gearCode) != null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这件装备已经做好了");
+        }
+        requireSkillLevel(profile, def.skill(), def.requireLevel(), "做这件装备");
+        EquipmentDef.EquipmentStep step = def.craft();
         if (step == null) {
-            throw new BizException(ResultCode.BAD_REQUEST, "这件已经升到顶了");
+            throw new BizException(ResultCode.BAD_REQUEST, "这件装备没有制造配方");
         }
-        if (nz(profile.player.getCoins()) < step.coins()) {
-            throw new BizException(ResultCode.BAD_REQUEST, "铜板不够");
+        Map<String, Long> need = checkCost(profile, step.coins(), step.materials());
+        if (allowOp(userId, opId)) {
+            applyItems(profile, Map.of(), need);
+            profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) - step.coins()));
+            HomesteadGear fresh = new HomesteadGear();
+            fresh.setUserId(userId);
+            fresh.setGearCode(gearCode);
+            fresh.setEnhance(0);
+            gearMapper.insert(fresh);
+            profile.gear.add(fresh);
+            playerMapper.updateProgress(profile.player);
         }
-        Map<String, Long> need = new HashMap<>();
-        Map<String, Long> stock = qtyMap(profile.items);
-        for (ActionDef.ItemAmount material : step.materials()) {
-            if (stock.getOrDefault(material.item(), 0L) < material.qty()) {
-                throw new BizException(ResultCode.BAD_REQUEST, "材料不够");
+        return snapshot(profile, settle);
+    }
+
+    /** 强化装备:0→5,每级效果 +50%,材料逐阶换更高档 */
+    @Transactional
+    public Map<String, Object> enhanceGear(Long userId, Long familyId, String gearCode, String opId) {
+        Profile profile = load(userId, familyId);
+        HomesteadEngine.SettleResult settle = advance(profile, familyId);
+        EquipmentDef def = content.gear(gearCode);
+        if (def == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "没有这件装备");
+        }
+        HomesteadGear row = gearRow(profile, gearCode);
+        if (row == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "还没做这件装备");
+        }
+        int enhance = nzInt(row.getEnhance());
+        if (enhance >= HomesteadConst.MAX_GEAR_TIER) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这件装备已经强化到顶了");
+        }
+        EquipmentDef.EquipmentStep step = def.nextStep(enhance);
+        if (step == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这件装备已经强化到顶了");
+        }
+        Map<String, Long> need = checkCost(profile, step.coins(), step.materials());
+        if (allowOp(userId, opId)) {
+            applyItems(profile, Map.of(), need);
+            profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) - step.coins()));
+            row.setEnhance(enhance + 1);
+            gearMapper.updateById(row);
+            playerMapper.updateProgress(profile.player);
+        }
+        return snapshot(profile, settle);
+    }
+
+    /** 穿 / 脱:gearCode 为空即脱下该部位;穿上要求已制造且等级达标 */
+    @Transactional
+    public Map<String, Object> wear(Long userId, Long familyId, String slotCode, String gearCode, String opId) {
+        Profile profile = load(userId, familyId);
+        HomesteadEngine.SettleResult settle = advance(profile, familyId);
+        String slot;
+        String targetGear = null;
+        if (gearCode == null || gearCode.isBlank()) {
+            if (slotCode == null || !HomesteadConst.GEAR_SLOTS.contains(slotCode)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "没有这个部位");
             }
-            need.merge(material.item(), material.qty(), Long::sum);
+            slot = slotCode;
+        } else {
+            EquipmentDef def = content.gear(gearCode);
+            if (def == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "没有这件装备");
+            }
+            if (gearRow(profile, gearCode) == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "还没做这件装备");
+            }
+            requireSkillLevel(profile, def.skill(), def.requireLevel(), "穿这件装备");
+            slot = def.slot();
+            targetGear = def.code();
         }
+        if (allowOp(userId, opId)) {
+            HomesteadWear row = wearRow(profile, slot);
+            if (row == null) {
+                HomesteadWear fresh = new HomesteadWear();
+                fresh.setUserId(userId);
+                fresh.setSlotCode(slot);
+                fresh.setGearCode(targetGear);
+                wearMapper.insert(fresh);
+                profile.wear.add(fresh);
+            } else {
+                row.setGearCode(targetGear);
+                wearMapper.update(null, new LambdaUpdateWrapper<HomesteadWear>()
+                        .eq(HomesteadWear::getUserId, userId)
+                        .eq(HomesteadWear::getSlotCode, slot)
+                        .set(HomesteadWear::getGearCode, targetGear));
+            }
+            playerMapper.updateProgress(profile.player);
+        }
+        return snapshot(profile, settle);
+    }
+
+    /** 造 / 升场地:0→10 级,效果按级线性叠加,工坊 Lv5 解锁该技能的门槛 70 动作 */
+    @Transactional
+    public Map<String, Object> upgradeBuilding(Long userId, Long familyId, String buildingCode, String opId) {
+        Profile profile = load(userId, familyId);
+        HomesteadEngine.SettleResult settle = advance(profile, familyId);
+        BuildingDef def = content.building(buildingCode);
+        if (def == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "没有这栋场地");
+        }
+        HomesteadBuilding row = buildingRow(profile, buildingCode);
+        int level = row == null ? 0 : nzInt(row.getLevel());
+        if (level >= def.maxLevel()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这栋场地已经升到顶了");
+        }
+        BuildingDef.BuildingStep step = def.nextStep(level);
+        if (step == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这栋场地已经升到顶了");
+        }
+        Map<String, Long> need = checkCost(profile, step.coins(), step.materials());
         if (allowOp(userId, opId)) {
             applyItems(profile, Map.of(), need);
             profile.player.setCoins(clampCoins(nz(profile.player.getCoins()) - step.coins()));
             if (row == null) {
-                HomesteadEquipment fresh = new HomesteadEquipment();
+                HomesteadBuilding fresh = new HomesteadBuilding();
                 fresh.setUserId(userId);
-                fresh.setSlotCode(slotCode);
-                fresh.setTier(tier + 1);
-                equipmentMapper.insert(fresh);
-                profile.gear.add(fresh);
+                fresh.setBuildingCode(buildingCode);
+                fresh.setLevel(level + 1);
+                buildingMapper.insert(fresh);
+                profile.buildings.add(fresh);
             } else {
-                row.setTier(tier + 1);
-                equipmentMapper.updateById(row);
+                row.setLevel(level + 1);
+                buildingMapper.updateById(row);
+            }
+            playerMapper.updateProgress(profile.player);
+        }
+        return snapshot(profile, settle);
+    }
+
+    /**
+     * 吃料理:消耗物品换一条限时 buff。同一种料理再吃只延长到期时刻;
+     * 同时最多 {@value HomesteadConst#MAX_ACTIVE_BUFFS} 种(第四种要等最早那份到期或手动等它过)。
+     */
+    @Transactional
+    public Map<String, Object> consume(Long userId, Long familyId, String itemCode, int qty, String opId) {
+        Profile profile = load(userId, familyId);
+        HomesteadEngine.SettleResult settle = advance(profile, familyId);
+        ItemDef item = content.item(itemCode);
+        if (item == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "没有这个物品");
+        }
+        ItemDef.BuffDef buff = item.buff();
+        if (buff == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这个物品不能吃");
+        }
+        if (qty <= 0 || qty > MAX_CONSUME_QTY) {
+            throw new BizException(ResultCode.BAD_REQUEST, "一次最多吃 " + MAX_CONSUME_QTY + " 份");
+        }
+        HomesteadItem row = itemRow(profile, itemCode);
+        if (row == null || nz(row.getQty()) < qty) {
+            throw new BizException(ResultCode.BAD_REQUEST, "背包里没有这么多");
+        }
+        long nowMs = Instant.now().toEpochMilli();
+        LocalDateTime expireAt = fromMillis(nowMs + buff.minutes() * 60_000L * qty);
+        HomesteadBuff existing = activeBuffOf(profile, itemCode, nowMs);
+        if (existing == null) {
+            long activeKinds = profile.buffs.stream()
+                    .filter(b -> b.getExpireAt() != null && toMillis(b.getExpireAt()) > nowMs)
+                    .count();
+            if (activeKinds >= HomesteadConst.MAX_ACTIVE_BUFFS) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "同时最多 " + HomesteadConst.MAX_ACTIVE_BUFFS + " 种料理加成,先等一份到期");
+            }
+        }
+        if (allowOp(userId, opId)) {
+            applyItems(profile, Map.of(), Map.of(itemCode, (long) qty));
+            if (existing == null) {
+                HomesteadBuff fresh = new HomesteadBuff();
+                fresh.setUserId(userId);
+                fresh.setItemCode(itemCode);
+                fresh.setKind(buff.kind());
+                fresh.setTarget(buff.target());
+                fresh.setBp(buff.bp());
+                fresh.setExpireAt(expireAt);
+                buffMapper.insert(fresh);
+                profile.buffs.add(fresh);
+            } else {
+                long base = Math.max(nowMs, toMillis(existing.getExpireAt()));
+                LocalDateTime extended = fromMillis(base + buff.minutes() * 60_000L * qty);
+                existing.setExpireAt(extended);
+                buffMapper.updateById(existing);
             }
             playerMapper.updateProgress(profile.player);
         }
@@ -333,10 +495,13 @@ public class HomesteadService {
         List<HomesteadSkill> skills;
         List<HomesteadItem> items;
         List<HomesteadTool> tools;
-        List<HomesteadEquipment> gear;
+        List<HomesteadGear> gear;
+        List<HomesteadWear> wear;
+        List<HomesteadBuilding> buildings;
+        List<HomesteadBuff> buffs;
     }
 
-    /** 锁行装载;首次访问建号并补齐技能/工具行(内容新增技能后老存档也能直接用) */
+    /** 锁行装载;首次访问建号并补齐技能/工具/部位/场地行(内容扩表后老存档也能直接用) */
     private Profile load(Long userId, Long familyId) {
         HomesteadPlayer player = playerMapper.selectByUserForUpdate(userId);
         if (player == null) {
@@ -364,8 +529,14 @@ public class HomesteadService {
                 new LambdaQueryWrapper<HomesteadItem>().eq(HomesteadItem::getUserId, userId)));
         profile.tools = new ArrayList<>(toolMapper.selectList(
                 new LambdaQueryWrapper<HomesteadTool>().eq(HomesteadTool::getUserId, userId)));
-        profile.gear = new ArrayList<>(equipmentMapper.selectList(
-                new LambdaQueryWrapper<HomesteadEquipment>().eq(HomesteadEquipment::getUserId, userId)));
+        profile.gear = new ArrayList<>(gearMapper.selectList(
+                new LambdaQueryWrapper<HomesteadGear>().eq(HomesteadGear::getUserId, userId)));
+        profile.wear = new ArrayList<>(wearMapper.selectList(
+                new LambdaQueryWrapper<HomesteadWear>().eq(HomesteadWear::getUserId, userId)));
+        profile.buildings = new ArrayList<>(buildingMapper.selectList(
+                new LambdaQueryWrapper<HomesteadBuilding>().eq(HomesteadBuilding::getUserId, userId)));
+        profile.buffs = new ArrayList<>(buffMapper.selectList(
+                new LambdaQueryWrapper<HomesteadBuff>().eq(HomesteadBuff::getUserId, userId)));
         ensureRows(profile, userId);
         return profile;
     }
@@ -397,15 +568,26 @@ public class HomesteadService {
             }
         }
         Set<String> slotCodes = new HashSet<>();
-        profile.gear.forEach(g -> slotCodes.add(g.getSlotCode()));
-        for (EquipmentDef def : content.equipment()) {
-            if (slotCodes.add(def.code())) {
-                HomesteadEquipment gear = new HomesteadEquipment();
-                gear.setUserId(userId);
-                gear.setSlotCode(def.code());
-                gear.setTier(0);
-                equipmentMapper.insert(gear);
-                profile.gear.add(gear);
+        profile.wear.forEach(w -> slotCodes.add(w.getSlotCode()));
+        for (String slot : HomesteadConst.GEAR_SLOTS) {
+            if (slotCodes.add(slot)) {
+                HomesteadWear wear = new HomesteadWear();
+                wear.setUserId(userId);
+                wear.setSlotCode(slot);
+                wearMapper.insert(wear);
+                profile.wear.add(wear);
+            }
+        }
+        Set<String> buildingCodes = new HashSet<>();
+        profile.buildings.forEach(b -> buildingCodes.add(b.getBuildingCode()));
+        for (BuildingDef def : content.buildings()) {
+            if (buildingCodes.add(def.code())) {
+                HomesteadBuilding building = new HomesteadBuilding();
+                building.setUserId(userId);
+                building.setBuildingCode(def.code());
+                building.setLevel(0);
+                buildingMapper.insert(building);
+                profile.buildings.add(building);
             }
         }
     }
@@ -424,20 +606,20 @@ public class HomesteadService {
             profile.player.setActionProgressMs(0L);
         } else {
             HomesteadSkill skill = skillOf(profile, action.skill());
-            HomesteadGear.Bonuses gear = gearBonuses(profile);
-            SkillDef skillDef = content.skill(action.skill());
+            HomesteadBonus.Bonus base = bonusOf(profile, action);
             HomesteadEngine.SettleInput input = new HomesteadEngine.SettleInput(
                     action,
                     skill.getLevel(),
                     skill.getXp(),
-                    tierOf(profile, action.skill()),
                     nz(profile.player.getActionSeq()),
                     nz(profile.player.getActionProgressMs()),
                     toMillis(profile.player.getLastSettleAt()),
                     nowMs,
                     qtyMap(profile.items),
-                    gear.speedBpFor(skillDef == null ? null : skillDef.kind()),
-                    gear.capMs());
+                    base,
+                    activeBuffSpans(profile, nowMs),
+                    base.capMs(),
+                    nz(profile.player.getUserId()));
             settle = HomesteadEngine.settle(input, content);
             if (settle.completions() > 0) {
                 applyItems(profile, settle.gained(), settle.consumed());
@@ -450,11 +632,29 @@ public class HomesteadService {
             profile.player.setActionSeq(settle.actionSeqAfter());
             profile.player.setActionProgressMs(settle.progressMs());
         }
+        // 过期 buff 顺手清掉(读取时不写库,只在真正的写路径删)
+        purgeExpiredBuffs(profile, nowMs);
         profile.player.setFamilyId(familyId);
         profile.player.setContentVersion(content.contentVersion());
         profile.player.setLastSettleAt(nowAt);
         playerMapper.updateProgress(profile.player);
         return settle;
+    }
+
+    private void purgeExpiredBuffs(Profile profile, long nowMs) {
+        List<HomesteadBuff> expired = new ArrayList<>();
+        for (HomesteadBuff buff : profile.buffs) {
+            if (buff.getExpireAt() == null || toMillis(buff.getExpireAt()) <= nowMs) {
+                expired.add(buff);
+            }
+        }
+        if (expired.isEmpty()) {
+            return;
+        }
+        List<Long> ids = new ArrayList<>(expired.size());
+        expired.forEach(buff -> ids.add(buff.getId()));
+        buffMapper.deleteBatchIds(ids);
+        profile.buffs.removeAll(expired);
     }
 
     /**
@@ -533,6 +733,7 @@ public class HomesteadService {
 
     private Map<String, Object> snapshot(Profile profile, HomesteadEngine.SettleResult settle) {
         HomesteadPlayer player = profile.player;
+        long nowMs = Instant.now().toEpochMilli();
         Map<String, Object> playerView = new LinkedHashMap<>();
         playerView.put("coins", nz(player.getCoins()));
         playerView.put("actionCode", player.getActionCode());
@@ -548,7 +749,7 @@ public class HomesteadService {
             view.put("code", def.code());
             view.put("level", row.getLevel());
             view.put("xp", nz(row.getXp()));
-            view.put("xpToNext", content.xpForNextLevel(row.getLevel()));
+            view.put("xpToNext", row.getLevel() >= content.maxLevel() ? 0 : content.xpForNextLevel(row.getLevel()));
             skills.add(view);
         }
 
@@ -567,25 +768,65 @@ public class HomesteadService {
         for (ToolDef def : content.tools()) {
             Map<String, Object> view = new LinkedHashMap<>();
             view.put("code", def.code());
-            view.put("tier", tierOf(profile, def.skill()));
+            view.put("tier", toolTier(profile, def.code()));
             tools.add(view);
         }
 
-        HomesteadGear.Bonuses bonus = gearBonuses(profile);
         List<Map<String, Object>> gear = new ArrayList<>();
         for (EquipmentDef def : content.equipment()) {
+            HomesteadGear row = gearRow(profile, def.code());
+            if (row == null) {
+                continue;
+            }
             Map<String, Object> view = new LinkedHashMap<>();
             view.put("code", def.code());
-            view.put("tier", gearTier(profile, def.code()));
+            view.put("enhance", nzInt(row.getEnhance()));
             gear.add(view);
         }
-        Map<String, Object> gearBonus = new LinkedHashMap<>();
-        gearBonus.put("gatherBp", bonus.gatherBp());
-        gearBonus.put("processBp", bonus.processBp());
-        gearBonus.put("allBp", bonus.allBp());
-        gearBonus.put("sellBp", bonus.sellBonusBp());
-        gearBonus.put("extraCapHours", bonus.extraCapHours());
-        gearBonus.put("capHours", HomesteadConst.OFFLINE_CAP_HOURS + bonus.extraCapHours());
+
+        List<Map<String, Object>> wear = new ArrayList<>();
+        for (String slot : HomesteadConst.GEAR_SLOTS) {
+            HomesteadWear row = wearRow(profile, slot);
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("slot", slot);
+            view.put("gearCode", row == null ? null : row.getGearCode());
+            wear.add(view);
+        }
+
+        List<Map<String, Object>> buildings = new ArrayList<>();
+        for (BuildingDef def : content.buildings()) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("code", def.code());
+            view.put("level", buildingLevel(profile, def.code()));
+            buildings.add(view);
+        }
+
+        ActionDef current = content.action(player.getActionCode());
+        HomesteadBonus.Bonus bonus = effectiveBonus(profile, current, nowMs);
+        Map<String, Object> bonusView = new LinkedHashMap<>();
+        bonusView.put("speedBp", bonus.speedBp());
+        bonusView.put("xpBp", bonus.xpBp());
+        bonusView.put("yieldBp", bonus.yieldBp());
+        bonusView.put("rareBp", bonus.rareBp());
+        bonusView.put("efficiencyBp", bonus.efficiencyBp());
+        bonusView.put("sellBonusBp", bonus.sellBonusBp());
+        bonusView.put("capHours", HomesteadConst.OFFLINE_CAP_HOURS + bonus.extraCapHours());
+
+        List<Map<String, Object>> buffs = new ArrayList<>();
+        for (HomesteadBuff buff : profile.buffs) {
+            long expireAt = toMillis(buff.getExpireAt());
+            if (expireAt <= nowMs) {
+                continue;
+            }
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("item", buff.getItemCode());
+            view.put("kind", buff.getKind());
+            view.put("target", buff.getTarget());
+            view.put("bp", nzInt(buff.getBp()));
+            view.put("expireAt", expireAt);
+            view.put("remainingMs", expireAt - nowMs);
+            buffs.add(view);
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("player", playerView);
@@ -593,49 +834,68 @@ public class HomesteadService {
         out.put("items", items);
         out.put("tools", tools);
         out.put("gear", gear);
-        out.put("gearBonus", gearBonus);
+        out.put("wear", wear);
+        out.put("buildings", buildings);
+        out.put("buffs", buffs);
+        out.put("bonus", bonusView);
         out.put("index", HomesteadIndex.compute(levelMap(profile.skills), nz(player.getCoins()),
                 qtyMap(profile.items), content));
-        out.put("serverNow", Instant.now().toEpochMilli());
-        out.put("msPerItem", currentMsPerItem(profile));
-        out.put("speedBp", currentSpeedBp(profile));
+        out.put("serverNow", nowMs);
+        out.put("msPerItem", currentMsPerItem(profile, current, bonus));
+        out.put("speedBp", current == null
+                ? HomesteadConst.SPEED_BASE_BP
+                : HomesteadEngine.speedBp(skillOf(profile, current.skill()).getLevel(), bonus.speedBp()));
         out.put("market", marketView(profile));
         out.put("offline", offlineView(settle));
         out.put("content", contentView());
         return out;
     }
 
-    private long currentMsPerItem(Profile profile) {
-        ActionDef action = content.action(profile.player.getActionCode());
+    private long currentMsPerItem(Profile profile, ActionDef action, HomesteadBonus.Bonus bonus) {
         if (action == null) {
             return 0L;
         }
         return HomesteadEngine.msPerItem(action.baseMs(),
-                skillOf(profile, action.skill()).getLevel(), tierOf(profile, action.skill()),
-                speedBonusOf(profile, action.skill()));
+                skillOf(profile, action.skill()).getLevel(), bonus.speedBp());
     }
 
-    private long currentSpeedBp(Profile profile) {
-        ActionDef action = content.action(profile.player.getActionCode());
-        if (action == null) {
-            return HomesteadConst.SPEED_BASE_BP;
+    /** 当前动作的生效加成(静态 + buff),空闲时只有全局项(离线上限/卖价) */
+    private HomesteadBonus.Bonus effectiveBonus(Profile profile, ActionDef action, long nowMs) {
+        HomesteadBonus.Bonus base = bonusOf(profile, action);
+        String kind = action == null ? "ALL" : skillKind(action.skill());
+        return HomesteadBonus.withBuffs(base, kind, activeBuffSpans(profile, nowMs), nowMs);
+    }
+
+    private HomesteadBonus.Bonus bonusOf(Profile profile, ActionDef action) {
+        List<HomesteadBonus.WornGear> worn = new ArrayList<>();
+        for (HomesteadWear row : profile.wear) {
+            if (row.getGearCode() == null || row.getGearCode().isBlank()) {
+                continue;
+            }
+            HomesteadGear gear = gearRow(profile, row.getGearCode());
+            worn.add(new HomesteadBonus.WornGear(row.getGearCode(),
+                    gear == null ? 0 : nzInt(gear.getEnhance())));
         }
-        return HomesteadEngine.speedBp(skillOf(profile, action.skill()).getLevel(), tierOf(profile, action.skill()),
-                speedBonusOf(profile, action.skill()));
-    }
-
-    /** 某个技能的穿戴加速:采集/加工分开算,袖套给全部技能 */
-    private int speedBonusOf(Profile profile, String skillCode) {
-        SkillDef def = content.skill(skillCode);
-        return gearBonuses(profile).speedBpFor(def == null ? null : def.kind());
-    }
-
-    private HomesteadGear.Bonuses gearBonuses(Profile profile) {
-        Map<String, Integer> tiers = new HashMap<>();
-        for (HomesteadEquipment row : profile.gear) {
-            tiers.put(row.getSlotCode(), row.getTier() == null ? 0 : row.getTier());
+        Map<String, Integer> levels = new HashMap<>();
+        for (HomesteadBuilding row : profile.buildings) {
+            if (nzInt(row.getLevel()) > 0) {
+                levels.put(row.getBuildingCode(), nzInt(row.getLevel()));
+            }
         }
-        return HomesteadGear.of(content, tiers);
+        int toolTier = action == null ? 0 : toolTier(profile, action);
+        return HomesteadBonus.resolve(content, action, toolTier, worn, levels);
+    }
+
+    private List<HomesteadBonus.BuffSpan> activeBuffSpans(Profile profile, long nowMs) {
+        List<HomesteadBonus.BuffSpan> spans = new ArrayList<>(profile.buffs.size());
+        for (HomesteadBuff buff : profile.buffs) {
+            long expireAt = toMillis(buff.getExpireAt());
+            if (expireAt > nowMs) {
+                spans.add(new HomesteadBonus.BuffSpan(buff.getKind(), buff.getTarget(),
+                        nzInt(buff.getBp()), expireAt));
+            }
+        }
+        return spans;
     }
 
     /** 赶集日行情:当天两单 + 共享额度 + 下次换货时刻(前端据此显示剩余与倒计时) */
@@ -695,7 +955,7 @@ public class HomesteadService {
         return view;
     }
 
-    /** 内容表整体下发给前端,保证名称/价格/耗时只有一份来源(后端 JSON) */
+    /** 内容表整体下发给前端,保证名称/价格/耗时/配方只有一份来源(后端 JSON) */
     private Map<String, Object> contentView() {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("version", content.contentVersion());
@@ -728,6 +988,16 @@ public class HomesteadService {
             view.put("nameEn", def.nameEn());
             view.put("category", def.category());
             view.put("sellPrice", def.sellPrice());
+            if (def.buff() == null) {
+                view.put("buff", null);
+            } else {
+                Map<String, Object> buff = new LinkedHashMap<>();
+                buff.put("kind", def.buff().kind());
+                buff.put("target", def.buff().target());
+                buff.put("bp", def.buff().bp());
+                buff.put("minutes", def.buff().minutes());
+                view.put("buff", buff);
+            }
             items.add(view);
         }
         out.put("items", items);
@@ -750,9 +1020,11 @@ public class HomesteadService {
                 Map<String, Object> rare = new LinkedHashMap<>();
                 rare.put("item", def.rare().item());
                 rare.put("qty", def.rare().qty());
-                rare.put("every", def.rare().every());
+                rare.put("chanceBp", def.rare().chanceBp());
                 view.put("rare", rare);
             }
+            view.put("requireBuilding", def.requireBuilding());
+            view.put("requireBuildingLevel", def.requireBuildingLevel());
             actions.add(view);
         }
         out.put("actions", actions);
@@ -761,11 +1033,14 @@ public class HomesteadService {
         for (ToolDef def : content.tools()) {
             Map<String, Object> view = new LinkedHashMap<>();
             view.put("code", def.code());
+            view.put("action", def.action());
             view.put("skill", def.skill());
             view.put("name", def.name());
             view.put("nameEn", def.nameEn());
             view.put("desc", def.desc());
             view.put("descEn", def.descEn());
+            view.put("requireLevel", def.requireLevel());
+            view.put("effects", effectViews(def.effects()));
             List<Map<String, Object>> steps = new ArrayList<>();
             for (ToolDef.ToolStep step : def.steps()) {
                 Map<String, Object> stepView = new LinkedHashMap<>();
@@ -782,28 +1057,85 @@ public class HomesteadService {
         for (EquipmentDef def : content.equipment()) {
             Map<String, Object> view = new LinkedHashMap<>();
             view.put("code", def.code());
+            view.put("slot", def.slot());
+            view.put("skill", def.skill());
+            view.put("requireLevel", def.requireLevel());
             view.put("name", def.name());
             view.put("nameEn", def.nameEn());
             view.put("desc", def.desc());
             view.put("descEn", def.descEn());
-            Map<String, Object> effect = new LinkedHashMap<>();
-            effect.put("kind", def.effect().kind());
-            effect.put("target", def.effect().target());
-            effect.put("bp", def.effect().bp());
-            effect.put("hours", def.effect().hours());
-            view.put("effect", effect);
+            view.put("effects", effectViews(def.effects()));
+            view.put("craft", stepView(def.craft()));
             List<Map<String, Object>> steps = new ArrayList<>();
             for (EquipmentDef.EquipmentStep step : def.steps()) {
+                steps.add(stepView(step));
+            }
+            view.put("steps", steps);
+            equipment.add(view);
+        }
+        out.put("equipment", equipment);
+
+        List<Map<String, Object>> buildings = new ArrayList<>();
+        for (BuildingDef def : content.buildings()) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("code", def.code());
+            view.put("skill", def.skill());
+            view.put("unlockAction", def.unlockAction());
+            view.put("name", def.name());
+            view.put("nameEn", def.nameEn());
+            view.put("icon", def.icon());
+            view.put("desc", def.desc());
+            view.put("descEn", def.descEn());
+            view.put("maxLevel", def.maxLevel());
+            view.put("effects", effectViews(def.effects()));
+            List<Map<String, Object>> steps = new ArrayList<>();
+            for (BuildingDef.BuildingStep step : def.steps()) {
                 Map<String, Object> stepView = new LinkedHashMap<>();
                 stepView.put("coins", step.coins());
                 stepView.put("materials", amountViews(step.materials()));
                 steps.add(stepView);
             }
             view.put("steps", steps);
-            equipment.add(view);
+            buildings.add(view);
         }
-        out.put("equipment", equipment);
+        out.put("buildings", buildings);
+        out.put("gearSlots", new ArrayList<>(HomesteadConst.GEAR_SLOTS));
         return out;
+    }
+
+    private List<Map<String, Object>> effectViews(List<?> effects) {
+        List<Map<String, Object>> out = new ArrayList<>(effects.size());
+        for (Object raw : effects) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            if (raw instanceof ToolDef.ToolEffect effect) {
+                view.put("kind", effect.kind());
+                view.put("target", "ACTION");
+                view.put("bp", effect.bp());
+                view.put("hours", 0);
+            } else if (raw instanceof EquipmentDef.EffectDef effect) {
+                view.put("kind", effect.kind());
+                view.put("target", effect.target());
+                view.put("bp", effect.bp());
+                view.put("hours", effect.hours());
+            } else if (raw instanceof BuildingDef.EffectDef effect) {
+                view.put("kind", effect.kind());
+                view.put("target", effect.target());
+                view.put("bp", effect.bp());
+                view.put("hours", effect.hours());
+            }
+            out.add(view);
+        }
+        return out;
+    }
+
+    private Map<String, Object> stepView(EquipmentDef.EquipmentStep step) {
+        if (step == null) {
+            return null;
+        }
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("coins", step.coins());
+        view.put("materials", amountViews(step.materials()));
+        return view;
     }
 
     private List<Map<String, Object>> amountViews(List<ActionDef.ItemAmount> amounts) {
@@ -818,6 +1150,54 @@ public class HomesteadService {
     }
 
     // ------------------------------------------------------------------ 小工具
+
+    /** 动作解锁:技能等级 + (工坊动作)对应场地等级 */
+    private void requireActionUnlocked(Profile profile, ActionDef action) {
+        HomesteadSkill skill = skillOf(profile, action.skill());
+        if (skill.getLevel() < action.level()) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "这个动作要 " + action.level() + " 级才能做");
+        }
+        if (action.needsBuilding()) {
+            int level = buildingLevel(profile, action.requireBuilding());
+            if (level < action.requireBuildingLevel()) {
+                BuildingDef building = content.building(action.requireBuilding());
+                String name = building == null ? "对应场地" : building.name();
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "要先把" + name + "升到 " + action.requireBuildingLevel() + " 级");
+            }
+        }
+    }
+
+    private void requireSkillLevel(Profile profile, String skillCode, int level, String what) {
+        if (level <= 1) {
+            return;
+        }
+        if (skillOf(profile, skillCode).getLevel() < level) {
+            throw new BizException(ResultCode.BAD_REQUEST, what + "要 " + level + " 级");
+        }
+    }
+
+    /** 校验铜板与材料够不够,返回材料总需求(同物品合并) */
+    private Map<String, Long> checkCost(Profile profile, long coins, List<ActionDef.ItemAmount> materials) {
+        if (nz(profile.player.getCoins()) < coins) {
+            throw new BizException(ResultCode.BAD_REQUEST, "铜板不够");
+        }
+        Map<String, Long> need = new HashMap<>();
+        Map<String, Long> stock = qtyMap(profile.items);
+        for (ActionDef.ItemAmount material : materials) {
+            if (stock.getOrDefault(material.item(), 0L) < material.qty()) {
+                throw new BizException(ResultCode.BAD_REQUEST, "材料不够");
+            }
+            need.merge(material.item(), material.qty(), Long::sum);
+        }
+        return need;
+    }
+
+    private String skillKind(String skillCode) {
+        SkillDef def = content.skill(skillCode);
+        return def == null || def.kind() == null ? "ALL" : def.kind();
+    }
 
     /** 写操作幂等:同一 opId 只生效一次;Redis 异常时放行(可用性优先于去重) */
     private boolean allowOp(Long userId, String opId) {
@@ -836,7 +1216,7 @@ public class HomesteadService {
 
     private HomesteadSkill skillOf(Profile profile, String skillCode) {
         for (HomesteadSkill skill : profile.skills) {
-            if (skillCode.equals(skill.getSkillCode())) {
+            if (skillCode != null && skillCode.equals(skill.getSkillCode())) {
                 return skill;
             }
         }
@@ -850,33 +1230,62 @@ public class HomesteadService {
         return fallback;
     }
 
-    private int tierOf(Profile profile, String skillCode) {
-        ToolDef def = content.toolOfSkill(skillCode);
-        if (def == null) {
-            return 0;
-        }
-        HomesteadTool row = toolRow(profile, def.code());
-        return row == null ? 0 : row.getTier();
+    private int toolTier(Profile profile, ActionDef action) {
+        ToolDef def = content.toolOfAction(action.code());
+        return def == null ? 0 : toolTier(profile, def.code());
+    }
+
+    private int toolTier(Profile profile, String toolCode) {
+        HomesteadTool row = toolRow(profile, toolCode);
+        return row == null ? 0 : nzInt(row.getTier());
     }
 
     private HomesteadTool toolRow(Profile profile, String toolCode) {
         for (HomesteadTool tool : profile.tools) {
-            if (toolCode.equals(tool.getToolCode())) {
+            if (toolCode != null && toolCode.equals(tool.getToolCode())) {
                 return tool;
             }
         }
         return null;
     }
 
-    private int gearTier(Profile profile, String slotCode) {
-        HomesteadEquipment row = equipmentRow(profile, slotCode);
-        return row == null || row.getTier() == null ? 0 : row.getTier();
+    private HomesteadGear gearRow(Profile profile, String gearCode) {
+        for (HomesteadGear row : profile.gear) {
+            if (gearCode != null && gearCode.equals(row.getGearCode())) {
+                return row;
+            }
+        }
+        return null;
     }
 
-    private HomesteadEquipment equipmentRow(Profile profile, String slotCode) {
-        for (HomesteadEquipment row : profile.gear) {
-            if (slotCode.equals(row.getSlotCode())) {
+    private HomesteadWear wearRow(Profile profile, String slotCode) {
+        for (HomesteadWear row : profile.wear) {
+            if (slotCode != null && slotCode.equals(row.getSlotCode())) {
                 return row;
+            }
+        }
+        return null;
+    }
+
+    private HomesteadBuilding buildingRow(Profile profile, String buildingCode) {
+        for (HomesteadBuilding row : profile.buildings) {
+            if (buildingCode != null && buildingCode.equals(row.getBuildingCode())) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private int buildingLevel(Profile profile, String buildingCode) {
+        HomesteadBuilding row = buildingRow(profile, buildingCode);
+        return row == null ? 0 : nzInt(row.getLevel());
+    }
+
+    private HomesteadBuff activeBuffOf(Profile profile, String itemCode, long nowMs) {
+        for (HomesteadBuff buff : profile.buffs) {
+            if (itemCode.equals(buff.getItemCode()) && buff.getExpireAt() != null
+                    && toMillis(buff.getExpireAt()) > nowMs) {
+                return buff;
             }
         }
         return null;
@@ -884,7 +1293,7 @@ public class HomesteadService {
 
     private HomesteadItem itemRow(Profile profile, String itemCode) {
         for (HomesteadItem item : profile.items) {
-            if (itemCode.equals(item.getItemCode())) {
+            if (itemCode != null && itemCode.equals(item.getItemCode())) {
                 return item;
             }
         }
@@ -932,6 +1341,10 @@ public class HomesteadService {
 
     private static long nz(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private static int nzInt(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private static long asLong(Object value) {

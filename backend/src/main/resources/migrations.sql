@@ -4181,3 +4181,82 @@ DROP TABLE IF EXISTS `family_plant`;
 
 DELETE FROM `sys_home_module` WHERE `code` = 'plant';
 DELETE FROM `family_points_rule` WHERE `feature_code` IN ('plant_water','plant_sun','plant_harvest');
+
+-- ------------------------------------------------------------
+-- V15.45 小院慢生活大扩版(11 技能 / 100 级 / 66 工具 / 15 装备 / 14 场地 / 料理 buff):
+--   旧存档按产品决定整体重置一次,用 game_homestead_meta 的 reset_v16 守卫,
+--   保证本段迁移重跑不会再次清档(第二遍跑时 @hs_reset 为 0,所有 DELETE 影响 0 行)。
+--   旧 game_homestead_equipment(按部位记阶数)由 gear + wear 两表替代,直接丢弃。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `game_homestead_meta` (
+  `k`          VARCHAR(48) NOT NULL COMMENT '键(当前只放存档重置守卫 reset_v16)',
+  `v`          VARCHAR(64) NOT NULL COMMENT '值',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '写入时间',
+  PRIMARY KEY (`k`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活全局键值(迁移守卫)';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_gear` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `gear_code`  VARCHAR(24) NOT NULL COMMENT '装备编码(见 content/homestead/equipment.json)',
+  `enhance`    INT         NOT NULL DEFAULT 0 COMMENT '强化等级(0–5,每级效果 +50%)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_gear` (`user_id`, `gear_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活装备(已制造)';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_wear` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `slot_code`  VARCHAR(16) NOT NULL COMMENT '部位编码(HEAD/BODY/HANDS/FEET/CHARM)',
+  `gear_code`  VARCHAR(24) DEFAULT NULL COMMENT '穿着的装备编码(NULL=空着)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_slot` (`user_id`, `slot_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴(一人一部位)';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_building` (
+  `id`            BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`       BIGINT      NOT NULL COMMENT '用户ID',
+  `building_code` VARCHAR(24) NOT NULL COMMENT '场地编码(见 content/homestead/buildings.json)',
+  `level`         INT         NOT NULL DEFAULT 0 COMMENT '等级(0=未建,10=满级)',
+  `created_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_building` (`user_id`, `building_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活场地';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_buff` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `item_code`  VARCHAR(24) NOT NULL COMMENT '来源料理编码',
+  `kind`       VARCHAR(16) NOT NULL COMMENT '效果类型(SPEED/XP/YIELD/RARE)',
+  `target`     VARCHAR(16) NOT NULL COMMENT '作用类别(GATHER/PROCESS/ALL)',
+  `bp`         INT         NOT NULL DEFAULT 0 COMMENT '加成基点',
+  `expire_at`  DATETIME(3) NOT NULL COMMENT '到期时刻(服务端按它清理)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '食用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_expire` (`user_id`, `expire_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活料理 buff(同时最多 3 条)';
+
+-- 工具编码从 7 件固定道具改成 T_<动作编码>(最长 22 字符),列宽同步放宽。
+ALTER TABLE `game_homestead_tool` MODIFY COLUMN `tool_code` VARCHAR(24) NOT NULL COMMENT '工具编码(T_<动作编码>,每个动作一件)';
+
+-- 一次性清档(只有 meta 里没有 reset_v16 时才生效)
+SET @hs_reset := (SELECT COUNT(*) = 0 FROM `game_homestead_meta` WHERE `k` = 'reset_v16');
+
+DELETE FROM `game_homestead_player` WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_skill`  WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_item`   WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_tool`   WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_gear`   WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_wear`   WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_building` WHERE @hs_reset = 1;
+DELETE FROM `game_homestead_buff`   WHERE @hs_reset = 1;
+
+DROP TABLE IF EXISTS `game_homestead_equipment`;
+
+INSERT IGNORE INTO `game_homestead_meta` (`k`, `v`)
+VALUES ('reset_v16', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'));
