@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.HomesteadPlayerMapper">
+
+    <sql id="progressColumns">
+        `id`, `user_id` AS `userId`, `family_id` AS `familyId`, `coins`,
+        `action_code` AS `actionCode`, `action_seq` AS `actionSeq`,
+        `action_progress_ms` AS `actionProgressMs`, `last_settle_at` AS `lastSettleAt`,
+        `total_actions` AS `totalActions`, `content_version` AS `contentVersion`,
+        `created_at` AS `createdAt`, `updated_at` AS `updatedAt`
+    </sql>
+
+    <!-- 结算入口:同一账号的结算/写操作全部串行在这一行锁上 -->
+    <select id="selectByUserForUpdate" resultType="com.ihomy.entity.HomesteadPlayer">
+        SELECT <include refid="progressColumns"/> FROM `game_homestead_player`
+        WHERE `user_id` = #{userId} FOR UPDATE
+    </select>
+
+    <!-- 建号:唯一键冲突即忽略(并发首访时后到的那个直接复用已有行) -->
+    <insert id="insertPlayerIfAbsent">
+        INSERT IGNORE INTO `game_homestead_player`
+            (`user_id`, `family_id`, `coins`, `action_code`, `action_seq`,
+             `action_progress_ms`, `last_settle_at`, `total_actions`, `content_version`)
+        VALUES
+            (#{userId}, #{familyId}, #{coins}, #{actionCode}, #{actionSeq},
+             #{actionProgressMs}, #{lastSettleAt}, #{totalActions}, #{contentVersion})
+    </insert>
+
+    <!-- 整行回写:action_code 可为 NULL(空闲),所以不能用 MP 的默认 null 跳过策略 -->
+    <update id="updateProgress">
+        UPDATE `game_homestead_player`
+        SET `family_id`          = #{familyId},
+            `coins`              = #{coins},
+            `action_code`        = #{actionCode},
+            `action_seq`         = #{actionSeq},
+            `action_progress_ms` = #{actionProgressMs},
+            `last_settle_at`     = #{lastSettleAt},
+            `total_actions`      = #{totalActions},
+            `content_version`    = #{contentVersion}
+        WHERE `user_id` = #{userId}
+    </update>
+
+    <!--
+      家庭榜候选:以 sys_user_role 的当前绑定判定「仍是本家庭成员」;
+      指数在 Java 侧由 HomesteadIndex 现算(库存半价口径依赖内容表,不适合作 SQL 列)。
+    -->
+    <select id="selectFamilyPlayers" resultType="java.util.Map">
+        SELECT p.`user_id` AS `userId`,
+               p.`coins`   AS `coins`,
+               p.`total_actions` AS `totalActions`,
+               p.`updated_at`    AS `updatedAt`,
+               COALESCE(NULLIF(u.`nickname`, ''), u.`username`) AS `name`,
+               u.`avatar` AS `avatar`
+        FROM `game_homestead_player` p
+        JOIN `sys_user` u ON u.`id` = p.`user_id` AND u.`deleted` = 0
+        JOIN `sys_user_role` ur ON ur.`user_id` = p.`user_id` AND ur.`family_id` = #{familyId}
+    </select>
+
+</mapper>

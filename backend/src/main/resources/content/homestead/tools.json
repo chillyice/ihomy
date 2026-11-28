@@ -1,0 +1,82 @@
+{
+  "comment": "小院慢生活工具表:每技能一件工具,0 阶=徒手,steps[i] 表示升到 (i+1) 阶的花费。阶数加成统一 +8%/阶(引擎常量 TOOL_STEP_BP),材料刻意跨技能,让四个采集/三个加工互相咬合。",
+  "tools": [
+    {
+      "code": "AXE", "skill": "WOOD", "name": "柴刀", "name_en": "Axe",
+      "desc": "砍柴用的厚背刀,刃口越磨越快。", "desc_en": "A thick-bladed axe for firewood.",
+      "steps": [
+        { "coins": 30, "materials": [{ "item": "DRY_WOOD", "qty": 4 }] },
+        { "coins": 120, "materials": [{ "item": "DRY_WOOD", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 420, "materials": [{ "item": "PINE_LOG", "qty": 6 }, { "item": "WHETSTONE", "qty": 1 }] },
+        { "coins": 1400, "materials": [{ "item": "PINE_LOG", "qty": 18 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 4800, "materials": [{ "item": "CAMPHOR_WOOD", "qty": 10 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "BASKET", "skill": "FORAGE", "name": "背篓", "name_en": "Gathering Basket",
+      "desc": "编得密实的背篓,装莓子不压坏。", "desc_en": "A tightly woven basket for berries.",
+      "steps": [
+        { "coins": 30, "materials": [{ "item": "WILD_BERRY", "qty": 6 }] },
+        { "coins": 120, "materials": [{ "item": "WILD_BERRY", "qty": 16 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 420, "materials": [{ "item": "MUSHROOM", "qty": 8 }, { "item": "WHETSTONE", "qty": 1 }] },
+        { "coins": 1400, "materials": [{ "item": "WILD_HONEY", "qty": 12 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 4800, "materials": [{ "item": "HONEY_FRUIT", "qty": 6 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "ROD", "skill": "FISHING", "name": "鱼竿", "name_en": "Fishing Rod",
+      "desc": "竹节竿配细线,溪边坐一下午。", "desc_en": "A bamboo rod with a fine line.",
+      "steps": [
+        { "coins": 30, "materials": [{ "item": "STREAM_FISH", "qty": 5 }] },
+        { "coins": 120, "materials": [{ "item": "RIVER_SHRIMP", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 420, "materials": [{ "item": "ROCK_FISH", "qty": 6 }, { "item": "WHETSTONE", "qty": 1 }] },
+        { "coins": 1400, "materials": [{ "item": "SILVER_FISH", "qty": 6 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 4800, "materials": [{ "item": "AGED_WINE", "qty": 3 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "SIEVE", "skill": "STONE", "name": "石筛", "name_en": "Stone Sieve",
+      "desc": "筛河滩用的粗筛,石子分得清。", "desc_en": "A coarse sieve for riverbank stones.",
+      "steps": [
+        { "coins": 40, "materials": [{ "item": "PEBBLE", "qty": 8 }] },
+        { "coins": 150, "materials": [{ "item": "BLUESTONE", "qty": 10 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 460, "materials": [{ "item": "WHETSTONE", "qty": 4 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 1500, "materials": [{ "item": "INKSTONE", "qty": 4 }, { "item": "WOODEN_STOOL", "qty": 2 }] },
+        { "coins": 5000, "materials": [{ "item": "INKSTONE", "qty": 12 }, { "item": "STONE_MILL", "qty": 2 }] }
+      ]
+    },
+    {
+      "code": "POT", "skill": "COOKING", "name": "铁锅", "name_en": "Iron Pot",
+      "desc": "灶上那口老铁锅,越用越顺手。", "desc_en": "A well-seasoned iron pot.",
+      "steps": [
+        { "coins": 40, "materials": [{ "item": "RICE_MEAL", "qty": 4 }] },
+        { "coins": 150, "materials": [{ "item": "FISH_SOUP", "qty": 4 }] },
+        { "coins": 480, "materials": [{ "item": "MUSHROOM_STEW", "qty": 3 }] },
+        { "coins": 1600, "materials": [{ "item": "HONEY_FRUIT", "qty": 4 }] },
+        { "coins": 5200, "materials": [{ "item": "MUSHROOM_SAUCE", "qty": 4 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "JAR", "skill": "BREWING", "name": "酒瓮", "name_en": "Wine Jar",
+      "desc": "口小肚大的陶瓮,封得越久越香。", "desc_en": "A narrow-mouthed clay jar.",
+      "steps": [
+        { "coins": 40, "materials": [{ "item": "BERRY_WINE", "qty": 4 }] },
+        { "coins": 150, "materials": [{ "item": "MINT_DEW", "qty": 4 }] },
+        { "coins": 480, "materials": [{ "item": "MUSHROOM_SAUCE", "qty": 3 }] },
+        { "coins": 1600, "materials": [{ "item": "AGED_WINE", "qty": 3 }] },
+        { "coins": 5200, "materials": [{ "item": "AGED_WINE", "qty": 8 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "PLANE", "skill": "CRAFT", "name": "木刨", "name_en": "Plane",
+      "desc": "推平木料的旧刨子,刨花卷成圈。", "desc_en": "An old plane that curls perfect shavings.",
+      "steps": [
+        { "coins": 40, "materials": [{ "item": "WOODEN_BASIN", "qty": 3 }] },
+        { "coins": 150, "materials": [{ "item": "WOODEN_STOOL", "qty": 3 }] },
+        { "coins": 480, "materials": [{ "item": "STONE_MILL", "qty": 2 }] },
+        { "coins": 1600, "materials": [{ "item": "WOODEN_BOX", "qty": 2 }] },
+        { "coins": 5200, "materials": [{ "item": "WOODEN_BOX", "qty": 6 }] }
+      ]
+    }
+  ]
+}

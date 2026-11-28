@@ -218,8 +218,13 @@ const routes = [
   { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
-  // 小面包房(放置挂机:产线升级 + 开分店,家庭净资产榜),需登录
-  { path: '/games/bakery', name: 'BakeryIdle', component: () => import('@/views/games/BakeryIdle.vue'), meta: { requiresAuth: true } },
+  // 小院慢生活(放置:服务端存档 + 离线结算,七个技能采集/加工闭环 + 家庭指数榜),需登录
+  {
+    path: '/games/homestead',
+    name: 'Homestead',
+    component: () => import('@/views/games/Homestead.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/games/pool', redirect: '/games/eight-ball' },
   {
     path: '/games/chinese-checkers',

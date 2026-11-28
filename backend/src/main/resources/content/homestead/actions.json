@@ -1,0 +1,39 @@
+{
+  "comment": "小院慢生活动作表(每技能 4 档,等级门槛 1/8/20/35)。seconds 为一次动作占用的实秒数(受工具与技能加成缩短);xp 为每次经验;inputs 为空即采集类,可无限挂;加工类材料耗尽会自动停。rare 按动作累计次数确定性掉落(seq % every == 0),不用随机数,离线可精确复算。加工动作的产出不得再作为自身输入(启动校验会拦),保证单次结算只走一遍。",
+  "actions": [
+    { "code": "PICK_TWIG", "skill": "WOOD", "name": "捡松枝", "name_en": "Pick Pine Twigs", "level": 1, "seconds": 3, "xp": 6, "yields": [{ "item": "PINE_TWIG", "qty": 1 }], "rare": { "item": "PINE_RESIN", "qty": 1, "every": 30 } },
+    { "code": "GATHER_WOOD", "skill": "WOOD", "name": "拾干柴", "name_en": "Gather Firewood", "level": 8, "seconds": 5, "xp": 14, "yields": [{ "item": "DRY_WOOD", "qty": 1 }], "rare": { "item": "PINE_RESIN", "qty": 1, "every": 35 } },
+    { "code": "FELL_PINE", "skill": "WOOD", "name": "伐松木", "name_en": "Fell Pine", "level": 20, "seconds": 8, "xp": 34, "yields": [{ "item": "PINE_LOG", "qty": 1 }], "rare": { "item": "PINE_RESIN", "qty": 1, "every": 40 } },
+    { "code": "FELL_CAMPHOR", "skill": "WOOD", "name": "伐香樟", "name_en": "Fell Camphor", "level": 35, "seconds": 12, "xp": 70, "yields": [{ "item": "CAMPHOR_WOOD", "qty": 1 }], "rare": { "item": "PINE_RESIN", "qty": 1, "every": 45 } },
+
+    { "code": "PICK_BERRY", "skill": "FORAGE", "name": "摘野莓", "name_en": "Pick Berries", "level": 1, "seconds": 4, "xp": 7, "yields": [{ "item": "WILD_BERRY", "qty": 1 }], "rare": { "item": "FOUR_LEAF", "qty": 1, "every": 40 } },
+    { "code": "PICK_MINT", "skill": "FORAGE", "name": "采薄荷", "name_en": "Pick Mint", "level": 8, "seconds": 6, "xp": 15, "yields": [{ "item": "MINT", "qty": 1 }], "rare": { "item": "FOUR_LEAF", "qty": 1, "every": 45 } },
+    { "code": "PICK_MUSHROOM", "skill": "FORAGE", "name": "寻菌子", "name_en": "Find Mushrooms", "level": 20, "seconds": 9, "xp": 36, "yields": [{ "item": "MUSHROOM", "qty": 1 }], "rare": { "item": "FOUR_LEAF", "qty": 1, "every": 50 } },
+    { "code": "GATHER_HONEY", "skill": "FORAGE", "name": "取野蜜", "name_en": "Harvest Honey", "level": 35, "seconds": 14, "xp": 75, "yields": [{ "item": "WILD_HONEY", "qty": 1 }], "rare": { "item": "FOUR_LEAF", "qty": 1, "every": 55 } },
+
+    { "code": "CATCH_MINNOW", "skill": "FISHING", "name": "钓溪鱼", "name_en": "Catch Stream Fish", "level": 1, "seconds": 5, "xp": 8, "yields": [{ "item": "STREAM_FISH", "qty": 1 }], "rare": { "item": "PEARL", "qty": 1, "every": 50 } },
+    { "code": "CATCH_SHRIMP", "skill": "FISHING", "name": "捞河虾", "name_en": "Catch Shrimp", "level": 8, "seconds": 7, "xp": 17, "yields": [{ "item": "RIVER_SHRIMP", "qty": 1 }], "rare": { "item": "PEARL", "qty": 1, "every": 55 } },
+    { "code": "CATCH_ROCKFISH", "skill": "FISHING", "name": "钓石斑", "name_en": "Catch Rock Fish", "level": 20, "seconds": 11, "xp": 40, "yields": [{ "item": "ROCK_FISH", "qty": 1 }], "rare": { "item": "PEARL", "qty": 1, "every": 60 } },
+    { "code": "CATCH_SILVER", "skill": "FISHING", "name": "钓银鳞", "name_en": "Catch Silver Fish", "level": 35, "seconds": 16, "xp": 80, "yields": [{ "item": "SILVER_FISH", "qty": 1 }], "rare": { "item": "PEARL", "qty": 1, "every": 65 } },
+
+    { "code": "PICK_PEBBLE", "skill": "STONE", "name": "捡卵石", "name_en": "Pick Pebbles", "level": 1, "seconds": 4, "xp": 7, "yields": [{ "item": "PEBBLE", "qty": 1 }], "rare": { "item": "AGATE", "qty": 1, "every": 45 } },
+    { "code": "PICK_BLUESTONE", "skill": "STONE", "name": "捡青石", "name_en": "Pick Bluestone", "level": 8, "seconds": 7, "xp": 16, "yields": [{ "item": "BLUESTONE", "qty": 1 }], "rare": { "item": "AGATE", "qty": 1, "every": 50 } },
+    { "code": "POLISH_WHETSTONE", "skill": "STONE", "name": "磨磨石", "name_en": "Polish Whetstone", "level": 20, "seconds": 10, "xp": 38, "yields": [{ "item": "WHETSTONE", "qty": 1 }], "rare": { "item": "AGATE", "qty": 1, "every": 55 } },
+    { "code": "SEEK_INKSTONE", "skill": "STONE", "name": "寻砚石", "name_en": "Seek Inkstone", "level": 35, "seconds": 15, "xp": 78, "yields": [{ "item": "INKSTONE", "qty": 1 }], "rare": { "item": "AGATE", "qty": 1, "every": 60 } },
+
+    { "code": "COOK_RICE", "skill": "COOKING", "name": "柴火饭", "name_en": "Cook Firewood Rice", "level": 1, "seconds": 6, "xp": 10, "inputs": [{ "item": "PINE_TWIG", "qty": 2 }], "yields": [{ "item": "RICE_MEAL", "qty": 1 }] },
+    { "code": "COOK_SOUP", "skill": "COOKING", "name": "溪鱼汤", "name_en": "Cook Fish Soup", "level": 8, "seconds": 9, "xp": 22, "inputs": [{ "item": "STREAM_FISH", "qty": 2 }, { "item": "PINE_TWIG", "qty": 1 }], "yields": [{ "item": "FISH_SOUP", "qty": 1 }] },
+    { "code": "COOK_STEW", "skill": "COOKING", "name": "菌菇煲", "name_en": "Cook Mushroom Stew", "level": 20, "seconds": 14, "xp": 50, "inputs": [{ "item": "MUSHROOM", "qty": 2 }, { "item": "DRY_WOOD", "qty": 1 }], "yields": [{ "item": "MUSHROOM_STEW", "qty": 1 }] },
+    { "code": "COOK_HONEY_FRUIT", "skill": "COOKING", "name": "蜜渍果", "name_en": "Make Honeyed Fruit", "level": 35, "seconds": 18, "xp": 95, "inputs": [{ "item": "WILD_BERRY", "qty": 3 }, { "item": "WILD_HONEY", "qty": 1 }], "yields": [{ "item": "HONEY_FRUIT", "qty": 1 }] },
+
+    { "code": "BREW_BERRY", "skill": "BREWING", "name": "莓子酿", "name_en": "Brew Berry Wine", "level": 1, "seconds": 10, "xp": 12, "inputs": [{ "item": "WILD_BERRY", "qty": 3 }], "yields": [{ "item": "BERRY_WINE", "qty": 1 }] },
+    { "code": "BREW_MINT", "skill": "BREWING", "name": "薄荷露", "name_en": "Brew Mint Dew", "level": 8, "seconds": 14, "xp": 26, "inputs": [{ "item": "MINT", "qty": 3 }], "yields": [{ "item": "MINT_DEW", "qty": 1 }] },
+    { "code": "BREW_SAUCE", "skill": "BREWING", "name": "菌香酱", "name_en": "Brew Mushroom Sauce", "level": 20, "seconds": 18, "xp": 55, "inputs": [{ "item": "MUSHROOM", "qty": 3 }, { "item": "STREAM_FISH", "qty": 1 }], "yields": [{ "item": "MUSHROOM_SAUCE", "qty": 1 }] },
+    { "code": "BREW_AGED", "skill": "BREWING", "name": "陈年酿", "name_en": "Brew Aged Wine", "level": 35, "seconds": 26, "xp": 110, "inputs": [{ "item": "BERRY_WINE", "qty": 2 }, { "item": "WILD_HONEY", "qty": 1 }], "yields": [{ "item": "AGED_WINE", "qty": 1 }] },
+
+    { "code": "CRAFT_BASIN", "skill": "CRAFT", "name": "箍木盆", "name_en": "Make a Basin", "level": 1, "seconds": 8, "xp": 12, "inputs": [{ "item": "PINE_TWIG", "qty": 4 }], "yields": [{ "item": "WOODEN_BASIN", "qty": 1 }] },
+    { "code": "CRAFT_STOOL", "skill": "CRAFT", "name": "打木凳", "name_en": "Make a Stool", "level": 8, "seconds": 12, "xp": 26, "inputs": [{ "item": "DRY_WOOD", "qty": 4 }], "yields": [{ "item": "WOODEN_STOOL", "qty": 1 }] },
+    { "code": "CRAFT_MILL", "skill": "CRAFT", "name": "凿石磨", "name_en": "Carve a Stone Mill", "level": 20, "seconds": 18, "xp": 55, "inputs": [{ "item": "BLUESTONE", "qty": 3 }, { "item": "PINE_LOG", "qty": 1 }], "yields": [{ "item": "STONE_MILL", "qty": 1 }] },
+    { "code": "CRAFT_BOX", "skill": "CRAFT", "name": "做木匣", "name_en": "Make a Wooden Box", "level": 35, "seconds": 22, "xp": 100, "inputs": [{ "item": "CAMPHOR_WOOD", "qty": 2 }, { "item": "WHETSTONE", "qty": 1 }], "yields": [{ "item": "WOODEN_BOX", "qty": 1 }] }
+  ]
+}

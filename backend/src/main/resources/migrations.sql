@@ -4020,18 +4020,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 SELECT 'LatLongToTimezoneMaven', 'MAVEN', 'com.moodysalem:LatLongToTimezoneMaven', '1.2', 'MIT', 'https://github.com/moodysalem/LatLongToTimezoneMaven', '离线查询家庭地点时区', 'FULL'
 WHERE NOT EXISTS (SELECT 1 FROM `sys_oss_component` WHERE `package_ref` = 'com.moodysalem:LatLongToTimezoneMaven');
 
--- V15.14 小面包房家庭榜(净资产,一人一行覆盖更新;进度仍在本机 localStorage)
-CREATE TABLE IF NOT EXISTS `game_bakery_idle_score` (
-  `id`         BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`  BIGINT   NOT NULL COMMENT '所属家庭ID',
-  `user_id`    BIGINT   NOT NULL COMMENT '成员ID',
-  `score`      BIGINT   NOT NULL DEFAULT 0 COMMENT '当前净资产(金币 + 面团/面包库存折算)',
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次上榜时间',
-  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最近上报时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`),
-  KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';
+-- V15.14 小面包房家庭榜已随 V15.39 下线(表在建库时不再创建,老库由文件末尾的 DROP 清理)
 
 -- 2026-11-26: 成就系统(V15.17):解锁记录 + 游戏完成记录 + 字典 + 导航入口
 CREATE TABLE IF NOT EXISTS `family_achievement` (
@@ -4088,3 +4077,68 @@ CREATE TABLE IF NOT EXISTS `family_house_share` (
   UNIQUE KEY `uk_house_grantee` (`house_id`, `grantee_family_id`),
   KEY `idx_grantee` (`grantee_family_id`, `house_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';
+
+-- ------------------------------------------------------------
+-- V15.39 小院慢生活(game_homestead_*):服务端权威放置游戏存档,4 张表。
+-- 幂等:表不存在才建;已有行/进度一律不动(游戏进度不可被迁移覆盖)。
+-- 榜单指数不落列,由 HomesteadIndex 读取时现算,故无需回填。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `game_homestead_player` (
+  `id`                 BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`            BIGINT      NOT NULL COMMENT '用户ID',
+  `family_id`          BIGINT      DEFAULT NULL COMMENT '最近一次进入时的家庭ID(仅冗余,榜单按 sys_user_role 现算)',
+  `coins`              BIGINT      NOT NULL DEFAULT 0 COMMENT '铜板',
+  `action_code`        VARCHAR(32) DEFAULT NULL COMMENT '当前挂机动作(NULL=空闲)',
+  `action_seq`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作累计完成次数(稀有掉落计数,换动作归零)',
+  `action_progress_ms` BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作已积累毫秒',
+  `last_settle_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '上次结算时刻(离线补算锚点)',
+  `total_actions`      BIGINT      NOT NULL DEFAULT 0 COMMENT '历史完成动作总数(成就指标)',
+  `content_version`    CHAR(64)    DEFAULT NULL COMMENT '落库时的内容版本',
+  `created_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活玩家档';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_skill` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `skill_code` VARCHAR(16) NOT NULL COMMENT '技能编码(WOOD/FORAGE/FISHING/STONE/COOKING/BREWING/CRAFT)',
+  `level`      INT         NOT NULL DEFAULT 1 COMMENT '当前等级',
+  `xp`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前等级内经验(满级后不再增长)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_skill` (`user_id`, `skill_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活技能档';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_item` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `item_code`  VARCHAR(24) NOT NULL COMMENT '物品编码(见 content/homestead/items.json)',
+  `qty`        BIGINT      NOT NULL DEFAULT 0 COMMENT '持有数量(0 行保留,卖出不清行)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_item` (`user_id`, `item_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活背包';
+
+CREATE TABLE IF NOT EXISTS `game_homestead_tool` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `tool_code`  VARCHAR(16) NOT NULL COMMENT '工具编码(AXE/BASKET/ROD/SIEVE/POT/JAR/PLANE)',
+  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '等阶(0=徒手,5=最高)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_tool` (`user_id`, `tool_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活工具档';
+
+-- ------------------------------------------------------------
+-- V15.39 小面包房下线:榜单表与积分规则孤儿行一并清理。
+-- 进度本来只在客户端,这张表只存「一个数字」,已无任何消费者;
+-- family_game_record 里的历史 bakery 行保留(成就的完成/胜场统计沿用)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `game_bakery_idle_score`;
+
+DELETE FROM `family_points_rule` WHERE `feature_code` = 'game_bakery';

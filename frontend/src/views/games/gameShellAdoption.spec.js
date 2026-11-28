@@ -17,7 +17,6 @@ const EMBEDDED_DIR = join(GAME_DIR, 'embedded')
 /** 已迁到 GameShell 的游戏页(全部自研舞台页;P9/P10 的 embed 本地化组件同批登记) */
 const MIGRATED = [
   'Baohuang.vue',
-  'BakeryIdle.vue',
   'BubbleGame.vue',
   'Cards.vue',
   'ChineseCheckers.vue',
@@ -28,6 +27,7 @@ const MIGRATED = [
   'Gomoku.vue',
   'Gouji.vue',
   'Guandan.vue',
+  'Homestead.vue',
   'Ludo.vue',
   'Mahjong.vue',
   'Mahjong3d.vue',

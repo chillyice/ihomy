@@ -436,10 +436,6 @@ export const gameApi = {
   baohuangReward: () => request.post('/game/baohuang/reward'),
   goujiReward: () => request.post('/game/gouji/reward'),
   mahjong3dReward: () => request.post('/game/mahjong3d/reward'),
-  bakeryReward: () => request.post('/game/bakery/reward'),
-  // 小面包房:进度在本机,家里只存「当前净资产」一个数字(覆盖更新);榜单只回本家庭前 20
-  bakeryScore: (score) => request.post('/game/bakery/score', { score }),
-  bakeryRanking: () => request.get('/game/bakery/ranking'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),
@@ -449,6 +445,21 @@ export const gameApi = {
     return request.post(`/game/${id}/saves`, form)
   },
   deleteSave: (id, name) => request.delete(`/game/${id}/saves/${encodeURIComponent(name)}`),
+}
+
+// 放置游戏幂等键:写操作带一次性 Key,双击/网络重发不会二次入账(服务端 Redis 去重 10 分钟)
+function homesteadOp(opId) {
+  return opId ? { headers: { 'Idempotency-Key': opId } } : undefined
+}
+
+// 小院慢生活(放置:服务端存档 + 离线结算)。读状态会顺带结算离线收益并返回全量存档
+export const homesteadApi = {
+  state: () => request.get('/game/homestead/state'),
+  action: (actionCode, opId) => request.post('/game/homestead/action', { actionCode }, homesteadOp(opId)),
+  stop: (opId) => request.post('/game/homestead/stop', null, homesteadOp(opId)),
+  sell: (itemCode, qty, opId) => request.post('/game/homestead/sell', { itemCode, qty }, homesteadOp(opId)),
+  tool: (toolCode, opId) => request.post('/game/homestead/tool', { toolCode }, homesteadOp(opId)),
+  ranking: () => request.get('/game/homestead/ranking'),
 }
 
 // 「一起玩」房间(2~8 人,PK/COOP):点「一起玩」直接进房、房内选游戏;状态变化经 WS game-signal(event=room)推送

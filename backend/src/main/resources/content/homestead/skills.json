@@ -1,0 +1,76 @@
+{
+  "comment": "小院慢生活技能表(唯一真相源)。max_level 与 xp_to_next 长度必须一致:xp_to_next[i] = 从 (i+1) 级升到 (i+2) 级所需经验,共 49 项;取整公式 round(50 * level^1.5),放在配置里而不是运行时算,保证跨环境整数确定性。",
+  "max_level": 50,
+  "xp_to_next": [
+    50, 141, 260, 400, 559, 735, 926, 1131, 1350, 1581,
+    1824, 2078, 2344, 2619, 2905, 3200, 3505, 3818, 4141, 4472,
+    4812, 5159, 5515, 5879, 6250, 6629, 7015, 7408, 7808, 8216,
+    8630, 9051, 9478, 9912, 10353, 10800, 11254, 11715, 12184, 12659,
+    13142, 13632, 14129, 14634, 15145, 15664, 16191, 16724, 17264
+  ],
+  "skills": [
+    {
+      "code": "WOOD",
+      "name": "拾柴",
+      "name_en": "Woodcutting",
+      "kind": "GATHER",
+      "icon": "🪵",
+      "desc": "后山的松林与香樟,捡枝、拾柴、砍木,灶台和木工都靠它。",
+      "desc_en": "Gather twigs and logs from the hillside grove."
+    },
+    {
+      "code": "FORAGE",
+      "name": "采撷",
+      "name_en": "Foraging",
+      "kind": "GATHER",
+      "icon": "🌿",
+      "desc": "草坡上的野莓、薄荷、菌子与野蜜,灶台和酒瓮的原料。",
+      "desc_en": "Pick berries, mint, mushrooms and wild honey."
+    },
+    {
+      "code": "FISHING",
+      "name": "垂钓",
+      "name_en": "Fishing",
+      "kind": "GATHER",
+      "icon": "🎣",
+      "desc": "溪边的鱼虾,慢一点,但能换更好的价钱。",
+      "desc_en": "Fish the creek for shrimp and silver-scaled catches."
+    },
+    {
+      "code": "STONE",
+      "name": "捡石",
+      "name_en": "Stone Picking",
+      "kind": "GATHER",
+      "icon": "🪨",
+      "desc": "河滩上的卵石、青石与磨石,工具和木工都离不开。",
+      "desc_en": "Collect pebbles and stone from the riverbank."
+    },
+    {
+      "code": "COOKING",
+      "name": "灶台",
+      "name_en": "Cooking",
+      "kind": "PROCESS",
+      "icon": "🍲",
+      "desc": "柴火、鱼和菌子下锅,做出能卖好价的家常菜。",
+      "desc_en": "Turn firewood, fish and mushrooms into hearty meals."
+    },
+    {
+      "code": "BREWING",
+      "name": "酒瓮",
+      "name_en": "Brewing",
+      "kind": "PROCESS",
+      "icon": "🍶",
+      "desc": "野莓与野蜜入瓮,越陈越值钱。",
+      "desc_en": "Ferment berries and honey into finer brews."
+    },
+    {
+      "code": "CRAFT",
+      "name": "木工",
+      "name_en": "Crafting",
+      "kind": "PROCESS",
+      "icon": "🪚",
+      "desc": "木头和石头做成盆、凳、磨与匣,也是升级工具的料。",
+      "desc_en": "Work wood and stone into basins, stools, mills and boxes."
+    }
+  ]
+}

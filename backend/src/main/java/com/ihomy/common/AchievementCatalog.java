@@ -53,6 +53,10 @@ public final class AchievementCatalog {
     public static final String M_GAME_WIN = "gameWin";
     public static final String M_GAME_ROOM_WIN = "gameRoomWin";
     public static final String M_GAME_MAHJONG_WIN = "gameMahjongWin";
+    public static final String M_HOMESTEAD_LEVEL_SUM = "homesteadLevelSum";
+    public static final String M_HOMESTEAD_MAX_LEVEL = "homesteadMaxLevel";
+    public static final String M_HOMESTEAD_ACTION_TOTAL = "homesteadActionTotal";
+    public static final String M_HOMESTEAD_SKILL_OPENED = "homesteadSkillOpened";
 
     /**
      * 单条成就定义。
@@ -103,9 +107,15 @@ public final class AchievementCatalog {
             new Achievement("game_10", CATEGORY_GAME, "🕹️", M_GAME_DISTINCT, 10, 60),
             new Achievement("game_50", CATEGORY_GAME, "🏅", M_GAME_TOTAL, 50, 50),
             new Achievement("game_room_win", CATEGORY_GAME, "🤝", M_GAME_ROOM_WIN, 10, 40),
-            new Achievement("mahjong_master", CATEGORY_GAME, "🀄", M_GAME_MAHJONG_WIN, 10, 50));
+            new Achievement("mahjong_master", CATEGORY_GAME, "🀄", M_GAME_MAHJONG_WIN, 10, 50),
+            // 小院慢生活(放置):指标直接聚合游戏自己的表,不挂 family_game_record
+            new Achievement("homestead_first", CATEGORY_GAME, "🏡", M_HOMESTEAD_ACTION_TOTAL, 1, 10),
+            new Achievement("homestead_skills", CATEGORY_GAME, "🧺", M_HOMESTEAD_SKILL_OPENED, 7, 40),
+            new Achievement("homestead_level", CATEGORY_GAME, "🌾", M_HOMESTEAD_LEVEL_SUM, 100, 50),
+            new Achievement("homestead_expert", CATEGORY_GAME, "🪵", M_HOMESTEAD_MAX_LEVEL, 30, 60),
+            new Achievement("homestead_veteran", CATEGORY_GAME, "⏳", M_HOMESTEAD_ACTION_TOTAL, 5000, 50));
 
-    /** 等级(成就分越高档位越高;最后一档按目录满分设定) */
+    /** 等级(成就分越高档位越高;目录扩充后满分高于最高档,满档后仍可继续积累) */
     public static final List<Level> LEVELS = List.of(
             new Level(1, 0),
             new Level(2, 100),

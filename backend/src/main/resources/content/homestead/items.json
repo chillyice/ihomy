@@ -1,0 +1,44 @@
+{
+  "comment": "小院慢生活物品表。category: MATERIAL(采集原料)/PRODUCT(加工成品)/RARE(稀有特产,按动作次数确定性掉落)。sell_price 是卖出单价(铜板),榜单估值按半价计,避免囤货刷榜。",
+  "items": [
+    { "code": "PINE_TWIG", "name": "松枝", "name_en": "Pine Twig", "category": "MATERIAL", "sell_price": 2 },
+    { "code": "DRY_WOOD", "name": "干柴", "name_en": "Dry Firewood", "category": "MATERIAL", "sell_price": 5 },
+    { "code": "PINE_LOG", "name": "松木", "name_en": "Pine Log", "category": "MATERIAL", "sell_price": 14 },
+    { "code": "CAMPHOR_WOOD", "name": "香樟木", "name_en": "Camphor Wood", "category": "MATERIAL", "sell_price": 38 },
+
+    { "code": "WILD_BERRY", "name": "野莓", "name_en": "Wild Berry", "category": "MATERIAL", "sell_price": 3 },
+    { "code": "MINT", "name": "薄荷", "name_en": "Mint", "category": "MATERIAL", "sell_price": 4 },
+    { "code": "MUSHROOM", "name": "菌子", "name_en": "Mushroom", "category": "MATERIAL", "sell_price": 9 },
+    { "code": "WILD_HONEY", "name": "野蜜", "name_en": "Wild Honey", "category": "MATERIAL", "sell_price": 30 },
+
+    { "code": "STREAM_FISH", "name": "溪鱼", "name_en": "Stream Fish", "category": "MATERIAL", "sell_price": 4 },
+    { "code": "RIVER_SHRIMP", "name": "河虾", "name_en": "River Shrimp", "category": "MATERIAL", "sell_price": 7 },
+    { "code": "ROCK_FISH", "name": "石斑", "name_en": "Rock Fish", "category": "MATERIAL", "sell_price": 16 },
+    { "code": "SILVER_FISH", "name": "银鳞鱼", "name_en": "Silver Fish", "category": "MATERIAL", "sell_price": 42 },
+
+    { "code": "PEBBLE", "name": "卵石", "name_en": "Pebble", "category": "MATERIAL", "sell_price": 2 },
+    { "code": "BLUESTONE", "name": "青石", "name_en": "Bluestone", "category": "MATERIAL", "sell_price": 6 },
+    { "code": "WHETSTONE", "name": "磨石", "name_en": "Whetstone", "category": "MATERIAL", "sell_price": 18 },
+    { "code": "INKSTONE", "name": "砚石", "name_en": "Inkstone", "category": "MATERIAL", "sell_price": 45 },
+
+    { "code": "RICE_MEAL", "name": "柴火饭", "name_en": "Firewood Rice", "category": "PRODUCT", "sell_price": 10 },
+    { "code": "FISH_SOUP", "name": "溪鱼汤", "name_en": "Fish Soup", "category": "PRODUCT", "sell_price": 26 },
+    { "code": "MUSHROOM_STEW", "name": "菌菇煲", "name_en": "Mushroom Stew", "category": "PRODUCT", "sell_price": 60 },
+    { "code": "HONEY_FRUIT", "name": "蜜渍果", "name_en": "Honeyed Fruit", "category": "PRODUCT", "sell_price": 120 },
+
+    { "code": "BERRY_WINE", "name": "莓子酿", "name_en": "Berry Wine", "category": "PRODUCT", "sell_price": 14 },
+    { "code": "MINT_DEW", "name": "薄荷露", "name_en": "Mint Dew", "category": "PRODUCT", "sell_price": 32 },
+    { "code": "MUSHROOM_SAUCE", "name": "菌香酱", "name_en": "Mushroom Sauce", "category": "PRODUCT", "sell_price": 70 },
+    { "code": "AGED_WINE", "name": "陈年酿", "name_en": "Aged Wine", "category": "PRODUCT", "sell_price": 160 },
+
+    { "code": "WOODEN_BASIN", "name": "木盆", "name_en": "Wooden Basin", "category": "PRODUCT", "sell_price": 16 },
+    { "code": "WOODEN_STOOL", "name": "木凳", "name_en": "Wooden Stool", "category": "PRODUCT", "sell_price": 36 },
+    { "code": "STONE_MILL", "name": "石磨", "name_en": "Stone Mill", "category": "PRODUCT", "sell_price": 80 },
+    { "code": "WOODEN_BOX", "name": "木匣", "name_en": "Wooden Box", "category": "PRODUCT", "sell_price": 180 },
+
+    { "code": "PINE_RESIN", "name": "松脂", "name_en": "Pine Resin", "category": "RARE", "sell_price": 25 },
+    { "code": "FOUR_LEAF", "name": "四叶草", "name_en": "Four-leaf Clover", "category": "RARE", "sell_price": 60 },
+    { "code": "PEARL", "name": "珍珠", "name_en": "Pearl", "category": "RARE", "sell_price": 120 },
+    { "code": "AGATE", "name": "雨花石", "name_en": "River Agate", "category": "RARE", "sell_price": 80 }
+  ]
+}

@@ -1075,7 +1075,7 @@ DROP TABLE IF EXISTS `family_points_rule`;
 CREATE TABLE `family_points_rule` (
   `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
-  `feature_code` VARCHAR(40) NOT NULL COMMENT '功能code(checkin/blog/diary/photo/video/task/game_petlink/plant_water/plant_sun/plant_harvest)',
+  `feature_code` VARCHAR(40) NOT NULL COMMENT '功能code(见 common/PointsRuleConst.FEATURES)',
   `enabled`      TINYINT     NOT NULL DEFAULT 1 COMMENT '是否允许该功能获取积分:0关闭 1开启',
   `points`       INT         NOT NULL DEFAULT 0 COMMENT '每次/每单位获取积分(任务此项不生效)',
   `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -3410,26 +3410,7 @@ CREATE TABLE `sys_ai_action` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私人助手确认卡与执行记录';
 
 -- ------------------------------------------------------------
--- 88. game_bakery_idle_score 小面包房家庭榜(V15.14):
---     一人一行,记录最近一次上报的「当前净资产」(金币 + 面团/面包库存折算);
---     净值会因升级花费回落,故是覆盖更新而非取最大。
---     进度本身仍在本机 localStorage,本表只放榜单口径的一个数字,不存产线细节。
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `game_bakery_idle_score`;
-CREATE TABLE `game_bakery_idle_score` (
-  `id`         BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`  BIGINT   NOT NULL COMMENT '所属家庭ID',
-  `user_id`    BIGINT   NOT NULL COMMENT '成员ID',
-  `score`      BIGINT   NOT NULL DEFAULT 0 COMMENT '当前净资产(金币 + 面团/面包库存折算)',
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次上榜时间',
-  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最近上报时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`),
-  KEY `idx_family_score` (`family_id`, `score` DESC, `updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小面包房家庭榜(净资产)';
-
--- ------------------------------------------------------------
--- 89. family_achievement 成就解锁记录(V15.17):
+-- 88. family_achievement 成就解锁记录(V15.17):
 --     成就目录内置在 common/AchievementCatalog(不入库),本表只落「已解锁」行;
 --     未解锁进度每次读取成就页时按指标实时聚合,不落进度列。
 --     UNIQUE(user_id, code) 兼作并发兜底;score 是解锁时的成就分快照,防目录调整影响家庭榜。
@@ -3449,9 +3430,9 @@ CREATE TABLE `family_achievement` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成就解锁记录';
 
 -- ------------------------------------------------------------
--- 90. family_game_record 游戏完成记录(V15.17):
+-- 89. family_game_record 游戏完成记录(V15.17):
 --     成就指标的唯一游戏口径——单人小游戏 reward、一起玩房间结算、家庭对战终局各落一行;
---     只记「完成/胜负」这一层,不存分数与过程(分数在 game_bakery_idle_score / room_round)。
+--     只记「完成/胜负」这一层,不存分数与过程(分数在 room_round)。
 --     source: SOLO单人 / ROOM一起玩 / MATCH家庭对战;result: FINISH完成 / WIN胜 / LOSE负。
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_game_record`;
@@ -3469,7 +3450,7 @@ CREATE TABLE `family_game_record` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏完成记录(成就指标)';
 
 -- ------------------------------------------------------------
--- 91. 成就相关种子:字典 + 首页模块入口
+-- 90. 成就相关种子:字典 + 首页模块入口
 --     首页/侧栏/移动端导航同源于 sys_home_module,新功能必须插一条;NAV_PATHS 需有同名映射。
 -- ------------------------------------------------------------
 INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
@@ -3483,7 +3464,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('achievement', '成就', 'icon-achievement', '/achievements', 'life', 'left', 13, 1);
 
 -- ------------------------------------------------------------
--- 92. family_house_share 房子协作共享(V15.33):
+-- 91. family_house_share 房子协作共享(V15.33):
 --     物品定位的房子可授权给另一个家庭共同维护(房间/家具/物品增删改查)。
 --     房子与子数据仍归房主家庭(family_house.family_id),协作方操作的 created_by 记实际操作人;
 --     一行 = 一条授权,撤销即物理删除;删房子与调整共享只归房主家庭家长。
@@ -3499,4 +3480,66 @@ CREATE TABLE `family_house_share` (
   UNIQUE KEY `uk_house_grantee` (`house_id`, `grantee_family_id`),
   KEY `idx_grantee` (`grantee_family_id`, `house_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子协作共享表(物品定位)';
+
+-- ------------------------------------------------------------
+-- 92. game_homestead_* 小院慢生活(V15.39):
+--     服务端权威的放置游戏存档——进度只由服务端结算,离线时长按 last_settle_at 补算(上限 24 小时)。
+--     player 一人一行;skill / item / tool 按 user_id + 编码各一行(建号时一次补齐 7 技能 + 7 工具)。
+--     家庭榜指数不落列:读取时由 HomesteadIndex 现算(等级×1000 + 铜板 + 库存半价),
+--     避免内容调价后留下陈旧分数,也杜绝客户端上报。时间列一律毫秒精度(离线补算锚点)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `game_homestead_player`;
+CREATE TABLE `game_homestead_player` (
+  `id`                 BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`            BIGINT      NOT NULL COMMENT '用户ID',
+  `family_id`          BIGINT      DEFAULT NULL COMMENT '最近一次进入时的家庭ID(仅冗余,榜单按 sys_user_role 现算)',
+  `coins`              BIGINT      NOT NULL DEFAULT 0 COMMENT '铜板',
+  `action_code`        VARCHAR(32) DEFAULT NULL COMMENT '当前挂机动作(NULL=空闲)',
+  `action_seq`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作累计完成次数(稀有掉落计数,换动作归零)',
+  `action_progress_ms` BIGINT      NOT NULL DEFAULT 0 COMMENT '当前动作已积累毫秒',
+  `last_settle_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '上次结算时刻(离线补算锚点)',
+  `total_actions`      BIGINT      NOT NULL DEFAULT 0 COMMENT '历史完成动作总数(成就指标)',
+  `content_version`    CHAR(64)    DEFAULT NULL COMMENT '落库时的内容版本',
+  `created_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活玩家档';
+
+DROP TABLE IF EXISTS `game_homestead_skill`;
+CREATE TABLE `game_homestead_skill` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `skill_code` VARCHAR(16) NOT NULL COMMENT '技能编码(WOOD/FORAGE/FISHING/STONE/COOKING/BREWING/CRAFT)',
+  `level`      INT         NOT NULL DEFAULT 1 COMMENT '当前等级',
+  `xp`         BIGINT      NOT NULL DEFAULT 0 COMMENT '当前等级内经验(满级后不再增长)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_skill` (`user_id`, `skill_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活技能档';
+
+DROP TABLE IF EXISTS `game_homestead_item`;
+CREATE TABLE `game_homestead_item` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `item_code`  VARCHAR(24) NOT NULL COMMENT '物品编码(见 content/homestead/items.json)',
+  `qty`        BIGINT      NOT NULL DEFAULT 0 COMMENT '持有数量(0 行保留,卖出不清行)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_item` (`user_id`, `item_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活背包';
+
+DROP TABLE IF EXISTS `game_homestead_tool`;
+CREATE TABLE `game_homestead_tool` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `tool_code`  VARCHAR(16) NOT NULL COMMENT '工具编码(AXE/BASKET/ROD/SIEVE/POT/JAR/PLANE)',
+  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '等阶(0=徒手,5=最高)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_tool` (`user_id`, `tool_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活工具档';
 

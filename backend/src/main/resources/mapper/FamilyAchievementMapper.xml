@@ -3,12 +3,14 @@
 <mapper namespace="com.ihomy.mapper.FamilyAchievementMapper">
 
     <!--
-      成就指标聚合:一次取回 15 个指标。
+      成就指标聚合:一次取回 19 个指标。
       - 签到:总次数 / 最长连续(历史峰值,不因断签回落)
       - 积分:累计获得(change>0 之和,单调不减),不用余额避免消费后成就倒退
       - 内容:本人已发布且未进回收站的行;愿望表无 deleted 列
       - 任务:本人领取且已完成
       - 游戏:family_game_record 的完成/胜场/一起玩胜场/麻将系胜场
+      - 小院慢生活:直接聚合游戏自己的表(技能等级和/最高等级/动作总数/已开技能数),
+        已开技能=升过级(level >= 2),七个技能建档时就都是 1 级,用 1 级当「开」会让建成即达标
       每个子查询都落在对应表的 user/author 索引上;家庭规模小,一次调用成本可忽略。
     -->
     <select id="loadMetrics" resultType="java.util.Map">
@@ -35,7 +37,15 @@
                 WHERE `user_id` = #{userId} AND `source` = 'ROOM' AND `result` = 'WIN') AS `gameRoomWin`,
             (SELECT COUNT(*) FROM `family_game_record`
                 WHERE `user_id` = #{userId} AND `result` = 'WIN'
-                  AND `game_code` IN ('mahjong', 'mahjong3d')) AS `gameMahjongWin`
+                  AND `game_code` IN ('mahjong', 'mahjong3d')) AS `gameMahjongWin`,
+            (SELECT COALESCE(SUM(`level`), 0) FROM `game_homestead_skill`
+                WHERE `user_id` = #{userId}) AS `homesteadLevelSum`,
+            (SELECT COALESCE(MAX(`level`), 0) FROM `game_homestead_skill`
+                WHERE `user_id` = #{userId}) AS `homesteadMaxLevel`,
+            (SELECT COALESCE(SUM(`total_actions`), 0) FROM `game_homestead_player`
+                WHERE `user_id` = #{userId}) AS `homesteadActionTotal`,
+            (SELECT COUNT(*) FROM `game_homestead_skill`
+                WHERE `user_id` = #{userId} AND `level` &gt; 1) AS `homesteadSkillOpened`
     </select>
 
     <!-- 解锁写入:UNIQUE(user_id, code) 冲突即忽略,返回 1 才代表本次新解锁 -->
