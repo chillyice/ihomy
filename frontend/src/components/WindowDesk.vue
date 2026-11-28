@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      v-if="placements.length"
+      v-if="sceneAvailable"
       ref="deskLayer"
       @load.capture="syncCasters"
       class="window-desk"
@@ -9,51 +9,57 @@
       :inert="modalOpen"
       :aria-hidden="modalOpen || undefined"
     >
-      <router-link
-        v-for="({ item, x, y, size, cropWidth, angle, edge }, index) in placements"
-        :key="item.key"
-        :to="item.to"
-        draggable="false"
-        @pointerdown="startMove($event, placements[index])"
-        @click.capture="guardClick"
-        :aria-label="t(item.labelKey, item.labelParams || {})"
-        :tabindex="modalOpen ? -1 : undefined"
-        class="desk-object"
-        :class="{ 'round-object': item.kind === 'cup' && !cropWidth, 'edge-crop': cropWidth }"
-        :data-edge="edge"
-        :style="{
-          left: x + 'px',
-          top: y + 'px',
-          width: (cropWidth || size) + 'px',
-          height: size + 'px',
-          '--desk-size': size + 'px',
-          '--desk-angle': angle + 'deg',
-          '--desk-ink': cropWidth ? paintHalfWidth(item, angle) + '%' : undefined,
-        }"
-      >
-        <span class="desk-crop" aria-hidden="true">
-          <span class="desk-illustration">
-            <span v-if="item.kind === 'photo'" class="instant-print">
-              <img :src="item.src" alt="" draggable="false" decoding="async" @error="hideMissingImage(item)" />
+      <Transition mode="out-in" :css="false" appear @enter="slideIn" @leave="slideOut" @enter-cancelled="stopSlide">
+        <div v-if="placements.length" :key="sceneKey">
+          <router-link
+            v-for="({ item, x, y, size, cropWidth, angle, edge }, index) in placements"
+            :key="item.key"
+            v-desk-seat="placements[index]"
+            :to="item.to"
+            draggable="false"
+            @pointerdown="startMove($event, placements[index])"
+            @click.capture="guardClick"
+            :aria-label="t(item.labelKey, item.labelParams || {})"
+            :tabindex="modalOpen ? -1 : undefined"
+            class="desk-object"
+            :class="{ 'round-object': item.kind === 'cup' && !cropWidth, 'edge-crop': cropWidth }"
+            :data-edge="edge"
+            :style="{
+              left: x + 'px',
+              top: y + 'px',
+              width: (cropWidth || size) + 'px',
+              height: size + 'px',
+              '--desk-size': size + 'px',
+              '--desk-angle': angle + 'deg',
+              '--desk-ink': cropWidth ? paintHalfWidth(item, angle) + '%' : undefined,
+            }"
+          >
+            <span class="desk-crop" aria-hidden="true">
+              <span class="desk-illustration">
+                <span v-if="item.kind === 'photo'" class="instant-print">
+                  <img :src="item.src" alt="" draggable="false" decoding="async" @error="hideMissingImage(item)" />
+                </span>
+                <span v-else-if="item.kind === 'note'" class="memo-paper" :style="paperStyle(item)">
+                  <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
+                  <img v-if="item.ageDays > 0" class="memo-fold" v-bind="illustrationSource(item, size)" alt="" draggable="false" />
+                </span>
+                <template v-else>
+                  <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
+                  <span v-if="item.kind === 'cup'" class="desk-steam"><i></i><i></i></span>
+                </template>
+              </span>
             </span>
-            <span v-else-if="item.kind === 'note'" class="memo-paper" :style="paperStyle(item)">
-              <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
-              <img v-if="item.ageDays > 0" class="memo-fold" v-bind="illustrationSource(item, size)" alt="" draggable="false" />
-            </span>
-            <template v-else>
-              <img v-bind="illustrationSource(item, size)" alt="" draggable="false" @error="hideMissingImage(item)" />
-              <span v-if="item.kind === 'cup'" class="desk-steam"><i></i><i></i></span>
-            </template>
-          </span>
-        </span>
-        <span class="desk-hint" aria-hidden="true">{{ t(item.labelKey, item.labelParams || {}) }}</span>
-      </router-link>
+            <span class="desk-hint" aria-hidden="true">{{ t(item.labelKey, item.labelParams || {}) }}</span>
+          </router-link>
+        </div>
+      </Transition>
     </div>
   </Teleport>
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, ref, shallowRef, watch, watchPostEffect } from 'vue'
+import { computed, inject, onBeforeUnmount, onUpdated, ref, shallowRef, watch } from 'vue'
+import { gsap } from 'gsap'
 import { useI18n } from 'vue-i18n'
 import { useDeskObjects } from '@/composables/useDeskObjects'
 import { useDeskSpace } from '@/composables/useDeskSpace'
@@ -62,8 +68,6 @@ import { useRoute } from 'vue-router'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
-  regular: { type: Boolean, default: true },
-  resume: Boolean,
   destinations: { type: Object, default: () => ({}) },
   arrangement: { type: Number, default: 0 },
   plan: { type: Array, required: true },
@@ -83,16 +87,16 @@ const hideMissingImage = (item) => {
   missingImages.value = new Set(missingImages.value).add(imageOf(item))
 }
 const arrangement = () => props.arrangement
-const { candidates } = useDeskObjects(
-  () => props.regular,
-  () => props.destinations,
-  arrangement,
-  () => props.resume,
-)
+const { candidates } = useDeskObjects(true, () => props.destinations, arrangement)
 const drawable = computed(() => candidates.value.filter((item) => imageOf(item) && !missingImages.value.has(imageOf(item))))
-const bookmarkPlan = [{ side: 1, u: 0.5, v: 0.5, angle: -12 }]
-const { placements: seats, modalOpen } = useDeskSpace(drawable, () =>
-  props.plan.length || drawable.value[0]?.key !== 'resume' ? props.plan : bookmarkPlan,
+const { placements: seats, modalOpen, sceneAvailable, sceneRevision } = useDeskSpace(drawable, () => props.plan)
+// Use the measured seats (before any manual drag). Background refreshes that only
+// change a label can patch in place. A new illustration or layout swaps the group.
+const sceneKey = computed(() =>
+  JSON.stringify([
+    sceneRevision.value,
+    ...seats.value.map(({ item, x, y, angle, edge }) => [item.key, imageOf(item), item.paperTone, x, y, angle, edge]),
+  ]),
 )
 
 const route = useRoute()
@@ -100,7 +104,10 @@ const temporaryPositions = shallowRef({})
 const { pos, size: dragSize, dragging, onDragStart } = useDragResize({ w: 1, h: 1 })
 let activeSeat
 let ignoreClick = false
-watch([() => route.fullPath, arrangement], () => {
+let dragRoute
+let dragArrangement
+watch(seats, () => {
+  if (dragRoute === route.fullPath && dragArrangement === arrangement()) return
   temporaryPositions.value = {}
   activeSeat = null
 })
@@ -110,6 +117,8 @@ function startMove(event, seat) {
   dragSize.value = { w, h: seat.size }
   pos.value = { x: seat.x - w / 2, y: seat.y - seat.size / 2 }
   activeSeat = seat
+  dragRoute = route.fullPath
+  dragArrangement = arrangement()
   ignoreClick = false
   onDragStart(event)
 }
@@ -159,6 +168,45 @@ const placements = computed(() =>
 )
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const deskLayer = ref(null)
+const elementSeats = new WeakMap()
+const vDeskSeat = (node, binding) => elementSeats.set(node, binding.value)
+let slide
+function stopSlide() {
+  slide?.kill()
+  slide = null
+}
+function slideGroup(group, entering, done) {
+  stopSlide()
+  group.inert = true
+  const nodes = [...group.children]
+  const finish = () => {
+    group.inert = !entering
+    slide = null
+    done()
+    syncCasters()
+  }
+  if (document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Vue must mount the out-in placeholder before completing a zero-duration leave.
+    queueMicrotask(finish)
+    return
+  }
+  const width = document.documentElement.clientWidth
+  const outside = (_, node) => {
+    const { x, edge, size, cropWidth } = elementSeats.get(node)
+    const margin = (cropWidth ? cropWidth / 2 : size * 0.72) + 4
+    return (edge === 'left' ? -x - margin : width - x + margin) + 'px'
+  }
+  if (entering) gsap.set(nodes, { '--desk-shift': outside })
+  slide = gsap.to(nodes, {
+    '--desk-shift': entering ? '0px' : outside,
+    duration: entering ? 0.48 : 0.32,
+    ease: entering ? 'power3.out' : 'power2.in',
+    onComplete: finish,
+  })
+  syncCasters()
+}
+const slideIn = (group, done) => slideGroup(group, true, done)
+const slideOut = (group, done) => slideGroup(group, false, done)
 
 // Share the same decoded images and placements that actually made it onto the desk.
 // The projection canvas paints their shadows from its interpolated solar position.
@@ -166,19 +214,22 @@ function syncCasters() {
   if (!sunLight?.deskCasters) return
   const casters = []
   if (deskLayer.value && !modalOpen.value) {
-    for (const [index, seat] of placements.value.entries()) {
+    for (const node of deskLayer.value.querySelectorAll('.desk-object')) {
+      const seat = elementSeats.get(node)
+      if (!seat) continue
       const { item, angle, x, y, size, cropWidth, edge } = seat
-      const image = deskLayer.value.children[index]?.querySelector('img')
+      const image = node.querySelector('img')
       if (!image?.complete || !image.naturalWidth) continue
       const halfInk = (size * paintHalfWidth(item, angle)) / 100
       const centerX = cropWidth ? x + (edge === 'left' ? 1 : -1) * (cropWidth / 2 - halfInk) : x
-      casters.push({ kind: item.kind, image, x: centerX, y, size, angle, cropLeft: x - cropWidth / 2, cropWidth })
+      casters.push({ kind: item.kind, image, node, x: centerX, y, size, angle, cropLeft: x - cropWidth / 2, cropWidth })
     }
   }
   sunLight.deskCasters.value = casters
 }
-watchPostEffect(syncCasters)
+onUpdated(syncCasters)
 onBeforeUnmount(() => {
+  stopSlide()
   if (sunLight?.deskCasters) sunLight.deskCasters.value = []
 })
 
@@ -236,7 +287,8 @@ function paperStyle(item) {
   --desk-ink: 30%;
   position: absolute;
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  --desk-shift: 0px;
+  transform: translate(calc(-50% + var(--desk-shift)), -50%);
   display: grid;
   place-items: center;
   border-radius: 12%;

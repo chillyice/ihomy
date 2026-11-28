@@ -65,6 +65,7 @@ import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } fro
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import GameShell from '@/components/games/GameShell.vue'
+import { recordDoing } from '@/utils/lastDoing'
 import GameSetupDialog from '@/components/games/GameSetupDialog.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { DIFFICULTIES } from '@/utils/games/spider'
@@ -180,6 +181,7 @@ const onSetupConfirm = (values) => {
 watch(
   currentGame,
   (mode) => {
+    if (route.path === '/games/cards' && !inRoom.value) recordDoing({ kind: 'GAME', id: '/games/cards/' + mode, title: t(modes[mode]) })
     try {
       localStorage.setItem(MODE_KEY, mode)
     } catch {

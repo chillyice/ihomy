@@ -168,21 +168,31 @@ describe('visibleDoing', () => {
 })
 
 describe('buildDoingPath', () => {
-  it('四种内容的跳转地址', () => {
+  it('阅读与写作分别回到内容页与编辑页，影视保留分集', () => {
     expect(buildDoingPath(book)).toBe('/library?book=12')
     expect(buildDoingPath({ kind: 'CINEMA', id: 9 })).toBe('/cinema/9')
     expect(buildDoingPath({ kind: 'CINEMA', id: 9, episodeId: 'ep 1' })).toBe('/cinema/9?ep=ep%201')
-    expect(buildDoingPath({ kind: 'BLOG', id: 4 })).toBe('/blog/4')
-    expect(buildDoingPath({ kind: 'DIARY', id: 5, authorId: 6 })).toBe('/diary/book/6?entry=5')
-    expect(buildDoingPath({ kind: 'DIARY', id: 5 })).toBe('/diary')
+    expect(buildDoingPath({ kind: 'BLOG_READ', id: 4 })).toBe('/blog/4')
+    expect(buildDoingPath({ kind: 'BLOG', id: 4 })).toBe('/blog/edit/4')
+    expect(buildDoingPath({ kind: 'DIARY', id: 5, authorId: 6 })).toBe('/diary/edit/5')
+    expect(buildDoingPath({ kind: 'DIARY', id: 5 })).toBe('/diary/edit/5')
+  })
+
+  it('内置游戏、具体牌桌和家庭游戏均能从账号记录恢复', () => {
+    const paths = ['/games/2048', '/games/cards/spider', '/games/embed/xiangqi', '/games/play/42', '/games/web/19']
+    const items = paths.map((id) => ({ kind: 'GAME', id, title: id, at: NOW }))
+    expect(parseDoingStore(serializeDoingStore(items, 7), 7).map(buildDoingPath).sort()).toEqual(paths.sort())
+    for (const id of ['/games', '/games/room/2', '/games/play/../2', '/games/sudoku?room=1', '//other.test']) {
+      expect(normalizeDoingEntry({ ...items[0], id })).toBeNull()
+    }
   })
 })
 
 describe('lastDoingMode', () => {
-  it('手机和平板 → desk,窄窗口电脑 → float,宽屏电脑 → dock', () => {
-    expect(lastDoingMode({ isMobile: true, isTablet: false, isWide: false })).toBe('desk')
+  it('按当前布局显示在手机首页、窄窗浮卡或宽屏侧栏', () => {
+    expect(lastDoingMode({ isMobile: true, isTablet: false, isWide: false })).toBe('home')
     expect(lastDoingMode({ isMobile: false, isTablet: false, isWide: false })).toBe('float')
-    expect(lastDoingMode({ isMobile: false, isTablet: true, isWide: true })).toBe('desk')
+    expect(lastDoingMode({ isMobile: false, isTablet: true, isWide: true })).toBe('dock')
     expect(lastDoingMode({ isMobile: false, isTablet: false, isWide: true })).toBe('dock')
   })
 })

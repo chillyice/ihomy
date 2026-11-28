@@ -10,6 +10,7 @@
         @touchend.passive="onTouchEnd"
         @touchcancel="onTouchCancel"
       >
+        <LastDoingCard v-if="showRecent && displayedTab === 'home'" variant="mobile" />
         <Transition :name="tabTransition" mode="out-in" @after-enter="restoreTabScroll">
           <KeepAlive>
             <component :is="tabComponent" :key="displayedTab === 'home' && isElder ? 'elder-home' : displayedTab" />
@@ -56,6 +57,7 @@ import MobileTabEditor from '@/components/MobileTabEditor.vue'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileGameChrome from '@/components/games/MobileGameChrome.vue'
 import MobileHomeFeed from '@/components/MobileHomeFeed.vue'
+import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import MobileMoreGrid from '@/components/MobileMoreGrid.vue'
 import MobileMePage from '@/components/MobileMePage.vue'
@@ -77,7 +79,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
-const props = defineProps({ windowHost: Boolean })
+const props = defineProps({ windowHost: Boolean, showRecent: Boolean })
 // 只有真手机(判据在 useDevice)才自动进浏览器全屏:窄窗桌面端不抢窗口
 const { isPhone, isMobile } = useDevice()
 const activeTab = ref('home')

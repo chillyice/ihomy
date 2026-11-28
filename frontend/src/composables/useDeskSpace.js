@@ -1,4 +1,5 @@
 import { onMounted, onBeforeUnmount, shallowRef, toValue, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useDevice } from './useDevice'
 import { DESK_FLOATS, deskLanes, placeDeskItems } from '@/utils/deskSpace'
 
@@ -32,9 +33,12 @@ function visibleRect(node) {
 
 // Reuse a layout while its page, viewport and object selection are stable.
 export function useDeskSpace(items, plan) {
+  const route = useRoute()
   const placements = shallowRef([])
+  const sceneRevision = shallowRef(0)
   const { isTablet, isMobile } = useDevice()
   const modalOpen = shallowRef(false)
+  const sceneAvailable = shallowRef(false)
   let running = false,
     refresh = true,
     frame = 0
@@ -43,6 +47,7 @@ export function useDeskSpace(items, plan) {
   let layout
 
   function clearScene() {
+    sceneAvailable.value = false
     layout = null
     if (placements.value.length) placements.value = []
   }
@@ -93,6 +98,7 @@ export function useDeskSpace(items, plan) {
       clearScene()
       return
     }
+    sceneAvailable.value = true
     const navRight = Math.max(0, ...nodes.nav.map((node) => visibleRect(node)?.right || 0))
     const width = document.documentElement.clientWidth
     const height = window.innerHeight
@@ -102,6 +108,7 @@ export function useDeskSpace(items, plan) {
     // Keep the chosen viewport coordinates even when scrolling changes the controls beneath them.
     if (
       layout &&
+      layout.path === route.fullPath &&
       layout.host === (host || board) &&
       layout.width === width &&
       layout.navRight === navRight &&
@@ -117,7 +124,8 @@ export function useDeskSpace(items, plan) {
       }
       return
     }
-    layout = { host: host || board, width, height, navRight, plan: slots, keys, objects }
+    if (!layout || layout.plan !== slots || layout.path !== route.fullPath) sceneRevision.value++
+    layout = { path: route.fullPath, host: host || board, width, height, navRight, plan: slots, keys, objects }
     const lanes = deskLanes(width, height, navRight, center)
     const cards = nodes.cards.map(visibleRect).filter(Boolean)
     const objectObstacles = nodes.floats.concat(nodes.rails).map(visibleRect).filter(Boolean)
@@ -189,7 +197,7 @@ export function useDeskSpace(items, plan) {
     clearScene()
     nodes = null
   }
-  watch([() => toValue(items), () => toValue(plan)], schedule, { flush: 'post' })
+  watch([() => toValue(items), () => toValue(plan), () => route.fullPath], schedule, { flush: 'post' })
   onMounted(() => {
     watch(
       () => toValue(items).length > 0,
@@ -198,5 +206,5 @@ export function useDeskSpace(items, plan) {
     )
   })
   onBeforeUnmount(stop)
-  return { placements, modalOpen }
+  return { placements, modalOpen, sceneAvailable, sceneRevision }
 }

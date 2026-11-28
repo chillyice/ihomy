@@ -1,4 +1,4 @@
-// 「上次在…」:记录账号最近一次续做的内容(读书 / 看片 / 写博客 / 写日记),只在 24 小时内展示。
+// 「上次在做」按资源保存阅读、观影、游戏和写作记录，只展示最近 24 小时。
 // - 内容数据源:各功能在续做发生点显式 recordDoing,不依赖 updated_at(博客/日记的 updated_at
 //   会被浏览/点赞计数刷新,读书借阅也没有「我的借阅按最近阅读」接口)。
 // - 存储:本机 localStorage 立即生效,登录后经 sys_user_pref 的 recent.doing.v1 跟账号走;
@@ -7,6 +7,7 @@
 import { ref } from 'vue'
 import { readPref, readRemotePrefMap, writePref } from '@/utils/userPref'
 import { useUserStore } from '@/stores/user'
+import { GAME_ENTRIES } from '@/utils/games/gameEntries'
 
 export const LAST_DOING_LOCAL_KEY = 'ihomy:last-doing:v1'
 export const LAST_DOING_PREF_KEY = 'recent.doing.v1'
@@ -17,7 +18,11 @@ export const DOING_VISIBLE_HOURS = 24
 /** 关闭阅读器时 close() 与 onBeforeUnmount 会先后各存一次,1 秒内同一目标只记一次 */
 const REPEAT_GUARD_MS = 1000
 
-export const DOING_KINDS = ['BOOK', 'CINEMA', 'BLOG', 'DIARY']
+export const DOING_KINDS = ['BOOK', 'CINEMA', 'GAME', 'BLOG_READ', 'BLOG', 'DIARY']
+
+function isGameDestination(path) {
+  return GAME_ENTRIES.some((game) => game.path === path) || /^\/games\/(?:play|web)\/[1-9]\d*$/.test(path)
+}
 
 const doingItems = ref([])
 let activeSession = null
@@ -51,6 +56,7 @@ export function normalizeDoingEntry(raw) {
     return null
   }
   const out = { kind, id: /^\d+$/.test(idText) ? Number(idText) : idText, title, at }
+  if (kind === 'GAME' && !isGameDestination(idText)) return null
   if (typeof out.id === 'number' && out.id <= 0) return null
   const progress = Number(raw.progress)
   if (Number.isFinite(progress)) out.progress = Math.max(0, Math.min(100, Math.round(progress)))
@@ -116,16 +122,16 @@ export function buildDoingPath(entry) {
   if (entry.kind === 'CINEMA') {
     return `/cinema/${id}${entry.episodeId ? `?ep=${encodeURIComponent(String(entry.episodeId))}` : ''}`
   }
-  if (entry.kind === 'BLOG') return `/blog/${id}`
-  if (entry.kind === 'DIARY') {
-    return entry.authorId ? `/diary/book/${entry.authorId}?entry=${id}` : '/diary'
-  }
+  if (entry.kind === 'GAME' && isGameDestination(entry.id)) return entry.id
+  if (entry.kind === 'BLOG_READ') return `/blog/${id}`
+  if (entry.kind === 'BLOG') return `/blog/edit/${id}`
+  if (entry.kind === 'DIARY') return `/diary/edit/${id}`
   return '/'
 }
 
-/** 三种形态:手机和平板桌沿书签 / 窄屏电脑浮卡 / 宽屏侧栏停靠 */
-export function lastDoingMode({ isMobile, isTablet, isWide }) {
-  if (isMobile || isTablet) return 'desk'
+/** 手机首页、窄窗口浮卡、宽屏侧栏。 */
+export function lastDoingMode({ isMobile, isWide }) {
+  if (isMobile) return 'home'
   if (!isWide) return 'float'
   return 'dock'
 }

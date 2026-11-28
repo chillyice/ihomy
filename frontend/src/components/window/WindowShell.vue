@@ -44,7 +44,7 @@
       </button>
     </div>
     <main class="window-content">
-      <MobileLayout window-host :key="String(user.userInfo?.id) + ':' + String(user.userInfo?.familyId)">
+      <MobileLayout window-host :show-recent="showRecent" :key="String(user.userInfo?.id) + ':' + String(user.userInfo?.familyId)">
         <template #header-right>
           <button v-if="isMobile && !game" class="directory-button" @click="directory = true">
             <el-icon><Grid /></el-icon>{{ $t('windowHome.directory') }}
@@ -80,11 +80,10 @@ const appIcon = useAppIconStore()
 const user = useUserStore()
 const nav = useWindowDirectory()
 const { isChild: child } = useDisplayMode()
-const { isMobile, isTablet, isWide } = useDevice()
+defineProps({ showRecent: Boolean })
+const { isMobile, isWide } = useDevice()
 const compact = computed(() => isMobile.value || !isWide.value)
-const showDockCard = computed(
-  () => user.isLoggedIn && lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }) === 'dock',
-)
+const showDockCard = computed(() => user.isLoggedIn && lastDoingMode({ isMobile: isMobile.value, isWide: isWide.value }) === 'dock')
 const isHome = computed(() => isMobileHomePath(route.path))
 const game = computed(() => isMobile.value && isMobileGamePath(route.path))
 const collapsed = ref(false)

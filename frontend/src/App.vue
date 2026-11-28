@@ -6,8 +6,8 @@
     </router-view>
     <template v-else-if="routeReady">
       <SunLightLayer v-if="anyEffectEnabled && !saverCoversScene && !immersive && !userStore.isPureOps" />
-      <WindowShell v-if="windowShell" />
-      <MobileLayout v-else-if="isMobile && !userStore.isPureOps" />
+      <WindowShell v-if="windowShell" :show-recent="canResume && doingMode === 'home'" />
+      <MobileLayout v-else-if="isMobile && !userStore.isPureOps" :show-recent="canResume" />
       <WarmLayout v-else-if="isWarm" />
       <template v-else>
         <AppSidebar v-if="!userStore.isPureOps && !immersive" />
@@ -48,7 +48,6 @@
     <WindowDesk
       v-if="
         routeReady &&
-        (regularDesk || showDoingDesk) &&
         desk.enabled &&
         !standalone &&
         !userStore.isPureOps &&
@@ -56,8 +55,7 @@
         !appStore.homeEditMode &&
         !userStore.mustChangePassword
       "
-      :regular="regularDesk"
-      :resume="showDoingDesk"
+      :key="appStore.generation"
       :destinations="desk.destinations"
       :arrangement="desk.arrangement"
       :plan="desk.plan"
@@ -146,7 +144,7 @@ const isNative = isNativeApp()
 const localGardenReview = !isNative && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
 const devGardenReview = import.meta.env.DEV
 
-const { lightAvailable, isMobile, isWide, isTablet } = useDevice()
+const { lightAvailable, isMobile, isWide } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
@@ -208,8 +206,7 @@ watch(
 )
 onBeforeUnmount(() => document.documentElement.classList.remove('warm-paper-page'))
 
-const regularDesk = computed(() => isTablet.value || (isWide.value && !isMobile.value))
-const doingMode = computed(() => lastDoingMode({ isMobile: isMobile.value, isTablet: isTablet.value, isWide: isWide.value }))
+const doingMode = computed(() => lastDoingMode({ isMobile: isMobile.value, isWide: isWide.value }))
 const canResume = computed(
   () =>
     routeReady.value &&
@@ -224,7 +221,6 @@ const canResume = computed(
     !route.query.hid &&
     !route.query.home_id,
 )
-const showDoingDesk = computed(() => canResume.value && doingMode.value === 'desk')
 const showDoingFloat = computed(() => canResume.value && doingMode.value === 'float')
 
 // 站内窗边页面允许低视力成员双指放大，独立产品及旧主题沿用原来的视口约定。

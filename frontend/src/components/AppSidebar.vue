@@ -251,11 +251,9 @@ const userStore = useUserStore()
 const { isChild } = useDisplayMode()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
-const { isTablet, isWide } = useDevice()
+const { isWide } = useDevice()
 // 宽屏电脑才停靠;平板/窄窗口由全局浮卡接管,避免同一份内容出现两次
-const showDockCard = computed(
-  () => userStore.isLoggedIn && lastDoingMode({ isMobile: false, isTablet: isTablet.value, isWide: isWide.value }) === 'dock',
-)
+const showDockCard = computed(() => userStore.isLoggedIn && lastDoingMode({ isMobile: false, isWide: isWide.value }) === 'dock')
 
 const WIDGET_MAP = {
   blog: 'feed',

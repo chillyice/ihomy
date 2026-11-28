@@ -1,7 +1,6 @@
 <template>
   <div class="page">
     <div class="wh">
-      <LastDoingCard v-if="!isMobile && !isTablet" variant="mobile" />
       <header class="wh-head">
         <div>
           <h1>{{ app.familyName || $t('windowHome.family') }}</h1>
@@ -92,13 +91,11 @@ import { ArrowRight, Calendar, Sunny, Wallet, Check } from '@element-plus/icons-
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { useDevice } from '@/composables/useDevice'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import { useHomeFeed } from '@/composables/useHomeFeed'
 import { useHomeCardData } from '@/composables/useHomeCardData'
 import { scheduleApi, reminderApi, planApi } from '@/api'
 import { feedSummary, feedTypeLabel } from '@/utils/feed'
-import LastDoingCard from '@/components/lastdoing/LastDoingCard.vue'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayStr } from '@/utils/date'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -111,7 +108,6 @@ const app = useAppStore()
 const user = useUserStore()
 const route = useRoute()
 const { t, locale } = useI18n()
-const { isMobile, isTablet } = useDevice()
 const { isChild } = useDisplayMode()
 const sun = inject(SUN_LIGHT_KEY, null)
 const weather = computed(() => sun?.weather?.value)

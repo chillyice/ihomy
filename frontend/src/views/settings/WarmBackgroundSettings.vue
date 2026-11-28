@@ -45,7 +45,7 @@
     <p v-else class="share-tip warmbg-lead">{{ $t(backgroundHint) }}</p>
 
     <el-divider class="warmbg-divider" />
-    <WindowDeskSettings embedded :show-objects="showObjects" />
+    <WindowDeskSettings embedded />
   </section>
 </template>
 
@@ -57,8 +57,6 @@ import { useDevice } from '@/composables/useDevice'
 import BackgroundImagePicker from '@/components/BackgroundImagePicker.vue'
 import WindowDeskSettings from './WindowDeskSettings.vue'
 import { initWarmBg, resetWarmBg, setWarmBg, warmBgLayer, warmBgState } from '@/utils/warmBackground'
-
-defineProps({ showObjects: Boolean })
 
 const userStore = useUserStore()
 const themeStore = useThemeStore()

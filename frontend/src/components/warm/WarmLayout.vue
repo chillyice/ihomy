@@ -192,10 +192,8 @@ const ElderHome = defineAsyncComponent(() => import('@/components/ElderHome.vue'
 const sunLight = inject(SUN_LIGHT_KEY)
 // 侧栏模块拖入首页的共享拖拽状态(幽灵形态/位置由本组件渲染)
 const { dragging, label, x, y, overGrid, startDrag } = useWarmWidgetDrag()
-const { isTablet, isWide } = useDevice()
-const showDockCard = computed(
-  () => userStore.isLoggedIn && lastDoingMode({ isMobile: false, isTablet: isTablet.value, isWide: isWide.value }) === 'dock',
-)
+const { isWide } = useDevice()
+const showDockCard = computed(() => userStore.isLoggedIn && lastDoingMode({ isMobile: false, isWide: isWide.value }) === 'dock')
 
 const familyName = computed(() => appStore.familyName)
 const familyDescription = computed(() => appStore.family?.description || '')

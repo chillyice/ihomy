@@ -12,7 +12,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FlashPlayer from '@/views/tools/FlashPlayer.vue'
 import EmulatorPlayer from '@/views/games/EmulatorPlayer.vue'
@@ -20,16 +20,30 @@ import DesktopGame from '@/views/games/DesktopGame.vue'
 import { isEmulatorType } from '@/utils/games/emulatorSystems'
 import { isDesktopType } from '@/utils/games/desktopGames'
 import { gameApi } from '@/api'
+import { recordDoing } from '@/utils/lastDoing'
 
 const route = useRoute()
 const router = useRouter()
 const game = ref(null)
 
-onMounted(async () => {
-  game.value = await gameApi.get(route.params.id)
-  // 网页游戏没有播放器:交给站内 iframe 页(旧链接/收藏夹照常可用)
-  if (game.value?.type === 'LINK') {
-    router.replace(`/games/web/${game.value.id}`)
-  }
-})
+watch(
+  () => route.name === 'GamePlayer' && route.params.id,
+  async (id, _, onCleanup) => {
+    game.value = null
+    if (!id) return
+    let active = true
+    onCleanup(() => {
+      active = false
+    })
+    const data = await gameApi.get(id)
+    if (!active || !data) return
+    if (data.type === 'LINK') {
+      router.replace(`/games/web/${data.id}`)
+      return
+    }
+    game.value = data
+    recordDoing({ kind: 'GAME', id: `/games/play/${data.id}`, title: data.name })
+  },
+  { immediate: true },
+)
 </script>

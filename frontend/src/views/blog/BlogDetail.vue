@@ -96,6 +96,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { blogApi, likeApi, commentApi } from '@/api'
+import { recordDoing } from '@/utils/lastDoing'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -186,6 +187,8 @@ const loadAll = async () => {
       .detail(route.params.id)
       .then((b) => {
         blog.value = b
+        if (b && route.name === 'BlogDetail' && String(b.id) === route.params.id)
+          recordDoing({ kind: 'BLOG_READ', id: b.id, title: b.title })
       })
       .catch(() => {}),
     // 评论加载失败不影响博客展示

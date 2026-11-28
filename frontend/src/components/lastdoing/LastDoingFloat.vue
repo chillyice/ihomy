@@ -29,11 +29,11 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Reading } from '@element-plus/icons-vue'
 import LastDoingCard from './LastDoingCard.vue'
 import { useDragResize } from '@/utils/useDragResize'
-import { useLastDoing, visibleDoing } from '@/utils/lastDoing'
+import { useRecentActivities } from '@/composables/useRecentActivities'
 
 const COLLAPSE_KEY = 'ihomy:last-doing:float:collapsed'
 const TAB_SIZE = 40
@@ -72,16 +72,8 @@ const onWrapperDown = (e) => {
 }
 
 // 没有可展示内容时整块不占位
-const { items } = useLastDoing()
-const now = ref(Date.now())
-let timer = null
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now()
-  }, 60_000)
-})
-onBeforeUnmount(() => clearInterval(timer))
-const hasItems = computed(() => visibleDoing(items.value, now.value).length > 0)
+const recent = useRecentActivities()
+const hasItems = computed(() => recent.value.length > 0)
 
 // 卡片按内容排版，拖动边界跟随实际外框，覆盖旧版本缓存的固定高度。
 watch(
@@ -94,7 +86,7 @@ watch(
     }
     measure()
     if (typeof ResizeObserver === 'undefined') {
-      onCleanup(watch([collapsed, items, now], measure, { flush: 'post' }))
+      onCleanup(watch([collapsed, recent], measure, { flush: 'post' }))
       return
     }
     const observer = new ResizeObserver(measure)

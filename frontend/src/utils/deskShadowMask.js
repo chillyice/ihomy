@@ -47,7 +47,12 @@ export function applyDeskShadowMask(light, work, casters, scene, width, height, 
   if (!cast) return
   cast.clearRect(0, 0, w, h)
 
-  for (const caster of casters) {
+  // Sample each sliding object once for this canvas paint, including its crop.
+  const positions = casters.map((caster) => {
+    const dx = parseFloat(caster.node?.style.getPropertyValue('--desk-shift'))
+    return dx ? { ...caster, x: caster.x + dx, cropLeft: caster.cropLeft + dx } : caster
+  })
+  for (const caster of positions) {
     const vector = deskShadowVector(scene, caster.size, caster.kind, realWeight)
     if (!vector || !caster.image.naturalWidth) continue
     work.clearRect(0, 0, work.canvas.width, work.canvas.height)
@@ -92,7 +97,7 @@ export function applyDeskShadowMask(light, work, casters, scene, width, height, 
   // their own cast, including overlapping silhouettes from neighboring objects.
   cast.save()
   cast.globalCompositeOperation = 'destination-out'
-  for (const caster of casters) {
+  for (const caster of positions) {
     if (caster.image.naturalWidth) paintBody(cast, caster, scaleX, scaleY)
   }
   cast.restore()

@@ -40,11 +40,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, CaretRight, EditPen, Notebook, Reading, VideoPlay } from '@element-plus/icons-vue'
-import { buildDoingPath, useLastDoing, visibleDoing } from '@/utils/lastDoing'
+import { Aim, ArrowRight, CaretRight, EditPen, Notebook, Reading, VideoPlay } from '@element-plus/icons-vue'
+import { buildDoingPath } from '@/utils/lastDoing'
+import { useRecentActivities } from '@/composables/useRecentActivities'
 import { formatRelativeTime } from '@/utils/datetime'
 
 const props = defineProps({
@@ -58,30 +59,20 @@ const emit = defineEmits(['collapse'])
 
 const router = useRouter()
 const { t } = useI18n()
-const { items } = useLastDoing()
+const recent = useRecentActivities()
 
-const now = ref(Date.now())
-let timer = null
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now()
-  }, 60_000)
-})
-onBeforeUnmount(() => clearInterval(timer))
-
-const ICONS = { BOOK: Reading, CINEMA: VideoPlay, BLOG: EditPen, DIARY: Notebook }
+const ICONS = { BOOK: Reading, CINEMA: VideoPlay, GAME: Aim, BLOG_READ: Reading, BLOG: EditPen, DIARY: Notebook }
 const MAX_ROWS = { 'warm-mobile': 1, mobile: 1, dock: 2, float: 1 }
 
 const warmMobile = computed(() => props.variant === 'warm-mobile')
-const rows = computed(() => visibleDoing(items.value, now.value).slice(0, MAX_ROWS[props.variant] ?? 1))
+const rows = computed(() => recent.value.slice(0, MAX_ROWS[props.variant] ?? 1))
 
 const kindIcon = (kind) => ICONS[kind] || Reading
 
 const metaOf = (it) => {
-  let lead = t(`lastDoing.${it.kind.toLowerCase()}`)
-  if (it.kind === 'BOOK' && it.progress != null) lead = t('lastDoing.progress', { p: it.progress })
-  else if (it.kind === 'CINEMA' && it.episodeCode) lead = it.episodeCode
-  return [lead, formatRelativeTime(t, it.at)].filter(Boolean).join(' · ')
+  const activity = t(`lastDoing.${it.kind.toLowerCase()}`)
+  const detail = it.kind === 'BOOK' && it.progress != null ? t('lastDoing.progress', { p: it.progress }) : it.episodeCode
+  return [activity, detail, formatRelativeTime(t, it.at)].filter(Boolean).join(' · ')
 }
 
 const go = (it) => {

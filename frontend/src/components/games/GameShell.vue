@@ -165,13 +165,16 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { ArrowLeft, FullScreen, Monitor, Reading } from '@element-plus/icons-vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameExit } from '@/composables/useGameExit'
 import { gameMuted, toggleGameMuted } from '@/utils/games/gameSound'
+import { GAME_ENTRIES } from '@/utils/games/gameEntries'
+import { recordDoing } from '@/utils/lastDoing'
 
 const props = defineProps({
   /** 游戏名(页面按对局状态拼好后传入,如「2048 · 一起玩」) */
@@ -206,6 +209,17 @@ const emit = defineEmits(['back', 'newGame'])
 useGameExit(() => emit('back'))
 
 const { t } = useI18n()
+const route = useRoute()
+// Record a resumable single-player destination. Room and match links are transient.
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.query.room || route.query.match) return
+    const game = GAME_ENTRIES.find((entry) => entry.path === route.path)
+    if (game) recordDoing({ kind: 'GAME', id: game.path, title: t(game.titleKey) })
+  },
+  { immediate: true },
+)
 // 静音状态是全局单例,页面自己也可以 import 同一份(如引擎侧需要读当前值)
 const muted = gameMuted
 

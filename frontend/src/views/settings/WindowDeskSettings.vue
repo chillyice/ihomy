@@ -9,7 +9,7 @@
           <span class="setting-label">{{ $t('windowDesk.pawToggle') }}</span>
         </div>
       </el-form-item>
-      <template v-if="desk.enabled && showObjects">
+      <template v-if="desk.enabled">
         <div class="share-tip">{{ $t('windowDesk.hint') }}</div>
         <el-form-item :label="$t('windowDesk.bind')">
           <div class="desk-bindings">
@@ -41,7 +41,7 @@ import { useAppStore } from '@/stores/app'
 import { useWindowDeskStore } from '@/stores/windowDesk'
 import { DESK_DEFAULT_PATHS, DESK_DESTINATIONS, deskPathAllowed } from '@/utils/deskObjects'
 
-defineProps({ showObjects: Boolean, embedded: Boolean })
+defineProps({ embedded: Boolean })
 const desk = useWindowDeskStore()
 const app = useAppStore()
 const { isChild } = useDisplayMode()

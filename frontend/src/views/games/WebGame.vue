@@ -73,6 +73,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Close, Expand, Fold, Lock, Refresh, TopRight } from '@element-plus/icons-vue'
 import GameShell from '@/components/games/GameShell.vue'
+import { recordDoing } from '@/utils/lastDoing'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -136,8 +137,10 @@ const loadGame = async (id) => {
   game.value = null
   try {
     const data = await gameApi.get(id)
+    if (route.name !== 'WebGame' || route.params.id !== id) return
     if (data && data.type === 'LINK' && data.linkUrl) {
       game.value = data
+      recordDoing({ kind: 'GAME', id: `/games/web/${data.id}`, title: data.name })
     } else if (data) {
       router.replace(`/games/play/${data.id}`)
     } else {
