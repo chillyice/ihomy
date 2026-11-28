@@ -1,0 +1,29 @@
+{
+  "comment": "24 节气表(唯一真相源,玩法稿 §14.4)。date 取常年区间代表日,游戏内按近似日判定,不做天文计算;跨年小寒/大寒在 1 月,排序按 (month,day) 从立春轮转、取模处理。第 k 个节气 = cycle_start_at 之后第 k 个交接点。event 列是节气事件系统(P2)的输入,本轮只随表下发、不生效。i18n 用标准译法。",
+  "terms": [
+    { "code": "LICHUN",   "name": "立春", "nameEn": "Start of Spring",      "date": "02-04", "event": "SPRING_PLOWING" },
+    { "code": "YUSHUI",   "name": "雨水", "nameEn": "Rain Water",           "date": "02-19", "event": "PLUM_RAIN" },
+    { "code": "JINGZHE",  "name": "惊蛰", "nameEn": "Awakening of Insects", "date": "03-06", "event": null },
+    { "code": "CHUNFEN",  "name": "春分", "nameEn": "Spring Equinox",       "date": "03-21", "event": "EQUINOX" },
+    { "code": "QINGMING", "name": "清明", "nameEn": "Pure Brightness",      "date": "04-05", "event": "SPRING_PLOWING_MINOR" },
+    { "code": "GUYU",     "name": "谷雨", "nameEn": "Grain Rain",           "date": "04-20", "event": "PLUM_RAIN" },
+    { "code": "LIXIA",    "name": "立夏", "nameEn": "Start of Summer",      "date": "05-06", "event": null },
+    { "code": "XIAOMAN",  "name": "小满", "nameEn": "Grain Buds",           "date": "05-21", "event": null },
+    { "code": "MANGZHONG","name": "芒种", "nameEn": "Grain in Ear",         "date": "06-06", "event": "PLUM_RAIN" },
+    { "code": "XIAZHI",   "name": "夏至", "nameEn": "Summer Solstice",      "date": "06-21", "event": "LONG_SUMMER" },
+    { "code": "XIAOSHU",  "name": "小暑", "nameEn": "Minor Heat",           "date": "07-07", "event": "MIDSUMMER" },
+    { "code": "DASHU",    "name": "大暑", "nameEn": "Major Heat",           "date": "07-23", "event": "MIDSUMMER" },
+    { "code": "LIQIU",    "name": "立秋", "nameEn": "Start of Autumn",      "date": "08-08", "event": "HARVEST_SEASON" },
+    { "code": "CHUSHU",   "name": "处暑", "nameEn": "End of Heat",          "date": "08-23", "event": null },
+    { "code": "BAILU",    "name": "白露", "nameEn": "White Dew",            "date": "09-08", "event": "DEW_MOIST" },
+    { "code": "QIUFEN",   "name": "秋分", "nameEn": "Autumn Equinox",       "date": "09-23", "event": "HARVEST_PEAK" },
+    { "code": "HANLU",    "name": "寒露", "nameEn": "Cold Dew",             "date": "10-08", "event": null },
+    { "code": "SHUANGJIANG", "name": "霜降", "nameEn": "Frost's Descent",   "date": "10-23", "event": "FROST_WARNING" },
+    { "code": "LIDONG",   "name": "立冬", "nameEn": "Start of Winter",      "date": "11-07", "event": "WINTER_ENTRY" },
+    { "code": "XIAOXUE",  "name": "小雪", "nameEn": "Minor Snow",           "date": "11-22", "event": null },
+    { "code": "DAXUE",    "name": "大雪", "nameEn": "Major Snow",           "date": "12-07", "event": "DORMANCY" },
+    { "code": "DONGZHI",  "name": "冬至", "nameEn": "Winter Solstice",      "date": "12-22", "event": "DORMANCY" },
+    { "code": "XIAOHAN",  "name": "小寒", "nameEn": "Minor Cold",           "date": "01-06", "event": "COLD_WAVE" },
+    { "code": "DAHAN",    "name": "大寒", "nameEn": "Major Cold",           "date": "01-20", "event": "COLD_WAVE" }
+  ]
+}

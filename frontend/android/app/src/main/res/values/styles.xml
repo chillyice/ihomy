@@ -15,6 +15,10 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- 启动页与主任务交接时不要第二个转场:两个窗口底色同为 logo_splash_canvas,
+             无动画才看不出换了窗口(有动画会被 ROM 画成任务切换)。这是 postSplashScreenTheme,
+             窗口进场动画按它解析,所以除了 IhomyMain 这里也要写一份。 -->
+        <item name="android:windowAnimationStyle">@style/IhomyNoWindowAnimation</item>
     </style>
 
 

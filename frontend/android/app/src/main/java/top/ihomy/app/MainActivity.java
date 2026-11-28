@@ -2,7 +2,14 @@ package top.ihomy.app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.webkit.CookieManager;
+import android.webkit.WebView;
+
+import androidx.core.content.ContextCompat;
+import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.BridgeActivity;
 import top.ihomy.app.biometric.BiometricPlugin;
@@ -30,8 +37,16 @@ import top.ihomy.app.window.SystemInsetsForwarder;
 import top.ihomy.app.window.WindowBarsPlugin;
 
 public class MainActivity extends BridgeActivity {
+    // 系统启动页留到业务首帧真正上屏为止(见 watchFirstPaint)。
+    // 壳内 WebView 先画出来的是空白页:读 Keystore 令牌、装 Vue 应用要几百毫秒,
+    // 那一段白屏就是冷启动「闪一下、像换了个应用」的来源。
+    private volatile boolean bootPainted = false;
+    private final Handler bootHandler = new Handler(Looper.getMainLooper());
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 必须在 super.onCreate 之前装:启动页由这里接管,首帧条件见下
+        SplashScreen splash = SplashScreen.installSplashScreen(this);
         // 崩溃落盘必须是越早越好:先于 super.onCreate 装好,桥构建期的崩溃也能留下证据
         CrashStore.install(getApplicationContext());
         // 桌面卡片桥:令牌下发 / 登出清理 / 改动后即时刷新(周期任务在插件 load 时注册)。
@@ -69,6 +84,7 @@ public class MainActivity extends BridgeActivity {
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);
+        splash.setKeepOnScreenCondition(() -> !bootPainted);
         // 闲时自动更新:周期任务在这里兜一次(插件 load 也会调,幂等);开关关着就撤排期
         AutoUpdateWorker.ensureScheduled(getApplicationContext());
         // 健康数据每日同步:开关打开过才排期(WorkManager KEEP 幂等,重复调用不重排)
@@ -80,10 +96,36 @@ public class MainActivity extends BridgeActivity {
         // 不显式允许三方 cookie 时这些子资源会一律 403。
         if (bridge != null && bridge.getWebView() != null) {
             CookieManager.getInstance().setAcceptThirdPartyCookies(bridge.getWebView(), true);
+            // 撤启动页到业务首帧之间不再露白:WebView 自绘底色取启动页同一颜色(跟深浅色走)
+            bridge.getWebView().setBackgroundColor(ContextCompat.getColor(this, R.color.logo_splash_canvas));
+            watchFirstPaint(bridge.getWebView());
         }
         // 安全区转发:接管 Capacitor SystemBars 的 insets 处理(配置里已 disable),
         // 消掉华为 WebView 上 decorView padding 造成的横屏顶部空区,并注入真实安全区变量
         SystemInsetsForwarder.install(bridge);
+    }
+
+    /**
+     * 系统启动页要贴到业务首帧真正上屏为止:壳内 WebView 先画的是一张空白页,
+     * 撤早了就是「纸面启动页 → 白屏 → 整页突然出现」,看起来像换了个应用。
+     * 前端在路由就绪、首屏画出后置 window.__ihomyBootPainted = true(见 App.vue);
+     * 前端起不来(JS 报错/卡住)时最多等 8 秒——宁可露一次白页,也不能一直停在启动页。
+     */
+    private void watchFirstPaint(WebView webView) {
+        final long deadline = SystemClock.uptimeMillis() + 8000;
+        final Runnable[] tick = new Runnable[1];
+        tick[0] = () -> {
+            if (bootPainted) return;
+            if (SystemClock.uptimeMillis() >= deadline) {
+                bootPainted = true;
+                return;
+            }
+            webView.evaluateJavascript("window.__ihomyBootPainted === true", value -> {
+                if ("true".equals(value)) bootPainted = true;
+                else bootHandler.postDelayed(tick[0], 60);
+            });
+        };
+        bootHandler.postDelayed(tick[0], 60);
     }
 
     /**

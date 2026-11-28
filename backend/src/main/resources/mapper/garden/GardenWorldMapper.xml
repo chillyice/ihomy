@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenWorldMapper">
+
+    <!-- 每日信封幂等领取:仅当 last_mail_date 为空或早于 date 时推进(FR-27,0 行 = 当天已拆) -->
+    <update id="claimMailDay">
+        UPDATE games.garden_world
+        SET last_mail_date = #{date}
+        WHERE id = #{familyId}
+          AND (last_mail_date IS NULL OR last_mail_date &lt; #{date})
+    </update>
+
+</mapper>

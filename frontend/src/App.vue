@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -274,6 +274,18 @@ onMounted(async () => {
   routeReady.value = true
 })
 onBeforeUnmount(() => window.removeEventListener('online', loadFamily))
+
+// 壳内冷启动:外壳与首屏真正画出第一帧后,才让原生撤掉系统启动页
+// (MainActivity.watchFirstPaint 轮询这个标记)。撤早了会先闪一帧空白页。
+watch(
+  routeReady,
+  async (ready) => {
+    if (!ready) return
+    await nextTick()
+    requestAnimationFrame(() => requestAnimationFrame(() => (window.__ihomyBootPainted = true)))
+  },
+  { once: true },
+)
 
 watch(
   [

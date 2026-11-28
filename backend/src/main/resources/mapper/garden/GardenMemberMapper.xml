@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenMemberMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO games.garden_member (family_id, player_uid, sys_user_id)
+        VALUES (#{familyId}, #{playerUid}, #{sysUserId})
+    </insert>
+
+    <!-- 动手即记当日活跃(协作加成判定源) -->
+    <update id="touchActive">
+        UPDATE games.garden_member
+        SET last_active_date = #{date}
+        WHERE family_id = #{familyId}
+          AND player_uid = #{playerUid}
+    </update>
+
+</mapper>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenPlotMapper">
+
+    <!-- 补地块行(世界引导 / 新成员加入):唯一键 (family_id, owner_uid, venue, slot_no) 去重 -->
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO games.garden_plot
+            (family_id, owner_uid, venue, slot_no, soil_type, created_by)
+        VALUES (#{familyId}, #{ownerUid}, #{venue}, #{slotNo}, #{soilType}, #{createdBy})
+    </insert>
+
+    <!-- 播种:仅空地可种(crop_code IS NULL 条件防并发双播,FR-04 ①) -->
+    <update id="sow">
+        UPDATE games.garden_plot
+        SET crop_code       = #{cropCode},
+            variant         = NULL,
+            prev_family     = NULL,
+            planted_at      = #{plantedAt},
+            last_watered_at = NULL,
+            last_sun_at     = NULL,
+            last_mist_at    = NULL,
+            last_fertilized_at = NULL,
+            care_boost_minutes = 0,
+            water_count     = 0,
+            sun_count       = 0,
+            mist_count      = 0,
+            fertilize_count = 0,
+            harvest_count   = 0
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND crop_code IS NULL
+    </update>
+
+    <!-- 备盆:一次性;已备返回 0 行(FR-04a ① 幂等) -->
+    <update id="prepare">
+        UPDATE games.garden_plot
+        SET prepared = 1
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND prepared = 0
+    </update>
+
+    <!-- 浇水:12h 地块冷却,条件 UPDATE 防并发/防刷(FR-07) -->
+    <update id="water">
+        UPDATE games.garden_plot
+        SET last_watered_at    = #{now},
+            water_count        = water_count + 1,
+            care_boost_minutes = care_boost_minutes + #{boost}
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND crop_code IS NOT NULL
+          AND (last_watered_at IS NULL OR last_watered_at &lt; #{boundary})
+    </update>
+
+    <!-- 晒太阳:同浇水 -->
+    <update id="sun">
+        UPDATE games.garden_plot
+        SET last_sun_at        = #{now},
+            sun_count          = sun_count + 1,
+            care_boost_minutes = care_boost_minutes + #{boost}
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND crop_code IS NOT NULL
+          AND (last_sun_at IS NULL OR last_sun_at &lt; #{boundary})
+    </update>
+
+    <!-- 施肥:同浇水,落 last_fertilized_at(FR-08) -->
+    <update id="fertilize">
+        UPDATE games.garden_plot
+        SET last_fertilized_at = #{now},
+            fertilize_count    = fertilize_count + 1,
+            care_boost_minutes = care_boost_minutes + #{boost}
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND crop_code IS NOT NULL
+          AND (last_fertilized_at IS NULL OR last_fertilized_at &lt; #{boundary})
+    </update>
+
+    <!-- 收获:锁定已种地块并清空照料状态(FR-12/FR-14);0 行 = 并发重复收获 -->
+    <update id="harvest">
+        UPDATE games.garden_plot
+        SET crop_code          = NULL,
+            variant            = NULL,
+            prev_family        = NULL,
+            planted_at         = NULL,
+            last_watered_at    = NULL,
+            last_sun_at        = NULL,
+            last_mist_at       = NULL,
+            last_fertilized_at = NULL,
+            care_boost_minutes = 0,
+            water_count        = 0,
+            sun_count          = 0,
+            mist_count         = 0,
+            fertilize_count    = 0,
+            harvest_count      = harvest_count + 1
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND crop_code = #{cropCode}
+    </update>
+
+    <select id="countPrepared" resultType="int">
+        SELECT COUNT(*) FROM games.garden_plot WHERE family_id = #{familyId} AND prepared = 1
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM games.garden_plot WHERE family_id = #{familyId}
+    </select>
+
+    <!-- 照料 XP 日去重(每地块每日第一次 +5):条件 UPDATE,0 行 = 今日已计过 -->
+    <update id="grantCareXpDay">
+        UPDATE games.garden_plot
+        SET last_care_date = #{today}
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND (last_care_date IS NULL OR last_care_date &lt; #{today})
+    </update>
+
+</mapper>

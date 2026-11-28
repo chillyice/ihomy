@@ -1,0 +1,699 @@
+{
+  "comment": "六树 54 节点(唯一真相源,玩法稿 §4.2)。级价统一按 tier(层):1/2/3/4/5 层每级 1/2/4/6/9 点,多级节点每级同价。release=P1..P4 分期;live=false = 服务端/客户端效果未落地,不可分配(不收点不白学);hidden 时不进 GET /garden/skills。本轮 live=true:上手/挑种/算苗/认盆/识土/过秤/核本(信息清单类,客户端随端点渲染)+ 轻锄/试水/仓廪(服务端直改数值)+ 一畦齐播/巡园(批量端点,2026-11-28 实装)。校验:同树单根、前置可达无环、后继 release 不早于前置。",
+  "tierCost": {
+    "1": 1,
+    "2": 2,
+    "3": 4,
+    "4": 6,
+    "5": 9
+  },
+  "trees": [
+    {
+      "code": "GENG",
+      "name": "耕",
+      "root": "SHANGSHOU",
+      "nodes": [
+        {
+          "code": "SHANGSHOU",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "在空地卡上并排比较自家可播的两包种子,列出当次花费与预计成熟时段。"
+        },
+        {
+          "code": "TIAOZHONG",
+          "branch": "播种",
+          "tier": 2,
+          "prereq": [
+            "SHANGSHOU"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "把种袋与当前地块逐项对照,标出场域、土壤两项匹配。"
+        },
+        {
+          "code": "QINGZHU",
+          "branch": "播种",
+          "tier": 3,
+          "prereq": [
+            "TIAOZHONG"
+          ],
+          "levels": 2,
+          "release": "P1",
+          "live": true,
+          "effectText": "备盆费由 5 园币依次降到 4、3 园币。"
+        },
+        {
+          "code": "SUANMIAO",
+          "branch": "播种",
+          "tier": 4,
+          "prereq": [
+            "QINGZHU"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "选一种种子,列出本场域能播的空位、总价与库存缺口。"
+        },
+        {
+          "code": "YIQI",
+          "branch": "播种",
+          "tier": 5,
+          "prereq": [
+            "SUANMIAO"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "勾选可操作空位后一次确认播同种,每块分别扣费并记播种流水。"
+        },
+        {
+          "code": "SHISHUI",
+          "branch": "照料",
+          "tier": 2,
+          "prereq": [
+            "SHANGSHOU"
+          ],
+          "levels": 2,
+          "release": "P1",
+          "live": true,
+          "effectText": "浇水的地块冷却从 12 小时缩至 11、10 小时,晒太阳沿用原冷却。"
+        },
+        {
+          "code": "RENPEN",
+          "branch": "照料",
+          "tier": 3,
+          "prereq": [
+            "SHISHUI"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "按所选照料动作列出本场域此刻可操作的地块,并说明跳过原因。"
+        },
+        {
+          "code": "XUNYUAN",
+          "branch": "照料",
+          "tier": 4,
+          "prereq": [
+            "RENPEN"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "一次确认所选的浇水、晒太阳或施肥,逐盆校验冷却与费用(缸内补水随生态缸端点开放)。"
+        },
+        {
+          "code": "FENCENG",
+          "branch": "缸景",
+          "tier": 2,
+          "prereq": [
+            "SHANGSHOU"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "venue": "TERRARIUM",
+          "effectText": "把已可种的缸内作物按三层做成候选色样。"
+        },
+        {
+          "code": "YIGANG",
+          "branch": "缸景",
+          "tier": 3,
+          "prereq": [
+            "FENCENG"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "venue": "TERRARIUM",
+          "effectText": "给两个实际缸位试摆候选,确认后向选中的空位按原价播种。"
+        }
+      ]
+    },
+    {
+      "code": "TU",
+      "name": "土",
+      "root": "SHITU",
+      "nodes": [
+        {
+          "code": "SHITU",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "在地块旁叠看可用土壤和作物偏好,已种植的地块也能查。"
+        },
+        {
+          "code": "YANGDI",
+          "branch": "四时轮作",
+          "tier": 2,
+          "prereq": [
+            "SHITU"
+          ],
+          "levels": 2,
+          "release": "P1",
+          "live": false,
+          "effectText": "营养衰减间隔由 72 小时延至 84、96 小时,与同类效果取高值。",
+          "pending": "营养衰减系统"
+        },
+        {
+          "code": "RENQIANCHA",
+          "branch": "四时轮作",
+          "tier": 3,
+          "prereq": [
+            "YANGDI"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "effectText": "选种时并排预览两种作物接在上一茬后的同科惩罚。"
+        },
+        {
+          "code": "PAILIANGCHA",
+          "branch": "四时轮作",
+          "tier": 4,
+          "prereq": [
+            "RENQIANCHA"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "effectText": "试排本茬和下茬,显示跨季、土壤与重茬对两次选择的影响。"
+        },
+        {
+          "code": "BIANLIN",
+          "branch": "邻作布局",
+          "tier": 2,
+          "prereq": [
+            "SHITU"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "effectText": "在播种预览里点邻株,可见它引起伴生、忌避或遮荫的原因。"
+        },
+        {
+          "code": "JIAGUANG",
+          "branch": "邻作布局",
+          "tier": 3,
+          "prereq": [
+            "BIANLIN"
+          ],
+          "levels": 2,
+          "release": "P2",
+          "live": false,
+          "effectText": "受高株遮荫时,把原有惩罚的绝对值减轻 15%、30%。"
+        },
+        {
+          "code": "HEXI",
+          "branch": "邻作布局",
+          "tier": 4,
+          "prereq": [
+            "JIAGUANG",
+            "RENQIANCHA"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "effectText": "同时替换两个空位的作物,比较邻作与接茬的净变化。"
+        },
+        {
+          "code": "RENYICHONG",
+          "branch": "益虫伴生",
+          "tier": 2,
+          "prereq": [
+            "SHITU"
+          ],
+          "levels": 1,
+          "release": "P2",
+          "live": false,
+          "effectText": "在已开放的设施页筛出适合当前地块或场域的功能动物。"
+        },
+        {
+          "code": "ANZHI",
+          "branch": "益虫伴生",
+          "tier": 3,
+          "prereq": [
+            "RENYICHONG"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "试摆虫屋、堆肥箱升级或蜂箱,选址后走原安装流程。"
+        }
+      ]
+    },
+    {
+      "code": "CHENG",
+      "name": "秤",
+      "root": "GUOCHENG",
+      "nodes": [
+        {
+          "code": "GUOCHENG",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "收获前显示这批收成预计占用多少仓容,并排显示当前空位。"
+        },
+        {
+          "code": "CANGLIN",
+          "branch": "分仓",
+          "tier": 2,
+          "prereq": [
+            "GUOCHENG"
+          ],
+          "levels": 2,
+          "release": "P1",
+          "live": true,
+          "effectText": "家庭仓容依次增加 50、100 格。"
+        },
+        {
+          "code": "FENKUANG",
+          "branch": "分仓",
+          "tier": 3,
+          "prereq": [
+            "CANGLIN"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "卖出时可按物类和本次想留下的数量生成待售清单,预览剩余库存后确认。"
+        },
+        {
+          "code": "HEBEN",
+          "branch": "算价",
+          "tier": 2,
+          "prereq": [
+            "GUOCHENG"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "卖出预览同时列出该批数量的种子参考成本与系统回收额。"
+        },
+        {
+          "code": "ZEISHI",
+          "branch": "算价",
+          "tier": 3,
+          "prereq": [
+            "HEBEN"
+          ],
+          "levels": 2,
+          "release": "P1",
+          "live": true,
+          "effectText": "对照系统回收与家庭市集报价,比较整批成交额和占用时间。"
+        },
+        {
+          "code": "ZHENGPI",
+          "branch": "算价",
+          "tier": 4,
+          "prereq": [
+            "ZEISHI",
+            "CANGLIN"
+          ],
+          "levels": 1,
+          "release": "P1",
+          "live": true,
+          "effectText": "比较整批回收与分批挂牌的预计净收入和占仓;同种满 10 份回收额 +5%。"
+        }
+      ]
+    },
+    {
+      "code": "CE",
+      "name": "册",
+      "root": "FANCE",
+      "nodes": [
+        {
+          "code": "FANCE",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "把一株作物的种子袋说明、首次收获和批注放在一起。"
+        },
+        {
+          "code": "CHENGTAO",
+          "branch": "标本",
+          "tier": 2,
+          "prereq": [
+            "FANCE"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "按套展示已收的实物和空位,并启用图鉴套装效果。"
+        },
+        {
+          "code": "BIAOBEN",
+          "branch": "标本",
+          "tier": 3,
+          "prereq": [
+            "CHENGTAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "任选两个已收变体并排比对,配图留进家庭相册。"
+        },
+        {
+          "code": "SHIXIN",
+          "branch": "四时手记",
+          "tier": 2,
+          "prereq": [
+            "FANCE"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "在节气信或知识卡旁,找到同一节气已经开放的作物记录。"
+        },
+        {
+          "code": "TITU",
+          "branch": "四时手记",
+          "tier": 3,
+          "prereq": [
+            "SHIXIN"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "从手记打开关联照片,预览带作物名和节气的图注。"
+        },
+        {
+          "code": "SISHI",
+          "branch": "四时手记",
+          "tier": 4,
+          "prereq": [
+            "TITU",
+            "CHENGTAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "自选四季对页合订园中年鉴;基本年鉴按年终仪式照常生成。"
+        }
+      ]
+    },
+    {
+      "code": "FAN",
+      "name": "繁",
+      "root": "XUANZHU",
+      "nodes": [
+        {
+          "code": "XUANZHU",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "对照两株已发现的作物、变体及现有材料。"
+        },
+        {
+          "code": "BEISUI",
+          "branch": "扦插保种",
+          "tier": 2,
+          "prereq": [
+            "XUANZHU"
+          ],
+          "levels": 2,
+          "release": "P3",
+          "live": false,
+          "effectText": "扦插费由每份 10 园币降到 8、6 园币。"
+        },
+        {
+          "code": "YIZHU",
+          "branch": "扦插保种",
+          "tier": 3,
+          "prereq": [
+            "BEISUI"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "选定母株变体,在同场域最多三个空位扦插。"
+        },
+        {
+          "code": "DUIQIN",
+          "branch": "定向杂交",
+          "tier": 2,
+          "prereq": [
+            "XUANZHU"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "选中第一亲本,从已拥有的亲本中过滤兼容者。"
+        },
+        {
+          "code": "CHAFANG",
+          "branch": "定向杂交",
+          "tier": 3,
+          "prereq": [
+            "DUIQIN"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "从已开放的定向配方反查库存中的亲本组合。"
+        },
+        {
+          "code": "YIFANG",
+          "branch": "定向杂交",
+          "tier": 4,
+          "prereq": [
+            "CHAFANG"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "从目标子代直接选择一对合格亲本,按已有配方培育。"
+        },
+        {
+          "code": "DUXING",
+          "branch": "性状选育",
+          "tier": 2,
+          "prereq": [
+            "XUANZHU"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "在亲本卡并列显示花型、叶纹与花色的实际变体码。"
+        },
+        {
+          "code": "BIWEIDIAN",
+          "branch": "性状选育",
+          "tier": 3,
+          "prereq": [
+            "DUXING"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "预览双亲与子代允许变体池的交集。"
+        },
+        {
+          "code": "ZEQIN",
+          "branch": "性状选育",
+          "tier": 4,
+          "prereq": [
+            "BIWEIDIAN",
+            "CHAFANG"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "按原规则结算各取一个允许位点,筛出有机会保留目标性状的双亲。"
+        }
+      ]
+    },
+    {
+      "code": "GONG",
+      "name": "工",
+      "root": "BEILIAO",
+      "nodes": [
+        {
+          "code": "BEILIAO",
+          "branch": "共根",
+          "tier": 1,
+          "prereq": [],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "把所需材料和家庭库存放在同一页。"
+        },
+        {
+          "code": "ZHELIAO",
+          "branch": "材料加工",
+          "tier": 2,
+          "prereq": [
+            "BEILIAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "反推一份成品的原料,先抵扣库存中的半成品。"
+        },
+        {
+          "code": "LIANZUO",
+          "branch": "材料加工",
+          "tier": 3,
+          "prereq": [
+            "ZHELIAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "按份数预览逐步榨花和精炼,确认后连续制作。"
+        },
+        {
+          "code": "ZECAI",
+          "branch": "草木手作",
+          "tier": 2,
+          "prereq": [
+            "BEILIAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "从材类收获物反查可做的已开放制品。"
+        },
+        {
+          "code": "SHIYANG",
+          "branch": "草木手作",
+          "tier": 3,
+          "prereq": [
+            "ZECAI"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "摆件配色试排;新增手作配方「草编杯垫」。"
+        },
+        {
+          "code": "BIANHU",
+          "branch": "草木手作",
+          "tier": 4,
+          "prereq": [
+            "SHIYANG",
+            "ZHELIAO"
+          ],
+          "levels": 1,
+          "release": "P4",
+          "live": false,
+          "effectText": "新增摆件「染花小篮」,成品只供陈列。"
+        },
+        {
+          "code": "LIANGCAI",
+          "branch": "工具营造",
+          "tier": 2,
+          "prereq": [
+            "BEILIAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "列出工具到下一级所缺的园币、花汁与花露。"
+        },
+        {
+          "code": "MORREN",
+          "branch": "工具营造",
+          "tier": 3,
+          "prereq": [
+            "LIANGCAI"
+          ],
+          "levels": 2,
+          "release": "P3",
+          "live": false,
+          "effectText": "工具强化园币费用减 10%、20%。"
+        },
+        {
+          "code": "PAIGONGXU",
+          "branch": "工具营造",
+          "tier": 4,
+          "prereq": [
+            "MORREN"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "显示要先做的半成品与已有图纸的用料冲突。"
+        },
+        {
+          "code": "ZHAODAN",
+          "branch": "工具营造",
+          "tier": 5,
+          "prereq": [
+            "PAIGONGXU",
+            "LIANZUO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "先按当前库存一并制料,再确认强化或安装。"
+        },
+        {
+          "code": "KANCAI",
+          "branch": "家常菜",
+          "tier": 2,
+          "prereq": [
+            "BEILIAO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "按今天可用的食材列出能做的菜。"
+        },
+        {
+          "code": "LIUXIANG",
+          "branch": "家常菜",
+          "tier": 3,
+          "prereq": [
+            "KANCAI"
+          ],
+          "levels": 2,
+          "release": "P3",
+          "live": false,
+          "effectText": "本次制作的限时食谱效果延长 2、4 小时。"
+        },
+        {
+          "code": "PEIYIZHUO",
+          "branch": "家常菜",
+          "tier": 4,
+          "prereq": [
+            "LIUXIANG"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "试排最多三道食谱,预览共享原料与增益槽。"
+        },
+        {
+          "code": "JIACHUAN",
+          "branch": "家常菜",
+          "tier": 5,
+          "prereq": [
+            "PEIYIZHUO"
+          ],
+          "levels": 1,
+          "release": "P3",
+          "live": false,
+          "effectText": "从家传食谱卡配一桌,逐道制作;是否食用由家人决定。"
+        }
+      ]
+    }
+  ]
+}

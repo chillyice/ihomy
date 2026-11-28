@@ -80,7 +80,9 @@ public class SecurityConfig {
                         "/book/summary",
                         // 书架读类接口允许游客访问(服务层匿名只返回 PUBLIC 书;写接口仍需登录)
                         "/library/list", "/library/categories", "/library/*",
-                        "/storage/file-signed").permitAll()
+                        "/storage/file-signed",
+                        // 家圃时光能力协商免登录(需求设计说明书 §6.3/架构分册 §28.2;其余 /garden/** 仍需登录)
+                        "/garden/meta").permitAll()
                 // 放映厅海报/字幕轨中转同样走签名 URL(<img>/<track> 带不了 JWT,签名即凭证)
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/media/image-signed", "/media/subtitle-signed").permitAll()

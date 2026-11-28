@@ -1,0 +1,89 @@
+{
+  "comment": "场域网格配置(唯一真相源)。归属(PLOT_OWNERSHIP)是工程常量不进 content(架构分册 §19-B):个人=WINDOWSILL/PLANTER/TERRARIUM,共享=BACKYARD/FARM/GREENHOUSE。slots 带 unlock_stage:阶段 1 只开窗台 0-2 号盆,阶段 2 补 3-5 号(玩法稿 §0.4)。所有地块的土壤类型由场域固定推导,种上即不可改。",
+  "venues": [
+    {
+      "code": "WINDOWSILL",
+      "name": "室内窗台",
+      "soil_type": "POT",
+      "indoor": true,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 1 },
+        { "slot_no": 1, "unlock_stage": 1 },
+        { "slot_no": 2, "unlock_stage": 1 },
+        { "slot_no": 3, "unlock_stage": 2 },
+        { "slot_no": 4, "unlock_stage": 2 },
+        { "slot_no": 5, "unlock_stage": 2 }
+      ]
+    },
+    {
+      "code": "PLANTER",
+      "name": "花箱",
+      "soil_type": "BOX",
+      "indoor": true,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 3 },
+        { "slot_no": 1, "unlock_stage": 3 },
+        { "slot_no": 2, "unlock_stage": 3 }
+      ]
+    },
+    {
+      "code": "TERRARIUM",
+      "name": "生态缸",
+      "soil_type": "TANK",
+      "indoor": true,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 6 },
+        { "slot_no": 1, "unlock_stage": 6 }
+      ]
+    },
+    {
+      "code": "BACKYARD",
+      "name": "后院",
+      "soil_type": "FIELD",
+      "indoor": false,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 4 },
+        { "slot_no": 1, "unlock_stage": 4 },
+        { "slot_no": 2, "unlock_stage": 4 },
+        { "slot_no": 3, "unlock_stage": 4 },
+        { "slot_no": 4, "unlock_stage": 4 },
+        { "slot_no": 5, "unlock_stage": 4 },
+        { "slot_no": 6, "unlock_stage": 5 },
+        { "slot_no": 7, "unlock_stage": 5 }
+      ]
+    },
+    {
+      "code": "FARM",
+      "name": "农场",
+      "soil_type": "FIELD",
+      "indoor": false,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 7 },
+        { "slot_no": 1, "unlock_stage": 7 },
+        { "slot_no": 2, "unlock_stage": 7 },
+        { "slot_no": 3, "unlock_stage": 7 },
+        { "slot_no": 4, "unlock_stage": 7 },
+        { "slot_no": 5, "unlock_stage": 7 },
+        { "slot_no": 6, "unlock_stage": 7 },
+        { "slot_no": 7, "unlock_stage": 7 },
+        { "slot_no": 8, "unlock_stage": 8 },
+        { "slot_no": 9, "unlock_stage": 8 },
+        { "slot_no": 10, "unlock_stage": 9 }
+      ]
+    },
+    {
+      "code": "GREENHOUSE",
+      "name": "温室大棚",
+      "soil_type": "FIELD",
+      "indoor": false,
+      "slots": [
+        { "slot_no": 0, "unlock_stage": 10 },
+        { "slot_no": 1, "unlock_stage": 10 },
+        { "slot_no": 2, "unlock_stage": 10 },
+        { "slot_no": 3, "unlock_stage": 10 },
+        { "slot_no": 4, "unlock_stage": 10 },
+        { "slot_no": 5, "unlock_stage": 10 }
+      ]
+    }
+  ]
+}

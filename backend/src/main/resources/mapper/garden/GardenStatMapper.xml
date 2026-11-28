@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenStatMapper">
+
+    <!-- 每日计数快照:按日增量 upsert(只存原始计数 + XP 写时落账,§15.2 禁读日志) -->
+    <insert id="upsertDeltas">
+        INSERT INTO games.garden_stat
+            (family_id, stat_date, care_cnt, plant_cnt, harvest_cnt, coin_in, coin_out, xp_gain)
+        VALUES (#{familyId}, #{statDate}, #{care}, #{plant}, #{harvest}, #{coinIn}, #{coinOut}, #{xp})
+        ON DUPLICATE KEY UPDATE
+            care_cnt    = care_cnt + #{care},
+            plant_cnt   = plant_cnt + #{plant},
+            harvest_cnt = harvest_cnt + #{harvest},
+            coin_in     = coin_in + #{coinIn},
+            coin_out    = coin_out + #{coinOut},
+            xp_gain     = xp_gain + #{xp}
+    </insert>
+
+</mapper>
