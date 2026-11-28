@@ -37,7 +37,7 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
-            android:theme="@style/IhomyLauncher"
+            android:theme="@style/IhomyMain"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
             android:exported="true">

@@ -8,7 +8,8 @@
 # 覆盖检查(全部只读、无副作用、可本地随时跑):
 #   1. VERSION 唯一事实来源:单行、形如 V<主>.<次>(次位不补零)
 #   2. 表数一致性:AGENTS.md「**N 张表**」+ 各前缀计数 / 需求 §6.2 标题 ↔ schema.sql 实际建表数
-#   3. 实体 ↔ 表:每个 @TableName 的表必须在 schema.sql 里存在(反向允许,关联/字典表无实体)
+#   3. 实体 ↔ 表:每个 @TableName 的表必须在 schema.sql 里存在(反向允许,关联/字典表无实体);
+#      带库名前缀的(games.garden_*)是跨库模块,建表脚本不在本仓,不参与比对
 #   4. Mapper 接口不写 SQL 注解(@Select/@Insert/@Update/@Delete 一律放 XML)
 #   5. 每个 *Controller.java 必须带 @Tag(文档生成按它出章,缺了会静默丢章)
 #   6. @RequirePermission("code") 的 code 必须在 schema.sql 的 sys_auth 种子里
@@ -87,7 +88,12 @@ game_actual="$(grep -oE '^CREATE TABLE `[^`]+`' "$SCHEMA" | sed 's/.*`\(.*\)`/\1
 # ------------------------------------------------------- 3. 实体 ↔ 表
 echo "[3] 实体 @TableName ↔ schema.sql 建表"
 grep -rhoE '@TableName\("[^"]+"\)' "$JAVA_DIR" 2>/dev/null \
-  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > $TMPD/_ddc_ents.txt
+  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > $TMPD/_ddc_ents_all.txt
+# 跨库实体:@TableName 带库名前缀(现只有家圃时光 games.garden_*),
+# 表与建表脚本归独立游戏仓 home_garden_moments(/db/schema.sql、/db/migrations.sql),
+# 本仓 schema.sql 只管 ihomy 库,拿它比对必然误报。
+grep -E '^[A-Za-z0-9_]+\.' $TMPD/_ddc_ents_all.txt > $TMPD/_ddc_ents_ext.txt || true
+grep -vE '^[A-Za-z0-9_]+\.' $TMPD/_ddc_ents_all.txt > $TMPD/_ddc_ents.txt || true
 grep -oE '^CREATE TABLE `[^`]+`' "$SCHEMA" | sed 's/.*`\(.*\)`/\1/' | sort -u > $TMPD/_ddc_tabs.txt
 MISSING_ENT="$(comm -23 $TMPD/_ddc_ents.txt $TMPD/_ddc_tabs.txt || true)"
 if [[ -z "$MISSING_ENT" ]]; then
@@ -95,6 +101,9 @@ if [[ -z "$MISSING_ENT" ]]; then
 else
   fail "以下 @TableName 在 schema.sql 无对应建表(表已改名/删除?):"
   printf '         %s\n' $MISSING_ENT
+fi
+if [[ -s $TMPD/_ddc_ents_ext.txt ]]; then
+  pass "跨库实体 $(wc -l < $TMPD/_ddc_ents_ext.txt | tr -d ' ') 个(建表脚本在所属仓,不参与本库比对):$(tr '\n' ' ' < $TMPD/_ddc_ents_ext.txt)"
 fi
 
 # ------------------------------------------------------- 4. Mapper 不写 SQL 注解

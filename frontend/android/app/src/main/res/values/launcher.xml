@@ -12,4 +12,17 @@
         <!-- Android 10–11 use one starting theme for every alias. -->
         <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
     </style>
+
+    <!-- 主窗口不要自己的进出动画:启动页(LauncherActivity)与主任务交接时,两个窗口背景同色,
+         无动画才是无缝的一跳。有动画时华为/鸿蒙会把它画成任务切换(横向滑入),像换了个 app。 -->
+    <style name="IhomyNoWindowAnimation">
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+    </style>
+    <!-- MainActivity 专用:桌面入口(多个 alias)先开启动页,再把前台交给主任务 -->
+    <style name="IhomyMain" parent="IhomyLauncher">
+        <item name="android:windowAnimationStyle">@style/IhomyNoWindowAnimation</item>
+    </style>
 </resources>
