@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { gardenApi } from '@/api'
 import { useWindowsill } from './useWindowsill'
 
-vi.mock('@/api', () => ({ gardenApi: { panorama: vi.fn(), entry: vi.fn(), water: vi.fn(), harvest: vi.fn(), sow: vi.fn() } }))
+vi.mock('@/api', () => ({ gardenApi: { panorama: vi.fn(), entry: vi.fn(), water: vi.fn(), sun: vi.fn(), harvest: vi.fn(), sow: vi.fn() } }))
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 let app
 let plot
@@ -49,6 +49,15 @@ it('keeps the art review independent of the member garden', async () => {
   expect(gardenApi.panorama).not.toHaveBeenCalled()
   expect(gardenApi.entry).not.toHaveBeenCalled()
 })
+it('reads the family again once after transient server contention without repeating a write', async () => {
+  const garden = mount()
+  await garden.refresh()
+  gardenApi.panorama.mockClear().mockRejectedValueOnce({ code: 500 })
+  await garden.refresh()
+  expect(gardenApi.panorama).toHaveBeenCalledTimes(2)
+  expect(garden.failed.value).toBe(false)
+  expect(gardenApi.harvest).not.toHaveBeenCalled()
+})
 it('reconciles an accepted watering after the reply was lost', async () => {
   const garden = mount()
   await garden.refresh()
@@ -91,6 +100,32 @@ it('retries an unconfirmed action with the same key and ignores an older panoram
 function emptyPot() {
   Object.assign(plot, { prepared: true, cropCode: null, plantedAt: null, stage: null, harvestable: false, lastWateredAt: null })
 }
+
+it('slides only a watered personal sill pot and reuses its pending sun key until the server confirms', async () => {
+  const garden = mount()
+  Object.assign(plot, { sunCooldownSec: 0 })
+  await garden.refresh()
+  await garden.sun()
+  plot.lastWateredAt = 'first-pour'
+  await garden.refresh()
+  garden.selectPlot(33)
+  await garden.sun()
+  expect(gardenApi.sun).not.toHaveBeenCalled()
+  garden.selectPlot(null)
+  gardenApi.sun.mockRejectedValueOnce(Error('offline')).mockImplementationOnce(async () => {
+    Object.assign(plot, { lastSunAt: 'after-sun', sunCooldownSec: 43200 })
+    throw Error('reply lost')
+  })
+  await garden.sun()
+  expect(garden.retrySun.value).toBe(true)
+  await garden.sun()
+  expect(gardenApi.sun.mock.calls[1]).toEqual(gardenApi.sun.mock.calls[0])
+  expect(garden.failed.value).toBe(false)
+  expect(garden.canSun.value).toBe(false)
+  expect(garden.retrySun.value).toBe(false)
+  await garden.sun()
+  expect(gardenApi.sun).toHaveBeenCalledTimes(2)
+})
 
 it('opens a family windowsill for observation and never routes an action to the owner’s pot', async () => {
   Object.assign(plot, { prepared: true, stage: 5, harvestable: true, thirsty: true })

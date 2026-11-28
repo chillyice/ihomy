@@ -16,8 +16,15 @@
         </div>
       </div>
       <footer v-if="status === 'ready'">
-        <p aria-live="polite">{{ hint }} {{ costHint }}</p>
-        <button v-if="!readOnly && harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
+        <p aria-live="polite">
+          {{ sunMode ? t('garden.sun.drag') : hint }} {{ costHint }}
+          <span v-if="!sunMode && !readOnly && !inField && step === 7 && sunRest">{{ t('garden.sun.rest') }}</span>
+        </p>
+        <template v-if="sunMode">
+          <button class="pot-back" :disabled="busy" @click="sunMode = false">{{ t('common.cancel') }}</button>
+          <button ref="action" class="pot-action" :disabled="busy" @click="post('act')">{{ t('garden.sun.place') }}</button>
+        </template>
+        <button v-else-if="!readOnly && harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
           {{ t('garden.harvest') }}
         </button>
         <button
@@ -48,8 +55,11 @@
         >
           {{ t('gardenEntry.potActions.' + step) }}
         </button>
-        <button v-if="preview && step >= 7" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
-        <div v-if="preview && step === 7" class="pot-samples" role="group" :aria-label="t('garden.review')">
+        <button v-if="!sunMode && canSun && !readOnly" class="pot-back" :disabled="busy" @click="retrySun ? emit('sun') : (sunMode = true)">
+          {{ t(retrySun ? 'garden.sun.confirm' : 'garden.sun.start') }}
+        </button>
+        <button v-if="preview && step >= 7 && !sunMode" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
+        <div v-if="preview && step === 7 && !sunMode" class="pot-samples" role="group" :aria-label="t('garden.review')">
           <span>{{ t('garden.review') }}</span>
           <button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
             {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
@@ -77,6 +87,9 @@ const props = defineProps({
   harvestable: Boolean,
   thirsty: Boolean,
   canWater: Boolean,
+  canSun: Boolean,
+  retrySun: Boolean,
+  sunRest: Boolean,
   retryWater: Boolean,
   alreadyWatered: Boolean,
   harvestError: String,
@@ -88,7 +101,14 @@ const props = defineProps({
   place: String,
   cropForm: String,
 })
-const emit = defineEmits(['advance', 'harvest', 'water', 'back', 'replay', 'sample', 'observed'])
+const emit = defineEmits(['advance', 'harvest', 'water', 'sun', 'back', 'replay', 'sample', 'observed'])
+const sunMode = ref(false)
+watch(
+  () => [props.canSun, props.retrySun, props.cycle],
+  ([available, retry, cycle], previous) => {
+    if (!available || retry || cycle !== previous[2]) sunMode.value = false
+  },
+)
 const { t } = useI18n()
 const title = computed(() => {
   if (props.place) {
@@ -151,7 +171,8 @@ function post(type, reveal = false) {
       readOnly: props.readOnly,
       form: props.cropForm,
       dry: props.thirsty,
-      canWater: props.canWater && !props.retryWater,
+      canWater: !sunMode.value && props.canWater && !props.retryWater,
+      moveToSun: sunMode.value && props.canSun,
       busy: props.busy,
       cycle: props.cycle,
     },
@@ -205,10 +226,16 @@ function receive(event) {
         !props.readOnly &&
         !props.busy &&
         props.canWater &&
+        !sunMode.value &&
         event.data.cycle === props.cycle &&
         event.data.step === props.step
       )
         emit('water')
+      else post('restore')
+      break
+    case 'sun':
+      if (status.value === 'ready' && sunMode.value && props.canSun && !props.readOnly && !props.busy && event.data.cycle === props.cycle)
+        emit('sun')
       else post('restore')
       break
     case 'back':
@@ -236,6 +263,8 @@ watch(
     props.cycle,
     props.thirsty,
     props.canWater,
+    sunMode.value,
+    props.canSun,
     props.retryWater,
     props.busy,
   ],

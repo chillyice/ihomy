@@ -58,6 +58,9 @@ export const gardenApi = {
   prepare: (id, key) => gardenWrite('plot/' + id + '/prepare', null, key),
   sow: (slotNo, cropCode, key, venue = 'WINDOWSILL') => gardenWrite('plot', { venue, slotNo, cropCode }, key),
   water: (id, key) => gardenWrite('plot/' + id + '/water', null, key),
+  sun: (id, key) => gardenWrite('plot/' + id + '/sun', null, key),
+  tasks: () => request.get('/garden/tasks', { isBackgroundRead: () => true }),
+  claimTask: (code) => request.post('/garden/tasks/' + encodeURIComponent(code) + '/claim'),
   harvest: (id, key) => gardenWrite('plot/' + id + '/harvest', null, key),
 }
 

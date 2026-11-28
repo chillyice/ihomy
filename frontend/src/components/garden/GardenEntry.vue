@@ -103,6 +103,9 @@
           ref="book"
           :world="bookWorld"
           :busy="busy"
+          :active="!tending"
+          :review="review"
+          @claimed="refresh"
           @visit="visitPlot"
           @back="closeBook"
         />
@@ -124,6 +127,9 @@
           :harvestable="harvestable"
           :thirsty="thirsty"
           :can-water="canWater"
+          :can-sun="homeReview ? progress === 7 && !harvestable && !review.slip.inLight : canSun"
+          :sun-rest="homeReview ? review.slip.inLight : plot?.sunCooldownSec > 0"
+          :retry-sun="retrySun"
           :retry-water="retryWater"
           :already-watered="alreadyWatered"
           :cycle="homeReview ? 'preview' : [plot?.id, plot?.plantedAt].join('/')"
@@ -133,6 +139,7 @@
           @advance="advance"
           @harvest="harvest"
           @water="water"
+          @sun="sun"
           @back="closePot"
           @replay="replay"
           @sample="setSample"
@@ -183,6 +190,7 @@ function savedStep() {
   return -1
 }
 const inside = computed(() => route.name === 'Home' && route.query.garden === 'window')
+const review = props.preview ? createGardenBookReview(t, saveKey) : null
 const {
   entry,
   plot,
@@ -202,10 +210,13 @@ const {
   harvest: harvestLive,
   water: waterLive,
   canWater: canWaterLive,
+  canSun,
+  retrySun,
+  sun: sunLive,
   retryWater,
   alreadyWatered,
   refresh,
-} = useWindowsill(props, inside, props.preview ? createGardenBookReview(t) : null)
+} = useWindowsill(props, inside, review)
 const homeReview = computed(() => props.preview && plot.value?.id === homePlot.value?.id)
 const readOnly = computed(() => !!plot.value && plot.value.mine !== true)
 const inField = computed(() => plot.value?.venue === 'BACKYARD')
@@ -316,6 +327,10 @@ function rememberGrowth() {
 }
 function syncProgress(event) {
   if (!props.preview) return
+  if (event.key === saveKey + ':task-slip') {
+    review.restoreSlip()
+    return
+  }
   if (event.key === saveKey + ':growth') {
     sample.value = savedSample()
     return
@@ -347,6 +362,7 @@ function advance(previous) {
 function harvest() {
   if (!harvestable.value) return
   if (!homeReview.value) return harvestLive()
+  review.mark({ harvested: true, inLight: false })
   save(8)
   setSample(0)
 }
@@ -355,6 +371,10 @@ function water() {
   if (!homeReview.value) return waterLive()
   if (progress.value === 6) advance(6)
   else setSample(2)
+}
+function sun() {
+  if (!homeReview.value) return sunLive()
+  if (progress.value === 7 && !harvestable.value && !review.slip.inLight) review.mark({ sunned: true, inLight: true })
 }
 async function closePot() {
   const id = plot.value?.id
@@ -389,6 +409,7 @@ watch(plot, (current) => {
 })
 async function replay() {
   if (!props.preview) return
+  review.resetSlip()
   setSample(0)
   tending.value = false
   bookOpen.value = false

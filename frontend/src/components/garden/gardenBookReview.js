@@ -1,5 +1,25 @@
-// A fresh sketchbook per art-review session. No account, wallet or network calls.
-export function createGardenBookReview(t) {
+import { reactive } from 'vue'
+
+// The cuttings and shared beds are sketches. The task slip follows the local first-pot save.
+export function createGardenBookReview(t, saveKey) {
+  const key = saveKey + ':task-slip'
+  function readSlip() {
+    try {
+      return JSON.parse(localStorage.getItem(key)) || {}
+    } catch {
+      return {}
+    }
+  }
+  const blank = { sunned: false, inLight: false, harvested: false, sunClaimed: false, harvestClaimed: false }
+  const slip = reactive({ ...blank, ...readSlip() })
+  function mark(values) {
+    Object.assign(slip, values)
+    try {
+      localStorage.setItem(key, JSON.stringify(slip))
+    } catch {
+      /* Keep this visit playable. */
+    }
+  }
   const crops = [
     { code: 'CATGRASS', name: t('garden.book.catgrass'), firstPot: true, packCount: 1 },
     { code: 'MINT', name: t('garden.book.mint') },
@@ -29,6 +49,37 @@ export function createGardenBookReview(t) {
     return { plot: { ...p } }
   }
   return {
+    slip,
+    mark,
+    restoreSlip: () => Object.assign(slip, blank, readSlip()),
+    resetSlip: () => mark(blank),
+    tasks: () => ({
+      starter: [
+        {
+          code: 'review-sun',
+          title: t('garden.todo.reviewSun'),
+          condition: { type: 'CARE_N', value: 1 },
+          visible: true,
+          completed: slip.sunned,
+          progress: Number(slip.sunned),
+          claimed: slip.sunClaimed,
+        },
+        {
+          code: 'review-harvest',
+          title: t('garden.todo.reviewHarvest'),
+          condition: { type: 'HARVEST_N', value: 1 },
+          visible: slip.sunClaimed,
+          completed: slip.harvested,
+          progress: Number(slip.harvested),
+          claimed: slip.harvestClaimed,
+        },
+      ],
+    }),
+    claimTask(code) {
+      if (code === 'review-sun' && slip.sunned) mark({ sunClaimed: true })
+      if (code === 'review-harvest' && slip.sunClaimed && slip.harvested) mark({ harvestClaimed: true })
+      return {}
+    },
     panorama: () => ({ plots: plots.map((p) => ({ ...p })), unlockedCrops: crops, letters: [] }),
     water: (id) =>
       change(

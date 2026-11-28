@@ -9,6 +9,14 @@
         <button v-for="tab in tabs" :key="tab" :aria-pressed="tab === page" @click="page = tab">{{ t('garden.book.' + tab) }}</button>
       </nav>
       <div class="entries">
+        <GardenTaskSlip
+          v-if="page === 'tasks' && active"
+          :world="world"
+          :review="review"
+          :busy="busy"
+          @visit="emit('visit', $event)"
+          @claimed="emit('claimed')"
+        />
         <section v-for="group in groups" :key="group.key">
           <h3 v-if="page === 'family'">{{ t('garden.book.ownerSill', { name: group.name }) }}</h3>
           <button v-for="p in group.plots" :key="p.id" :data-plot="p.id" class="entry" :disabled="busy" @click="emit('visit', p.id)">
@@ -26,7 +34,7 @@
             <span class="arrow" aria-hidden="true">›</span>
           </button>
         </section>
-        <p v-if="!groups.length" class="empty">{{ t(page === 'own' ? 'garden.noPot' : 'garden.book.noFamily') }}</p>
+        <p v-if="page !== 'tasks' && !groups.length" class="empty">{{ t(page === 'own' ? 'garden.noPot' : 'garden.book.noFamily') }}</p>
       </div>
       <details v-if="Number.isFinite(world.inventoryCap)" class="stores">
         <summary>
@@ -42,13 +50,16 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-const props = defineProps({ world: { type: Object, required: true }, busy: Boolean })
-const emit = defineEmits(['visit', 'back'])
+import GardenTaskSlip from './GardenTaskSlip.vue'
+const props = defineProps({ world: { type: Object, required: true }, busy: Boolean, active: Boolean, review: Object })
+const emit = defineEmits(['visit', 'back', 'claimed'])
 const { t } = useI18n()
-const page = ref('own')
+const page = ref('tasks')
 const close = ref(null)
 const tabs = computed(() =>
-  props.world.plots.some((p) => p.venue === 'BACKYARD' && p.ownerUid === '') ? ['own', 'family', 'yard'] : ['own', 'family'],
+  props.world.plots.some((p) => p.venue === 'BACKYARD' && p.ownerUid === '')
+    ? ['tasks', 'own', 'family', 'yard']
+    : ['tasks', 'own', 'family'],
 )
 watch(tabs, (available) => {
   if (!available.includes(page.value)) page.value = 'own'
@@ -152,7 +163,7 @@ nav {
 }
 nav button {
   flex: 1;
-  padding: 6px;
+  padding: 6px 2px;
   border: 0;
   border-radius: 6px 6px 0 0;
   background: #e8e1c9;

@@ -14,6 +14,7 @@ export function useWindowsill(props, inside, review = null) {
   const harvestError = ref('')
   const reconciling = ref(false)
   const retryWater = ref(false)
+  const retrySun = ref(false)
   const replayedWater = ref(null)
   const selectedId = ref(null)
   const homePlot = computed(() => world.value?.plots?.find((p) => p.mine === true && p.venue === 'WINDOWSILL' && p.slotNo === 0))
@@ -29,6 +30,18 @@ export function useWindowsill(props, inside, review = null) {
     )
   })
   const mail = computed(() => world.value?.letters?.some((l) => l.claimable))
+  const canSun = computed(() => {
+    const p = plot.value
+    return (
+      p?.mine === true &&
+      p.venue === 'WINDOWSILL' &&
+      !!p.cropCode &&
+      !!p.plantedAt &&
+      !!p.lastWateredAt &&
+      !p.harvestable &&
+      p.sunCooldownSec === 0
+    )
+  })
   const startedWith = ref(null)
   const crop = computed(() => {
     const data = world.value
@@ -78,13 +91,14 @@ export function useWindowsill(props, inside, review = null) {
     put('draft:' + plot.value.id, n ? String(n) : null)
   }
   let epoch = 0
-  function waterAction(p) {
-    // Keep the existing key for the first pour. Each later pour starts a new cooldown.
-    return 'water:' + p.id + ':' + p.plantedAt + (p.lastWateredAt ? ':' + p.lastWateredAt : '')
+  function careAction(type, p) {
+    const last = type === 'water' ? p.lastWateredAt : p.lastSunAt
+    return type + ':' + p.id + ':' + p.plantedAt + (last ? ':' + last : '')
   }
   function restoreDraft() {
     const p = plot.value
-    retryWater.value = canWater.value && !!get('action:' + waterAction(p))
+    retryWater.value = canWater.value && !!get('action:' + careAction('water', p))
+    retrySun.value = canSun.value && !!get('action:' + careAction('sun', p))
     startedWith.value = p?.mine && !p.cropCode ? get('seed:' + p.id) : null
     const n = p?.mine && !p.cropCode ? Number(get('draft:' + p.id)) : 0
     draft.value = Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0
@@ -118,7 +132,7 @@ export function useWindowsill(props, inside, review = null) {
       /* A background read can be retried on focus. */
     }
   }
-  async function refresh() {
+  async function refresh(allowRetry = true) {
     if ((props.preview && !review) || busy.value || !alive || !inside.value) return
     const ticket = ++epoch
     try {
@@ -127,8 +141,13 @@ export function useWindowsill(props, inside, review = null) {
       world.value = data
       restoreDraft()
       failed.value = false
-    } catch {
-      if (alive && ticket === epoch) failed.value = true
+    } catch (error) {
+      if (!alive || ticket !== epoch) return
+      // Concurrent visits can briefly contend while the server prepares a family's plots.
+      if (allowRetry !== false && (error?.code === 500 || error?.response?.status === 500)) {
+        await new Promise((resolve) => setTimeout(resolve, 350))
+        if (alive && ticket === epoch) await refresh(false)
+      } else failed.value = true
     }
   }
   async function write(action, send, onError) {
@@ -188,30 +207,34 @@ export function useWindowsill(props, inside, review = null) {
     if (!result && plot.value?.id === p.id && previous === 1 && plot.value.prepared && !plot.value.cropCode && draft.value < 2) saveDraft(2)
     if (!result && plot.value?.id === p.id && step.value === previous && alive) failed.value = true
   }
-  async function water() {
-    if (!canWater.value || busy.value || reconciling.value) return
+  async function care(type) {
+    const watering = type === 'water'
+    if (!(watering ? canWater.value : canSun.value) || busy.value || reconciling.value) return
     const p = plot.value
-    const { id, plantedAt, lastWateredAt } = p
-    const action = waterAction(p)
-    replayedWater.value = null
+    const { id, plantedAt } = p
+    const action = careAction(type, p)
+    const retry = watering ? retryWater : retrySun
+    if (watering) replayedWater.value = null
     reconciling.value = true
     try {
-      const result = await write(action, (key) => api.water(id, key))
+      const result = await write(action, (key) => api[type](id, key))
       if (!alive) return
-      if (plot.value?.id === id) retryWater.value = !result
+      if (plot.value?.id === id) retry.value = !result
       if (result?.plot?.id === id) {
         world.value.plots = world.value.plots.map((item) => (item.id === id ? result.plot : item))
-        if (result.alreadyDone && result.plot.plantedAt === plantedAt) replayedWater.value = waterAction(result.plot)
+        if (watering && result.alreadyDone && result.plot.plantedAt === plantedAt) replayedWater.value = careAction(type, result.plot)
       }
       await refresh()
       if (!alive || result) return
       const current = world.value?.plots?.find((item) => item.id === id)
-      if (current && (current.id !== id || current.plantedAt !== plantedAt || current.lastWateredAt !== lastWateredAt))
-        put('action:' + action, null)
+      if (current && careAction(type, current) !== action) put('action:' + action, null)
       else failed.value = true
     } finally {
       reconciling.value = false
     }
+  }
+  function water() {
+    return care('water')
   }
   async function harvest() {
     const p = plot.value
@@ -291,8 +314,11 @@ export function useWindowsill(props, inside, review = null) {
     letters,
     busy: computed(() => busy.value || reconciling.value),
     canWater,
+    canSun,
+    retrySun,
+    sun: () => care('sun'),
     retryWater,
-    alreadyWatered: computed(() => !!plot.value?.cropCode && !canWater.value && replayedWater.value === waterAction(plot.value)),
+    alreadyWatered: computed(() => !!plot.value?.cropCode && !canWater.value && replayedWater.value === careAction('water', plot.value)),
     water,
     failed,
     crop,
