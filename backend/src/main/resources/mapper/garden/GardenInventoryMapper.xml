@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenInventoryMapper">
+
+    <!-- 同码堆叠入库(收获 / 拆信发种) -->
+    <insert id="upsertAdd">
+        INSERT INTO games.garden_inventory (family_id, item_code, item_type, qty)
+        VALUES (#{familyId}, #{itemCode}, #{itemType}, #{qty})
+        ON DUPLICATE KEY UPDATE qty = qty + #{qty}
+    </insert>
+
+    <!-- 条件扣减(播种消耗种子包):不足返回 0 行,不用先查后写 -->
+    <update id="deduct">
+        UPDATE games.garden_inventory
+        SET qty = qty - #{qty}
+        WHERE family_id = #{familyId}
+          AND item_code = #{itemCode}
+          AND qty &gt;= #{qty}
+    </update>
+
+    <!-- qty=0 即删行(架构分册 §16.4 要点 8) -->
+    <delete id="deleteIfZero">
+        DELETE FROM games.garden_inventory
+        WHERE family_id = #{familyId}
+          AND item_code = #{itemCode}
+          AND qty &lt;= 0
+    </delete>
+
+    <select id="sumQty" resultType="int">
+        SELECT COALESCE(SUM(qty), 0) FROM games.garden_inventory WHERE family_id = #{familyId}
+    </select>
+
+</mapper>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenLogMapper">
+
+    <!-- 分批物理删(§15.2:项目规则物理删走自定义 SQL;MP deleteById 实为 UPDATE 不可用)。
+         只清热度行(WATER/SUN/FERTILIZE/GIFT,已全部落 stat 快照);
+         STAGE_ADVANCE/TASK_CLAIM/SKILL_ALLOCATE/SKILL_RESET/PLANT/HARVEST 是标记与记忆行,豁免。 -->
+    <delete id="cleanupExpired">
+        DELETE FROM games.garden_log
+        WHERE created_at &lt; #{cutoff}
+          AND action IN ('WATER','SUN','FERTILIZE','GIFT')
+        LIMIT #{limit}
+    </delete>
+
+</mapper>

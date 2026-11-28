@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenWalletMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO games.garden_wallet (family_id, player_uid, coins)
+        VALUES (#{familyId}, #{playerUid}, 0)
+    </insert>
+
+    <!-- 条件扣款:余额不足返回 0 行(调用方按当前余额补「还差 N 园币」文案,FR-23) -->
+    <update id="deduct">
+        UPDATE games.garden_wallet
+        SET coins = coins - #{amount}
+        WHERE family_id = #{familyId}
+          AND player_uid = #{playerUid}
+          AND coins &gt;= #{amount}
+    </update>
+
+    <update id="add">
+        UPDATE games.garden_wallet
+        SET coins = coins + #{amount}
+        WHERE family_id = #{familyId}
+          AND player_uid = #{playerUid}
+    </update>
+
+</mapper>

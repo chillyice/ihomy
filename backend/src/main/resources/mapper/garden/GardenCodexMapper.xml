@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenCodexMapper">
+
+    <!-- 图鉴 upsert:返回 1 = 新行(首收),返回 2 = 已存在累加 -->
+    <insert id="upsertHarvest">
+        INSERT INTO games.garden_codex (family_id, crop_code, first_harvest_at, harvest_cnt)
+        VALUES (#{familyId}, #{cropCode}, #{firstHarvestAt}, 1)
+        ON DUPLICATE KEY UPDATE harvest_cnt = harvest_cnt + 1
+    </insert>
+
+</mapper>

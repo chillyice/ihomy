@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.garden.mapper.GardenListingMapper">
+
+    <select id="selectExpired" resultType="com.ihomy.garden.entity.GardenListing">
+        SELECT * FROM games.garden_listing
+        WHERE family_id = #{familyId} AND status = 'ACTIVE' AND expires_at &lt; #{now}
+        LIMIT 100
+    </select>
+
+    <update id="markExpired">
+        UPDATE games.garden_listing SET status = 'EXPIRED'
+        WHERE id = #{id} AND status = 'ACTIVE'
+    </update>
+
+    <!-- 购买锁定:仅 ACTIVE 且未过期且非卖家本人;0 行 = 已售/已下架/已过期/自己的单 -->
+    <update id="markSold">
+        UPDATE games.garden_listing SET status = 'SOLD'
+        WHERE id = #{id} AND family_id = #{familyId} AND status = 'ACTIVE'
+          AND expires_at &gt; #{now} AND seller_uid != #{buyerUid}
+    </update>
+
+    <update id="markCancelled">
+        UPDATE games.garden_listing SET status = 'CANCELLED'
+        WHERE id = #{id} AND family_id = #{familyId} AND status = 'ACTIVE' AND seller_uid = #{sellerUid}
+    </update>
+
+</mapper>
