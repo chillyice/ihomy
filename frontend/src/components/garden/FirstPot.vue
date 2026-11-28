@@ -17,11 +17,14 @@
         <button v-if="harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
           {{ t('garden.harvest') }}
         </button>
+        <button v-else-if="canWater" ref="action" class="pot-action" :disabled="busy" @click="retryWater ? emit('water') : post('act')">
+          {{ retryWater ? t('garden.confirmWater') : step === 6 ? t('gardenEntry.potActions.6') : t('garden.waterPot') }}
+        </button>
         <button v-else-if="step === 8 && seedAvailable" ref="action" class="pot-action" :disabled="busy" @click="emit('advance', 8)">
           {{ t('garden.resow') }}
         </button>
         <button
-          v-else-if="step < 7"
+          v-else-if="step < 6"
           ref="action"
           class="pot-action"
           :disabled="busy"
@@ -33,9 +36,10 @@
         <button v-if="preview && step >= 7" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
         <div v-if="preview && step === 7" class="pot-samples" role="group" :aria-label="t('garden.review')">
           <span>{{ t('garden.review') }}</span>
-          <button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="growth === n" @click="emit('sample', n)">
+          <button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
             {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
           </button>
+          <button :aria-pressed="thirsty" @click="emit('sample', 'dry')">{{ t('garden.drySample') }}</button>
         </div>
       </footer>
     </section>
@@ -56,12 +60,16 @@ const props = defineProps({
   costHint: String,
   firstShoot: Boolean,
   harvestable: Boolean,
+  thirsty: Boolean,
+  canWater: Boolean,
+  retryWater: Boolean,
+  alreadyWatered: Boolean,
   harvestError: String,
   seedAvailable: Boolean,
   receipt: Object,
   cycle: String,
 })
-const emit = defineEmits(['advance', 'harvest', 'back', 'replay', 'sample', 'observed'])
+const emit = defineEmits(['advance', 'harvest', 'water', 'back', 'replay', 'sample', 'observed'])
 const { t } = useI18n()
 const title = computed(() =>
   props.step === 8 ? t('garden.soilPot') : props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName }),
@@ -76,6 +84,10 @@ const hint = computed(() => {
     return parts.join(' ')
   }
   if (props.harvestable) return props.harvestError || t('garden.harvestHint')
+  if (props.canWater && props.retryWater) return t('garden.pendingWater')
+  if (props.thirsty && !props.canWater) return t('garden.waterRest')
+  if (props.alreadyWatered) return t('garden.alreadyWatered')
+  if (props.canWater && (props.step === 6 || props.thirsty)) return t('garden.waterHint')
   return props.step === 7 ? t('garden.stages.' + props.growth) : t('gardenEntry.potHints.' + props.step)
 })
 const frame = ref(null)
@@ -100,6 +112,9 @@ function post(type, reveal = false) {
       crop: props.cropCode,
       reveal,
       ripe: props.harvestable,
+      dry: props.thirsty,
+      canWater: props.canWater && !props.retryWater,
+      busy: props.busy,
       cycle: props.cycle,
     },
     gameUrl.origin,
@@ -144,6 +159,11 @@ function receive(event) {
     case 'harvest':
       if (status.value === 'ready' && !props.busy && props.harvestable && event.data.cycle === props.cycle) emit('harvest')
       break
+    case 'water':
+      if (status.value === 'ready' && !props.busy && props.canWater && event.data.cycle === props.cycle && event.data.step === props.step)
+        emit('water')
+      else post('restore')
+      break
     case 'back':
       emit('back')
       break
@@ -157,7 +177,20 @@ function receive(event) {
   }
 }
 
-watch(() => [props.step, props.growth, props.cropCode, props.harvestable, props.cycle], restore)
+watch(
+  () => [
+    props.step,
+    props.growth,
+    props.cropCode,
+    props.harvestable,
+    props.cycle,
+    props.thirsty,
+    props.canWater,
+    props.retryWater,
+    props.busy,
+  ],
+  restore,
+)
 onMounted(() => {
   window.addEventListener('message', receive)
   motion.addEventListener('change', restore)

@@ -92,6 +92,53 @@ function emptyPot() {
   Object.assign(plot, { prepared: true, cropCode: null, plantedAt: null, stage: null, harvestable: false, lastWateredAt: null })
 }
 
+it('accepts one pour per cooldown and reuses the pending key after a failed revisit', async () => {
+  Object.assign(plot, { stage: 2, lastWateredAt: '2026-11-27T10:00:00', thirsty: true, waterCooldownSec: 50 })
+  const garden = mount()
+  await garden.refresh()
+  await garden.water()
+  expect(gardenApi.water).not.toHaveBeenCalled()
+  plot.waterCooldownSec = 0
+  await garden.refresh()
+  gardenApi.water.mockRejectedValueOnce(Error('offline')).mockImplementationOnce(async () => {
+    Object.assign(plot, { lastWateredAt: '2026-11-28T10:00:00', thirsty: false, waterCooldownSec: 43200 })
+    throw Error('reply lost')
+  })
+  await garden.water()
+  expect(garden.failed.value).toBe(true)
+  expect(garden.plot.value.thirsty).toBe(true)
+  expect(garden.retryWater.value).toBe(true)
+  await Promise.all([garden.water(), garden.water()])
+  expect(gardenApi.water.mock.calls[1]).toEqual(gardenApi.water.mock.calls[0])
+  expect(garden.canWater.value).toBe(false)
+  expect(garden.failed.value).toBe(false)
+  expect(garden.plot.value.stage).toBe(2)
+  expect(garden.retryWater.value).toBe(false)
+  await garden.water()
+  expect(gardenApi.water).toHaveBeenCalledTimes(2)
+  plot.waterCooldownSec = 0
+  await garden.refresh()
+  gardenApi.water.mockResolvedValueOnce({ plot: { ...plot, waterCooldownSec: 43200 } })
+  await garden.water()
+  expect(gardenApi.water.mock.calls[2][1]).not.toBe(gardenApi.water.mock.calls[0][1])
+})
+
+it('uses the current plot from a replayed watering receipt', async () => {
+  Object.assign(plot, { stage: 2, lastWateredAt: '2026-11-27', thirsty: true, waterCooldownSec: 0 })
+  const garden = mount()
+  await garden.refresh()
+  gardenApi.water.mockImplementationOnce(async () => {
+    Object.assign(plot, { lastWateredAt: '2026-11-28', thirsty: false, waterCooldownSec: 43200 })
+    return { alreadyDone: true, plot: { ...plot } }
+  })
+  await garden.water()
+  expect(garden.alreadyWatered.value).toBe(true)
+  expect(garden.canWater.value).toBe(false)
+  emptyPot()
+  await garden.refresh()
+  expect(garden.alreadyWatered.value).toBe(false)
+})
+
 it('retains the ripe plant after a full store and sows another crop in the same soil after a confirmed harvest', async () => {
   plot.stage = 5
   const garden = mount()

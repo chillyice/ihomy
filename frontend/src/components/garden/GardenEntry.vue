@@ -31,7 +31,7 @@
         </button>
         <div class="garden-frame">
           <div class="garden-view" aria-hidden="true"></div>
-          <div v-if="planted || progress === 8" class="sill-soil" aria-hidden="true">
+          <div v-if="planted || progress === 8" class="sill-soil" :class="{ thirsty }" aria-hidden="true">
             <i
               v-if="growth > 0 && sketchCrop"
               class="sill-shoot"
@@ -100,12 +100,17 @@
           :cost-hint="costHint"
           :first-shoot="firstShoot"
           :harvestable="harvestable"
+          :thirsty="thirsty"
+          :can-water="canWater"
+          :retry-water="retryWater"
+          :already-watered="alreadyWatered"
           :cycle="String(preview ? 'preview' : plot?.plantedAt || '')"
           :receipt="receipt"
           :harvest-error="harvestError"
           :seed-available="preview || !!crop"
           @advance="advance"
           @harvest="harvest"
+          @water="water"
           @back="closePot"
           @replay="replay"
           @sample="setSample"
@@ -165,13 +170,19 @@ const {
   openMail,
   advance: advanceLive,
   harvest: harvestLive,
+  water: waterLive,
+  canWater: canWaterLive,
+  retryWater,
+  alreadyWatered,
   refresh,
 } = useWindowsill(props, inside)
 const localStep = ref(props.preview ? savedStep() : -1)
 const progress = computed(() => (props.preview ? localStep.value : step.value))
 function savedSample() {
   try {
-    const n = Number(localStorage.getItem(saveKey + ':growth'))
+    const raw = localStorage.getItem(saveKey + ':growth')
+    if (raw === 'dry') return raw
+    const n = Number(raw)
     return [1, 2, 5].includes(n) ? n : 0
   } catch {
     return 0
@@ -179,7 +190,7 @@ function savedSample() {
 }
 const sample = ref(props.preview && localStep.value === 7 ? savedSample() : 0)
 function setSample(n) {
-  if (!props.preview || ![0, 1, 2, 5].includes(n)) return
+  if (!props.preview || ![0, 1, 2, 5, 'dry'].includes(n)) return
   sample.value = n
   try {
     localStorage.setItem(saveKey + ':growth', String(n))
@@ -187,7 +198,15 @@ function setSample(n) {
     /* Session preview. */
   }
 }
-const growth = computed(() => (props.preview ? (progress.value === 7 ? sample.value : 0) : (plot.value?.stage ?? 0)))
+const growth = computed(() => {
+  if (!props.preview) return plot.value?.stage ?? 0
+  if (progress.value !== 7) return 0
+  return sample.value === 'dry' ? 2 : sample.value
+})
+const thirsty = computed(() =>
+  props.preview ? progress.value === 7 && sample.value === 'dry' : !!plot.value?.cropCode && plot.value.thirsty === true,
+)
+const canWater = computed(() => (props.preview ? progress.value === 6 || thirsty.value : canWaterLive.value))
 const planted = computed(() => (props.preview ? progress.value === 7 : !!plot.value?.cropCode))
 const cropCode = computed(() => (props.preview ? 'CATGRASS' : plot.value?.cropCode || crop.value?.code))
 const sketchCrop = computed(() => ['CATGRASS', 'MINT', 'SNAKE_PLANT'].includes(cropCode.value))
@@ -197,6 +216,7 @@ const harvestable = computed(() =>
 )
 const potLabel = computed(() => {
   if (harvestable.value) return t('garden.ripePot')
+  if (thirsty.value) return t('garden.dryPot')
   if (progress.value === 8) return t('garden.soilPot')
   if (progress.value === 0) return props.preview ? t('gardenEntry.seeds') : t('garden.seedPacket', { crop: cropName.value })
   return t('gardenEntry.visitPot')
@@ -270,6 +290,12 @@ function harvest() {
   if (!props.preview) return harvestLive()
   save(8)
   setSample(0)
+}
+function water() {
+  if (!canWater.value) return
+  if (!props.preview) return waterLive()
+  if (progress.value === 6) advance(6)
+  else setSample(2)
 }
 async function closePot() {
   tending.value = false
@@ -639,6 +665,22 @@ onBeforeUnmount(() => releaseHome?.())
 .sill-shoot.broad i {
   width: 68%;
   border-radius: 70% 30%;
+}
+.sill-soil.thirsty {
+  background: #aa8660;
+  background-image: linear-gradient(15deg, transparent 44%, #79593c 45% 48%, transparent 49%);
+}
+.thirsty .sill-shoot {
+  scale: 1.16 0.7;
+  transform-origin: bottom;
+}
+.thirsty .sill-shoot i {
+  border-radius: 100% 0 75% 10%;
+  background: linear-gradient(90deg, #6e773f 50%, #a5a866 51%);
+  rotate: 20deg;
+}
+.thirsty .sill-shoot i:nth-child(2) {
+  rotate: -24deg;
 }
 .sill-shoot.mature {
   width: 36%;

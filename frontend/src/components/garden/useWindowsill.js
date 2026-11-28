@@ -11,8 +11,16 @@ export function useWindowsill(props, inside) {
   const failed = ref(false)
   const receipt = ref(null)
   const harvestError = ref('')
-  const harvesting = ref(false)
+  const reconciling = ref(false)
+  const retryWater = ref(false)
+  const replayedWater = ref(null)
   const plot = computed(() => world.value?.plots?.find((p) => p.mine && p.venue === 'WINDOWSILL' && p.slotNo === 0))
+  const canWater = computed(() => {
+    const p = plot.value
+    return (
+      !!p?.plantedAt && !!p.cropCode && !p.harvestable && (p.waterCooldownSec === 0 || (!p.lastWateredAt && p.waterCooldownSec == null))
+    )
+  })
   const mail = computed(() => world.value?.letters?.some((l) => l.claimable))
   const startedWith = ref(null)
   const crop = computed(() => {
@@ -60,6 +68,10 @@ export function useWindowsill(props, inside) {
     put('draft:' + plot.value.id, n ? String(n) : null)
   }
   let epoch = 0
+  function waterAction(p) {
+    // Keep the existing key for the first pour. Each later pour starts a new cooldown.
+    return 'water:' + p.id + ':' + p.plantedAt + (p.lastWateredAt ? ':' + p.lastWateredAt : '')
+  }
   let alive = true
   let timer
   async function refreshEntry() {
@@ -78,6 +90,7 @@ export function useWindowsill(props, inside) {
       const data = await gardenApi.panorama()
       if (!alive || ticket !== epoch) return
       world.value = data
+      retryWater.value = canWater.value && !!get('action:' + waterAction(plot.value))
       if (plot.value) {
         const n = Number(get('draft:' + plot.value.id))
         startedWith.value = plot.value.cropCode ? null : get('seed:' + plot.value.id)
@@ -129,7 +142,8 @@ export function useWindowsill(props, inside) {
   }
   async function advance(previous) {
     const p = plot.value
-    if (!p || busy.value || harvesting.value || step.value !== previous) return
+    if (!p || busy.value || reconciling.value || step.value !== previous) return
+    if (previous === 6) return water()
     if (previous === 8 && crop.value) {
       receipt.value = null
       saveDraft(2)
@@ -140,8 +154,6 @@ export function useWindowsill(props, inside) {
     else if (previous === 5 && crop.value) {
       const code = crop.value.code
       result = await write('sow:' + p.id + ':' + code, (key) => gardenApi.sow(p.slotNo, code, key))
-    } else if (previous === 6 && p.cropCode) {
-      result = await write('water:' + p.id + ':' + p.plantedAt, (key) => gardenApi.water(p.id, key))
     } else if (previous >= 0 && previous < 5) {
       saveDraft(previous + 1)
       return
@@ -154,13 +166,38 @@ export function useWindowsill(props, inside) {
     if (!result && previous === 1 && plot.value?.prepared && !plot.value.cropCode && draft.value < 2) saveDraft(2)
     if (!result && step.value === previous && alive) failed.value = true
   }
+  async function water() {
+    if (props.preview || !canWater.value || busy.value || reconciling.value) return
+    const p = plot.value
+    const { id, plantedAt, lastWateredAt } = p
+    const action = waterAction(p)
+    replayedWater.value = null
+    reconciling.value = true
+    try {
+      const result = await write(action, (key) => gardenApi.water(id, key))
+      if (!alive) return
+      retryWater.value = !result
+      if (result?.plot?.id === id) {
+        world.value.plots = world.value.plots.map((item) => (item.id === id ? result.plot : item))
+        if (result.alreadyDone && result.plot.plantedAt === plantedAt) replayedWater.value = waterAction(result.plot)
+      }
+      await refresh()
+      if (!alive || result) return
+      const current = plot.value
+      if (current && (current.id !== id || current.plantedAt !== plantedAt || current.lastWateredAt !== lastWateredAt))
+        put('action:' + action, null)
+      else failed.value = true
+    } finally {
+      reconciling.value = false
+    }
+  }
   async function harvest() {
     const p = plot.value
-    if (props.preview || !p?.cropCode || !p.harvestable || !p.plantedAt || busy.value || harvesting.value) return
+    if (props.preview || !p?.cropCode || !p.harvestable || !p.plantedAt || busy.value || reconciling.value) return
     const plantedAt = p.plantedAt
     const name = p.cropName || crop.value?.name
     const action = 'harvest:' + p.id + ':' + plantedAt
-    harvesting.value = true
+    reconciling.value = true
     harvestError.value = ''
     try {
       const result = await write(
@@ -183,7 +220,7 @@ export function useWindowsill(props, inside) {
         harvestError.value = ''
       } else if (!result && !harvestError.value) failed.value = true
     } finally {
-      harvesting.value = false
+      reconciling.value = false
     }
   }
   function onVisible() {
@@ -225,7 +262,11 @@ export function useWindowsill(props, inside) {
     step,
     mail,
     letters,
-    busy: computed(() => busy.value || harvesting.value),
+    busy: computed(() => busy.value || reconciling.value),
+    canWater,
+    retryWater,
+    alreadyWatered: computed(() => !!plot.value?.cropCode && !canWater.value && replayedWater.value === waterAction(plot.value)),
+    water,
     failed,
     crop,
     receipt,
