@@ -37,7 +37,6 @@ const routes = [
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue'), meta: { public: true } },
   { path: '/reminder', redirect: { path: '/plan', query: { tab: 'today' } } },
   { path: '/plan', name: 'Plan', component: () => import('@/views/schedule/Schedule.vue'), meta: { public: true } },
-  { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },
   // 智能家居中控(Home Assistant 接入):设备/历史/控制属家庭内部数据,要登录
@@ -188,9 +187,7 @@ const routes = [
   { path: '/tools/flash', name: 'FlashPlayer', component: () => import('@/views/tools/FlashPlayer.vue'), meta: { public: true } },
   // 模拟器播放器(EmulatorJS):本地打开 GBA/GB/GBC/NES/SNES/MD·GG/街机/NDS 的 ROM;机种按扩展名自动判定
   { path: '/tools/gba', name: 'EmulatorPlayer', component: () => import('@/views/games/EmulatorPlayer.vue'), meta: { public: true } },
-  // 植物养殖小游戏:全家共养一棵,营养/天气/积分/成长日志(需登录,涉及积分与家庭交互)
-  { path: '/tools/plant', name: 'Plant', component: () => import('@/views/plant/Plant.vue'), meta: { requiresAuth: true } },
-  // 小游戏:家庭游戏库(花园 + 导入的 swf 游戏),需登录
+  // 小游戏:家庭游戏库(导入的 swf/ROM/网页游戏 + 内置 H5),需登录
   { path: '/games', name: 'Games', component: () => import('@/views/games/Games.vue'), meta: { requiresAuth: true } },
   { path: '/games/play/:id', name: 'GamePlayer', component: () => import('@/views/games/GamePlayer.vue'), meta: { requiresAuth: true } },
   // 网页游戏:站内 iframe 直接打开外部游戏页(LINK 类型),不再新标签页跳走

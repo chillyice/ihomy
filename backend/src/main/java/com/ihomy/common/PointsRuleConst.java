@@ -38,15 +38,11 @@ public final class PointsRuleConst {
     public static final String GAME_MAHJONG3D = "game_mahjong3d";
     public static final String GAME_HOMESTEAD = "game_homestead";
     public static final String GAME_MATCH_WIN = "game_match_win";
-    public static final String PLANT_WATER = "plant_water";
-    public static final String PLANT_SUN = "plant_sun";
-    public static final String PLANT_HARVEST = "plant_harvest";
 
     /** 分组(前端分区渲染用) */
     public static final String GROUP_CONTENT = "content";
     public static final String GROUP_TASK = "task";
     public static final String GROUP_GAME = "game";
-    public static final String GROUP_GARDEN = "garden";
 
     /**
      * 功能定义:code / 分组 / 默认分值 / 是否可配分值。
@@ -78,10 +74,7 @@ public final class PointsRuleConst {
             new Feature(GAME_GOUJI, GROUP_GAME, 10, true),
             new Feature(GAME_MAHJONG3D, GROUP_GAME, 10, true),
             new Feature(GAME_HOMESTEAD, GROUP_GAME, 10, true),
-            new Feature(GAME_MATCH_WIN, GROUP_GAME, 5, true),
-            new Feature(PLANT_WATER, GROUP_GARDEN, 2, true),
-            new Feature(PLANT_SUN, GROUP_GARDEN, 2, true),
-            new Feature(PLANT_HARVEST, GROUP_GARDEN, 30, true));
+            new Feature(GAME_MATCH_WIN, GROUP_GAME, 5, true));
 
     public static Feature feature(String code) {
         for (Feature f : FEATURES) {

@@ -113,7 +113,6 @@ const PREFIX_TITLE_RULES = [
   { prefix: '/tools/light-lab', key: () => 'lightLab.title' },
   { prefix: '/tools/flash', key: () => 'tools.flash.title' },
   { prefix: '/tools/gba', key: () => 'tools.gba.title' },
-  { prefix: '/tools/plant', key: () => 'plant.title' },
   { prefix: '/games/petlink', key: () => 'games.petlink.title' },
   { prefix: '/games/chinese-checkers', key: () => 'games.chineseCheckers.title' },
   { prefix: '/games/gomoku', key: () => 'games.gomoku.title' },

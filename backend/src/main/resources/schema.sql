@@ -873,12 +873,10 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('health',    '健康',     'icon-health',    '/health', 'life', 'left', 15, 1),
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
-('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'family',  'right',  3, 1),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
--- 停用行说明:`plant`(花园)入口在「小游戏」页(Games.vue → /tools/plant),首页/侧栏不重复占位;
--- `tree`(家谱)已并入「家庭成员」页的图谱标签,停用独立入口(旧 /tree 仍重定向到 /member?tab=tree);
--- `NAV_PATHS` 已映射 plant,启用即回导航。原 `cover`(家庭封面 /cover)停用行已删除——无路由、
+-- 停用行说明:`tree`(家谱)已并入「家庭成员」页的图谱标签,停用独立入口(旧 /tree 仍重定向到 /member?tab=tree);
+-- 原 `cover`(家庭封面 /cover)停用行已删除——无路由、
 -- 无 NAV_PATHS 映射,任何状态下都到不了,属死种子(2026-10-05 治理轮)。
 
 -- ------------------------------------------------------------
@@ -1159,47 +1157,7 @@ CREATE TABLE `family_reminder_check` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='循环提醒按日完成记录';
 
 -- ------------------------------------------------------------
--- 33b. 家庭共养植物表（V9.67 小游戏模块:全家共养一棵,实时养成）
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `family_plant`;
-CREATE TABLE `family_plant` (
-  `id`                  BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`           BIGINT      NOT NULL COMMENT '所属家庭ID',
-  `species`             VARCHAR(20) NOT NULL DEFAULT 'SUNFLOWER' COMMENT '品种:SUNFLOWER向日葵/ROSE玫瑰/SUCCULENT多肉',
-  `planted_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '种植时间',
-  `last_watered_at`     DATETIME    DEFAULT NULL COMMENT '上次浇水时间',
-  `last_sun_at`         DATETIME    DEFAULT NULL COMMENT '上次晒太阳时间',
-  `last_fertilized_at`  DATETIME    DEFAULT NULL COMMENT '上次施肥时间',
-  `water_count`         INT         NOT NULL DEFAULT 0 COMMENT '累计浇水次数',
-  `sun_count`           INT         NOT NULL DEFAULT 0 COMMENT '累计晒太阳次数',
-  `fertilize_count`     INT         NOT NULL DEFAULT 0 COMMENT '累计施肥次数',
-  `harvest_count`       INT         NOT NULL DEFAULT 0 COMMENT '累计收获次数',
-  `care_boost_minutes`  INT         NOT NULL DEFAULT 0 COMMENT '累计照料加成(分钟,已按天气修正,收获清零)',
-  `created_by`          BIGINT      NOT NULL COMMENT '创建人ID',
-  `created_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_family` (`family_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共养植物表';
-
--- ------------------------------------------------------------
--- 33c. 植物成长日志表（V9.68 家庭内容+交互:照料/收获时间线）
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `family_plant_log`;
-CREATE TABLE `family_plant_log` (
-  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
-  `user_id`    BIGINT       NOT NULL COMMENT '操作人ID',
-  `action`     VARCHAR(20)  NOT NULL COMMENT '动作:PLANT/WATER/SUN/FERTILIZE/HARVEST',
-  `message`    VARCHAR(200) DEFAULT NULL COMMENT '成员寄语(可选)',
-  `detail`     VARCHAR(200) DEFAULT NULL COMMENT '系统描述文案',
-  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_family_created` (`family_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植物成长日志表';
-
--- ------------------------------------------------------------
--- 33d. 家庭小游戏表（V9.69 小游戏模块:导入 .swf,家庭隔离,改名/改描述）
+-- 33b. 家庭小游戏表（V9.69 小游戏模块:导入 .swf,家庭隔离,改名/改描述）
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `game_info`;
 CREATE TABLE `game_info` (

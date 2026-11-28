@@ -25,9 +25,9 @@ public enum BackupModule {
             "family_circle", "family_circle_member", "family_share_default"
     )),
 
-    /** 家庭事务:家务、种植、家居、物品、菜谱、保险箱、公告、签到积分、通知 */
+    /** 家庭事务:家务、家居、物品、菜谱、保险箱、公告、签到积分、通知 */
     LIFE(Set.of(
-            "family_task", "family_plant", "family_plant_log", "family_house", "family_room",
+            "family_task", "family_house", "family_room",
             "family_furniture", "family_item", "family_house_share", "family_recipe", "family_vault_item",
             "family_announcement", "family_file", "family_checkin",
             "family_points_record", "family_points_product", "family_points_order", "family_points_rule",

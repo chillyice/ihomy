@@ -4157,3 +4157,13 @@ SET @add_homestead_market := (
 PREPARE add_homestead_market_stmt FROM @add_homestead_market;
 EXECUTE add_homestead_market_stmt;
 DEALLOCATE PREPARE add_homestead_market_stmt;
+
+-- ------------------------------------------------------------
+-- V15.42 旧「花园」小游戏下线(仅保留家圃时光):共养植物两张表、停用的
+-- 首页模块种子与积分规则孤儿行一并清理。历史积分流水保留。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_plant_log`;
+DROP TABLE IF EXISTS `family_plant`;
+
+DELETE FROM `sys_home_module` WHERE `code` = 'plant';
+DELETE FROM `family_points_rule` WHERE `feature_code` IN ('plant_water','plant_sun','plant_harvest');

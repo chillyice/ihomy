@@ -169,12 +169,6 @@ describe('路径 → 功能', () => {
     expect(isPathHidden('/games/embed/xiangqi', { games: 'off' }, 'normal')).toBe(true)
     expect(isPathHidden('/games', { games: 'off' }, 'normal')).toBe(true)
   })
-
-  it('植物养成同页在工具箱里,不跟随游戏总开关', () => {
-    expect(isPathHidden('/tools/plant', { games: 'off' }, 'normal')).toBe(false)
-    expect(isPathHidden('/tools/plant', { [gameFeatureId('garden')]: 'off' }, 'normal')).toBe(true)
-    expect(isPathHidden('/tools', { [gameFeatureId('garden')]: 'off' }, 'normal')).toBe(false)
-  })
 })
 
 describe('小游戏清单是开关身份的唯一来源', () => {

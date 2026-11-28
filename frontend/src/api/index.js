@@ -403,16 +403,6 @@ export const scheduleApi = {
   occurrences: (from, to) => request.get('/schedule/occurrences', { params: { from, to } }),
 }
 
-// 植物养殖(全家共养一棵,实时养成;营养/天气/积分/成长日志)
-export const plantApi = {
-  state: () => request.get('/plant'),
-  plant: (species) => request.post('/plant', { species }),
-  water: (message) => request.post('/plant/water', { message }),
-  sun: (message) => request.post('/plant/sun', { message }),
-  fertilize: (message) => request.post('/plant/fertilize', { message }),
-  harvest: (species, message) => request.post('/plant/harvest', { species, message }),
-}
-
 // 小游戏(家庭游戏库:导入 .swf/.gba、添加网页游戏 LINK,列表/详情/改名/改描述/删除;H5 通关奖励;GBA 存档)
 // 网页游戏的站点登录信息统一存家庭保险箱,vaultApi 里维护
 export const gameApi = {

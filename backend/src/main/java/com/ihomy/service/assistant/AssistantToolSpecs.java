@@ -18,7 +18,7 @@ final class AssistantToolSpecs {
             Map.entry("games", "/games"), Map.entry("help", "/help"),
             Map.entry("item", "/item"), Map.entry("kitchen", "/kitchen"), Map.entry("library", "/library"),
             Map.entry("member", "/member"), Map.entry("music", "/music"), Map.entry("notification", "/notification"),
-            Map.entry("plan", "/plan"), Map.entry("plant", "/tools/plant"), Map.entry("points", "/points"),
+            Map.entry("plan", "/plan"), Map.entry("points", "/points"),
             Map.entry("reminder", "/plan?tab=today"), Map.entry("settings", "/settings"),
             Map.entry("storage", "/storage/files"), Map.entry("task", "/task"), Map.entry("tools", "/tools"),
             Map.entry("tree", "/member?tab=tree"), Map.entry("wish", "/wish"));

@@ -106,8 +106,8 @@ function pathIndex() {
     rows.push({
       id: gameFeatureId(game.key),
       path: game.path,
-      // /games 之外(如植物养成 /tools/plant)不跟随「游戏」总开关,它同时是工具页入口
-      parent: game.path.startsWith('/games/') ? 'games' : null,
+      // 固定入口与站内开源游戏都在 /games 下,跟随「游戏」总开关
+      parent: 'games',
     })
   }
   pathRows = rows.sort((a, b) => b.path.length - a.path.length)

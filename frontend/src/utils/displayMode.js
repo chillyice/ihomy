@@ -22,7 +22,6 @@ export const CHILD_ALLOWED_PATHS = [
   '/help',
   '/points',
   '/achievements',
-  '/plant',
   '/login',
   '/reset-password',
   '/app',

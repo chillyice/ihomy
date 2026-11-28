@@ -253,7 +253,6 @@ def main():
             ["content_video", "idx_family_source", "family_id, deleted, source_device_id", "按家庭与来源设备筛选映射入库的影片"],
             ["game_info", "idx_family_created", "family_id, deleted, created_at", "按家庭列出小游戏"],
             ["family_notification", "idx_receiver_read", "receiver_id, is_read", "查询某成员的未读通知"],
-            ["family_plant_log", "idx_family_created", "family_id, created_at", "按家庭读取植物成长时间线"],
             ["content_photo_album", "idx_family_parent", "family_id, parent_id, deleted", "按家庭与父相册列出子相册"],
         ],
         [22, 26, 26, 26],

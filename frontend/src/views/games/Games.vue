@@ -82,7 +82,7 @@
     </div>
 
     <div v-if="activeCategory" v-loading="loading" class="tool-grid">
-      <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
+      <!-- 固定入口(小院/连连看/数独/2048)同样参与分类筛选 -->
       <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card paper-surface" @click="$router.push(b.path)">
         <GameIcon :code="b.key" class="builtin-icon" />
         <div class="tool-name">{{ $t(b.titleKey) }}</div>

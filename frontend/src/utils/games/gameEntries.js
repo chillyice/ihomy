@@ -2,15 +2,8 @@
 // key 同时用于卡片图标(暖居/游戏图标)与功能开关 id(game:<key>),改动 key 等于换了开关身份。
 import { EMBEDDED_GAMES } from './embeddedGames'
 
-/** 固定入口(不依赖后端数据):花园/小院/连连看/数独…;path 为站内路由 */
+/** 固定入口(不依赖后端数据):小院/连连看/数独…;path 为站内路由 */
 export const BUILTIN_GAMES = [
-  {
-    key: 'garden',
-    titleKey: 'games.garden.title',
-    descKey: 'games.garden.desc',
-    path: '/tools/plant',
-    category: 'SIMULATION',
-  },
   {
     key: 'homestead',
     titleKey: 'games.homestead.title',

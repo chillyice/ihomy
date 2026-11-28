@@ -68,7 +68,6 @@ describe('mobileHeaderTitleKey', () => {
       '/tools/light-lab',
       '/tools/flash',
       '/tools/gba',
-      '/tools/plant',
       '/games',
       '/games/petlink',
       '/games/eight-ball',

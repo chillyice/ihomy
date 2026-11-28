@@ -485,7 +485,6 @@ const MODULE_META = {
   tools: { titleKey: 'warm.module.tools', path: '/tools', icon: '🧰' },
   member: { titleKey: 'warm.module.member', path: '/member', icon: '👨‍👩‍👧' },
   storage: { titleKey: 'warm.module.storage', path: '/storage/files', icon: '🗂' },
-  plant: { titleKey: 'warm.module.plant', path: '/plant', icon: '🌱' },
   chat: { titleKey: 'warm.module.chat', path: '/chat', icon: '💬' },
   games: { titleKey: 'warm.module.games', path: '/games', icon: '🎮' },
   vault: { titleKey: 'warm.module.vault', path: '/vault', icon: '🔐' },
