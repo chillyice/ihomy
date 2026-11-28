@@ -78,6 +78,9 @@
         <button v-if="!fromTask && !sunMode && !readOnly && !inField && sunRest && step === 7" class="pot-back" @click="emit('tasks')">
           {{ t('garden.hand.toTask') }}
         </button>
+        <button v-if="observing" class="pot-back guide-link" @click="emit('guide', $event.currentTarget)">
+          {{ t('garden.guide.title') }}
+        </button>
         <details v-if="preview && step >= 7 && !sunMode" class="pot-review">
           <summary>{{ t('garden.review') }}</summary>
           <div class="pot-samples">
@@ -130,7 +133,7 @@ const props = defineProps({
   prepKey: { type: String, required: true },
   weather: Object,
 })
-const emit = defineEmits(['advance', 'harvest', 'water', 'sun', 'back', 'tasks', 'replay', 'sample', 'observed'])
+const emit = defineEmits(['advance', 'harvest', 'water', 'sun', 'back', 'tasks', 'replay', 'sample', 'observed', 'guide'])
 const sunMode = ref(false)
 watch(
   () => [props.canSun, props.retrySun, props.cycle],
@@ -560,6 +563,9 @@ button {
   background: #4a6047;
   color: #fff9e8;
   border: 1px solid #42533f;
+}
+.guide-link {
+  margin-inline-start: auto;
 }
 .pot-shortcut {
   color: #584a39;

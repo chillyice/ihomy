@@ -21,7 +21,17 @@
         class="garden-room"
         role="dialog"
         aria-modal="true"
-        :aria-labelledby="tending ? 'pot-name' : reading ? 'garden-letter-title' : bookOpen ? 'garden-book-title' : 'garden-name'"
+        :aria-labelledby="
+          guideOpen
+            ? 'garden-guide-title'
+            : tending
+              ? 'pot-name'
+              : reading
+                ? 'garden-letter-title'
+                : bookOpen
+                  ? 'garden-book-title'
+                  : 'garden-name'
+        "
         tabindex="-1"
         @keydown.esc.stop.prevent="goBack"
         @keydown.tab="cycleFocus"
@@ -107,7 +117,7 @@
         </Transition>
         <GardenNotebook
           v-if="bookOpen && bookWorld"
-          v-show="!tending && !reading"
+          v-show="!tending && !reading && !guideOpen"
           ref="book"
           :world="bookWorld"
           :busy="busy"
@@ -115,10 +125,12 @@
           :review="review"
           @claimed="refresh"
           @visit="visitPlot"
+          @guide="openGuide"
           @back="closeBook"
         />
         <FirstPot
           v-if="tending && progress >= 0"
+          v-show="!guideOpen"
           ref="potScene"
           :from-task="bookOpen && taskVisit"
           :prep-key="saveKey + ':bench:' + (preview ? 'preview' : 'member') + ':' + plot?.id"
@@ -158,8 +170,10 @@
           @replay="replay"
           @sample="setSample"
           @observed="rememberGrowth"
+          @guide="openGuide"
         />
-        <div v-if="!preview && failed" class="garden-sync" role="status">
+        <CatgrassGuide v-if="guideOpen" :from-pot="tending" :dry="tending && thirsty" @back="closeGuide" />
+        <div v-if="!preview && failed && !guideOpen" class="garden-sync" role="status">
           {{ t('garden.syncFailed') }} <button @click="refresh">{{ t('common.retry') }}</button>
         </div>
       </section>
@@ -176,6 +190,7 @@ import { useAppBack } from '@/composables/useAppBack'
 import envelopeArt from '@/assets/windowdesk/envelope.webp'
 import journalArt from '@/assets/windowdesk/journal-linen.webp'
 import GardenNotebook from './GardenNotebook.vue'
+import CatgrassGuide from './CatgrassGuide.vue'
 import { createGardenBookReview } from './gardenBookReview'
 import FirstPot from './FirstPot.vue'
 import { useWindowsill } from './useWindowsill'
@@ -191,6 +206,20 @@ const envelope = ref(null)
 const packet = ref(null)
 const fold = ref(null)
 const bookOpen = ref(false)
+const guideOpen = ref(false)
+let guideTrigger
+function openGuide(trigger) {
+  guideTrigger = trigger
+  guideOpen.value = true
+}
+async function closeGuide() {
+  guideOpen.value = false
+  await nextTick()
+  if (guideTrigger?.getClientRects().length) guideTrigger.focus({ preventScroll: true })
+  else if (bookOpen.value) await book.value?.focus()
+  else packet.value?.focus({ preventScroll: true })
+  guideTrigger = undefined
+}
 const bookTab = ref(null)
 const book = ref(null)
 const potScene = ref(null)
@@ -535,6 +564,10 @@ async function closeLetter(continuePlanting = false) {
 
 function goBack() {
   if (!inside.value) return false
+  if (guideOpen.value) {
+    closeGuide()
+    return true
+  }
   if (tending.value && potScene.value?.cancelSun()) return true
   if (tending.value) closePot()
   else if (reading.value) closeLetter()
@@ -568,6 +601,8 @@ watch(
   async (visible) => {
     releaseHome?.()
     if (!visible) {
+      guideOpen.value = false
+      guideTrigger = undefined
       reading.value = false
       tending.value = false
       bookOpen.value = false

@@ -1,6 +1,10 @@
 <template>
   <figure class="grass-study" :style="tileStyle">
-    <div class="specimen" :class="{ leafy: stage >= 2 && !cut, dry: dry && stage > 0 && !cut }" aria-hidden="true">
+    <div
+      class="specimen"
+      :class="{ leafy: stage >= 2 && !cut, dry: dry && stage > 0 && !cut, wilted: dry && stage >= 4 && !cut }"
+      aria-hidden="true"
+    >
       <i class="soil"></i><i class="leaves"></i>
     </div>
     <figcaption>{{ label }}</figcaption>
@@ -59,6 +63,12 @@ const tileStyle = computed(() => {
 }
 .dry .leaves {
   transform: skewX(5deg) scaleY(0.86);
+}
+.specimen.wilted i {
+  background-image: url('@/assets/garden/catgrass-conditions.webp');
+  background-size: 300% 300%;
+  background-position: 0 0;
+  transform: none;
 }
 @media (prefers-reduced-motion: no-preference) {
   .leafy:not(.dry) .leaves {

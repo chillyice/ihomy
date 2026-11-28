@@ -36,6 +36,9 @@
         </section>
         <p v-if="page !== 'tasks' && !groups.length" class="empty">{{ t(page === 'own' ? 'garden.noPot' : 'garden.book.noFamily') }}</p>
       </div>
+      <button class="guide-link" @click="emit('guide', $event.currentTarget)">
+        {{ t('garden.guide.title') }} <span aria-hidden="true">›</span>
+      </button>
       <details v-if="Number.isFinite(world.inventoryCap) || items.length" class="stores">
         <summary>
           {{ t('garden.book.store') }}
@@ -53,7 +56,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GardenTaskSlip from './GardenTaskSlip.vue'
 const props = defineProps({ world: { type: Object, required: true }, busy: Boolean, active: Boolean, review: Object })
-const emit = defineEmits(['visit', 'back', 'claimed'])
+const emit = defineEmits(['visit', 'back', 'claimed', 'guide'])
 const { t } = useI18n()
 const page = ref('tasks')
 const close = ref(null)
@@ -162,6 +165,17 @@ button {
   background: transparent;
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+.guide-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 7px;
+  border: none;
+  border-top: 1px solid #c7bd9e;
+  background: transparent;
+  color: #475e41;
+  font-size: 14px;
 }
 nav {
   gap: 3px;

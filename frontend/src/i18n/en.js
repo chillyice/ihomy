@@ -47,6 +47,51 @@ export default {
     fold: 'Fold the letter',
   },
   garden: {
+    guide: {
+      title: 'Cat grass field guide',
+      backPot: 'Back to the pot',
+      conditions: 'Care conditions',
+      variants: 'Leaf varieties',
+      detail: 'Enlarge {part}',
+      parts: { blade: 'leaf blade', tip: 'leaf tips', edge: 'leaf edge', base: 'stem base' },
+      whole: 'See whole pot',
+      compare: 'Compare with plain grass',
+      backSample: 'Back to specimen',
+      ordinary: 'Plain mature grass',
+      ordinaryNote: 'New leaves rise from the centre and the outer blades arch towards the rim. The green runs all the way to the edges.',
+      entries: {
+        aphids: {
+          title: 'Aphids',
+          note: 'Follow the slanted blade in front. A row of grey-green aphids clings to its vein, beside curled new leaves.',
+        },
+        dry: {
+          title: 'Dry soil',
+          note: 'The blades bend midway and several tips hang over the pot rim. Dry soil shows through the clump.',
+        },
+        long: {
+          title: 'Leggy growth',
+          note: 'Long, thin blades all lean towards the light. Wide patches of soil show between their stems.',
+        },
+        scorch: { title: 'Leaf scorch', note: 'The sun-facing tips have a papery brown edge. The blades are still green further down.' },
+        wet: {
+          title: 'Waterlogged roots',
+          note: 'The soil glistens around the stems. The lowest leaves have yellowed and lie flat against it.',
+        },
+        perfect: {
+          title: 'Perfect care',
+          note: 'A pale gold sheen catches the plump young leaves. This tint changes with the care the grass receives.',
+        },
+        whiteEdge: {
+          title: 'White margins',
+          note: 'A fine cream line follows both sides of each green blade. The edging belongs to this variety.',
+        },
+        mottled: { title: 'White mottling', note: 'Cream patches sit inside the leaf blades. Their shapes vary from leaf to leaf.' },
+        silver: {
+          title: 'Gold-edged silver',
+          note: 'Warm gold borders a silvery green centre. New leaves open with the same gold margins.',
+        },
+      },
+    },
     look: {
       cutPot: 'Freshly clipped cat grass',
       inspect: 'Look closer',
