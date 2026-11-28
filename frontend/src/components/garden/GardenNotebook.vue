@@ -14,7 +14,7 @@
           :world="world"
           :review="review"
           :busy="busy"
-          @visit="emit('visit', $event)"
+          @visit="emit('visit', $event, true)"
           @claimed="emit('claimed')"
         />
         <section v-for="group in groups" :key="group.key">
@@ -97,9 +97,15 @@ async function focus(id) {
   await nextTick()
   const buttons = close.value?.closest('section.book')?.querySelectorAll('.entry')
   const previous = Array.from(buttons || []).find((b) => b.dataset.plot === String(id) && !b.disabled)
-  ;(previous || close.value)?.focus({ preventScroll: true })
+  const tab = close.value?.closest('section.book')?.querySelector('nav [aria-pressed="true"]')
+  ;(previous || (id != null && tab) || close.value)?.focus({ preventScroll: true })
 }
-defineExpose({ focus })
+async function showTasks() {
+  page.value = 'tasks'
+  await nextTick()
+  close.value?.closest('section.book')?.querySelector('nav [aria-pressed="true"]')?.focus({ preventScroll: true })
+}
+defineExpose({ focus, showTasks })
 </script>
 
 <style scoped>

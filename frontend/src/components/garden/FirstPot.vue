@@ -1,12 +1,14 @@
 <template>
   <div class="pot-shade">
-    <section class="pot-card" aria-labelledby="pot-name">
+    <section class="pot-card" aria-labelledby="pot-name" @keydown.esc="escapeSun">
       <header>
         <div>
           <small v-if="place" class="pot-place">{{ place }}</small>
           <h2 id="pot-name">{{ title }}</h2>
         </div>
-        <button ref="back" class="pot-back" @click="emit('back')">{{ t(place ? 'garden.book.back' : 'gardenEntry.sill') }}</button>
+        <button ref="back" class="pot-back" @click="emit('back')">
+          {{ t(fromTask ? 'garden.hand.toTask' : place ? 'garden.book.back' : 'gardenEntry.sill') }}
+        </button>
       </header>
       <div class="pot-stage">
         <iframe v-if="status !== 'error'" ref="frame" :key="attempt" :src="gameUrl.href" :title="title" tabindex="-1" />
@@ -16,56 +18,61 @@
         </div>
       </div>
       <footer v-if="status === 'ready'">
-        <p aria-live="polite">
-          {{ sunMode ? t('garden.sun.drag') : hint }} {{ costHint }}
+        <p aria-live="polite" aria-atomic="true">
+          <strong v-if="step >= 2 && step <= 4 && !readOnly" class="seed-count">{{ t('garden.hand.seeds', { n: step - 2 }) }}</strong>
+          <strong v-if="step === 1 && !readOnly" class="seed-count">{{ t('garden.hand.preparing', { n: Math.min(4, prep + 2) }) }}</strong>
+          {{ instruction }} {{ costHint }}
           <span v-if="!sunMode && !readOnly && !inField && step === 7 && sunRest">{{ t('garden.sun.rest') }}</span>
         </p>
-        <template v-if="sunMode">
-          <button class="pot-back" :disabled="busy" @click="sunMode = false">{{ t('common.cancel') }}</button>
-          <button ref="action" class="pot-action" :disabled="busy" @click="post('act')">{{ t('garden.sun.place') }}</button>
-        </template>
-        <button v-else-if="!readOnly && harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
-          {{ t('garden.harvest') }}
+        <p v-if="!readOnly && (canSun || sunMode)" class="daylight">
+          {{
+            t(weather ? 'garden.hand.daylight' : 'garden.hand.baseLight', {
+              sky: weather?.text,
+              factor: (weather?.sunTotalBp ?? 100) / 100,
+            })
+          }}
+        </p>
+        <button v-if="sunMode" class="pot-back" :disabled="busy" @click="sunMode = false">{{ t('common.cancel') }}</button>
+        <button v-if="!sunMode && !readOnly && canWater && retryWater" class="pot-action" :disabled="busy" @click="emit('water')">
+          {{ t('garden.confirmWater') }}
         </button>
-        <button
-          v-else-if="!readOnly && canWater"
-          ref="action"
-          class="pot-action"
-          :disabled="busy"
-          @click="retryWater ? emit('water') : post('act')"
-        >
-          {{ retryWater ? t('garden.confirmWater') : step === 6 ? t('gardenEntry.potActions.6') : t('garden.waterPot') }}
-        </button>
-        <button
-          v-else-if="!readOnly && step === 8 && seedAvailable"
-          ref="action"
-          class="pot-action"
-          :disabled="busy"
-          @click="emit('advance', 8)"
-        >
+        <button v-if="!readOnly && step === 8 && seedAvailable" class="pot-action" :disabled="busy" @click="emit('advance', 8)">
           {{ t(inField ? 'garden.book.sowBed' : 'garden.resow') }}
         </button>
         <button
-          v-else-if="!readOnly && step < 6"
+          v-if="!readOnly && (step < 6 || harvestable || (canWater && !retryWater) || sunMode)"
           ref="action"
-          class="pot-action"
+          class="pot-back"
           :disabled="busy"
-          :class="{ 'pot-shortcut': step <= 4 }"
-          @click="post('act')"
+          @click="useKeys"
         >
-          {{ t('gardenEntry.potActions.' + step) }}
+          {{ t('garden.hand.keyboard') }}
         </button>
-        <button v-if="!sunMode && canSun && !readOnly" class="pot-back" :disabled="busy" @click="retrySun ? emit('sun') : (sunMode = true)">
+        <small v-if="keyboard && !readOnly" class="keys">{{ t('garden.hand.keys') }}</small>
+        <button
+          v-if="!sunMode && canSun && !readOnly"
+          ref="sunButton"
+          class="pot-back"
+          :disabled="busy"
+          @click="retrySun ? emit('sun') : (sunMode = true)"
+        >
           {{ t(retrySun ? 'garden.sun.confirm' : 'garden.sun.start') }}
         </button>
-        <button v-if="preview && step >= 7 && !sunMode" class="pot-back" @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
-        <div v-if="preview && step === 7 && !sunMode" class="pot-samples" role="group" :aria-label="t('garden.review')">
-          <span>{{ t('garden.review') }}</span>
-          <button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
-            {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
-          </button>
-          <button :aria-pressed="thirsty" @click="emit('sample', 'dry')">{{ t('garden.drySample') }}</button>
-        </div>
+        <button v-if="!fromTask && !sunMode && !readOnly && !inField && sunRest && step === 7" class="pot-back" @click="emit('tasks')">
+          {{ t('garden.hand.toTask') }}
+        </button>
+        <details v-if="preview && step >= 7 && !sunMode" class="pot-review">
+          <summary>{{ t('garden.review') }}</summary>
+          <div class="pot-samples">
+            <template v-if="step === 7"
+              ><button v-for="n in [0, 1, 2, 5]" :key="n" :aria-pressed="!thirsty && growth === n" @click="emit('sample', n)">
+                {{ n === 5 ? t('garden.ripeSample') : t('garden.samples.' + n) }}
+              </button>
+              <button :aria-pressed="thirsty" @click="emit('sample', 'dry')">{{ t('garden.drySample') }}</button></template
+            >
+            <button @click="emit('replay')">{{ t('gardenEntry.replay') }}</button>
+          </div>
+        </details>
       </footer>
     </section>
   </div>
@@ -100,8 +107,11 @@ const props = defineProps({
   inField: Boolean,
   place: String,
   cropForm: String,
+  fromTask: Boolean,
+  prepKey: { type: String, required: true },
+  weather: Object,
 })
-const emit = defineEmits(['advance', 'harvest', 'water', 'sun', 'back', 'replay', 'sample', 'observed'])
+const emit = defineEmits(['advance', 'harvest', 'water', 'sun', 'back', 'tasks', 'replay', 'sample', 'observed'])
 const sunMode = ref(false)
 watch(
   () => [props.canSun, props.retrySun, props.cycle],
@@ -148,6 +158,78 @@ const hint = computed(() => {
 const frame = ref(null)
 const back = ref(null)
 const action = ref(null)
+const sunButton = ref(null)
+const cue = ref('')
+const keyboard = ref(false)
+function useKeys() {
+  keyboard.value = true
+  post('controls')
+}
+const prep = ref(0)
+function savePrep(value) {
+  prep.value = value
+  try {
+    if (value) localStorage.setItem(props.prepKey, String(value))
+    else localStorage.removeItem(props.prepKey)
+  } catch {
+    /* The gesture remains playable for this visit. */
+  }
+}
+watch(
+  () => props.step,
+  (step) => {
+    if (props.readOnly) return
+    if (step !== 1) return savePrep(0)
+    try {
+      const saved = Number(localStorage.getItem(props.prepKey))
+      prep.value = [1, 2, 3].includes(saved) ? saved : 0
+    } catch {
+      prep.value = 0
+    }
+  },
+  { immediate: true },
+)
+const instruction = computed(() => {
+  const base = sunMode.value ? t('garden.sun.drag') : props.step === 1 && !props.readOnly ? t('garden.hand.prep.' + prep.value) : hint.value
+  if (props.readOnly || !cue.value || props.busy) return base
+  if (cue.value === 'miss') return t('garden.hand.miss') + ' ' + base
+  if (props.step === 1 && prep.value !== 1) return t('garden.hand.' + (prep.value === 0 ? 'liner' : 'rake') + '.' + cue.value)
+  const mode = sunMode.value
+    ? 'light'
+    : props.harvestable
+      ? 'cut'
+      : props.canWater
+        ? 'water'
+        : props.step === 5
+          ? 'brush'
+          : props.step < 2
+            ? 'bag'
+            : 'seed'
+  return t('garden.hand.' + mode + '.' + cue.value)
+})
+function cancelSun() {
+  if (!sunMode.value || props.busy) return false
+  sunMode.value = false
+  return true
+}
+function escapeSun(event) {
+  if (cancelSun()) {
+    event.stopPropagation()
+    event.preventDefault()
+  }
+}
+defineExpose({ cancelSun })
+watch(
+  () => [props.step, props.cycle, props.canWater, props.harvestable, sunMode.value, props.busy],
+  () => {
+    cue.value = ''
+  },
+)
+watch(sunMode, async (on) => {
+  await nextTick()
+  const target = on ? action.value : sunButton.value || back.value
+  target?.focus({ preventScroll: true })
+})
 const attempt = ref(0)
 const status = ref('loading')
 const channel = 'ihomy-first-pot-v1'
@@ -162,6 +244,7 @@ function post(type, reveal = false) {
       channel,
       type,
       step: props.step,
+      prep: prep.value,
       reduced: motion.matches,
       growth: props.growth,
       crop: props.cropCode,
@@ -203,6 +286,30 @@ function receive(event) {
   if (event.origin !== gameUrl.origin || !frame.value || event.source !== frame.value.contentWindow || event.data?.channel !== channel)
     return
   switch (event.data.type) {
+    case 'prep':
+      if (
+        status.value === 'ready' &&
+        !props.readOnly &&
+        !props.busy &&
+        props.step === 1 &&
+        event.data.cycle === props.cycle &&
+        event.data.prep === prep.value &&
+        prep.value < 3
+      )
+        savePrep(prep.value + 1)
+      break
+    case 'guide':
+      if (
+        status.value === 'ready' &&
+        !props.readOnly &&
+        !props.busy &&
+        event.data.step === props.step &&
+        event.data.cycle === props.cycle &&
+        event.data.sun === sunMode.value &&
+        ['', 'held', 'ready', 'miss'].includes(event.data.cue)
+      )
+        cue.value = event.data.cue
+      break
     case 'loading':
       timeout(60000)
       break
@@ -212,7 +319,14 @@ function receive(event) {
       restore(true)
       break
     case 'advance':
-      if (status.value === 'ready' && !props.readOnly && !props.busy && event.data.step === props.step && props.step < 7)
+      if (
+        status.value === 'ready' &&
+        !props.readOnly &&
+        !props.busy &&
+        event.data.step === props.step &&
+        props.step < 7 &&
+        (props.step !== 1 || prep.value === 3)
+      )
         emit('advance', props.step)
       else post('restore')
       break
@@ -239,7 +353,7 @@ function receive(event) {
       else post('restore')
       break
     case 'back':
-      emit('back')
+      if (!cancelSun()) emit('back')
       break
     case 'focus':
       ;(action.value || back.value)?.focus()
@@ -254,6 +368,7 @@ function receive(event) {
 watch(
   () => [
     props.step,
+    prep.value,
     props.growth,
     props.cropCode,
     props.harvestable,
@@ -325,10 +440,35 @@ footer {
   flex-wrap: wrap;
 }
 footer p {
-  flex: 1 1 110px;
+  flex: 1 1 100%;
+  min-height: 3em;
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
+}
+.seed-count {
+  display: block;
+  margin-bottom: 2px;
+  color: #556548;
+  font-size: 13px;
+}
+.keys {
+  flex-basis: 100%;
+  color: #63583d;
+}
+footer .daylight {
+  min-height: 0;
+  color: #79582e;
+}
+.pot-review {
+  flex: 1 1 100%;
+  border-top: 1px dashed #c6b694;
+}
+.pot-review summary {
+  cursor: pointer;
+  padding: 10px 0;
+  color: #665840;
+  font-size: 14px;
 }
 button {
   font: inherit;

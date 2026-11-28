@@ -10,10 +10,21 @@
         <progress :value="task.progress" :max="task.condition.value" :aria-label="task.title"></progress>
         <span>{{ Math.min(task.progress, task.condition.value) }} / {{ task.condition.value }}</span>
       </div>
-      <button v-if="task.completed" class="ink" :disabled="claiming || busy" @click="claim">{{ t('garden.todo.claim') }}</button>
-      <button v-else-if="destination" class="ink" :disabled="busy" @click="emit('visit', destination.id)">
-        {{ t(destination.venue === 'BACKYARD' ? 'garden.todo.toYard' : 'garden.todo.toSill') }}
+      <p v-if="task.reward?.coins || task.reward?.seed" class="pencil">
+        {{ t('garden.hand.reward', { items: rewardText(task.reward.coins, task.reward.seed) }) }}
+      </p>
+      <button v-if="task.completed" class="ink" :disabled="claiming || busy" @click="claim">
+        {{ t(claiming ? 'garden.hand.claiming' : 'garden.todo.claim') }}
       </button>
+      <template v-else-if="destination">
+        <p class="pencil">
+          {{ t(destination.venue === 'BACKYARD' ? 'garden.book.bedNo' : 'garden.book.potNo', { n: destination.slotNo + 1 }) }} ·
+          {{ destination.cropName || t(destination.cropCode ? 'gardenEntry.visitPot' : 'garden.book.empty') }}
+        </p>
+        <button class="ink" :disabled="busy" @click="emit('visit', destination.id)">
+          {{ t(destination.venue === 'BACKYARD' ? 'garden.todo.toYard' : 'garden.todo.toSill') }}
+        </button>
+      </template>
     </template>
     <p v-else>{{ t(data ? 'garden.todo.clear' : 'common.loading') }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
@@ -69,6 +80,15 @@ const destination = computed(() => {
   }
 })
 let sequence = 0
+function rewardText(coins, seed) {
+  const parts = []
+  if (coins > 0) parts.push(t('garden.hand.coins', { n: coins }))
+  if (seed) {
+    const crop = props.world.unlockedCrops?.find((c) => 'SEED_' + c.code === seed)
+    parts.push(crop ? t('garden.seedPacket', { crop: crop.name }) : t('garden.hand.seedPack'))
+  }
+  return parts.join(' · ')
+}
 async function load() {
   const current = ++sequence
   try {
@@ -87,8 +107,9 @@ async function claim() {
   claiming.value = true
   notice.value = ''
   try {
-    await api.claimTask(code)
-    notice.value = t('garden.todo.claimed', { title })
+    const result = await api.claimTask(code)
+    const reward = result?.alreadyDone ? '' : rewardText(result?.coinsGranted, result?.seed)
+    notice.value = [t('garden.todo.claimed', { title }), reward].filter(Boolean).join(' ')
     emit('claimed')
   } catch {
     notice.value = t('garden.todo.checkClaim')
@@ -121,6 +142,9 @@ summary {
 }
 .term {
   color: #77513b;
+}
+.pencil {
+  color: #65573e;
 }
 .progress {
   display: flex;

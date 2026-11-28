@@ -21,7 +21,7 @@
         class="garden-room"
         role="dialog"
         aria-modal="true"
-        :aria-labelledby="tending ? 'pot-name' : bookOpen ? 'garden-book-title' : 'garden-name'"
+        :aria-labelledby="tending ? 'pot-name' : reading ? 'garden-letter-title' : bookOpen ? 'garden-book-title' : 'garden-name'"
         tabindex="-1"
         @keydown.esc.stop.prevent="goBack"
         @keydown.tab="cycleFocus"
@@ -94,16 +94,18 @@
                 <p class="garden-signature">{{ letter.signature }}</p>
               </div>
             </template>
-            <button ref="fold" @click="closeLetter">{{ t('gardenEntry.fold') }}</button>
+            <button ref="fold" @click="closeLetter(true)">
+              {{ t(bookOpen && taskVisit ? 'garden.hand.foldAndPlant' : 'gardenEntry.fold') }}
+            </button>
           </article>
         </Transition>
         <GardenNotebook
           v-if="bookOpen && bookWorld"
-          v-show="!tending"
+          v-show="!tending && !reading"
           ref="book"
           :world="bookWorld"
           :busy="busy"
-          :active="!tending"
+          :active="!tending && !reading"
           :review="review"
           @claimed="refresh"
           @visit="visitPlot"
@@ -111,6 +113,10 @@
         />
         <FirstPot
           v-if="tending && progress >= 0"
+          ref="potScene"
+          :from-task="bookOpen && taskVisit"
+          :prep-key="saveKey + ':bench:' + (preview ? 'preview' : 'member') + ':' + plot?.id"
+          :weather="bookWorld?.world?.weather"
           :key="plot?.id"
           :step="progress"
           :growth="growth"
@@ -141,6 +147,7 @@
           @water="water"
           @sun="sun"
           @back="closePot"
+          @tasks="viewTasks"
           @replay="replay"
           @sample="setSample"
           @observed="rememberGrowth"
@@ -179,6 +186,8 @@ const fold = ref(null)
 const bookOpen = ref(false)
 const bookTab = ref(null)
 const book = ref(null)
+const potScene = ref(null)
+const taskVisit = ref(false)
 const saveKey = 'ihomy:garden:first-pot-preview:v1:' + (props.member ?? 'guest') + ':' + (props.family ?? 'guest')
 function savedStep() {
   try {
@@ -391,15 +400,23 @@ async function openBook() {
   await nextTick()
   book.value?.focus()
 }
-function visitPlot(id) {
+async function viewTasks() {
+  tending.value = false
+  bookOpen.value = true
+  await nextTick()
+  await book.value?.showTasks()
+}
+function visitPlot(id, fromTask = false) {
   if (busy.value || !selectPlot(id)) return
+  taskVisit.value = fromTask
   if (progress.value < 0) {
-    closeBook()
+    if (!fromTask) closeBook()
     openLetter()
   } else openPot()
 }
 async function closeBook() {
   bookOpen.value = false
+  taskVisit.value = false
   selectPlot(null)
   await nextTick()
   bookTab.value?.focus({ preventScroll: true })
@@ -441,17 +458,23 @@ async function openLetter() {
   fold.value?.focus({ preventScroll: true })
 }
 
-async function closeLetter() {
+async function closeLetter(continuePlanting = false) {
   reading.value = false
+  if (bookOpen.value && taskVisit.value) {
+    if (continuePlanting && progress.value >= 0) openPot()
+    else await book.value?.showTasks()
+    return
+  }
   await nextTick()
   packet.value?.focus({ preventScroll: true })
 }
 
 function goBack() {
   if (!inside.value) return false
+  if (tending.value && potScene.value?.cancelSun()) return true
   if (tending.value) closePot()
-  else if (bookOpen.value) closeBook()
   else if (reading.value) closeLetter()
+  else if (bookOpen.value) closeBook()
   else leave()
   return true
 }
