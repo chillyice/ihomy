@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   actionState,
+  bpToPercent,
   elapsedText,
   formatCompact,
+  gearSpeedBonus,
   hasMaterials,
   msPerItem,
   pickName,
   progressOf,
+  sellCoinsWithBonus,
   speedBp,
   toolUpgradeCheck,
   xpRatio,
@@ -36,6 +39,30 @@ describe('homestead display helpers', () => {
     expect(msPerItem(pickTwig, 1, 0)).toBe(3000)
     expect(msPerItem(pickTwig, 2, 0)).toBe(2971)
     expect(msPerItem(pickTwig, 1, 5)).toBe(2143)
+  })
+
+  it('gear bonus stacks on top of level and tool speed', () => {
+    // HomesteadEngineTest.gearSpeedBonusShortensActionTime:草帽 5 阶 +750bp
+    expect(speedBp(1, 0, 750)).toBe(10750)
+    expect(msPerItem(pickTwig, 1, 0, 750)).toBe(2791)
+    expect(msPerItem(pickTwig, 1, 0, -50)).toBe(3000)
+  })
+
+  it('gear speed bonus splits gather and process, all applies to both', () => {
+    const bonus = { gatherBp: 750, processBp: 400, allBp: 300 }
+    expect(gearSpeedBonus(bonus, 'GATHER')).toBe(1050)
+    expect(gearSpeedBonus(bonus, 'PROCESS')).toBe(700)
+    expect(gearSpeedBonus({ allBp: 300 }, 'GATHER')).toBe(300)
+    expect(gearSpeedBonus(null, 'GATHER')).toBe(0)
+  })
+
+  it('sell bonus floors like the backend', () => {
+    expect(sellCoinsWithBonus(1000, 800)).toBe(1080)
+    expect(sellCoinsWithBonus(7, 800)).toBe(7)
+    expect(sellCoinsWithBonus(0, 800)).toBe(0)
+    expect(sellCoinsWithBonus(1000, 0)).toBe(1000)
+    expect(bpToPercent(150)).toBe(1.5)
+    expect(bpToPercent(200)).toBe(2)
   })
 
   it('progress interpolates from server anchor', () => {

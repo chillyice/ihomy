@@ -24,6 +24,8 @@ public final class HomesteadConst {
     public static final int TOOL_STEP_BP = 800;
     /** 工具最高阶(steps 数量) */
     public static final int MAX_TOOL_TIER = 5;
+    /** 穿戴最高阶(每个部位的 steps 数量) */
+    public static final int MAX_GEAR_TIER = 5;
 
     /** 铜板上限与物品堆上限:防极端离线把数值推到溢出 */
     public static final long MAX_COINS = 1_000_000_000_000L;

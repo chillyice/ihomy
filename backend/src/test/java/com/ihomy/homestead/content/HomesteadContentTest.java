@@ -25,8 +25,27 @@ class HomesteadContentTest {
         assertEquals(32, CONTENT.items().size());
         assertEquals(28, CONTENT.actions().size());
         assertEquals(7, CONTENT.tools().size());
+        assertEquals(5, CONTENT.equipment().size());
         assertEquals(50, CONTENT.maxLevel());
         assertEquals(64, CONTENT.contentVersion().length());
+    }
+
+    @Test
+    void equipmentHasFiveStableSlots() {
+        Set<String> codes = new HashSet<>();
+        CONTENT.equipment().forEach(slot -> {
+            assertTrue(codes.add(slot.code()), "部位编码重复:" + slot.code());
+            assertEquals(HomesteadConst.MAX_GEAR_TIER, slot.steps().size(), "穿戴阶数不符:" + slot.code());
+            for (int tier = 0; tier < HomesteadConst.MAX_GEAR_TIER; tier++) {
+                assertNotNull(slot.nextStep(tier));
+            }
+            assertNull(slot.nextStep(HomesteadConst.MAX_GEAR_TIER));
+            assertNotNull(slot.effect(), "穿戴缺效果:" + slot.code());
+            slot.steps().forEach(s -> s.materials().forEach(m -> assertNotNull(CONTENT.item(m.item()))));
+        });
+        assertEquals(Set.of("HAT", "APRON", "SLEEVE", "BOOTS", "CHARM"), codes);
+        assertNotNull(CONTENT.equipmentSlot("HAT"));
+        assertNull(CONTENT.equipmentSlot("NOPE"));
     }
 
     @Test

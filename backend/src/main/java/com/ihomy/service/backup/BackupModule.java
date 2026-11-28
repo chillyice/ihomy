@@ -69,7 +69,8 @@ public enum BackupModule {
     GAME(Set.of(
             "game_info", "family_game_match", "family_game_room", "family_game_room_member",
             "family_game_room_round", "family_game_record",
-            "game_homestead_player", "game_homestead_skill", "game_homestead_item", "game_homestead_tool"
+            "game_homestead_player", "game_homestead_skill", "game_homestead_item", "game_homestead_tool",
+            "game_homestead_equipment"
     )),
 
     /** 统计报表 */

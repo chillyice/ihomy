@@ -157,4 +157,30 @@ class HomesteadEngineTest {
         assertEquals(2, r.levelAfter());
         assertEquals(10, r.xpAfter());
     }
+
+    @Test
+    void gearSpeedBonusShortensActionTime() {
+        // 草帽 5 阶 = +750bp:3000 × 10000 / 10750 向上取整
+        assertEquals(2791, HomesteadEngine.msPerItem(3000, 1, 0, 750));
+        HomesteadEngine.SettleInput geared = new HomesteadEngine.SettleInput(
+                CONTENT.action("PICK_TWIG"), 1, 0, 0, 0, 0, T0, T0 + 10_000, Map.of(), 750, 0);
+        HomesteadEngine.SettleResult r = HomesteadEngine.settle(geared, CONTENT);
+        assertEquals(3, r.completions());
+        assertEquals(10_000 - 3 * 2791, r.progressMs());
+    }
+
+    @Test
+    void gearCapExtendsOfflineWindow() {
+        long fiftyHours = 50L * 3600_000L;
+        long cap44h = HomesteadConst.OFFLINE_CAP_MS + 20L * 3600_000L;
+        HomesteadEngine.SettleInput geared = new HomesteadEngine.SettleInput(
+                CONTENT.action("PICK_TWIG"), 1, 0, 0, 0, 0, T0, T0 + fiftyHours, Map.of(), 0, cap44h);
+        HomesteadEngine.SettleResult withBoots = HomesteadEngine.settle(geared, CONTENT);
+        HomesteadEngine.SettleResult withoutBoots = HomesteadEngine.settle(
+                in("PICK_TWIG", 1, 0, 0, 0, 0, fiftyHours, Map.of()), CONTENT);
+        assertTrue(withBoots.capped());
+        assertEquals(cap44h, withBoots.elapsedMs());
+        assertEquals(HomesteadConst.OFFLINE_CAP_MS, withoutBoots.elapsedMs());
+        assertTrue(withBoots.completions() > withoutBoots.completions());
+    }
 }

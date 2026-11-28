@@ -70,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`。**业务运行用 `ihomy` 账号**(仅 DML on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序 踩坑速查 §2.7。
-- **119 张表**:`sys_` 35、`report_` 5、`family_` 52、`content_` 22、`game_` 5(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
+- **120 张表**:`sys_` 35、`report_` 5、`family_` 52、`content_` 22、`game_` 6(清单 需求 §6.2);游戏域 `game_<code>_<module>_<entity>`,`game_info` 遗留未带前缀,口径 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量 `common/DictConst.java`,前端 `utils/dict.js`;**禁止 0/1/2 判断**。
 - **可见范围四档** `PUBLIC > CIRCLE > FAMILY > PRIVATE`(顺序即界面顺序):`content_blog/diary/photo/video/wish/book`、`content_photo_album`、`game_info`、`family_item` 四档;`family_vault_item`、`sys_iot_device` 只两档(PRIVATE/FAMILY)。清单 需求 §6.4。

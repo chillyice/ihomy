@@ -4159,6 +4159,20 @@ EXECUTE add_homestead_market_stmt;
 DEALLOCATE PREPARE add_homestead_market_stmt;
 
 -- ------------------------------------------------------------
+-- 小院慢生活穿戴:五部位一人一行(0 阶=未穿),与 schema.sql 同结构。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `game_homestead_equipment` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `slot_code`  VARCHAR(16) NOT NULL COMMENT '部位编码(HAT/APRON/SLEEVE/BOOTS/CHARM)',
+  `tier`       INT         NOT NULL DEFAULT 0 COMMENT '阶数(0=未穿,5=最高)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建档时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_slot` (`user_id`, `slot_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小院慢生活穿戴档';
+
+-- ------------------------------------------------------------
 -- V15.42 旧「花园」小游戏下线(仅保留家圃时光):共养植物两张表、停用的
 -- 首页模块种子与积分规则孤儿行一并清理。历史积分流水保留。
 -- ------------------------------------------------------------

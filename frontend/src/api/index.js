@@ -452,6 +452,7 @@ export const homesteadApi = {
   stop: (opId) => request.post('/game/homestead/stop', null, homesteadOp(opId)),
   sell: (itemCode, qty, opId) => request.post('/game/homestead/sell', { itemCode, qty }, homesteadOp(opId)),
   tool: (toolCode, opId) => request.post('/game/homestead/tool', { toolCode }, homesteadOp(opId)),
+  equipment: (slotCode, opId) => request.post('/game/homestead/equipment', { slotCode }, homesteadOp(opId)),
   ranking: () => request.get('/game/homestead/ranking'),
 }
 

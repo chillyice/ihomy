@@ -28,18 +28,41 @@ export function pickName(def, locale) {
   return (en && def.nameEn) || def.name || ''
 }
 
-/** 速度倍率(基点):10000 + (等级-1)×100 + 工具阶×800 */
-export function speedBp(level, toolTier) {
+/** 速度倍率(基点):10000 + (等级-1)×100 + 工具阶×800 + 穿戴加成(基点) */
+export function speedBp(level, toolTier, bonusBp = 0) {
   const lv = Math.max(1, Number(level) || 1)
   const tier = Math.max(0, Number(toolTier) || 0)
-  return SPEED_BASE_BP + (lv - 1) * LEVEL_STEP_BP + tier * TOOL_STEP_BP
+  return SPEED_BASE_BP + (lv - 1) * LEVEL_STEP_BP + tier * TOOL_STEP_BP + Math.max(0, Number(bonusBp) || 0)
 }
 
 /** 单次动作耗时(毫秒):ceil(baseMs × 10000 / speedBp),至少 1ms(与后端同口径) */
-export function msPerItem(action, level, toolTier) {
+export function msPerItem(action, level, toolTier, bonusBp = 0) {
   if (!action) return 0
   const baseMs = Math.max(1, Number(action.seconds) || 1) * 1000
-  return Math.max(1, Math.ceil((baseMs * SPEED_BASE_BP) / speedBp(level, toolTier)))
+  return Math.max(1, Math.ceil((baseMs * SPEED_BASE_BP) / speedBp(level, toolTier, bonusBp)))
+}
+
+/**
+ * 某类技能吃到的穿戴加速(基点):通用档叠在专属档上,与后端 HomesteadGear.speedBpFor 同口径。
+ * gearBonus 直接来自 /state,客户端不再从部位表折叠一遍。
+ */
+export function gearSpeedBonus(gearBonus, kind) {
+  const all = Math.max(0, Number(gearBonus?.allBp) || 0)
+  if (kind === SKILL_GATHER) return all + Math.max(0, Number(gearBonus?.gatherBp) || 0)
+  if (kind === SKILL_PROCESS) return all + Math.max(0, Number(gearBonus?.processBp) || 0)
+  return all
+}
+
+/** 卖价含穿戴加成:向下取整(与后端 Bonuses.sellCoins 同口径) */
+export function sellCoinsWithBonus(price, sellBonusBp) {
+  const base = Number(price) || 0
+  if (base <= 0) return 0
+  return Math.floor((base * (SPEED_BASE_BP + Math.max(0, Number(sellBonusBp) || 0))) / SPEED_BASE_BP)
+}
+
+/** 基点转百分比文案用数值:150 → 1.5,200 → 2 */
+export function bpToPercent(bp) {
+  return Math.round((Math.max(0, Number(bp) || 0) / 100) * 10) / 10
 }
 
 /**

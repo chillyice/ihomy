@@ -41,6 +41,8 @@ public class HomesteadContent {
     private final List<ToolDef> tools;
     private final Map<String, ToolDef> toolByCode;
     private final Map<String, ToolDef> toolBySkill;
+    private final List<EquipmentDef> equipment;
+    private final Map<String, EquipmentDef> equipmentByCode;
     private final String contentVersion;
 
     public HomesteadContent() {
@@ -51,6 +53,7 @@ public class HomesteadContent {
             this.items = List.copyOf(load(mapper, "items.json", ItemsFile.class).items());
             this.actions = List.copyOf(load(mapper, "actions.json", ActionsFile.class).actions());
             this.tools = List.copyOf(load(mapper, "tools.json", ToolsFile.class).tools());
+            this.equipment = List.copyOf(load(mapper, "equipment.json", EquipmentFile.class).slots());
         } catch (Exception e) {
             throw new IllegalStateException("homestead content 加载失败:检查 resources/content/homestead/*.json", e);
         }
@@ -75,6 +78,7 @@ public class HomesteadContent {
         this.itemByCode = index(items, ItemDef::code, "item");
         this.actionByCode = index(actions, ActionDef::code, "action");
         this.toolByCode = index(tools, ToolDef::code, "tool");
+        this.equipmentByCode = index(equipment, EquipmentDef::code, "equipment");
         Map<String, List<ActionDef>> bySkill = new HashMap<>();
         for (ActionDef action : actions) {
             bySkill.computeIfAbsent(action.skill(), k -> new java.util.ArrayList<>()).add(action);
@@ -88,8 +92,8 @@ public class HomesteadContent {
         this.toolBySkill = Map.copyOf(toolPerSkill);
         validate();
         this.contentVersion = computeVersion();
-        log.info("[homestead] content loaded: {} skills, {} items, {} actions, {} tools, maxLevel={}, content_version={}",
-                skills.size(), items.size(), actions.size(), tools.size(), maxLevel, contentVersion);
+        log.info("[homestead] content loaded: {} skills, {} items, {} actions, {} tools, {} equipment, maxLevel={}, content_version={}",
+                skills.size(), items.size(), actions.size(), tools.size(), equipment.size(), maxLevel, contentVersion);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -109,6 +113,10 @@ public class HomesteadContent {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record ToolsFile(@JsonProperty("tools") List<ToolDef> tools) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record EquipmentFile(@JsonProperty("slots") List<EquipmentDef> slots) {
     }
 
     private <T> T load(ObjectMapper mapper, String name, Class<T> type) throws Exception {
@@ -169,6 +177,46 @@ public class HomesteadContent {
                 requireItems(step.materials(), "工具 " + tool.code());
             }
         }
+        if (equipment.isEmpty()) {
+            throw new IllegalStateException("homestead content 非法:equipment.json 没有 slots");
+        }
+        Set<String> effectKinds = Set.of(EquipmentDef.EffectDef.KIND_SPEED,
+                EquipmentDef.EffectDef.KIND_OFFLINE_CAP, EquipmentDef.EffectDef.KIND_SELL_BONUS);
+        Set<String> speedTargets = Set.of(EquipmentDef.EffectDef.TARGET_GATHER,
+                EquipmentDef.EffectDef.TARGET_PROCESS, EquipmentDef.EffectDef.TARGET_ALL);
+        for (EquipmentDef slot : equipment) {
+            if (slot.steps().size() != HomesteadConst.MAX_GEAR_TIER) {
+                throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code()
+                        + " steps 应为 " + HomesteadConst.MAX_GEAR_TIER + " 阶");
+            }
+            EquipmentDef.EffectDef effect = slot.effect();
+            if (effect == null || !effectKinds.contains(effect.kind())) {
+                throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code() + " effect 缺失或 kind 未知");
+            }
+            switch (effect.kind()) {
+                case EquipmentDef.EffectDef.KIND_SPEED -> {
+                    if (!speedTargets.contains(effect.target()) || effect.bp() <= 0) {
+                        throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code() + " SPEED 参数非法");
+                    }
+                }
+                case EquipmentDef.EffectDef.KIND_OFFLINE_CAP -> {
+                    if (effect.hours() <= 0) {
+                        throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code() + " hours 非法");
+                    }
+                }
+                default -> {
+                    if (effect.bp() <= 0) {
+                        throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code() + " SELL_BONUS 基点非法");
+                    }
+                }
+            }
+            for (EquipmentDef.EquipmentStep step : slot.steps()) {
+                if (step.coins() < 0) {
+                    throw new IllegalStateException("homestead content 非法:穿戴 " + slot.code() + " 有负花费");
+                }
+                requireItems(step.materials(), "穿戴 " + slot.code());
+            }
+        }
         for (ActionDef action : actions) {
             SkillDef skill = skillByCode.get(action.skill());
             if (skill == null) {
@@ -221,7 +269,7 @@ public class HomesteadContent {
     private String computeVersion() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            List<String> names = List.of("actions.json", "items.json", "skills.json", "tools.json");
+            List<String> names = List.of("actions.json", "equipment.json", "items.json", "skills.json", "tools.json");
             for (String name : names.stream().sorted().toList()) {
                 byte[] bytes;
                 try (var in = new ClassPathResource("content/homestead/" + name).getInputStream()) {
@@ -283,6 +331,14 @@ public class HomesteadContent {
 
     public ToolDef toolOfSkill(String skillCode) {
         return skillCode == null ? null : toolBySkill.get(skillCode);
+    }
+
+    public List<EquipmentDef> equipment() {
+        return equipment;
+    }
+
+    public EquipmentDef equipmentSlot(String code) {
+        return code == null ? null : equipmentByCode.get(code);
     }
 
     public String contentVersion() {

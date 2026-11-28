@@ -22,7 +22,7 @@
       >
       <span class="gh-chip"
         ><span>{{ $t('games.homestead.offlineCap') }}</span
-        ><b>{{ $t('games.homestead.offlineCapValue') }}</b></span
+        ><b>{{ $t('games.homestead.offlineCapHours', { h: capHours }) }}</b></span
       >
     </template>
 
@@ -39,6 +39,7 @@
         <li>{{ $t('games.homestead.rules.play2') }}</li>
         <li>{{ $t('games.homestead.rules.play3') }}</li>
         <li>{{ $t('games.homestead.rules.play4') }}</li>
+        <li>{{ $t('games.homestead.rules.play6') }}</li>
       </ul>
       <ul v-else-if="page === 1">
         <li>{{ $t('games.homestead.rules.skill1') }}</li>
@@ -146,7 +147,10 @@
             <i class="hs-skill-bar"><b :style="{ width: skill.percent + '%' }"></b></i>
             <span class="hs-skill-meta">
               <span>{{ $t('games.homestead.kind.' + skill.kind) }}</span>
-              <span v-if="skill.toolTier > 0">{{ $t('games.homestead.toolShort', { n: skill.toolTier }) }}</span>
+              <span class="hs-skill-side">
+                <span v-if="skill.toolTier > 0">{{ $t('games.homestead.toolShort', { n: skill.toolTier }) }}</span>
+                <span v-if="skill.gearBp > 0">{{ $t('games.homestead.gearShort', { p: bpToPercent(skill.gearBp) }) }}</span>
+              </span>
             </span>
           </button>
         </div>
@@ -261,6 +265,36 @@
               </template>
             </section>
 
+            <!-- 穿戴:五个部位各一件,穿上就生效;加速/离线上限/卖价由服务端折叠后下发 -->
+            <section v-if="gearRows.length" class="hs-tools hs-gear">
+              <h2 class="hs-pane-title">
+                <span>{{ $t('games.homestead.gear.title') }}</span>
+                <em>{{ $t('games.homestead.gear.hint') }}</em>
+              </h2>
+              <div v-for="slot in gearRows" :key="slot.code" class="hs-tool" :class="{ 'is-maxed': slot.maxed }">
+                <div class="hs-tool-head">
+                  <span class="hs-tool-name">{{ slot.name }}</span>
+                  <b class="hs-tool-tier">
+                    {{ slot.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolTier', { n: slot.tier, max: slot.max }) }}
+                  </b>
+                </div>
+                <i class="hs-tool-steps">
+                  <b v-for="step in slot.max" :key="step" :class="{ 'is-on': step <= slot.tier }"></b>
+                </i>
+                <p v-if="slot.effectText" class="hs-tool-effect">{{ slot.effectText }}</p>
+                <p v-if="slot.desc" class="hs-tool-desc">{{ slot.desc }}</p>
+                <div class="hs-tool-foot">
+                  <span class="hs-tool-cost">
+                    {{ slot.costText }}
+                    <em v-if="slot.lackText">{{ $t('games.homestead.toolLack', { list: slot.lackText }) }}</em>
+                  </span>
+                  <button type="button" class="hs-mini is-main" :disabled="busy || !slot.ok" @click="upgradeGear(slot.code)">
+                    {{ slot.maxed ? $t('games.homestead.toolMaxed') : $t('games.homestead.toolUpgrade') }}
+                  </button>
+                </div>
+              </div>
+            </section>
+
             <!-- 工具:每件对应一个技能,升一阶涨 8% 速度 -->
             <section class="hs-tools">
               <h2 class="hs-pane-title">
@@ -308,12 +342,15 @@ import GameShell from '@/components/games/GameShell.vue'
 import { homesteadApi } from '@/api'
 import {
   actionState,
+  bpToPercent,
   elapsedText,
   formatCompact,
+  gearSpeedBonus,
   hasMaterials,
   msPerItem,
   pickName,
   progressOf,
+  sellCoinsWithBonus,
   toolUpgradeCheck,
   xpRatio,
 } from '@/utils/games/homestead'
@@ -359,7 +396,7 @@ const rankFailed = ref(false)
 const rankRows = ref([])
 
 // ---------- 内容表与服务端状态 ----------
-const content = computed(() => state.value?.content || { skills: [], items: [], actions: [], tools: [] })
+const content = computed(() => state.value?.content || { skills: [], items: [], actions: [], tools: [], equipment: [] })
 const player = computed(() => state.value?.player || {})
 const coins = computed(() => Number(player.value.coins) || 0)
 const index = computed(() => Number(state.value?.index) || 0)
@@ -398,6 +435,16 @@ const tierBySkill = computed(() => {
   for (const def of content.value.tools || []) out[def.skill] = tierByTool.value[def.code] || 0
   return out
 })
+/** 穿戴加成(服务端折叠好的基点汇总):动作耗时、卖价、离线上限都从这里取 */
+const gearBonus = computed(() => state.value?.gearBonus || {})
+const tierBySlot = computed(() => {
+  const out = {}
+  for (const row of state.value?.gear || []) out[row.code] = Number(row.tier) || 0
+  return out
+})
+const speedBonusOf = (skillCode) => gearSpeedBonus(gearBonus.value, skillMap.value[skillCode]?.kind)
+const capHours = computed(() => Number(gearBonus.value.capHours) || 24)
+const sellBonusBp = computed(() => Math.max(0, Number(gearBonus.value.sellBp) || 0))
 const inventory = computed(() => {
   const out = {}
   for (const row of state.value?.items || []) out[row.code] = Number(row.qty) || 0
@@ -415,6 +462,7 @@ const skills = computed(() =>
       level: Number(row.level) || 1,
       percent: xpRatio(row) * 100,
       toolTier: tierBySkill.value[row.code] || 0,
+      gearBp: gearSpeedBonus(gearBonus.value, def.kind || 'GATHER'),
     }
   }),
 )
@@ -471,7 +519,7 @@ const actionRows = computed(() =>
   skillActions.value.map((def) => {
     const level = levelOf(def.skill)
     const tier = tierBySkill.value[def.skill] || 0
-    const perItem = msPerItem(def, level, tier)
+    const perItem = msPerItem(def, level, tier, speedBonusOf(def.skill))
     const inputs = def.inputs || []
     const missing = inputs.filter((need) => (inventory.value[need.item] || 0) < need.qty)
     const amountText = (need) => `${itemName(need.item)} ×${need.qty}`
@@ -501,8 +549,8 @@ const bagGroups = computed(() => {
       code: row.code,
       name: pickName(def, locale.value),
       qty: Number(row.qty) || 0,
-      // 命中当天赶集行情且有额度时显示溢价,实际成交价仍以服务端返回的铜板为准
-      price: Number((boosted ? order.price : def.sellPrice) || 0),
+      // 赶集日额度内显示溢价,再叠上穿戴在卖价上的加成(实际入账仍以服务端返回为准)
+      price: sellCoinsWithBonus((boosted ? order.price : def.sellPrice) || 0, sellBonusBp.value),
       boosted,
       category: def.category || 'MATERIAL',
     }
@@ -513,34 +561,52 @@ const bagGroups = computed(() => {
 })
 const itemKinds = computed(() => bagGroups.value.reduce((sum, group) => sum + group.rows.length, 0))
 
-const toolRows = computed(() =>
-  (content.value.tools || []).map((def) => {
-    const tier = tierByTool.value[def.code] || 0
-    const steps = def.steps || []
-    const step = steps[tier] || null
-    const check = toolUpgradeCheck(def, tier, coins.value, inventory.value)
-    const mats = (step?.materials || []).map((need) => `${itemName(need.item)} ×${need.qty}`)
-    const lack = []
-    if (step && check.missingCoins > 0) lack.push(`${t('games.homestead.coins')} ×${compact(check.missingCoins)}`)
-    for (const need of check.missingItems || []) {
-      lack.push(`${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`)
-    }
-    return {
-      code: def.code,
-      name: pickName(def, locale.value),
-      desc: pickDesc(def),
-      tier,
-      max: steps.length || FALLBACK_TIERS,
-      maxed: check.maxed,
-      ok: check.ok,
-      costText: !step
-        ? ''
-        : mats.length
-          ? t('games.homestead.toolCost', { coins: compact(step.coins), items: mats.join(listSep.value) })
-          : t('games.homestead.toolCostCoins', { coins: compact(step.coins) }),
-      lackText: lack.join(listSep.value),
-    }
-  }),
+/** 工具与穿戴共用一张升阶卡:阶数、进度点、花费、缺什么 */
+function upgradeView(def, tier) {
+  const steps = def.steps || []
+  const step = steps[tier] || null
+  const check = toolUpgradeCheck(def, tier, coins.value, inventory.value)
+  const mats = (step?.materials || []).map((need) => `${itemName(need.item)} ×${need.qty}`)
+  const lack = []
+  if (step && check.missingCoins > 0) lack.push(`${t('games.homestead.coins')} ×${compact(check.missingCoins)}`)
+  for (const need of check.missingItems || []) {
+    lack.push(`${itemName(need.item)} ×${need.qty - (inventory.value[need.item] || 0)}`)
+  }
+  return {
+    code: def.code,
+    name: pickName(def, locale.value),
+    desc: pickDesc(def),
+    tier,
+    max: steps.length || FALLBACK_TIERS,
+    maxed: check.maxed,
+    ok: check.ok,
+    costText: !step
+      ? ''
+      : mats.length
+        ? t('games.homestead.toolCost', { coins: compact(step.coins), items: mats.join(listSep.value) })
+        : t('games.homestead.toolCostCoins', { coins: compact(step.coins) }),
+    lackText: lack.join(listSep.value),
+  }
+}
+
+const toolRows = computed(() => (content.value.tools || []).map((def) => upgradeView(def, tierByTool.value[def.code] || 0)))
+
+/** 穿戴效果文案:每阶加成,币值口径与内容表一致(基点 → 百分比) */
+const gearEffectText = (effect) => {
+  if (!effect) return ''
+  if (effect.kind === 'SPEED') {
+    const key = effect.target === 'GATHER' ? 'speedGather' : effect.target === 'PROCESS' ? 'speedProcess' : 'speedAll'
+    return t('games.homestead.gear.' + key, { p: bpToPercent(effect.bp) })
+  }
+  if (effect.kind === 'OFFLINE_CAP') return t('games.homestead.gear.cap', { h: effect.hours })
+  if (effect.kind === 'SELL_BONUS') return t('games.homestead.gear.sell', { p: bpToPercent(effect.bp) })
+  return ''
+}
+const gearRows = computed(() =>
+  (content.value.equipment || []).map((def) => ({
+    ...upgradeView(def, tierBySlot.value[def.code] || 0),
+    effectText: gearEffectText(def.effect),
+  })),
 )
 
 // ---------- 离线摘要文案 ----------
@@ -627,6 +693,7 @@ const sellItem = (code, qty) => {
   if (qty > 0) runOp((key) => homesteadApi.sell(code, qty, key))
 }
 const upgradeTool = (code) => runOp((key) => homesteadApi.tool(code, key))
+const upgradeGear = (code) => runOp((key) => homesteadApi.equipment(code, key))
 
 async function openRanking() {
   rankOpen.value = true
@@ -831,6 +898,11 @@ onBeforeUnmount(() => {
   gap: 6px;
   font-size: 10.5px;
   color: var(--color-text-tertiary);
+}
+.hs-skill-side {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 6px;
 }
 
 /* --- 动作区 --- */
@@ -1181,6 +1253,12 @@ onBeforeUnmount(() => {
 }
 .hs-tool-steps b.is-on {
   background: var(--gs-accent);
+}
+.hs-tool-effect {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--gs-accent);
 }
 .hs-tool-desc {
   margin: 0;

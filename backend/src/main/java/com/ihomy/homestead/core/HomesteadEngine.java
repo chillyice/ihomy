@@ -13,8 +13,9 @@ import java.util.Map;
  * 约定:整数毫秒 / 基点倍率,不取时钟(now 由调用方给),不用浮点,不用随机数
  * (稀有产出按动作累计次数 seq % every 确定性发放),因此离线补算与单测都可精确复现。
  * <p>
- * 一次结算只推进「当前一个动作」:挂机时长先按 24h 封顶,再按「升到下一级所需次数」分段,
- * 每段用该段起点的等级/工具重算单次耗时(升级会变快),材料耗尽即停在 MATERIALS。
+ * 一次结算只推进「当前一个动作」:挂机时长先按档位上限封顶(默认 24h,穿鞋后放宽),
+ * 再按「升到下一级所需次数」分段,每段用该段起点的等级/工具/穿戴重算单次耗时(升级会变快),
+ * 材料耗尽即停在 MATERIALS。
  */
 public final class HomesteadEngine {
 
@@ -31,10 +32,21 @@ public final class HomesteadEngine {
             long progressMs,
             long lastSettleAt,
             long now,
-            Map<String, Long> materials) {
+            Map<String, Long> materials,
+            int speedBonusBp,
+            long capMs) {
 
         public SettleInput {
             materials = materials == null ? Map.of() : Map.copyOf(materials);
+            speedBonusBp = Math.max(0, speedBonusBp);
+            capMs = capMs > 0 ? capMs : HomesteadConst.OFFLINE_CAP_MS;
+        }
+
+        /** 未穿戴时的写法(离线上限取全局默认) */
+        public SettleInput(ActionDef action, int level, long xp, int toolTier, long actionSeq,
+                           long progressMs, long lastSettleAt, long now, Map<String, Long> materials) {
+            this(action, level, xp, toolTier, actionSeq, progressMs, lastSettleAt, now, materials,
+                    0, HomesteadConst.OFFLINE_CAP_MS);
         }
     }
 
@@ -61,14 +73,25 @@ public final class HomesteadEngine {
 
     /** 当前速度倍率(基点):10000 + (等级-1)×100 + 工具阶×800 */
     public static long speedBp(int level, int toolTier) {
+        return speedBp(level, toolTier, 0);
+    }
+
+    /** 含穿戴加成的速度倍率:在上面基础上加穿戴给的基点(采集/加工/全部已由 HomesteadGear 折叠) */
+    public static long speedBp(int level, int toolTier, int speedBonusBp) {
         return HomesteadConst.SPEED_BASE_BP
                 + (long) Math.max(0, level - 1) * HomesteadConst.LEVEL_STEP_BP
-                + (long) Math.max(0, toolTier) * HomesteadConst.TOOL_STEP_BP;
+                + (long) Math.max(0, toolTier) * HomesteadConst.TOOL_STEP_BP
+                + Math.max(0, speedBonusBp);
     }
 
     /** 单次动作耗时:ceil(baseMs × 10000 / speedBp),至少 1ms */
     public static long msPerItem(long baseMs, int level, int toolTier) {
-        long speedBp = speedBp(level, toolTier);
+        return msPerItem(baseMs, level, toolTier, 0);
+    }
+
+    /** 含穿戴加成的单次动作耗时(与 speedBp 同口径) */
+    public static long msPerItem(long baseMs, int level, int toolTier, int speedBonusBp) {
+        long speedBp = speedBp(level, toolTier, speedBonusBp);
         long ms = (baseMs * HomesteadConst.SPEED_BASE_BP + speedBp - 1) / speedBp;
         return Math.max(1L, ms);
     }
@@ -98,8 +121,8 @@ public final class HomesteadEngine {
         boolean capped = false;
         if (elapsed < 0) {
             elapsed = 0; // 时钟回拨:不补算,也不回退进度
-        } else if (elapsed > HomesteadConst.OFFLINE_CAP_MS) {
-            elapsed = HomesteadConst.OFFLINE_CAP_MS;
+        } else if (elapsed > in.capMs()) {
+            elapsed = in.capMs();
             capped = true;
         }
         long totalMs = Math.max(0, in.progressMs()) + elapsed;
@@ -121,7 +144,7 @@ public final class HomesteadEngine {
 
         int guard = 0;
         while (guard++ < HomesteadConst.MAX_SETTLE_SEGMENTS) {
-            long perItem = msPerItem(action.baseMs(), level, in.toolTier());
+            long perItem = msPerItem(action.baseMs(), level, in.toolTier(), in.speedBonusBp());
             long byTime = totalMs / perItem;
             if (byTime <= 0) {
                 break;

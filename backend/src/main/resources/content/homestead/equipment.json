@@ -1,0 +1,80 @@
+{
+  "comment": "小院慢生活穿戴表(唯一真相源):五个部位各一件,0 阶=还没穿上。effect 一律整数口径——SPEED 按基点给对应技能类别加速(target=GATHER/PROCESS/ALL,bp 为每阶加成),OFFLINE_CAP 每阶多补几小时离线,SELL_BONUS 每阶卖价高几个百分点(bp)。steps[i] 表示升到 (i+1) 阶的花费,材料刻意用特产与高阶成品,给稀有掉落一个去处。",
+  "slots": [
+    {
+      "code": "HAT",
+      "name": "草帽",
+      "name_en": "Straw Hat",
+      "desc": "檐口压得低,晒不着也淋不着,手上活自然快些。",
+      "desc_en": "A broad brim keeps the sun and rain off while you work.",
+      "effect": { "kind": "SPEED", "target": "GATHER", "bp": 150 },
+      "steps": [
+        { "coins": 60, "materials": [{ "item": "DRY_WOOD", "qty": 5 }] },
+        { "coins": 220, "materials": [{ "item": "DRY_WOOD", "qty": 14 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 700, "materials": [{ "item": "MINT", "qty": 10 }, { "item": "WHETSTONE", "qty": 1 }] },
+        { "coins": 2200, "materials": [{ "item": "WILD_HONEY", "qty": 8 }, { "item": "WOODEN_STOOL", "qty": 1 }] },
+        { "coins": 7000, "materials": [{ "item": "CAMPHOR_WOOD", "qty": 8 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "APRON",
+      "name": "围裙",
+      "name_en": "Work Apron",
+      "desc": "灶前酒瓮边都系着它,油点酒渍沾上去也不心疼。",
+      "desc_en": "Tied on at the stove and the wine jar alike.",
+      "effect": { "kind": "SPEED", "target": "PROCESS", "bp": 200 },
+      "steps": [
+        { "coins": 60, "materials": [{ "item": "WILD_BERRY", "qty": 6 }] },
+        { "coins": 220, "materials": [{ "item": "MINT", "qty": 8 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 700, "materials": [{ "item": "FISH_SOUP", "qty": 4 }, { "item": "WHETSTONE", "qty": 1 }] },
+        { "coins": 2200, "materials": [{ "item": "MUSHROOM_STEW", "qty": 4 }, { "item": "WOODEN_STOOL", "qty": 1 }] },
+        { "coins": 7000, "materials": [{ "item": "AGED_WINE", "qty": 2 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "SLEEVE",
+      "name": "袖套",
+      "name_en": "Cloth Cuffs",
+      "desc": "粗布缝的护袖,哪样活都搭得上一点。",
+      "desc_en": "Rough cloth cuffs that help with every kind of work.",
+      "effect": { "kind": "SPEED", "target": "ALL", "bp": 100 },
+      "steps": [
+        { "coins": 80, "materials": [{ "item": "PEBBLE", "qty": 6 }] },
+        { "coins": 260, "materials": [{ "item": "BLUESTONE", "qty": 8 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 800, "materials": [{ "item": "WHETSTONE", "qty": 3 }, { "item": "WOODEN_STOOL", "qty": 1 }] },
+        { "coins": 2400, "materials": [{ "item": "INKSTONE", "qty": 4 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 7600, "materials": [{ "item": "INKSTONE", "qty": 10 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "BOOTS",
+      "name": "布鞋",
+      "name_en": "Cloth Shoes",
+      "desc": "鞋底纳得厚,走一天山路也不磨脚,出门久一点也不慌。",
+      "desc_en": "Thick soles that make long days out feel shorter.",
+      "effect": { "kind": "OFFLINE_CAP", "hours": 4 },
+      "steps": [
+        { "coins": 50, "materials": [{ "item": "PEBBLE", "qty": 4 }] },
+        { "coins": 200, "materials": [{ "item": "BLUESTONE", "qty": 6 }, { "item": "WOODEN_BASIN", "qty": 1 }] },
+        { "coins": 650, "materials": [{ "item": "WHETSTONE", "qty": 2 }, { "item": "WOODEN_STOOL", "qty": 1 }] },
+        { "coins": 2000, "materials": [{ "item": "MUSHROOM", "qty": 10 }, { "item": "STONE_MILL", "qty": 1 }] },
+        { "coins": 6500, "materials": [{ "item": "CAMPHOR_WOOD", "qty": 6 }, { "item": "WOODEN_BOX", "qty": 1 }] }
+      ]
+    },
+    {
+      "code": "CHARM",
+      "name": "挂饰",
+      "name_en": "Lucky Charm",
+      "desc": "集市上认得的几样小东西串成一挂,谈价时底气足些。",
+      "desc_en": "A string of small finds that carries some weight at the market.",
+      "effect": { "kind": "SELL_BONUS", "bp": 200 },
+      "steps": [
+        { "coins": 100, "materials": [{ "item": "PINE_RESIN", "qty": 2 }] },
+        { "coins": 300, "materials": [{ "item": "PEARL", "qty": 2 }] },
+        { "coins": 900, "materials": [{ "item": "FOUR_LEAF", "qty": 2 }] },
+        { "coins": 2600, "materials": [{ "item": "AGATE", "qty": 3 }] },
+        { "coins": 8000, "materials": [{ "item": "PEARL", "qty": 4 }, { "item": "AGATE", "qty": 4 }] }
+      ]
+    }
+  ]
+}
