@@ -56,7 +56,7 @@ export const gardenApi = {
   panorama: () => request.get('/garden', { isBackgroundRead: () => true }),
   openMail: (key) => gardenWrite('mail/open', null, key),
   prepare: (id, key) => gardenWrite('plot/' + id + '/prepare', null, key),
-  sow: (slotNo, cropCode, key) => gardenWrite('plot', { venue: 'WINDOWSILL', slotNo, cropCode }, key),
+  sow: (slotNo, cropCode, key, venue = 'WINDOWSILL') => gardenWrite('plot', { venue, slotNo, cropCode }, key),
   water: (id, key) => gardenWrite('plot/' + id + '/water', null, key),
   harvest: (id, key) => gardenWrite('plot/' + id + '/harvest', null, key),
 }

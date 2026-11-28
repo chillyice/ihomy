@@ -2,8 +2,11 @@
   <div class="pot-shade">
     <section class="pot-card" aria-labelledby="pot-name">
       <header>
-        <h2 id="pot-name">{{ title }}</h2>
-        <button ref="back" class="pot-back" @click="emit('back')">{{ t('gardenEntry.sill') }}</button>
+        <div>
+          <small v-if="place" class="pot-place">{{ place }}</small>
+          <h2 id="pot-name">{{ title }}</h2>
+        </div>
+        <button ref="back" class="pot-back" @click="emit('back')">{{ t(place ? 'garden.book.back' : 'gardenEntry.sill') }}</button>
       </header>
       <div class="pot-stage">
         <iframe v-if="status !== 'error'" ref="frame" :key="attempt" :src="gameUrl.href" :title="title" tabindex="-1" />
@@ -14,17 +17,29 @@
       </div>
       <footer v-if="status === 'ready'">
         <p aria-live="polite">{{ hint }} {{ costHint }}</p>
-        <button v-if="harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
+        <button v-if="!readOnly && harvestable" ref="action" class="pot-action" :disabled="busy" @click="emit('harvest')">
           {{ t('garden.harvest') }}
         </button>
-        <button v-else-if="canWater" ref="action" class="pot-action" :disabled="busy" @click="retryWater ? emit('water') : post('act')">
+        <button
+          v-else-if="!readOnly && canWater"
+          ref="action"
+          class="pot-action"
+          :disabled="busy"
+          @click="retryWater ? emit('water') : post('act')"
+        >
           {{ retryWater ? t('garden.confirmWater') : step === 6 ? t('gardenEntry.potActions.6') : t('garden.waterPot') }}
         </button>
-        <button v-else-if="step === 8 && seedAvailable" ref="action" class="pot-action" :disabled="busy" @click="emit('advance', 8)">
-          {{ t('garden.resow') }}
+        <button
+          v-else-if="!readOnly && step === 8 && seedAvailable"
+          ref="action"
+          class="pot-action"
+          :disabled="busy"
+          @click="emit('advance', 8)"
+        >
+          {{ t(inField ? 'garden.book.sowBed' : 'garden.resow') }}
         </button>
         <button
-          v-else-if="step < 6"
+          v-else-if="!readOnly && step < 6"
           ref="action"
           class="pot-action"
           :disabled="busy"
@@ -68,19 +83,39 @@ const props = defineProps({
   seedAvailable: Boolean,
   receipt: Object,
   cycle: String,
+  readOnly: Boolean,
+  inField: Boolean,
+  place: String,
+  cropForm: String,
 })
 const emit = defineEmits(['advance', 'harvest', 'water', 'back', 'replay', 'sample', 'observed'])
 const { t } = useI18n()
-const title = computed(() =>
-  props.step === 8 ? t('garden.soilPot') : props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName }),
-)
+const title = computed(() => {
+  if (props.place) {
+    if (props.step === 8 || (props.readOnly && props.step === 0)) return t(props.inField ? 'garden.book.emptyBed' : 'garden.book.emptyPot')
+    return props.cropName || t('garden.book.catgrass')
+  }
+  return props.step === 8 ? t('garden.soilPot') : props.preview ? t('gardenEntry.pot') : t('garden.potTitle', { crop: props.cropName })
+})
 const hint = computed(() => {
+  if (props.readOnly) {
+    const status =
+      props.step === 0 || props.step === 8
+        ? ''
+        : props.harvestable
+          ? t('garden.book.ripe')
+          : props.thirsty
+            ? t('garden.book.dry')
+            : t('garden.book.stageNames.' + props.growth)
+    return [status, t('garden.book.visiting')].filter(Boolean).join(' · ')
+  }
   if (props.step === 8) {
     const r = props.receipt
     const parts = []
+    if (r?.alreadyDone) parts.push(t('garden.book.harvestConfirmed'))
     if (r?.name && r.quantity > 0) parts.push(t('garden.stored', { crop: r.name, qty: r.quantity }))
     if (r?.coins > 0) parts.push(t('garden.earned', { coins: r.coins }))
-    parts.push(t('garden.readySoil'))
+    parts.push(t(props.inField ? 'garden.book.readyBed' : 'garden.readySoil'))
     return parts.join(' ')
   }
   if (props.harvestable) return props.harvestError || t('garden.harvestHint')
@@ -111,7 +146,10 @@ function post(type, reveal = false) {
       growth: props.growth,
       crop: props.cropCode,
       reveal,
-      ripe: props.harvestable,
+      ripe: !props.readOnly && props.harvestable,
+      field: props.inField,
+      readOnly: props.readOnly,
+      form: props.cropForm,
       dry: props.thirsty,
       canWater: props.canWater && !props.retryWater,
       busy: props.busy,
@@ -153,14 +191,23 @@ function receive(event) {
       restore(true)
       break
     case 'advance':
-      if (status.value === 'ready' && !props.busy && event.data.step === props.step && props.step < 7) emit('advance', props.step)
+      if (status.value === 'ready' && !props.readOnly && !props.busy && event.data.step === props.step && props.step < 7)
+        emit('advance', props.step)
       else post('restore')
       break
     case 'harvest':
-      if (status.value === 'ready' && !props.busy && props.harvestable && event.data.cycle === props.cycle) emit('harvest')
+      if (status.value === 'ready' && !props.readOnly && !props.busy && props.harvestable && event.data.cycle === props.cycle)
+        emit('harvest')
       break
     case 'water':
-      if (status.value === 'ready' && !props.busy && props.canWater && event.data.cycle === props.cycle && event.data.step === props.step)
+      if (
+        status.value === 'ready' &&
+        !props.readOnly &&
+        !props.busy &&
+        props.canWater &&
+        event.data.cycle === props.cycle &&
+        event.data.step === props.step
+      )
         emit('water')
       else post('restore')
       break
@@ -183,6 +230,9 @@ watch(
     props.growth,
     props.cropCode,
     props.harvestable,
+    props.readOnly,
+    props.inField,
+    props.cropForm,
     props.cycle,
     props.thirsty,
     props.canWater,
@@ -237,6 +287,10 @@ h2 {
   font-size: 19px;
   margin: 0;
   color: inherit;
+}
+.pot-place {
+  color: #64644b;
+  font-size: 13px;
 }
 footer {
   flex-wrap: wrap;

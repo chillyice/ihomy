@@ -21,24 +21,32 @@
         class="garden-room"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="garden-name"
+        :aria-labelledby="tending ? 'pot-name' : bookOpen ? 'garden-book-title' : 'garden-name'"
         tabindex="-1"
         @keydown.esc.stop.prevent="goBack"
         @keydown.tab="cycleFocus"
       >
-        <button v-show="!tending" ref="back" class="garden-back" @click="leave">
+        <button v-show="!tending && !bookOpen" ref="back" class="garden-back" @click="leave">
           <el-icon><Back /></el-icon>{{ t('gardenEntry.back') }}
         </button>
-        <div class="garden-frame">
+        <button v-if="!reading && !tending && !bookOpen && bookWorld" ref="bookTab" class="book-tab" @click="openBook">
+          <img :src="journalArt" alt="" />{{ t('garden.book.title') }}
+        </button>
+        <div class="garden-frame" :inert="bookOpen || tending || reading">
           <div class="garden-view" aria-hidden="true"></div>
-          <div v-if="planted || progress === 8" class="sill-soil" :class="{ thirsty }" aria-hidden="true">
+          <div
+            v-if="sillPlant?.cropCode || sillPlant?.prepared"
+            class="sill-soil"
+            :class="{ thirsty: sillPlant.thirsty }"
+            aria-hidden="true"
+          >
             <i
-              v-if="growth > 0 && sketchCrop"
+              v-if="sillPlant.cropCode && sillPlant.stage > 0"
               class="sill-shoot"
-              :class="{ leafy: growth >= 2, mature: harvestable, broad: cropCode === 'MINT' }"
+              :class="{ leafy: sillPlant.stage >= 2, mature: sillPlant.harvestable, broad: sillPlant.cropCode === 'MINT' }"
             >
-              <i></i><i v-if="growth >= 2"></i><i v-if="growth >= 2"></i>
-              <template v-if="harvestable"><i></i><i></i><i></i><i></i></template>
+              <i></i><i v-if="sillPlant.stage >= 2"></i><i v-if="sillPlant.stage >= 2"></i>
+              <template v-if="sillPlant.harvestable"><i></i><i></i><i></i><i></i></template>
             </i>
           </div>
           <button
@@ -63,7 +71,7 @@
             <span>{{ potLabel }}</span>
           </button>
         </div>
-        <div v-show="!tending" class="garden-title">
+        <div v-show="!tending && !bookOpen" class="garden-title">
           <h1 id="garden-name">{{ t('gardenEntry.name') }}</h1>
           <p v-if="preview">{{ t('gardenEntry.preview') }}</p>
           <p v-else-if="!world && !failed" role="status">{{ t('common.loading') }}</p>
@@ -89,13 +97,27 @@
             <button ref="fold" @click="closeLetter">{{ t('gardenEntry.fold') }}</button>
           </article>
         </Transition>
+        <GardenNotebook
+          v-if="bookOpen && bookWorld"
+          v-show="!tending"
+          ref="book"
+          :world="bookWorld"
+          :busy="busy"
+          @visit="visitPlot"
+          @back="closeBook"
+        />
         <FirstPot
           v-if="tending && progress >= 0"
+          :key="plot?.id"
           :step="progress"
           :growth="growth"
           :crop-code="cropCode"
           :crop-name="cropName"
-          :preview="preview"
+          :preview="homeReview"
+          :read-only="readOnly"
+          :in-field="inField"
+          :place="bookOpen ? place : ''"
+          :crop-form="plot?.form"
           :busy="busy"
           :cost-hint="costHint"
           :first-shoot="firstShoot"
@@ -104,10 +126,10 @@
           :can-water="canWater"
           :retry-water="retryWater"
           :already-watered="alreadyWatered"
-          :cycle="String(preview ? 'preview' : plot?.plantedAt || '')"
+          :cycle="homeReview ? 'preview' : [plot?.id, plot?.plantedAt].join('/')"
           :receipt="receipt"
           :harvest-error="harvestError"
-          :seed-available="preview || !!crop"
+          :seed-available="homeReview || !!crop"
           @advance="advance"
           @harvest="harvest"
           @water="water"
@@ -131,6 +153,9 @@ import { useI18n } from 'vue-i18n'
 import { Back } from '@element-plus/icons-vue'
 import { useAppBack } from '@/composables/useAppBack'
 import envelopeArt from '@/assets/windowdesk/envelope.webp'
+import journalArt from '@/assets/windowdesk/journal-linen.webp'
+import GardenNotebook from './GardenNotebook.vue'
+import { createGardenBookReview } from './gardenBookReview'
 import FirstPot from './FirstPot.vue'
 import { useWindowsill } from './useWindowsill'
 
@@ -144,6 +169,9 @@ const back = ref(null)
 const envelope = ref(null)
 const packet = ref(null)
 const fold = ref(null)
+const bookOpen = ref(false)
+const bookTab = ref(null)
+const book = ref(null)
 const saveKey = 'ihomy:garden:first-pot-preview:v1:' + (props.member ?? 'guest') + ':' + (props.family ?? 'guest')
 function savedStep() {
   try {
@@ -158,6 +186,8 @@ const inside = computed(() => route.name === 'Home' && route.query.garden === 'w
 const {
   entry,
   plot,
+  homePlot,
+  selectPlot,
   world,
   crop,
   mail,
@@ -175,9 +205,22 @@ const {
   retryWater,
   alreadyWatered,
   refresh,
-} = useWindowsill(props, inside)
+} = useWindowsill(props, inside, props.preview ? createGardenBookReview(t) : null)
+const homeReview = computed(() => props.preview && plot.value?.id === homePlot.value?.id)
+const readOnly = computed(() => !!plot.value && plot.value.mine !== true)
+const inField = computed(() => plot.value?.venue === 'BACKYARD')
+const place = computed(() => {
+  const p = plot.value
+  if (!p) return ''
+  const owner = inField.value
+    ? t('garden.book.yard')
+    : p.mine
+      ? t('garden.book.own')
+      : t('garden.book.ownerSill', { name: p.ownerName || t('garden.book.member') })
+  return owner + ' · ' + t(inField.value ? 'garden.book.bedNo' : 'garden.book.potNo', { n: p.slotNo + 1 })
+})
 const localStep = ref(props.preview ? savedStep() : -1)
-const progress = computed(() => (props.preview ? localStep.value : step.value))
+const progress = computed(() => (homeReview.value ? localStep.value : step.value))
 function savedSample() {
   try {
     const raw = localStorage.getItem(saveKey + ':growth')
@@ -189,6 +232,23 @@ function savedSample() {
   }
 }
 const sample = ref(props.preview && localStep.value === 7 ? savedSample() : 0)
+const sillPlant = computed(() => {
+  if (!props.preview) return homePlot.value
+  const planted = localStep.value === 7 || localStep.value === 6
+  return {
+    ...homePlot.value,
+    prepared: localStep.value >= 2,
+    cropCode: planted ? 'CATGRASS' : null,
+    cropName: planted ? t('garden.book.catgrass') : null,
+    stage: planted ? (sample.value === 'dry' ? 2 : sample.value) : null,
+    thirsty: planted && sample.value === 'dry',
+    harvestable: planted && sample.value === 5,
+  }
+})
+const bookWorld = computed(() => {
+  const data = world.value
+  return props.preview && data ? { ...data, plots: data.plots.map((p) => (p.id === homePlot.value?.id ? sillPlant.value : p)) } : data
+})
 function setSample(n) {
   if (!props.preview || ![0, 1, 2, 5, 'dry'].includes(n)) return
   sample.value = n
@@ -199,20 +259,19 @@ function setSample(n) {
   }
 }
 const growth = computed(() => {
-  if (!props.preview) return plot.value?.stage ?? 0
+  if (!homeReview.value) return plot.value?.stage ?? 0
   if (progress.value !== 7) return 0
   return sample.value === 'dry' ? 2 : sample.value
 })
 const thirsty = computed(() =>
-  props.preview ? progress.value === 7 && sample.value === 'dry' : !!plot.value?.cropCode && plot.value.thirsty === true,
+  homeReview.value ? progress.value === 7 && sample.value === 'dry' : !!plot.value?.cropCode && plot.value.thirsty === true,
 )
-const canWater = computed(() => (props.preview ? progress.value === 6 || thirsty.value : canWaterLive.value))
-const planted = computed(() => (props.preview ? progress.value === 7 : !!plot.value?.cropCode))
-const cropCode = computed(() => (props.preview ? 'CATGRASS' : plot.value?.cropCode || crop.value?.code))
-const sketchCrop = computed(() => ['CATGRASS', 'MINT', 'SNAKE_PLANT'].includes(cropCode.value))
+const canWater = computed(() => (homeReview.value ? progress.value === 6 || thirsty.value : canWaterLive.value))
+const planted = computed(() => (homeReview.value ? progress.value === 7 : !!plot.value?.cropCode))
+const cropCode = computed(() => (homeReview.value ? 'CATGRASS' : plot.value?.cropCode || crop.value?.code))
 const cropName = computed(() => plot.value?.cropName || crop.value?.name || '')
 const harvestable = computed(() =>
-  props.preview ? progress.value === 7 && growth.value === 5 : !!plot.value?.cropCode && plot.value.harvestable === true,
+  homeReview.value ? progress.value === 7 && growth.value === 5 : !!plot.value?.cropCode && plot.value.harvestable === true,
 )
 const potLabel = computed(() => {
   if (harvestable.value) return t('garden.ripePot')
@@ -230,7 +289,7 @@ const costHint = computed(() => {
 const tending = ref(false)
 const firstShoot = ref(false)
 const seenKey = computed(() =>
-  props.preview ? saveKey + ':seen' : 'ihomy:garden:seen:' + props.member + ':' + props.family + ':' + plot.value?.id,
+  homeReview.value ? saveKey + ':seen' : 'ihomy:garden:seen:' + props.member + ':' + props.family + ':' + plot.value?.id,
 )
 function viewedStage(n) {
   return (props.preview ? 'review' : plot.value?.plantedAt) + ':' + n
@@ -277,7 +336,7 @@ function save(step) {
   }
 }
 function advance(previous) {
-  if (!props.preview) return advanceLive(previous)
+  if (!homeReview.value) return advanceLive(previous)
   if (previous === 8 && progress.value === 8) {
     setSample(0)
     save(2)
@@ -287,25 +346,53 @@ function advance(previous) {
 }
 function harvest() {
   if (!harvestable.value) return
-  if (!props.preview) return harvestLive()
+  if (!homeReview.value) return harvestLive()
   save(8)
   setSample(0)
 }
 function water() {
   if (!canWater.value) return
-  if (!props.preview) return waterLive()
+  if (!homeReview.value) return waterLive()
   if (progress.value === 6) advance(6)
   else setSample(2)
 }
 async function closePot() {
+  const id = plot.value?.id
   tending.value = false
+  if (bookOpen.value) {
+    await book.value?.focus(id)
+    return
+  }
   await nextTick()
   packet.value?.focus({ preventScroll: true })
 }
+async function openBook() {
+  bookOpen.value = true
+  await nextTick()
+  book.value?.focus()
+}
+function visitPlot(id) {
+  if (busy.value || !selectPlot(id)) return
+  if (progress.value < 0) {
+    closeBook()
+    openLetter()
+  } else openPot()
+}
+async function closeBook() {
+  bookOpen.value = false
+  selectPlot(null)
+  await nextTick()
+  bookTab.value?.focus({ preventScroll: true })
+}
+watch(plot, (current) => {
+  if (!current && bookOpen.value && tending.value) closePot()
+})
 async function replay() {
   if (!props.preview) return
   setSample(0)
   tending.value = false
+  bookOpen.value = false
+  selectPlot(null)
   save(-1)
   await nextTick()
   envelope.value?.focus({ preventScroll: true })
@@ -342,6 +429,7 @@ async function closeLetter() {
 function goBack() {
   if (!inside.value) return false
   if (tending.value) closePot()
+  else if (bookOpen.value) closeBook()
   else if (reading.value) closeLetter()
   else leave()
   return true
@@ -349,7 +437,9 @@ function goBack() {
 useAppBack(goBack)
 
 function cycleFocus(event) {
-  const buttons = Array.from(room.value.querySelectorAll('button:not(:disabled)')).filter((el) => el.getClientRects().length > 0)
+  const buttons = Array.from(room.value.querySelectorAll('button:not(:disabled), summary')).filter(
+    (el) => !el.closest('[inert]') && el.getClientRects().length > 0,
+  )
   const first = buttons[0]
   const last = buttons.at(-1)
   const target = event.shiftKey && event.target === first ? last : !event.shiftKey && event.target === last ? first : null
@@ -372,6 +462,8 @@ watch(
     if (!visible) {
       reading.value = false
       tending.value = false
+      bookOpen.value = false
+      selectPlot(null)
       return
     }
     await nextTick()
@@ -489,6 +581,27 @@ onBeforeUnmount(() => releaseHome?.())
   top: max(56px, calc(env(safe-area-inset-top) + 10px));
   left: max(18px, env(safe-area-inset-left));
   box-shadow: 0 2px 6px #45382024;
+}
+.book-tab {
+  position: absolute;
+  z-index: 1;
+  right: max(18px, env(safe-area-inset-right));
+  top: max(56px, calc(env(safe-area-inset-top) + 10px));
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 6px;
+  padding: 3px 12px 3px 4px;
+  font-size: 15px;
+  background: #f7efd8;
+  border: 1px solid #ac9c77;
+  border-radius: 4px 8px 8px 4px;
+  box-shadow: 0 2px 6px #45382024;
+}
+.book-tab img {
+  width: 35px;
+  height: 35px;
+  object-fit: contain;
 }
 .garden-title {
   position: absolute;

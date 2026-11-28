@@ -92,6 +92,52 @@ function emptyPot() {
   Object.assign(plot, { prepared: true, cropCode: null, plantedAt: null, stage: null, harvestable: false, lastWateredAt: null })
 }
 
+it('opens a family windowsill for observation and never routes an action to the owner’s pot', async () => {
+  Object.assign(plot, { prepared: true, stage: 5, harvestable: true, thirsty: true })
+  const garden = mount()
+  await garden.refresh()
+  expect(garden.selectPlot(33)).toBe(true)
+  expect(garden.plot.value.id).toBe(33)
+  expect(garden.canWater.value).toBe(false)
+  await garden.advance(7)
+  await garden.harvest()
+  await garden.water()
+  expect(gardenApi.harvest).not.toHaveBeenCalled()
+  expect(gardenApi.water).not.toHaveBeenCalled()
+  gardenApi.panorama.mockResolvedValueOnce({ plots: [{ ...plot }] })
+  await garden.refresh()
+  expect(garden.plot.value).toBeUndefined()
+  await garden.harvest()
+  expect(gardenApi.harvest).not.toHaveBeenCalled()
+  garden.selectPlot(null)
+  expect(garden.plot.value.id).toBe(7)
+})
+
+it('sows into the selected shared bed and restores unfinished seeds only for that bed', async () => {
+  const bed = { ...plot, id: 47, venue: 'BACKYARD', ownerUid: '', slotNo: 3, cropCode: null, plantedAt: null, prepared: false }
+  gardenApi.panorama.mockImplementation(async () => ({ ...snapshot(), plots: [{ ...plot }, { ...bed }] }))
+  const garden = mount()
+  await garden.refresh()
+  garden.selectPlot(47)
+  expect(garden.step.value).toBe(8)
+  await garden.advance(8)
+  await garden.advance(2)
+  garden.selectPlot(null)
+  expect(garden.step.value).toBe(6)
+  garden.selectPlot(47)
+  expect(garden.step.value).toBe(3)
+  await garden.advance(3)
+  await garden.advance(4)
+  gardenApi.sow.mockImplementationOnce(async () => {
+    Object.assign(bed, { cropCode: 'CATGRASS', plantedAt: '2026-11-29', stage: 0 })
+    return { plot: { ...bed } }
+  })
+  await garden.advance(5)
+  expect(gardenApi.sow).toHaveBeenCalledWith(3, 'CATGRASS', expect.any(String), 'BACKYARD')
+  expect(garden.plot.value.id).toBe(47)
+  expect(garden.step.value).toBe(6)
+})
+
 it('accepts one pour per cooldown and reuses the pending key after a failed revisit', async () => {
   Object.assign(plot, { stage: 2, lastWateredAt: '2026-11-27T10:00:00', thirsty: true, waterCooldownSec: 50 })
   const garden = mount()
